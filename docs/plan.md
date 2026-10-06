@@ -12,6 +12,21 @@ Stav: fáze 1 hotová · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · Y
 4. **Lehký**: 8–10 oken současně bez znatelné RAM/CPU zátěže; jedna instance s frontou.
 5. **Měřitelný**: baseline před nasazením, stejné metriky po něm, telemetrie mezer.
 
+## 0a. Rozhodnutí: Kotlin/JVM (uživatel 2026-10-07)
+
+Jazyk, který uživatel zná a chce číst. Node.js prototyp fáze 1 (b7d0166, CL-9) zůstává jako referenční chování
+a smaže se po dosažení parity (CL-56).
+
+- Dotazy: stejně rychlé (rozhoduje SQLite). Build báze: rychlejší s nativním parserem. Start procesu 0,5–1 s
+  (CLI, build worker). RAM daemonu vyšší než Node (80 MB) → budget **≤ 200 MB** (SerialGC, malý heap, CDS).
+- Parser podle spiku v CL-56: Kotlin compiler PSI (jen parse, kotlin-compiler-embeddable) vs. tree-sitter-ng
+  (JNI, nativní knihovny přibalené) vs. jtreesitter (FFM, Java 22+, gramatiku nutno buildit pro každý OS).
+- SQLite `org.xerial:sqlite-jdbc`, MCP `io.modelcontextprotocol:kotlin-sdk-server` 0.15 (stateless Streamable
+  HTTP, případně vlastní minimální JSON-RPC), Ktor server, CLI clikt, Gradle Kotlin DSL, toolchain JDK 25,
+  jen Maven Central.
+- Distribuce pro ostatní: zip s jlink runtime (bez nutnosti JDK) + Claude Code plugin (CL-45).
+- Desktopová aplikace zůstává Electron (TypeScript), čte HTTP API daemonu.
+
 ## 1. Baseline — co dnes stojí tokeny (2026-09-23 → 10-06, 2 373 běhů)
 
 Zdroj: `run/codemetrics.mjs collect` nad transcripty Claude Code; report
@@ -51,7 +66,7 @@ Zjištění, která mění odhady:
 | Wall time | −15 % | −15 % | −10 % |
 | Kvalita: kola na task, potvrzené nálezy, Edit chyby, červené compile | beze zhoršení |
 
-Technické budgety: daemon ustáleně ≤ 150 MB, špička ≤ 250 MB; build worker ≤ 600 MB, max 1 naráz;
+Technické budgety: daemon ustáleně ≤ 200 MB (JVM), špička ≤ 300 MB; build worker ≤ 600 MB, max 1 naráz;
 0 MB za každé další okno; CPU v klidu 0; dotaz p95 ≤ 300 ms teplý, první dotaz ve worktree ≤ 2 s;
 `usages` = nadmnožina `rg -w` (100 %); přesnost `exact` ≥ 95 %.
 

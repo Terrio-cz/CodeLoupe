@@ -10,7 +10,10 @@ branch changes, and get exactly that piece of code instead of grepping and readi
   in a short-lived child process.
 - **MCP** over Streamable HTTP (stateless) plus the same tools on a CLI.
 
-Languages: Kotlin (Java next). Status and roadmap: [docs/plan.md](docs/plan.md) (Czech).
+Languages: Kotlin (Java next).
+
+> **Status:** this Node.js implementation is the phase-1 prototype. CodeLoupe is being ported to Kotlin/JVM
+> (YouTrack CL-56); the prototype is removed once the port reaches parity. Status and roadmap: [docs/plan.md](docs/plan.md) (Czech).
 
 ## Requirements
 
