@@ -94,10 +94,10 @@ kolik coder píše boilerplate).
 
 ## 6. Desktopová aplikace — návrh
 
-**Rozhodnutí: UI jako webová aplikace servírovaná daemonem (`http://127.0.0.1:47391/ui`), Electron jen jako
-volitelný obal** (tray ikona, notifikace, autostart daemonu). Důvod: Electron = 150–300 MB RAM navíc;
-webové UI v prohlížeči nestojí nic, když není otevřené, a obě varianty sdílí jeden kód. Data jen z
-read-only API daemonu.
+**Rozhodnutí (uživatel 2026-10-07): samostatná desktopová aplikace v Electronu** — 150–300 MB RAM je
+přijatelná cena za samostatnou aplikaci (okno, tray, notifikace, autostart a správa daemonu). Renderer čte data
+z read-only API daemonu; aplikace daemon spustí, když neběží, a ukazuje jeho stav. Stejné obrazovky jdou
+volitelně otevřít i v prohlížeči (`/ui`), ale primární je aplikace.
 
 Obrazovky:
 1. **Přehled** — KPI dlaždice (tokeny dnes/týden vs. baseline, úspora podle nástroje, aktivní okna,
@@ -128,5 +128,5 @@ panely, tmavý i světlý režim, žádné dekorace.
 2. Audit startovního kontextu (rychlý, 3 %).
 3. YouTrack mirror (1,4 %, opakované čtení).
 4. Měření + gap detector + benchmark → rozhodnutí o zápisových nástrojích a šablonách.
-5. UI (web v daemonu), pak Electron obal.
+5. Desktopová aplikace (Electron) nad read-only API daemonu.
 6. Balení (npm + plugin), Terrio integrace, vypnutí GitNexus/IDEA MCP.
