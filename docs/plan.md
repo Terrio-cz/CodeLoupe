@@ -15,7 +15,7 @@ Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56) · 2026-10-07 · repo 
 ## 0a. Rozhodnutí: Kotlin/JVM (uživatel 2026-10-07)
 
 Jazyk, který uživatel zná a chce číst. Node.js prototyp fáze 1 (b7d0166, CL-9) zůstává jako referenční chování
-a smaže se po dosažení parity (CL-56).
+a po dosažení parity byl odstraněn (CL-56); jeho chování drží golden testy (`ParityTest`).
 
 - Dotazy: stejně rychlé (rozhoduje SQLite). Build báze: rychlejší s nativním parserem. Start procesu 0,5–1 s
   (CLI, build worker). RAM daemonu vyšší než Node (80 MB) → budget **≤ 200 MB** (SerialGC, malý heap, CDS).
@@ -344,4 +344,4 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 ## 11. Mimo rozsah v1
 
 Typová inference na úrovni kompilátoru · další jazyky než Kotlin/Java · frontend (TS) · grafický panel ·
-sémantické vyhledávání (embeddings) · publikace na npm/GitHub bez tvého souhlasu.
+sémantické vyhledávání (embeddings) · publikace bez tvého souhlasu.
