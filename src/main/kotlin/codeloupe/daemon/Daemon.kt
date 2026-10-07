@@ -3,10 +3,21 @@ package codeloupe.daemon
 import codeloupe.CodeLoupe
 import codeloupe.JsonFormat
 import codeloupe.config.Config
+import codeloupe.events.EventBus
+import codeloupe.events.EventStore
+import codeloupe.events.WebhookKey
+import codeloupe.events.WebhookUrls
+import codeloupe.events.Webhooks
+import codeloupe.events.eventRoutes
+import codeloupe.jobs.JobRunner
+import codeloupe.jobs.JobTool
+import codeloupe.jobs.jobRoutes
 import codeloupe.platform.IsoTime
 import codeloupe.platform.ProcessMemory
 import codeloupe.platform.Timings
 import codeloupe.repo.Registry
+import codeloupe.tracker.TrackerSettingsLoader
+import codeloupe.tracker.Trackers
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
 import io.ktor.http.ContentType
@@ -53,13 +64,24 @@ import kotlin.system.exitProcess
  * The single CodeLoupe daemon: one process for every client on the machine. Serves MCP (stateless Streamable
  * HTTP) on /mcp, the same tools as JSON on /api/<tool> for the CLI, and /status.
  */
-class Daemon private constructor(val config: Config, private val exitOnShutdown: Boolean) {
+class Daemon private constructor(
+    val config: Config,
+    private val exitOnShutdown: Boolean,
+    webhookBackoffMs: List<Long>,
+) {
     private val started = Instant.now()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = AppendLog(config.home.resolve("daemon.log"))
     private val queue = JobQueue(scope)
-    val registry = Registry(config, queue, log = ::log)
-    private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")))
+    private val eventStore = EventStore(config.home.resolve("events.db"))
+    private val webhookKey = WebhookKey(config.home.resolve("webhook.key"))
+    private val webhooks = Webhooks(eventStore, webhookKey, WebhookUrls(config.port, config.jobs.remoteWebhooks), scope, ::log, webhookBackoffMs)
+    val events = EventBus(eventStore, webhooks)
+    val registry = Registry(config, queue, log = ::log, emit = events::emit)
+    val jobs = JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
+    private val trackers = Trackers.open(TrackerSettingsLoader.load(config.home), config.home, scope, ::log)
+    private val tools = Tools.catalog(trackers)
+    private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = trackers::touch)
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
     private val pid = ProcessHandle.current().pid()
@@ -72,14 +94,18 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
             name = CodeLoupe.NAME, version = CodeLoupe.VERSION, pid = pid, port = config.port, home = config.home.toString(),
             uptimeSec = Instant.now().epochSecond - started.epochSecond, rssMb = ProcessMemory.rssMb(),
             heapMb = (runtime.totalMemory() - runtime.freeMemory()) / MB, cpuSec = cpu,
-            calls = runner.stats(), queue = queue.snapshot(), repos = registry.snapshot(),
+            calls = runner.stats(), queue = queue.snapshot(), repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
             gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(),
         )
     }
 
     fun stop() {
         server.stop(gracePeriodMillis = 100, timeoutMillis = 2_000)
+        jobs.shutdown()
         scope.cancel()
+        jobs.close()
+        eventStore.close()
+        trackers.close()
         registry.close()
         runCatching {
             val info = JsonFormat.json.decodeFromString(DaemonInfo.serializer(), Files.readString(infoFile))
@@ -109,8 +135,13 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
         } catch (e: Exception) {
             server.stop(0, 0)
             scope.cancel()
+            jobs.close()
+            eventStore.close()
             throw generateSequence<Throwable>(e) { it.cause }.filterIsInstance<BindException>().firstOrNull() ?: e
         }
+        // Only once the port is ours: a second daemon that fails to bind must not touch the first one's jobs.
+        jobs.recover()
+        webhooks.resume()
         val info = DaemonInfo(pid, config.port, CodeLoupe.VERSION, IsoTime.of(started))
         Files.writeString(infoFile, JsonFormat.json.encodeToString(DaemonInfo.serializer(), info))
         log("daemon ${CodeLoupe.VERSION} pid $pid listening on 127.0.0.1:${config.port}")
@@ -136,17 +167,24 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
                 if (!call.response.isCommitted) call.respondJson(HttpStatusCode.InternalServerError, error(reason))
             }
         }
-        val mcp = McpTools(runner)
+        val mcp = McpTools(runner, tools, JobTool(jobs))
         mcpStatelessStreamableHttp(path = "/mcp") { mcp.server() }
         routing {
             get("/status") { call.respondJson(HttpStatusCode.OK, DaemonStatus.serializer(), status()) }
             post("/api/{tool}") {
-                val tool = Tools.named(call.parameters["tool"].orEmpty())
+                val name = call.parameters["tool"].orEmpty()
+                val tool = tools.firstOrNull { it.name == name }
                     ?: return@post call.respondJson(HttpStatusCode.NotFound, error("unknown tool"))
                 val args = readBody(call) ?: return@post call.respondJson(HttpStatusCode.InternalServerError, error("body too large"))
                 call.respondJson(HttpStatusCode.OK, ToolOutcome.serializer(), runner.run(tool, ToolArgs(args), "api"))
             }
+            jobRoutes(jobs)
+            eventRoutes(events, webhooks, webhookKey)
             post("/shutdown") {
+                val pending = jobs.pending()
+                if (pending > 0 && call.parameters["force"] != "1") {
+                    return@post call.respondJson(HttpStatusCode.Conflict, error("$pending jobs queued or running; stop --force ends them (they become lost)"))
+                }
                 call.respondJson(HttpStatusCode.OK, buildJsonObject { put("ok", true) })
                 log("shutdown requested")
                 scope.launch {
@@ -179,6 +217,7 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
         private const val IDLE_SECONDS = 2
 
         /** Binds 127.0.0.1:<port>; fails with a BindException while another daemon holds the port. */
-        fun start(config: Config, exitOnShutdown: Boolean = false): Daemon = Daemon(config, exitOnShutdown).apply { start() }
+        fun start(config: Config, exitOnShutdown: Boolean = false, webhookBackoffMs: List<Long> = Webhooks.BACKOFF_MS): Daemon =
+            Daemon(config, exitOnShutdown, webhookBackoffMs).apply { start() }
     }
 }

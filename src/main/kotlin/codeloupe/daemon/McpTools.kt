@@ -1,7 +1,9 @@
 package codeloupe.daemon
 
 import codeloupe.CodeLoupe
+import codeloupe.jobs.JobTool
 import codeloupe.tools.ArgsValidator
+import codeloupe.tools.Tool
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -13,13 +15,13 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 
 /** An MCP server exposing the tool catalog; stateless HTTP builds one per request. */
-internal class McpTools(private val runner: ToolRunner) {
+internal class McpTools(private val runner: ToolRunner, private val tools: List<Tool>, private val jobTool: JobTool? = null) {
     fun server(): Server {
         val server = Server(
             Implementation(name = CodeLoupe.NAME, version = CodeLoupe.VERSION),
             ServerOptions(capabilities = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = true))),
         )
-        for (tool in Tools.ALL) {
+        for (tool in tools) {
             server.addTool(
                 name = tool.name,
                 description = tool.description,
@@ -31,6 +33,7 @@ internal class McpTools(private val runner: ToolRunner) {
                 }
             }
         }
+        jobTool?.register(server)
         return server
     }
 

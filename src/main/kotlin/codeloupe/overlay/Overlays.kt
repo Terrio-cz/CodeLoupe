@@ -1,6 +1,7 @@
 package codeloupe.overlay
 
 import codeloupe.daemon.JobQueue
+import codeloupe.events.EventTypes
 import codeloupe.git.GitLayout
 import codeloupe.git.GitObjects
 import codeloupe.git.WorktreeGit
@@ -19,6 +20,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -38,6 +42,7 @@ class Overlays(
     /** Called before an overlay file is deleted, so nothing keeps it open. */
     private val release: (Path) -> Unit,
     private val log: (String) -> Unit,
+    private val emit: (String, JsonObject) -> Unit = { _, _ -> },
 ) {
     private val states = ConcurrentHashMap<String, OverlayState>()
 
@@ -196,6 +201,17 @@ class Overlays(
                 log(
                     "overlay ${state.worktree}: ${update.puts.size} parsed, ${update.copies.size} copied, " +
                         "${update.removes.size + update.tombstones.size} removed in ${result.ms} ms${if (heavy) " (build worker)" else ""}",
+                )
+                emit(
+                    EventTypes.OVERLAY_REFRESHED,
+                    buildJsonObject {
+                        put("repo", repo.id)
+                        put("worktree", state.worktree)
+                        put("parsed", update.puts.size)
+                        put("copied", update.copies.size)
+                        put("removed", update.removes.size + update.tombstones.size)
+                        put("ms", result.ms)
+                    },
                 )
                 result
             }

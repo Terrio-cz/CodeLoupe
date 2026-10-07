@@ -26,6 +26,7 @@ object ConfigLoader {
             buildHeapMb = number("buildHeapMb")?.toInt() ?: 512,
             defaultRoot = env["CODELOUPE_ROOT"]?.takeIf { it.isNotEmpty() } ?: text("defaultRoot"),
             overlayCheckMs = number("overlayCheckMs") ?: 1_000,
+            jobs = JobsConfig.parse(file),
         )
     }
 

@@ -4,6 +4,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 
@@ -47,6 +48,19 @@ object RefReader {
 
     /** True when [commonDir] keeps refs as files (and packed-refs), the layout this reader understands. */
     fun filesBackend(commonDir: String): Boolean = !isReftable(Path.of(commonDir))
+
+    /**
+     * Branches checked out in every worktree of the repository at [path] (a worktree or the common dir); null when
+     * the layout is not the files backend.
+     */
+    fun worktreeBranches(path: String): List<String>? = runCatching {
+        val start = Path.of(path)
+        val common = (GitLayout.gitDir(start) ?: start.takeIf { it.resolve("HEAD").isRegularFile() })?.let(GitLayout::commonDir)?.takeUnless(::isReftable) ?: return null
+        val heads = listOf(common.resolve("HEAD")) + (common.resolve("worktrees").takeIf { it.isDirectory() }?.let { dir ->
+            Files.list(dir).use { s -> s.map { it.resolve("HEAD") }.toList() }
+        } ?: emptyList())
+        heads.filter { it.isRegularFile() }.map { it.readText().trim() }.filter { it.startsWith("ref: refs/heads/") }.map { it.removePrefix("ref: refs/heads/") }
+    }.getOrNull()
 
     private fun candidates(name: String): List<String> =
         if (name.startsWith("refs/")) listOf(name) else listOf("refs/heads/$name", "refs/remotes/$name", "refs/remotes/$name/HEAD")

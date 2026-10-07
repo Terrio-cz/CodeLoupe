@@ -1,6 +1,6 @@
 # CodeLoupe — plán (code index pro AI agenty)
 
-Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56), vrstvy worktree (CL-16), `changes` (CL-17), dotaz bez git procesů (CL-96) · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
+Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56), vrstvy worktree (CL-16), `changes` (CL-17), joby a události (CL-84–87), dotaz bez git procesů (CL-96) · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
 
 ## 0. Zadání
 
@@ -128,6 +128,7 @@ CLI `codeloupe …` ──HTTP (spustí daemon, když neběží)─────�
                          ├─ registry repozitářů a worktree (z `git worktree list`)
                          ├─ core: parse · extract · store · delta · resolve · write · format
                          ├─ jazykové adaptéry: kotlin, java
+                         ├─ tracker mirror (SQLite + FTS5, watcher jen při aktivních klientech)
                          ├─ telemetrie (`/status`, `calls.jsonl`)
                          └─ build worker (podproces, nízká priorita, max 1)
 ```
@@ -253,9 +254,17 @@ overloady a třída s konstruktory jsou jeden symbol.
 ## 6. Nástroje
 
 `root` = cesta do repozitáře nebo worktree (výchozí: výchozí větev repozitáře z `cwd` klienta). Výstup:
-kompaktní text, řádky 1-based, `limit` + `… +N dalších`. Strop: **≤ 12 nástrojů** celkem (popisy stojí tokeny
-v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`); dnes 6 (`find`, `outline`, `symbol`,
-`usages`, `calls`, `hierarchy`).
+kompaktní text, řádky 1-based, `limit` + `… +N dalších`. Strop: **≤ 14 nástrojů** celkem (popisy stojí tokeny
+v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`, `tasks mode=…`); dnes 7 kódových (`find`,
+`outline`, `symbol`, `usages`, `calls`, `hierarchy`, `changes`) + 2 trackerové (`issue`, `tasks`, jen když je
+tracker v konfiguraci) + `job` (start/status/cancel jedním nástrojem, CL-84).
+
+### Tracker (CL-26, CL-27, CL-29, CL-90)
+
+| Nástroj | Vrací |
+|---|---|
+| `issue(id, view=brief\|full, sections=[…], since)` | brief: pole, odkazy (epic s názvem, blokery se stavem), checklist kritérií, rejstřík sekcí; `full` celé; `sections` jen nadpisy popisu (prefix) nebo `criteria`/`fields`/`links`/`comments`/`attachments`/`history`. Druhé čtení ze stejného `root` → „unchanged since …“ (< 100 zn.), po změně jen rozdíl; `since=<ISO>` rozdíl proti verzi z té doby, `since=none` znovu celé |
+| `tasks(query, mode=list\|graph\|ready\|progress, depth, limit)` | 1 řádek na task (`id stav · typ · priorita ‹epic› název ⛔blokery`); `list` filtry ve stylu YouTrack + fulltext (FTS5); `graph` epic, závislosti, podúkoly, vazby (hloubka ≤ 3, řetězec jen svým směrem); `ready` otevřené listové tasky s vyřešenými závislostmi mimo větve git worktree (registr workspaců CL-66 později); `progress` epic: stavy, kritéria, blokery, otevřené tasky |
 
 ### Čtení
 
@@ -523,6 +532,85 @@ view, SQL, zbytek nástroje (resolver + formát), HTTP (klient − nástroj). Te
   SHA-256 přes git; `OverlayTest`: teplé dotazy a první dotaz po restartu bez git procesu, nesedící snapshot → git,
   nové ignore pravidlo za běhu i ve vnořeném `.gitignore` při vypnutém daemonu).
 
+### Výsledek jobů, událostí a webhooků (CL-84, CL-86, CL-87, CL-85, 2026-10-07)
+
+Cíl (epic CL-83): čekací tahy stály 9,1 % ceny agentů (sleep/until smyčky 5,7 %, `brain status` polly na volný
+gradle-test slot 2,9 %). Hranice: CodeLoupe joby spouští a hlásí události, agenty nesleduje — jak obnovit session,
+rozhoduje launcher.
+
+- **Joby** (`jobs/*`): `codeloupe job start [--slot s] [--then …] [--on-failure …] -- <argv>` vrátí id hned; proces je
+  potomek daemonu (ne session), výstup jde OS přímo do `<home>/jobs/<id>.log`, záznam v `jobs.db` (exit, trvání, kompaktní
+  souhrn: počty testů Gradle/Maven/node:test/Jest/pytest, první chybové řádky, posledních 15 řádků). Bez shellu; na
+  Windows se `./gradlew`/`npm` najdou jako `.bat`/`.cmd`. Env jen `--env K=V` (hodnoty se neukládají).
+- **Odpojení od session**: daemon se na Windows startuje přes `Win32_Process.Create` (mimo job object volajícího).
+  Ověřeno simulací konce headless běhu (PowerShell v job objectu s KILL_ON_JOB_CLOSE spustí `codeloupe job start` a
+  skončí): **dřív daemon (a job) zemřel se session** — autostart byl obyčejný potomek CLI; teď daemon i job přežijí, job
+  doběhl za 40 s. Joby běží v job objectu daemonu (kill-on-close): `taskkill /F` daemonu ukončil i proces jobu, nový daemon
+  ho ohlásil `lost` se zachovaným logem (daemon je sám v job objectu s KILL_ON_JOB_CLOSE, každý job má navíc vlastní
+  vnořený pro cancel); po pádu bez job objectu (ne-Windows) přeživší ukončí podle pid + času startu.
+  `codeloupe stop` s běžícími joby odmítne (`--force`).
+- **Sloty**: `slots` v `config.json` (Terrio `gradle-test` ×2, `vps-test`), nekonfigurovaný slot = 1. Ověřeno: dva
+  `gradle-test` obsazené, třetí job čekal v daemonu (`/status` `jobs.slots.waiting`) a spustil se po uvolnění; čekání
+  je suspendovaná korutina (semafor FIFO), ne smyčka.
+- **Policy**: každý job (i následný, i znovu po čekání na slot) dostane `policyHook` stejný JSON jako PreToolUse Bash hook
+  Claude Code (`tool_input.command` = argv citované pro Bash, `--env` jako `K=v` prefix, `cwd`); jen allow / prázdný
+  výstup spustí, deny, ask, exit 2, pád, timeout i nečitelný výstup = nespustit (exit 2, bez záznamu). Hook běží v env
+  daemonu — volající ho nepřesměruje vlastními proměnnými (`TERRIO_GUARD_WORKTREES_ROOT`). Ověřeno se skutečným Terrio
+  `guard.ps1`: `git status` allow, `git push --force` deny, push větve a `git reset --hard` ask, `rm -rf` kanonického
+  checkoutu deny.
+- **Probudit jednou** (CL-86): `job wait <id>` long-polluje daemon (5 min na request, opakuje se i přes restart daemonu)
+  do konce jobu i jeho následných jobů, bez 9min stropu; výstup = kompaktní report, exit kód = kód jobu. Jako background
+  Bash task = **1 notifikace na job bez ohledu na délku** (ověřeno: job 40 s, jedno volání 26,6 s; job ve frontě za dvěma
+  sloty, jedno volání 6,7 s). `job start --wait` spojí obojí do jednoho volání. Headless: poslední `job.finished` řetězu
+  nese `wake` a `text` (report) — launcher obnoví session jen při `wake: true` (CL-88).
+- **Cena čekání v tazích**: dřív Terrio `job wait` ≤ 9 min na volání → 30min test = start + 4 čekání = 5 tahů (sleep
+  smyčky víc: 3 703 tahů za 2 týdny), čekání na volný slot = polly `brain status` (1 398 tahů); teď start + 1 notifikace
+  = **2 tahy na job** nezávisle na délce, čekání na slot **0 tahů**, PASS řetěz s `--then` bez `notify` **0 tahů** probuzení.
+- **Události** (CL-87): `job.started`, `job.finished`, `job.notify`, `build.done`, `overlay.refreshed` v `events.db` se `seq`,
+  před uložením očištěné od tajemství (tokeny, hesla, `Authorization`, přihlašovací údaje v URL, známé tvary tokenů);
+  `GET /events?since=`, SSE `GET /events/stream` (replay po `Last-Event-ID`, pak živě; tichý stream přežije idle timeout
+  CIO). Webhooky: perzistentní odběry (`codeloupe webhook add`), HMAC-SHA256 nad `<timestamp>.<body>` klíčem
+  `<home>/webhook.key`, retry 2 s / 10 s / 1 min / 5 min / 30 min (i po restartu daemonu), log doručení; cíle jen lokální
+  (ne port daemonu), vzdálené jen https origin z `remoteWebhooks`, bez redirectů. Aplikace stream napojí v CL-89.
+- **Následné akce** (CL-85): uzavřená sada typů — `job[@slot]:<příkaz>`, `notify[:zpráva]`, `webhook:<url>` — s podmínkou
+  na exit a souhrn (`failed==0 && tests>0 ? …`); kroky v pořadí, krok `job` počká na svůj job. YouTrack (CL-28) a release
+  workspace (CL-69) přibudou jako další podtypy `Action`.
+- MCP: jediný nový nástroj `job` (start/status/cancel); čekání je věc CLI. Daemon: RSS 110–113 MB po jobech, čerstvý daemon
+  v klidu 16 ms CPU za 60 s (granularita Windows); webhooky vytváří HTTP klienta až pro pokus (klient JDK v klidu budí
+  selector každé 3 s).
+- Review (3 kola max): nálezy opraveny — `.bat`/`.cmd` nedostane argumenty se znaky, které cmd.exe čte znovu (BatBadBut);
+  daemon nemá prostředí toho, kdo ho spustil (Windows: prostředí uživatele přes WMI, ověřeno — podstrčená proměnná se do
+  jobu nedostala), holé jméno programu jen z PATH jako v Bash; cancel ukončí živý job řetězu i celý strom (job object na
+  job) a nespustí další joby; podmínky kroků se vyhodnocují až u svého kroku; souhrn čte řádky max 4 KB; timeout hooku
+  platí i na jeho roury; SSE doplní mezeru ze store; nekonfigurované sloty se po použití uklidí; URL webhooků v
+  odpovědích a logu očištěné; CLI nepošle nic daemonu s jiným home na svém portu (jiný `config.json`, třeba bez hooku).
+- Testy: 98 (nově `JobsTest` 14, `EventsTest` 5, `JobPartsTest` 8, `DetachedStartTest` 2).
+
+### Výsledek fáze 0.3a — tracker mirror (CL-26, CL-29, CL-27, CL-90, 2026-10-07)
+
+- Konfigurace `config.json` `trackers`: instance (URL, typ), zkratky projektů, zdroj tokenu (`env` nebo dotenv soubor +
+  klíč, čte jen daemon při každém požadavku), `repos` pro obsazené větve. Adaptér `TrackerAdapter` (YouTrack první):
+  stránkování „nejnovější `updated` první“ místo dat v dotazu (YouTrack čte data v časové zóně uživatele), historie
+  přes `activities` s epoch `start`. Terrio pravidla (lifecycle, completion) zůstávají v Terrio vrstvě.
+- Mirror `<home>/trackers/<name>.db`: issues (JSON bez komentářů), pole, odkazy (PARENT/SUBTASK/DEPENDS_ON/…),
+  kritéria `- [ ]`/`- [x]`, komentáře, metadata příloh, historie změn polí, až 5 předchozích verzí na issue (30 dní)
+  pro delty, contentless FTS5 nad názvem, popisem a komentáři. Mirror nikdy nesestoupí ke starší verzi.
+- Sync: poprvé celý projekt (stránky po 50), pak jen issues s posunutým `updated` od watermarku projektu (nejnovější
+  `updated`, který tracker sám vypsal, − 5 min; čtení jednoho issue ho neposouvá); víc než 10 změn najednou jedním
+  stránkovaným dotazem. Historie polí jen když se něco změnilo; její selhání sync nezastaví. Každých 6 h seznam id
+  odstraní smazané issues (každé ověřené dotazem), přesunuté issue se uloží pod novým id. Watcher je korutina, kterou spustí volání nástroje a která skončí
+  10 min po posledním — v klidu žádný časovač ani dotaz. Čtení `issue` > 30 s po syncu projektu se ptá jen na `updated`.
+- Token: nikde ve výstupu, chybě, `/status`, logu ani souboru mirroru (test proti lokálnímu HTTP fake včetně proxy,
+  která ozvěnou vrací hlavičky — body chyb se čistí).
+- Paměť čtení po `root` (bez `root` žádná); „unchanged“ nese stav a počet splněných kritérií, aby subagent bez
+  kontextu věděl, kde issue stojí, a `since=none` vrátí celé.
+- TER živě (674 issues, jen čtení): první sync 18–23 s, DB 14 MB; inkrementální sync bez změny 1 požadavek, 0,08 s;
+  dotazy `tasks` 0–4 ms. Issue (zn.): TER-591 brief 1 718 / full 2 967, TER-656 2 015 / 3 416, TER-650 460 / 2 648,
+  TER-666 1 125 / 2 598; opakované čtení ~100 zn. (~30 tokenů). `yt_get_issue` 2,4–3,2 tis. zn. bez komentářů,
+  5,4–6,3 tis. s komentáři a odkazy. `ready` na TER-164, TER-161, TER-163 = nezávislý výpočet nad YouTrack API
+  (11, 24, 10 tasků).
+- Mimo rozsah: zápisy (CL-28), registr workspaců (CL-66 — dnes větve git worktree), keychain OS.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
@@ -535,7 +623,8 @@ view, SQL, zbytek nástroje (resolver + formát), HTTP (klient − nástroj). Te
 | Parser PSI je superlineární u jednoho výrazu s desítkami tisíc operandů (20 000 → 0,7 s, 80 000 → 9 s; jen generovaný kód) | build běží v podprocesu s timeoutem a nízkou prioritou; dotazy nečeká |
 | Gramatika nezvládne nový Kotlin | počet ERROR uzlů v doctoru, degradovaný režim, pinnutá verze, upgrade = golden test |
 | Zápis poškodí soubor | hash zámek, validace + rollback, atomický zápis, journal, fuzz + compile |
-| MCP obchází guard hooky klienta | zápisová politika v daemonu; testy guardů |
+| MCP obchází guard hooky klienta | zápisová politika v daemonu; testy guardů; každý job (i následný a znovu po čekání na slot) projde `policyHook` jako PreToolUse Bash, selhání hooku = deny (CL-84) |
+| Job daemonu přežije daemon jako sirotek | Windows: joby v job objectu daemonu s KILL_ON_JOB_CLOSE; po restartu daemon ukončí přeživší podle pid + času startu a job označí `lost` |
 | Lokální stránka volá daemon | bind 127.0.0.1, Host/Origin, vlastní hlavička, bez preflightu |
 | Rozdíly OS (cesty, CRLF, zámky souborů) | normalizace cest, EOL podle souboru, retry rename; testy Windows + Linux |
 | Generičnost zesložití Terrio | Terrio = jen `.codeloupe.json` + skill; jádro nezná TER, brain ani YouTrack |

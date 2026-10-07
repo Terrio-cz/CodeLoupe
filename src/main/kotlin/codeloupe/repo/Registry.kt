@@ -18,6 +18,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonObject
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -33,11 +34,13 @@ class Registry(
     private val queue: JobQueue,
     launcher: BuildLauncher = BuildLauncher(config.buildHeapMb, config.buildTimeoutMs),
     private val log: (String) -> Unit = {},
+    /** Reports `build.done` and `overlay.refreshed` to the event bus. */
+    emit: (String, JsonObject) -> Unit = { _, _ -> },
 ) {
     private val repos = ConcurrentHashMap<String, RepoState>()
     private val views = ViewPool()
-    private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, views::release, log)
-    private val builds = BaseBuilds(queue, launcher, log, release = views::release, swapped = ::collectOverlays)
+    private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, views::release, log, emit)
+    private val builds = BaseBuilds(queue, launcher, log, release = views::release, swapped = ::collectOverlays, emit = emit)
     private val mergeBases = MergeBases(queue, launcher, config.queryTimeoutMs)
 
     /** Read from the `.git` files on every call (well under a millisecond), so a moved or removed worktree is never served from a cache. */
