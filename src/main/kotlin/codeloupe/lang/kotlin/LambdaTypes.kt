@@ -42,15 +42,16 @@ internal class LambdaTypes(private val types: LocalTypes) {
             name == "with" -> (callee.parent as KtCallExpression).valueArguments.firstOrNull()?.getArgumentExpression()?.let(types::ofExpression) ?: ""
             name in RECEIVER || name in RECEIVERLESS || name in SELF || name in ELEMENT || name in INDEXED -> null
             // Any other callee: its parameter's function type says (`R.() -> T`); unindexed ones stay unknown.
-            else -> types.at(callee).let { if (it.isEmpty()) "" else TypeSpec.lambdaReceiver(it, argumentIndex(literal)) }
+            else -> types.at(callee).let { if (it.isEmpty()) "" else TypeSpec.lambdaReceiver(it, argument(literal)) }
         }
     }
 
-    // A trailing lambda is the last parameter.
-    private fun argumentIndex(literal: KtFunctionLiteral): Int {
+    // The parameter a lambda is passed as: by name, by position, or -1 for a trailing lambda (the last parameter).
+    private fun argument(literal: KtFunctionLiteral): String {
         val argument = (literal.parent as KtLambdaExpression).parent as KtValueArgument
-        if (argument is KtLambdaArgument) return -1
-        return (argument.parent as? KtValueArgumentList)?.arguments?.indexOf(argument) ?: -1
+        argument.getArgumentName()?.asName?.identifier?.let { return it }
+        if (argument is KtLambdaArgument) return "-1"
+        return ((argument.parent as? KtValueArgumentList)?.arguments?.indexOf(argument) ?: -1).toString()
     }
 
     /** Callee of the call the lambda is an argument of, and that call's receiver. */

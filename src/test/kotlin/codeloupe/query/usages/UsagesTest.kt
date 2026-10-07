@@ -83,6 +83,14 @@ class UsagesTest {
     }
 
     @Test
+    fun `lambda receivers - through receiver-less lambdas, named lambda arguments, receivers of receiver names`() {
+        assertEquals(mapOf("Dsl.kt:28" to Label.EXACT, "Dsl.kt:30" to Label.EXACT), labels("Builder.add2"))
+        assertEquals(mapOf("Dsl.kt:28" to Label.OTHER, "Dsl.kt:30" to Label.OTHER), labels("Use.add2"))
+        assertEquals(mapOf("Dsl.kt:32" to Label.EXACT), labels("Bag.clear3"), "items is Builder.items inside b.apply")
+        assertEquals(mapOf("Dsl.kt:32" to Label.OTHER), labels("Sack.clear3"))
+    }
+
+    @Test
     fun `ambiguous names must be qualified`() {
         assertContains(UsagesQuery.run(view, UsagesQuery.Args("label")), "declarations match \"label\" — qualify it")
     }

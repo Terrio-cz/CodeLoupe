@@ -8,11 +8,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** A value parameter as the index records it. */
-internal data class Param(val type: String, val default: Boolean, val vararg: Boolean) {
+internal data class Param(val name: String, val type: String, val default: Boolean, val vararg: Boolean) {
     companion object {
         fun of(d: DeclRow): List<Param> =
             Json.parseToJsonElement(d.params?.takeIf { it.isNotEmpty() } ?: "[]").jsonArray.map { it.jsonObject }.map { p ->
                 Param(
+                    name = p["name"]?.jsonPrimitive?.content.orEmpty(),
                     type = p["type"]?.jsonPrimitive?.content.orEmpty(),
                     default = p["default"]?.jsonPrimitive?.booleanOrNull == true,
                     vararg = p["vararg"]?.jsonPrimitive?.booleanOrNull == true,

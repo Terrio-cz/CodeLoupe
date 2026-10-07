@@ -65,21 +65,24 @@ internal class TypeSpecs(
         return resolution.decls.mapNotNull(::declaredType).distinctBy { it.text }.singleOrNull()
     }
 
-    /**
-     * The receiver of the function type a lambda is passed as (`&@line:col#i`): its text when the parameter declares
-     * one (`R.() -> T`), "" when it declares none (`() -> T`), null when that is not known (an unindexed callee, a
-     * `fun interface` or alias parameter, an argument the index cannot place).
-     */
-    fun lambdaReceiver(spec: String, file: FileScope): TypeText? {
+    /** The receiver of the function type a lambda is passed as (`&@line:col#p`), from the called declaration. */
+    fun lambdaReceiver(spec: String, file: FileScope): LambdaReceiver {
         val position = spec.substring(1).substringBefore(TypeSpec.ARGUMENT)
-        val index = spec.substringAfter(TypeSpec.ARGUMENT).toIntOrNull() ?: return null
+        val argument = spec.substringAfter(TypeSpec.ARGUMENT).substringBefore(TypeSpec.OR)
         val (line, col) = position.substring(1).split(':').map(String::toInt)
-        val callee = cache.refAt(file.path, line, col)?.let(resolveRef)?.takeIf { it.complete }?.decls?.singleOrNull { it.kind == "fun" } ?: return null
+        val called = cache.refAt(file.path, line, col)?.let(resolveRef) ?: return LambdaReceiver.Unknown
+        if (called.decls.isEmpty() && (called.complete || called.byName)) return LambdaReceiver.Library
+        val callee = called.takeIf { it.complete }?.decls?.singleOrNull { it.kind == "fun" } ?: return LambdaReceiver.Unknown
         val params = cache.params(callee)
-        val type = (if (index < 0) params.lastOrNull() else params.getOrNull(index))?.type ?: return null
-        if ("->" !in type) return null
-        val receiver = FUNCTION_RECEIVER.find(type)?.groupValues?.get(1).orEmpty()
-        return TypeText(receiver, cache.file(callee.path) ?: return null, cache.parent(callee))
+        val index = argument.toIntOrNull()
+        val param = when {
+            index == null -> params.firstOrNull { it.name == argument }
+            index < 0 -> params.lastOrNull()
+            else -> params.getOrNull(index)
+        }
+        val type = param?.type?.takeIf { "->" in it } ?: return LambdaReceiver.Unknown
+        val receiver = FUNCTION_RECEIVER.find(type)?.groupValues?.get(1) ?: return LambdaReceiver.None
+        return LambdaReceiver.Typed(TypeText(receiver, cache.file(callee.path) ?: return LambdaReceiver.Unknown, cache.parent(callee)))
     }
 
     private companion object {

@@ -12,8 +12,8 @@ import codeloupe.query.View
 class UsageFinder(view: View) {
     internal val context = IndexContext(view)
     internal val cache get() = context.cache
-    private val implicit = ImplicitScope(context.cache, context.types, context.visibility, context.lookup)
     private val libraryNames = LibraryNames(context.cache)
+    private val implicit = ImplicitScope(context.cache, context.types, context.visibility, context.lookup, libraryNames)
     private val deciding = HashSet<String>()
     private val outsideIndex = HashMap<String, Boolean>()
     private val resolved = HashMap<Triple<String, Int, Int>, Resolution>()

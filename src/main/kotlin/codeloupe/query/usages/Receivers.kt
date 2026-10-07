@@ -23,20 +23,33 @@ internal class Receivers(
             recv == "this" -> ref.recvType?.let { lambdaReceiver(it, file, at) } ?: thisType(chain, file, null)
             recv.startsWith("this@") -> thisType(chain, file, recv.removePrefix("this@"))
             recv == "super" || recv.startsWith("super<") -> superType(chain)
+            // A capitalised name the spec cannot type is looked up as a property, object or library type.
             else -> qualifier(recv, file, at)
-                ?: ref.recvType?.let { fromSpec(it, file, at) }
-                ?: if (NAME.matches(recv)) property(recv, file, chain) else ReceiverType.Unknown
+                ?: ref.recvType?.let { spec -> specs.text(spec, file, at)?.let(::instance) }
+                ?: if (NAME.matches(recv) && (ref.recvType == null || recv.first().isUpperCase())) property(recv, file, chain) else ReceiverType.Unknown
         }
     }
 
     fun fromSpec(spec: String, file: FileScope, at: DeclRow?): ReceiverType =
         specs.text(spec, file, at)?.let { instance(it) } ?: ReceiverType.Unknown
 
-    /** The implicit receiver a lambda brought (`x.apply { m() }`, a DSL builder), null when it brings none. */
+    /**
+     * The implicit receiver a lambda brought (`x.apply { m() }`, a DSL builder), null when it brings none. A lambda
+     * whose parameter takes no receiver hands on the enclosing lambda's (`&…|outer`).
+     */
     fun lambdaReceiver(spec: String, file: FileScope, at: DeclRow?): ReceiverType? {
         if (spec.isEmpty() || spec[0] != TypeSpec.LAMBDA_RECEIVER) return fromSpec(spec, file, at)
-        val receiver = specs.lambdaReceiver(spec, file) ?: return ReceiverType.Unknown
-        return if (receiver.text.isEmpty()) null else instance(receiver)
+        return when (val receiver = specs.lambdaReceiver(spec, file)) {
+            is LambdaReceiver.Typed -> instance(receiver.type)
+            // A library receiver comes first, the enclosing lambda's (if any) after it.
+            LambdaReceiver.Library -> when (val outer = spec.substringAfter(TypeSpec.OR, "").let { if (it.isEmpty()) null else lambdaReceiver(it, file, at) }) {
+                is ReceiverType.Instance -> outer.copy(open = true)
+                null -> ReceiverType.Instance(emptyList(), emptySet())
+                else -> outer
+            }
+            LambdaReceiver.Unknown -> ReceiverType.Unknown
+            LambdaReceiver.None -> spec.substringAfter(TypeSpec.OR, "").let { if (it.isEmpty()) null else lambdaReceiver(it, file, at) }
+        }
     }
 
     // `Type`, `Outer.Inner`, `pkg.Type`, `pkg` before a top-level name.

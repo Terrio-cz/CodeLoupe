@@ -84,7 +84,7 @@ internal class RefResolver(
         val decls = members.flatMap { it.decls }
         if (decls.isNotEmpty()) return Resolution(decls, complete = true, further = members.flatMap { it.further })
         lookup.extensions(name, type.names, file, accept).let { if (it.isNotEmpty()) return Resolution(it, complete = true) }
-        val library = if (implicit.opensToLibrary(type)) lookup.onLibraryTypes(name, file, accept) else emptyList()
+        val library = if (implicit.hasLibraryPart(type)) lookup.onLibraryTypes(name, file, accept) else emptyList()
         val cast = type.types.flatMap(types::allSubtypes).flatMap { sub -> lookup.instance(types.closure(sub), name, accept).decls }
         val guesses = (library + cast).distinct()
         return Resolution(guesses, complete = guesses.isEmpty())

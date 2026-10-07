@@ -205,11 +205,13 @@ Implementace (CL-13, `query/usages`), pro každou referenci se jménem cíle (ne
 
 1. Vázané jméno (`bind`) → lokální deklarace té funkce. Volání jde přes vazbu, kterou nejde zavolat (`flag()` při
    `flag: Boolean` volá funkci); vazba za tělem třídy (`^`) může být i členem té třídy → `candidate`.
-2. Bez receiveru: implicitní receiver lambdy (`apply`/`run`/`with`; u neznámého receiveru DSL lambdy jsou ve hře
-   všechny členy toho jména), pak členy obklopujících tříd a receiverů extension funkcí (od nejvnitřnější, včetně
-   nadtypů, companionů a vnořených typů), pak top-level v pořadí explicitní import (alias) → stejný package → star
-   import. Úroveň, jejíž typ či nadtypy leží mimo index (`fun Route.x()`, `object T : Table()`), může jméno
-   deklarovat sama → odpověď nalezená za ní je neúplná.
+2. Bez receiveru: implicitní receiver lambdy — `apply`/`run`/`with`, jinak z typu parametru volané funkce
+   (`R.() -> T` → `R`; `() -> T` nechá platit receiver vnější lambdy; funkce mimo index dá knihovní receiver; nejasný
+   typ = neznámý receiver, ve hře jsou všechny členy toho jména) — pak členy obklopujících tříd a receiverů extension
+   funkcí (od nejvnitřnější, včetně nadtypů, companionů a vnořených typů), pak top-level v pořadí explicitní import
+   (alias) → stejný package → star import. Receiver, jehož typ či nadtypy leží mimo index (`fun Route.x()`,
+   `object T : Table()`, enum), může jméno deklarovat sám, pokud je to jméno, které knihovny deklarují → odpověď
+   nalezená za ním je neúplná. Receiver `x` v `x.m()` se typuje celým resolverem včetně receiverů lambd.
 3. S receiverem: `this`/`this@L`/`super`, typ nebo package jako kvalifikátor (`Type.m` → companion, object, vnořené
    typy, enum entry; `Type::m` i instanční člen), typový spec z indexu, property s deklarovaným nebo odvozeným
    typem; velké jméno, které nic v dosahu nedeklaruje a nenese ho žádný typ v indexu, je knihovní typ

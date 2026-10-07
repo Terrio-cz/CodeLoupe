@@ -37,10 +37,13 @@ internal class LocalTypes(private val source: Source, private val scopes: LocalS
     /** `for (x in items)`: the element type of `items`. */
     fun elementOf(range: KtExpression?): String = range?.let(::ofExpression)?.let(TypeSpec::element) ?: ""
 
-    /** The spec of a receiver expression; null for a name that is not bound locally (the query side looks it up). */
+    /**
+     * The spec of a receiver expression. A name not bound locally is typed by what it denotes (`@line:col`): the query
+     * side resolves it with every scope in reach, a lambda's receiver included.
+     */
     fun ofReceiver(receiver: KtExpression): String? {
         val inner = unwrapped(receiver)
-        if (inner is KtNameReferenceExpression) return scopes.typeOf(JsText.bare(source.of(inner)))
+        if (inner is KtNameReferenceExpression) return scopes.typeOf(JsText.bare(source.of(inner))) ?: at(inner).ifEmpty { null }
         return ofExpression(receiver).ifEmpty { null }
     }
 

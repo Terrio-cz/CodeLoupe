@@ -5,6 +5,7 @@ import codeloupe.lang.FileFacts
 import codeloupe.lang.ImportFact
 import codeloupe.lang.JsText
 import codeloupe.lang.RefFact
+import codeloupe.lang.TypeSpec
 import codeloupe.platform.Sha1
 import org.jetbrains.kotlin.com.intellij.psi.PsiComment
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
@@ -77,7 +78,7 @@ internal class KotlinExtractor(private val source: Source) {
                 scopes.within(parameters(element.valueParameters)) { nested(declare(element, shapes.constructor(element, ownerName())), element) }
             is KtPropertyAccessor -> scopes.within(parameters(element.valueParameters)) { walkChildren(element) }
             is KtFunctionLiteral ->
-                scopes.within(lambdaParameters(element)) { scopes.withReceiver(lambdaTypes.receiver(element)) { walkChildren(element) } }
+                scopes.within(lambdaParameters(element)) { scopes.withReceiver(lambdaReceiver(element)) { walkChildren(element) } }
             is KtForExpression -> forLoop(element)
             is KtCatchClause -> scopes.within(parameters(listOfNotNull(element.catchParameter))) { walkChildren(element) }
             is KtBlockExpression, is KtWhenExpression -> scopes.within(emptyMap()) { walkChildren(element) }
@@ -201,6 +202,13 @@ internal class KotlinExtractor(private val source: Source) {
             typed.nameIdentifier?.let { bindings[JsText.bare(source.of(it))] = implied }
         }
         return bindings
+    }
+
+    // A lambda whose parameter turns out to take no receiver leaves the outer implicit receiver in place.
+    private fun lambdaReceiver(literal: KtFunctionLiteral): String? {
+        val spec = lambdaTypes.receiver(literal) ?: return null
+        if (spec.firstOrNull() != TypeSpec.LAMBDA_RECEIVER) return spec
+        return scopes.implicitReceiver?.let { "$spec${TypeSpec.OR}$it" } ?: spec
     }
 
     private fun bindName(identifier: PsiElement?, type: String) {

@@ -115,7 +115,7 @@ class KotlinExtractorTest {
         assertEquals("", ref("local", 74).bind, "a local function")
         assertEquals(1, ref("local", 74).args)
         assertEquals("@102:${ref("create", 102).col}", ref("handle", 107).recvType)
-        assertEquals(null, ref("register", 106).recvType, "a name not bound in code is looked up by the query")
+        assertEquals("@106:${ref("Registry", 106).col}", ref("register", 106).recvType, "a name not bound in code: typed by what it denotes")
         assertEquals(null, ref("repo", 69).bind, "a property is not a local binding")
     }
 
