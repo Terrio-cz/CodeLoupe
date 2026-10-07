@@ -22,7 +22,8 @@ internal object ShortSignature {
         if (d.container.isEmpty()) return clip(head, MAX)
         // A long container (a backticked test name) gives way before the signature does.
         val room = MAX - head.length - 3
-        val container = if (d.container.length <= room) d.container else "…" + d.container.takeLast(maxOf(room - 1, MIN_CONTAINER))
+        val keep = maxOf(room, MIN_CONTAINER)
+        val container = if (d.container.length <= keep) d.container else "…" + d.container.takeLast(keep - 1)
         return clip("[$container] $head", MAX)
     }
 
