@@ -1,6 +1,6 @@
 # CodeLoupe — plán (code index pro AI agenty)
 
-Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56) · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
+Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56), vrstvy worktree (CL-16) · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
 
 ## 0. Zadání
 
@@ -44,7 +44,8 @@ SerialGC), bloby načtené předem (~150 MB z peaku), parse + průchod celým st
 - (b) má starší gramatiku (0.3.8, jiné typy uzlů než prototyp) a 4× víc chybných souborů.
 - **Rozhodnutí: (a) PSI** — nejrychlejší, 0 chyb (gramatika samotného kompilátoru, drží krok s jazykem), bez nativních
   knihoven (stejné na všech OS), nejnižší peak. Java (CL-11) jde stejnou cestou: Java parser IntelliJ je ve stejném
-  jaru. Cena 64 MB v distribuci; parser se načítá jen v build workeru, daemon ho nikdy nenačte.
+  jaru. Cena 64 MB v distribuci; plné buildy a velké obnovy parsuje build worker, daemon parsuje jen malé obnovy
+  vrstev worktree (CL-16, +~30 MB RSS).
 
 ## 1. Baseline — co dnes stojí tokeny (2026-09-23 → 10-06, 2 373 běhů)
 
@@ -170,13 +171,22 @@ Pozice jen řádek/sloupec (CRLF vs LF nevadí).
 
 - Báze = index commitu `B` výchozí větve, stavěný z git objektů (`git cat-file --batch`), nezávisle na
   stavu jakéhokoli checkoutu.
-- Vrstva worktree = soubory, které se liší od `B` (`git diff --name-status B` + untracked; smazané jako
-  tombstone). Klíč = cesta worktree, ne název větve → funguje pro jakýkoli workflow.
-- Kontrola při dotazu (žádný watcher): `git status` + mtime/velikost → přeparsovat jen změněné.
+- Vrstva worktree = soubory, které se liší od `B` (`git diff --name-only B` + untracked; smazané jako
+  tombstone), vlastní SQLite `overlays/<hash cesty>.db`. Klíč = cesta worktree, ne název větve → funguje pro
+  jakýkoli workflow, i pro hlavní checkout.
+- Kontrola při dotazu (žádný watcher, v klidu 0 CPU): první dotaz a nová báze → git (`diff B`, untracked,
+  ignorované adresáře); každý další dotaz → paralelní výpis adresářů worktree (mtime/velikost z výpisu, bez
+  git procesu; Terrio ~30 ms) → přeparsovat jen soubory se změněným razítkem, obsah porovnaný s bází (CRLF/BOM
+  = beze změny). Kontrola mladší než `overlayCheckMs` (1 s) platí i pro další dotaz: dávky dotazů platí jeden
+  výpis; agent mezi editací a dotazem vždy čeká na tah modelu. Dotaz čte souběžně s kontrolou; když kontrola
+  nic nezměnila, odpověď platí.
+- Obnova vrstvy ve FAST lane, parse v daemonu (≤ 200 souborů do 512 KB), jinak build worker v HEAVY lane.
 - Správnost vrstvy nezávisí na čerstvosti báze; zastaralá báze jen zvětší vrstvu.
-- Sync báze líně (výchozí větev ≠ `B`) nebo `codeloupe sync`; diff ≤ 200 souborů inline, větší v P3.
-- Úklid: vrstva worktree, který už neexistuje (`git worktree list`), se maže při startu a v `doctor`.
-  Žádné hooky do workflow nejsou nutné; Terrio může volat `codeloupe sync` po landu jen pro rychlost.
+- Sync báze líně (výchozí větev ≠ `B`): předchozí báze + změněné bloby; ≤ 200 souborů inline (dotaz počká),
+  větší v HEAVY lane (worker) a dotazy mezitím odpovídají ze staré báze. Předchozí báze zůstává do dalšího
+  přepnutí: vrstva po přepnutí kopíruje fakta nezměněných souborů z ní místo parse.
+- Úklid: vrstva worktree, který už neexistuje (`git worktree list` nebo chybí adresář), se maže při prvním
+  dotazu na repozitář po startu daemonu a po každém přepnutí báze. Žádné hooky do workflow nejsou nutné.
 - Zapisuje jen daemon; nová báze do nového souboru, atomické přepnutí; WAL.
 
 ### 5.4 Resolver (bez IDE a kompilátoru)
@@ -322,6 +332,28 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
   Báze nese verzi formátu (`format` v `repo.json`) — báze z prototypu nebo starého extraktoru se přestaví.
 - Testy: 34 (17 portovaných z Node + parita, CRLF/BOM, uzavírání spojení, chyby API, overlay ve View, čtení refů,
   řazení, fronta, hluboký soubor, opakování po selhání a timeout buildu, formát indexu).
+
+### Výsledek fáze 3a — vrstvy worktree a líný sync báze (CL-16, 2026-10-07)
+
+Měřeno na Terriu (canonical + TER worktree, jen čtení) a na lokálním klonu (editace, posun báze); stroj byl po
+celou dobu vytížený jinými okny (CPU 40–97 %), `main` měřený souběžně pro srovnání.
+
+- Změněný, nový i smazaný soubor vidět v dalším dotazu (test + klon Terria: editace → další dotaz 0,74 s včetně
+  inicializace parseru v daemonu, další editace ~0,1 s). Hlavní worktree změny jiného worktree nevidí.
+- První dotaz ve worktree: TER-591 / 664 / 656 / 477 (13–72 změněných souborů) **0,6–0,75 s**; TER-114 (311 souborů
+  za bází, 149 parsovaných) 2,1 s. Po restartu daemonu se vrstvy znovu použijí z disku: 0,26–0,29 s.
+- Posun výchozí větve o 644 souborů (klon): sync ve worker v HEAVY lane 2,5 s, dotazy mezitím 89–201 ms ze staré
+  báze se správnými odpověďmi; první dotaz worktree na nové bázi 1,65 s (182 souborů zkopírováno ze staré báze,
+  0 parsováno). Malý posun (≤ 200 souborů) se synchronizuje inline před odpovědí.
+- Teplý dotaz těsně po sobě: p50 9–22 ms (main 9–17 ms). Dotaz po pauze platí výpis worktree: +30–55 ms podle
+  zátěže stroje (Terrio: 1 150 adresářů, 2 200 zdrojů; `git status` ze JVM by stál ~60 ms + start procesu).
+- CPU: v klidu **0 ms za 30 s** (bez časovačů a watcherů). Výpis worktree ~60 ms CPU (atributy z výpisu adresáře;
+  dotaz na atributy po souborech otevírá každý soubor a stál 270 ms CPU).
+- RSS daemonu: 141–145 MB (klon), 165–192 MB po parsování v daemonu (budget 200). Dynamický CDS archiv vypnut: po
+  běhu s parserem obsahoval jeho třídy (+30 MB RSS) bez měřitelného zrychlení startu (670 vs 685 ms).
+- Testy: 39 (nově `OverlayTest`: dva worktree se změnou/novým/smazaným/ignorovaným souborem, CRLF návrat k bázi,
+  inline sync, posun o 500 souborů v HEAVY lane se starou bází mezitím, vrstva > 200 souborů a soubor > 512 KB ve
+  workeru, GC vrstvy smazaného worktree, znovupoužití vrstvy po restartu).
 
 ## 10. Rizika
 

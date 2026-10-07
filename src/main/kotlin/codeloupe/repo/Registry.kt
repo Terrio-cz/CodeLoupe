@@ -6,34 +6,34 @@ import codeloupe.daemon.JobQueue
 import codeloupe.git.Git
 import codeloupe.git.RefReader
 import codeloupe.index.Store
-import codeloupe.platform.IsoTime
+import codeloupe.overlay.Overlays
 import codeloupe.platform.Sha1
 import codeloupe.query.View
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
-import kotlin.io.path.listDirectoryEntries
-import kotlin.io.path.name
 
 /**
  * Repositories the daemon knows: any path inside a git repository or one of its worktrees maps to one
- * repository (keyed by its git common dir) with one base index of its default branch.
+ * repository (keyed by its git common dir) with one base index of its default branch; each worktree adds an
+ * overlay of the files that differ from that base.
  */
 class Registry(
     private val config: Config,
     private val queue: JobQueue,
-    private val launcher: BuildLauncher = BuildLauncher(config.buildHeapMb, config.buildTimeoutMs),
+    launcher: BuildLauncher = BuildLauncher(config.buildHeapMb, config.buildTimeoutMs),
     private val log: (String) -> Unit = {},
 ) {
     private val repos = ConcurrentHashMap<String, RepoState>()
     private val located = ConcurrentHashMap<String, RepoLocation>()
+    private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, log)
+    private val builds = BaseBuilds(queue, launcher, log, swapped = ::collectOverlays)
 
     fun locate(root: String): RepoLocation {
         // The daemon's working directory is its home, so a relative root would name the wrong repository.
@@ -60,44 +60,73 @@ class Registry(
                 baseFile = file
             }
             lastBuild = saved?.lastBuild
+            // Worktrees removed while the daemon was not running.
+            collectOverlays(this)
         }
     }
 
     /**
-     * Base index for the repository's current default-branch commit. A stale base keeps answering while the new
-     * one builds; only a missing base makes the caller wait (bounded by queryTimeoutMs). A commit whose build
-     * failed is not retried for [RETRY_FAILED_MS].
+     * Base index for the repository's current default-branch commit. A sync the daemon parses itself
+     * is waited for; during a larger one the old base keeps answering. Only a missing base makes the caller wait for a
+     * full build (bounded by queryTimeoutMs). A commit whose build failed is not retried for [RETRY_FAILED_MS].
      */
     suspend fun base(repo: RepoState): RepoState {
         val head = headOf(repo)
         if (repo.baseCommit == head) return repo
         val failed = synchronized(repo) { repo.failure?.takeIf { it.commit == head && System.currentTimeMillis() - repo.failedAt < RETRY_FAILED_MS } }
-        val job = if (failed == null) queue.run(JobQueue.Lane.HEAVY, "build:${repo.id}:$head") { build(repo, head) } else null
-        if (repo.baseFile != null) return repo
-        if (job == null) throw IllegalStateException("indexing ${head.take(7)} failed: ${failed!!.error}")
-        withTimeoutOrNull(config.queryTimeoutMs) { job.await() }
-            ?: throw BusyException("indexing ${repo.commonDir} (first build); retry in a few seconds")
+        if (failed != null) {
+            if (repo.baseFile != null) return repo
+            throw IllegalStateException("indexing ${head.take(7)} failed: ${failed.error}")
+        }
+        if (repo.baseFile == null) {
+            val job = builds.full(repo, head)
+            withTimeoutOrNull(config.queryTimeoutMs) { job.await() }
+                ?: throw BusyException("indexing ${repo.commonDir} (first build); retry in a few seconds")
+            return repo
+        }
+        val sync = withContext(Dispatchers.IO) { builds.sync(repo, head) }
+        // A failed sync is recorded in repo.failure; the old base answers meanwhile.
+        if (sync.inline) withTimeoutOrNull(config.queryTimeoutMs) { runCatching { sync.job.await() } }
         return repo
     }
 
-    /** Runs [read] on the base index of [root]'s repository; the answer carries a note when the worktree moved on. */
-    suspend fun <T> query(root: String, read: (View) -> T): Answer<T> {
+    /** Runs [read] on the base index of [root]'s repository with [root]'s worktree overlay on top. */
+    suspend fun <T> query(root: String, read: (View) -> T): T {
+        val arrived = System.nanoTime()
         val location = locate(root)
         val repo = base(repo(location.commonDir))
-        return withContext(Dispatchers.IO) {
-            // Opened under the lock that guards the swap, so a new build cannot prune this base in between.
-            val (view, baseCommit) = synchronized(repo) { View(repo.baseFile!!) to repo.baseCommit!! }
-            val value = view.use(read)
-            Answer(value, note(repo, location.worktree, baseCommit))
+        repeat(ATTEMPTS) {
+            val (baseFile, baseCommit) = synchronized(repo) { repo.baseFile!! to repo.baseCommit!! }
+            val answer = coroutineScope {
+                // Read the overlay as it is while the worktree is checked: the answer stands when the check changed nothing.
+                val known = overlays.known(location.worktree, baseCommit)
+                val early = known?.let { async(Dispatchers.IO) { runCatching { read(repo, baseFile, baseCommit, it.file, read) } } }
+                val overlay = overlays.fresh(repo, location.worktree, baseCommit, baseFile, arrived)
+                if (overlay == known) {
+                    early!!.await().getOrThrow()
+                } else {
+                    withContext(Dispatchers.IO) { read(repo, baseFile, baseCommit, overlay.file, read) }
+                }
+            }
+            if (answer != null) return answer.value
         }
+        throw BusyException("the index of ${location.worktree} keeps changing; retry in a few seconds")
     }
 
-    fun snapshot(): List<RepoSummary> = repos.values.map(RepoState::summary)
+    /** Null when the base or the overlay moved on since [baseCommit]: the caller tries again. */
+    private fun <T> read(repo: RepoState, baseFile: Path, baseCommit: String, overlay: Path?, read: (View) -> T): Read<T>? {
+        // Opened under the lock that guards the swap, so a new build cannot prune this base in between.
+        val view = synchronized(repo) { if (repo.baseCommit == baseCommit) View(baseFile, overlay) else null } ?: return null
+        // An overlay refreshed against a newer base in the meantime does not fit this one.
+        return view.use { if (overlay == null || it.overlayBase() == baseCommit) Read(read(it)) else null }
+    }
 
-    private fun note(repo: RepoState, worktree: String, baseCommit: String): String? {
-        val head = RefReader.head(worktree) ?: Git.run(worktree, "rev-parse", "HEAD", allowFail = true)?.trim()
-        if (head == null || head == baseCommit) return null
-        return "(index of ${repo.defaultRef}@${baseCommit.take(7)}; this worktree is at ${head.take(7)} — its own changes are not indexed yet)"
+    fun snapshot(): List<RepoSummary> = repos.values.map { it.summary(overlays.count(it.id)) }
+
+    private fun collectOverlays(repo: RepoState) {
+        queue.run(JobQueue.Lane.FAST, "gc:${repo.id}") {
+            withContext(Dispatchers.IO) { runCatching { overlays.collect(repo) }.onFailure { log("overlay collection ${repo.id} failed: ${it.message}") } }
+        }
     }
 
     // Reading the ref files costs microseconds; only the git fallback is rate-limited.
@@ -109,59 +138,15 @@ class Registry(
         repo.head!!
     }
 
-    private suspend fun build(repo: RepoState, commit: String) = withContext(Dispatchers.IO) {
-        val name = "base-${commit.take(12)}"
-        val tmp = repo.dir.resolve("$name.tmp.db")
-        val out = repo.dir.resolve("$name.db")
-        val result = try {
-            launcher.build(repo.commonDir, commit, tmp, workDir = repo.dir)
-        } catch (e: Exception) {
-            synchronized(repo) {
-                repo.failure = BuildFailure(commit, IsoTime.now(), e.message ?: e.toString())
-                repo.failedAt = System.currentTimeMillis()
-            }
-            log("build ${repo.id} ${commit.take(7)} failed: ${e.message}")
-            throw e
-        }
-        synchronized(repo) {
-            for (suffix in listOf("", "-wal", "-shm")) Files.deleteIfExists(Path.of("$out$suffix"))
-            Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING)
-            repo.baseCommit = commit
-            repo.baseFile = out
-            repo.lastBuild = LastBuild(IsoTime.now(), result.ok, result.files, result.errors, result.ms, result.peakRssMb)
-            repo.failure = null
-            prune(repo)
-        }
-        save(repo)
-        log("build ${repo.id} ${commit.take(7)}: ${result.files} files in ${result.ms} ms, peak ${result.peakRssMb} MB")
-        result
-    }
-
-    private fun save(repo: RepoState) {
-        Files.writeString(repo.dir.resolve("repo.json"), PRETTY.encodeToString(RepoRecord.serializer(), repo.record()))
-    }
-
-    // Called with the repo lock held. Windows refuses to delete a base an in-flight query still has open: best effort,
-    // the next build retries.
-    private fun prune(repo: RepoState) {
-        val keep = repo.baseFile?.name ?: return
-        for (file in repo.dir.listDirectoryEntries("base-*")) {
-            if (file.name == keep || file.name.startsWith("$keep-")) continue
-            runCatching { Files.deleteIfExists(file) }
-        }
-    }
-
     private fun normalize(path: String): String = Path.of(path).toAbsolutePath().normalize().toString().replace('\\', '/')
+
+    /** Wraps a query result, which may itself be null. */
+    private class Read<T>(val value: T)
 
     private companion object {
         const val LOCATE_TTL_MS = 60_000
         const val HEAD_TTL_MS = 2_000
         const val RETRY_FAILED_MS = 5 * 60_000
-
-        @OptIn(ExperimentalSerializationApi::class)
-        val PRETTY = Json(JsonFormat.json) {
-            prettyPrint = true
-            prettyPrintIndent = " "
-        }
+        const val ATTEMPTS = 3
     }
 }

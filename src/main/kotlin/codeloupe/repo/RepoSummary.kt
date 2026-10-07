@@ -11,4 +11,6 @@ data class RepoSummary(
     val baseCommit: String?,
     val lastBuild: LastBuild?,
     val failure: BuildFailure?,
+    /** Worktrees with an overlay of their own changes. */
+    val overlays: Int = 0,
 )

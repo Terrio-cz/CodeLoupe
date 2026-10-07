@@ -16,8 +16,14 @@ class View(baseFile: Path, overlayFile: Path? = null) : AutoCloseable {
     init {
         if (overlayFile != null) {
             db.createStatement().use { it.execute("ATTACH DATABASE '${overlayFile.toString().replace("'", "''")}' AS ov") }
+            // One read transaction: every statement sees the same version of an overlay that a refresh may be rewriting.
+            db.autoCommit = false
         }
     }
+
+    /** The base commit the attached overlay was made against; null without an overlay. */
+    fun overlayBase(): String? =
+        if (overlay) query("SELECT value FROM ov.meta WHERE key = 'base'", emptyMap()) { it.getString(1) }.firstOrNull() else null
 
     /** Declarations matching [where] (written against aliases `d`/`f`, with `:params`) over base and overlay. */
     fun decls(where: String, params: Map<String, Any?> = emptyMap(), tail: String = ""): List<DeclRow> {

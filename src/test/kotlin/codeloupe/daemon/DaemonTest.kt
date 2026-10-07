@@ -67,7 +67,7 @@ class DaemonTest {
         val b = json(api("outline", args("root" to repo.toString(), "target" to "Registry")))
         a.join()
         assertTrue(b["ok"]!!.jsonPrimitive.boolean, b.toString())
-        assertEquals(1, daemon.status().queue.done, "one build")
+        assertEquals(1, daemon.status().queue.heavy.done, "one build")
         assertEquals(1, daemon.status().repos.size)
     }
 
@@ -133,7 +133,7 @@ class DaemonTest {
         daemon = Daemon.start(config)
         val second = client.callTool("symbol", mapOf("root" to repo.toString(), "name" to "Registry.register"))
         assertContains((second.content.single() as TextContent).text, "fun register")
-        assertEquals(0, daemon.status().queue.done, "restart reused the saved base index")
+        assertEquals(0, daemon.status().queue.heavy.done, "restart reused the saved base index")
         client.close()
     }
 

@@ -1,0 +1,198 @@
+package codeloupe.overlay
+
+import codeloupe.TestRepos
+import codeloupe.TestRepos.git
+import codeloupe.config.Config
+import codeloupe.daemon.JobQueue
+import codeloupe.index.BuildResult
+import codeloupe.index.StoreUpdate
+import codeloupe.query.FindQuery
+import codeloupe.repo.BuildLauncher
+import codeloupe.repo.Registry
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
+import kotlin.io.path.writeText
+import kotlin.test.Test
+import kotlin.test.assertContains
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/** Worktree overlays and base syncs against real git repositories with two worktrees. */
+class OverlayTest {
+    private val repo = TestRepos.fixtureRepo(
+        "kotlin/sample",
+        mapOf(".gitignore" to "build/\n*.gen.kt\n", ALPHA to alpha("one"), GONE to "package demo\n\nclass Gone\n"),
+    )
+    private val feature = worktree("feature")
+    private val config = Config(TestRepos.tmpDir("home"), 0, 60_000, buildTimeoutMs = 120_000, buildHeapMb = 512, defaultRoot = null, overlayCheckMs = 0)
+    private val queue = JobQueue(CoroutineScope(Dispatchers.Default))
+
+    @Test
+    fun `changed, new and deleted files of a worktree show in its next query`() {
+        val registry = Registry(config, queue)
+        write(repo, "build/Old.kt", "package demo\n\nclass Old\n")
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertNone(find(registry, repo, "Old"), "ignored directory")
+
+        write(feature, ALPHA, alpha("two"))
+        write(feature, BETA, "package demo\n\nclass Beta\n")
+        Files.delete(feature.resolve(GONE))
+        write(feature, "build/gen/Hidden.kt", "package demo\n\nclass Hidden\n")
+        write(feature, "src/main/kotlin/demo/Skip.gen.kt", "package demo\n\nclass Skip\n")
+        assertContains(find(registry, feature, "Alpha.two"), "fun two")
+        assertNone(find(registry, feature, "Alpha.one"), "old body")
+        assertContains(find(registry, feature, "Beta"), "class Beta")
+        assertNone(find(registry, feature, "Gone"), "deleted file")
+        assertNone(find(registry, feature, "Hidden"), "new ignored directory")
+        assertNone(find(registry, feature, "Skip"), "ignored file")
+
+        assertContains(find(registry, repo, "Alpha.one"), "fun one")
+        assertNone(find(registry, repo, "Beta"), "other worktree's file")
+        assertContains(find(registry, repo, "Gone"), "class Gone")
+
+        git(feature, "add", "-A")
+        git(feature, "commit", "-q", "-m", "feature work")
+        assertContains(find(registry, feature, "Beta"), "class Beta")
+        // Back to the base text, only with other line ends: the file leaves the overlay.
+        write(feature, ALPHA, alpha("one").replace("\n", "\r\n"))
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertEquals(1, registry.snapshot().single().overlays)
+    }
+
+    @Test
+    fun `a small move of the default branch syncs inline`() {
+        val launcher = CountingLauncher()
+        val registry = Registry(config, queue, launcher)
+        assertContains(find(registry, repo, "Alpha.one"), "fun one")
+        write(repo, ALPHA, alpha("three"))
+        commit(repo, "small move")
+        assertContains(find(registry, repo, "Alpha.three"), "fun three")
+        assertEquals(git(repo, "rev-parse", "HEAD"), registry.snapshot().single().baseCommit, "base synced before the answer")
+        assertEquals(0, launcher.syncs.get(), "no build worker")
+        assertEquals(0, registry.snapshot().single().overlays)
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+    }
+
+    @Test
+    fun `a default branch moved by 500 files syncs in the heavy lane while the old base answers`() {
+        val gate = CompletableDeferred<Unit>()
+        val launcher = CountingLauncher(gate)
+        val registry = Registry(config, queue, launcher)
+        write(feature, BETA, "package demo\n\nclass Beta\n")
+        assertContains(find(registry, feature, "Beta"), "class Beta")
+
+        for (i in 0 until 500) write(repo, "src/main/kotlin/gen/Gen$i.kt", "package gen\n\nclass Gen$i {\n    fun v() = $i\n}\n")
+        write(repo, ALPHA, alpha("three"))
+        commit(repo, "big move")
+        val head = git(repo, "rev-parse", "HEAD")
+        assertContains(find(registry, feature, "Beta"), "class Beta")
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertNone(find(registry, feature, "Gen1"), "not on the feature branch")
+        assertEquals(1, launcher.syncs.get())
+        assertTrue(queue.snapshot().heavy.running.orEmpty().startsWith("sync:"), queue.snapshot().toString())
+
+        gate.complete(Unit)
+        waitFor("base synced") { registry.snapshot().single().baseCommit == head }
+        assertContains(find(registry, repo, "Gen499"), "class Gen499")
+        assertContains(find(registry, repo, "Alpha.three"), "fun three")
+        assertContains(find(registry, repo, "Gen0"), "class Gen0")
+        // The feature worktree is still on the old commit: main's files are tombstones, its Alpha is the old one.
+        assertNone(find(registry, feature, "Gen1"), "tombstone")
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertContains(find(registry, feature, "Beta"), "class Beta")
+        assertEquals(0, launcher.overlays.get(), "the feature overlay copied its unchanged files from the old base")
+    }
+
+    @Test
+    fun `a worktree with more than 200 changed files is indexed by a build worker`() {
+        val launcher = CountingLauncher()
+        val registry = Registry(config, queue, launcher)
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        for (i in 0 until 250) write(feature, "src/main/kotlin/many/Many$i.kt", "package many\n\nclass Many$i\n")
+        assertContains(find(registry, feature, "Many249"), "class Many249")
+        assertEquals(1, launcher.overlays.get())
+        write(feature, "src/main/kotlin/many/Many0.kt", "package many\n\nclass Many0 {\n    fun again() = 0\n}\n")
+        assertContains(find(registry, feature, "Many0.again"), "fun again")
+        assertEquals(1, launcher.overlays.get(), "a small change after it is parsed in the daemon")
+        write(feature, "src/main/kotlin/many/Generated.kt", TestRepos.bigClass("many", "Generated", 12_000))
+        assertContains(find(registry, feature, "Generated.m11999"), "fun m11999")
+        assertEquals(2, launcher.overlays.get(), "one file over 512 KB goes to a build worker too")
+    }
+
+    @Test
+    fun `the overlay of a removed worktree is deleted, a live one survives a restart`() {
+        val other = worktree("other")
+        write(feature, BETA, "package demo\n\nclass Beta\n")
+        write(other, BETA, "package demo\n\nclass Other\n")
+        val first = Registry(config, queue)
+        assertContains(find(first, feature, "Beta"), "class Beta")
+        assertContains(find(first, other, "Other"), "class Other")
+        assertEquals(2, overlayFiles().size)
+
+        git(repo, "worktree", "remove", "--force", feature.toString())
+        val restartQueue = JobQueue(CoroutineScope(Dispatchers.Default))
+        val restarted = Registry(config, restartQueue)
+        assertContains(find(restarted, other, "Other"), "class Other")
+        waitFor("overlay collected") { overlayFiles().size == 1 }
+        assertEquals(1, restartQueue.snapshot().fast.done, "the collection only: the live overlay was reused, not rebuilt")
+    }
+
+    private fun overlayFiles(): List<Path> = Files.walk(config.home).use { paths ->
+        paths.filter { it.parent.fileName.toString() == "overlays" && it.toString().endsWith(".db") }.toList()
+    }
+
+    private fun find(registry: Registry, root: Path, q: String): String =
+        runBlocking { registry.query(root.toString()) { FindQuery.run(it, FindQuery.Args(q)) } }
+
+    private fun assertNone(answer: String, what: String) = assertTrue(answer.startsWith("no declaration"), "$what: $answer")
+
+    private fun worktree(name: String): Path = TestRepos.tmpDir("wt").resolve(name).also { git(repo, "worktree", "add", "-q", "-b", name, it.toString()) }
+
+    private fun write(root: Path, path: String, text: String) {
+        root.resolve(path).also { it.parent.createDirectories() }.writeText(text)
+    }
+
+    private fun commit(root: Path, message: String) {
+        git(root, "add", "-A")
+        git(root, "commit", "-q", "-m", message)
+    }
+
+    private fun waitFor(what: String, condition: () -> Boolean) {
+        val until = System.currentTimeMillis() + 60_000
+        while (!condition()) {
+            check(System.currentTimeMillis() < until) { "timed out waiting: $what" }
+            Thread.sleep(50)
+        }
+    }
+
+    /** The real build worker, counted; base syncs wait for [gate]. */
+    private class CountingLauncher(private val gate: CompletableDeferred<Unit>? = null) : BuildLauncher(512, 120_000) {
+        val syncs = AtomicInteger()
+        val overlays = AtomicInteger()
+
+        override fun update(commonDir: String, commit: String?, dbFile: Path, update: StoreUpdate, workDir: Path): BuildResult {
+            if (commit == null) {
+                overlays.incrementAndGet()
+            } else {
+                syncs.incrementAndGet()
+                gate?.let { runBlocking { it.await() } }
+            }
+            return super.update(commonDir, commit, dbFile, update, workDir)
+        }
+    }
+
+    private companion object {
+        const val ALPHA = "src/main/kotlin/demo/Alpha.kt"
+        const val BETA = "src/main/kotlin/demo/Beta.kt"
+        const val GONE = "src/main/kotlin/demo/Gone.kt"
+
+        fun alpha(member: String) = "package demo\n\nclass Alpha {\n    fun $member() = 1\n}\n"
+    }
+}

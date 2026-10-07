@@ -1,0 +1,129 @@
+package codeloupe.repo
+
+import codeloupe.JsonFormat
+import codeloupe.daemon.JobQueue
+import codeloupe.git.Git
+import codeloupe.index.BaseBuilder
+import codeloupe.index.BuildResult
+import codeloupe.index.FilePut
+import codeloupe.index.StoreUpdate
+import codeloupe.lang.Languages
+import codeloupe.index.InlineParse
+import codeloupe.platform.IsoTime
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+
+/**
+ * Brings a repository's base index to a commit: a full build in a worker while there is no base, else the previous
+ * base plus the files that changed — parsed in the daemon when few, in a worker in the heavy lane when many. Each
+ * base is a new file swapped in atomically; queries read the old one until then.
+ */
+internal class BaseBuilds(
+    private val queue: JobQueue,
+    private val launcher: BuildLauncher,
+    private val log: (String) -> Unit,
+    private val swapped: (RepoState) -> Unit,
+) {
+    fun full(repo: RepoState, commit: String): Deferred<BuildResult> =
+        queue.run(JobQueue.Lane.HEAVY, "build:${repo.id}:$commit") {
+            build(repo, commit) { tmp -> launcher.build(repo.commonDir, commit, tmp, workDir = repo.dir) }
+        }
+
+    /** Starts (or joins) the sync of [repo]'s base to [commit]. Asks git for the changed files once per commit. */
+    fun sync(repo: RepoState, commit: String): BaseSync {
+        synchronized(repo) { repo.sync?.takeIf { it.commit == commit }?.let { return it } }
+        val from = synchronized(repo) { repo.baseCommit!! }
+        val planned = changes(repo, from, commit)
+        val inline = InlineParse.fits(planned.puts)
+        val job = queue.run(if (inline) JobQueue.Lane.FAST else JobQueue.Lane.HEAVY, "sync:${repo.id}:$commit") {
+            build(repo, commit) { tmp ->
+                // Copied under the lock that guards pruning, so the source cannot vanish mid-copy.
+                val source = synchronized(repo) {
+                    Files.copy(repo.baseFile!!, tmp, StandardCopyOption.REPLACE_EXISTING)
+                    repo.baseCommit!!
+                }
+                val update = if (source == from) planned else changes(repo, source, commit)
+                if (inline) {
+                    BaseBuilder.update(repo.commonDir, commit, tmp, update)
+                } else {
+                    launcher.update(repo.commonDir, commit, tmp, update, repo.dir)
+                }
+            }
+        }
+        return BaseSync(commit, inline, job).also { synchronized(repo) { repo.sync = it } }
+    }
+
+    private fun changes(repo: RepoState, from: String, to: String): StoreUpdate {
+        val changed = Git.diff(repo.commonDir, from, to).filter { Languages.languageOf(it.path) != null }
+        val sizes = Git.blobSizes(repo.commonDir, changed.mapNotNull { it.blob })
+        return StoreUpdate(
+            puts = changed.mapNotNull { entry -> entry.blob?.let { FilePut(entry.path, blob = it, size = sizes[it] ?: 0) } },
+            removes = changed.filter { it.blob == null }.map { it.path },
+        )
+    }
+
+    private suspend fun build(repo: RepoState, commit: String, produce: (Path) -> BuildResult): BuildResult = withContext(Dispatchers.IO) {
+        val name = "base-${commit.take(12)}"
+        val tmp = repo.dir.resolve("$name.tmp.db")
+        val out = repo.dir.resolve("$name.db")
+        val result = try {
+            produce(tmp)
+        } catch (e: Exception) {
+            synchronized(repo) {
+                repo.failure = BuildFailure(commit, IsoTime.now(), e.message ?: e.toString())
+                repo.failedAt = System.currentTimeMillis()
+            }
+            for (suffix in listOf("", "-wal", "-shm")) runCatching { Files.deleteIfExists(Path.of("$tmp$suffix")) }
+            log("build ${repo.id} ${commit.take(7)} failed: ${e.message}")
+            throw e
+        }
+        synchronized(repo) {
+            for (suffix in listOf("", "-wal", "-shm")) Files.deleteIfExists(Path.of("$out$suffix"))
+            Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING)
+            if (repo.baseCommit != commit) {
+                repo.previousCommit = repo.baseCommit
+                repo.previousFile = repo.baseFile
+            }
+            repo.baseCommit = commit
+            repo.baseFile = out
+            repo.lastBuild = LastBuild(IsoTime.now(), result.ok, result.files, result.errors, result.ms, result.peakRssMb)
+            repo.failure = null
+            prune(repo)
+        }
+        save(repo)
+        log("build ${repo.id} ${commit.take(7)}: ${result.files} files in ${result.ms} ms, peak ${result.peakRssMb} MB")
+        swapped(repo)
+        result
+    }
+
+    private fun save(repo: RepoState) {
+        Files.writeString(repo.dir.resolve("repo.json"), PRETTY.encodeToString(RepoRecord.serializer(), repo.record()))
+    }
+
+    // Called with the repo lock held. Windows refuses to delete a base an in-flight query still has open: best effort,
+    // the next build retries.
+    private fun prune(repo: RepoState) {
+        val keep = listOfNotNull(repo.baseFile?.name, repo.previousFile?.name)
+        for (file in repo.dir.listDirectoryEntries("base-*")) {
+            // A .tmp file is a build still in progress in the other lane.
+            if (".tmp." in file.name || keep.any { file.name == it || file.name.startsWith("$it-") }) continue
+            runCatching { Files.deleteIfExists(file) }
+        }
+    }
+
+    private companion object {
+        @OptIn(ExperimentalSerializationApi::class)
+        val PRETTY = Json(JsonFormat.json) {
+            prettyPrint = true
+            prettyPrintIndent = " "
+        }
+    }
+}

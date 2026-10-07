@@ -20,6 +20,7 @@ class JobQueue(private val scope: CoroutineScope) {
     private class LaneState {
         var running: Job? = null
         val waiting = ArrayDeque<Job>()
+        var done = 0
     }
 
     private val lanes = Lane.entries.associateWith { LaneState() }
@@ -43,7 +44,7 @@ class JobQueue(private val scope: CoroutineScope) {
     }
 
     fun snapshot(): QueueSnapshot = synchronized(this) {
-        fun lane(state: LaneState) = LaneSnapshot(state.running?.key, state.waiting.map { it.key })
+        fun lane(state: LaneState) = LaneSnapshot(state.running?.key, state.waiting.map { it.key }, state.done)
         QueueSnapshot(lane(lanes.getValue(Lane.FAST)), lane(lanes.getValue(Lane.HEAVY)), done, failed, coalesced, waitMsMax)
     }
 
@@ -57,7 +58,12 @@ class JobQueue(private val scope: CoroutineScope) {
         scope.launch {
             val outcome = runCatching { job.work() }
             synchronized(this@JobQueue) {
-                if (outcome.isSuccess) done++ else failed++
+                if (outcome.isSuccess) {
+                    done++
+                    state.done++
+                } else {
+                    failed++
+                }
                 byKey.remove(job.key)
                 state.running = null
                 pump(lane)

@@ -4,7 +4,8 @@ On-demand code index for AI coding agents. Ask for a declaration, a file outline
 branch changes, and get exactly that piece of code instead of grepping and reading whole files.
 
 - **Any git repository**, no configuration: the base index follows the default branch and is built
-  from git objects; every worktree of the repository shares it.
+  from git objects; every worktree of the repository shares it and adds an overlay of its own changed, new
+  and deleted files, checked when a query arrives (no file watchers, no CPU while idle).
 - **No IDE**: the Kotlin compiler's own parser (syntax only, no classpath) and SQLite.
 - **One daemon per machine** for every agent window, started on demand; heavy builds run one at a time
   in a short-lived child JVM at low priority, so the daemon stays small (~135 MB).
@@ -59,6 +60,7 @@ read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-s
 | Default root for tools without `root` | — | `CODELOUPE_ROOT` or `config.json` `defaultRoot` |
 | Base branch of a repository | `origin/HEAD`, else `origin/main`, `origin/master`, `main`, `master` | `.codeloupe.json` `{ "baseBranch": "origin/master" }` in the main worktree |
 | Build worker heap, timeouts | 512 MB, query wait 10 s, build 10 min | `config.json` `buildHeapMb`, `queryTimeoutMs`, `buildTimeoutMs` |
+| Reuse of a worktree check | 1 s: queries within a second of the last check of their worktree share it | `config.json` `overlayCheckMs` (1 = check on every query) |
 
 The daemon listens on 127.0.0.1 only and refuses requests with a foreign `Host`, any `Origin`, or
 without the `x-codeloupe` header; responses carry `Connection: close`. Calls are logged (tool, latency,
@@ -74,7 +76,8 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 |---|---|
 | `lang`, `lang.kotlin` | file → facts (declarations, imports, references) via Kotlin PSI |
 | `index` | SQLite store, base build from git objects, build worker entry point |
-| `repo` | repositories and worktrees → base index, child-process builds |
+| `repo` | repositories and worktrees → base index, base syncs, child-process builds |
+| `overlay` | per-worktree overlays: change checks, refreshes, cleanup of removed worktrees |
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |

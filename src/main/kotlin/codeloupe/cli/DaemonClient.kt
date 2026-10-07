@@ -31,7 +31,7 @@ class DaemonClient(private val config: Config) {
         status()?.let { return it }
         Files.createDirectories(config.home)
         // Its own home as working directory: the daemon outlives the CLI and must not hold the user's directory.
-        ProcessBuilder(JavaProcess.command(MAIN_CLASS, DaemonJvm.args(config.home), listOf("daemon", "--detached")))
+        ProcessBuilder(JavaProcess.command(MAIN_CLASS, DaemonJvm.args(), listOf("daemon", "--detached")))
             .directory(config.home.toFile())
             .redirectOutput(ProcessBuilder.Redirect.DISCARD)
             .redirectError(ProcessBuilder.Redirect.DISCARD)

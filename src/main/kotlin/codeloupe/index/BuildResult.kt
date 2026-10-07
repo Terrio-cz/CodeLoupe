@@ -11,4 +11,6 @@ data class BuildResult(
     val ms: Long = 0,
     val peakRssMb: Long? = null,
     val error: String? = null,
+    /** Files of an update that could not be read and were left unchanged. */
+    val unread: List<String> = emptyList(),
 )

@@ -22,8 +22,7 @@ class ToolRunner(private val registry: Registry, private val defaultRoot: String
         val outcome = try {
             val root = args.string("root")?.takeIf { it.isNotEmpty() } ?: defaultRoot
                 ?: throw IllegalArgumentException("pass root: the absolute path of the repository or worktree to answer for")
-            val answer = registry.query(root) { tool.run(it, args) }
-            ToolOutcome(true, listOfNotNull(answer.note, answer.value).joinToString("\n"))
+            ToolOutcome(true, registry.query(root) { tool.run(it, args) })
         } catch (e: CancellationException) {
             throw e
         } catch (e: BusyException) {

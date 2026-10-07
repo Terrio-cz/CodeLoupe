@@ -48,6 +48,13 @@ object Store {
         return connection
     }
 
+    fun count(db: Connection, sql: String): Long = db.createStatement().use { s -> s.executeQuery(sql).use { it.next(); it.getLong(1) } }
+
+    /** Folds the write-ahead log into the database file, so a copy of the file alone is complete. */
+    fun checkpoint(db: Connection) {
+        db.createStatement().use { it.execute("PRAGMA wal_checkpoint(TRUNCATE)") }
+    }
+
     fun getMeta(db: Connection, key: String): String? =
         db.prepareStatement("SELECT value FROM meta WHERE key = ?").use { s ->
             s.setString(1, key)
