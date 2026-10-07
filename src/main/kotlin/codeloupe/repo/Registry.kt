@@ -100,11 +100,15 @@ class Registry(
     suspend fun <T> changes(root: String, read: (ChangeSet, View, View?) -> T): T {
         val location = locate(root)
         val set = mergeBases.changes(repo(location.commonDir), location.worktree)
-        return query(root) { after -> set.beforeFile?.let(::View).use { before -> read(set, after, before) } }
+        return query(root, speculative = false) { after -> set.beforeFile?.let(::View).use { before -> read(set, after, before) } }
     }
 
-    /** Runs [read] on the base index of [root]'s repository with [root]'s worktree overlay on top. */
-    suspend fun <T> query(root: String, read: (View) -> T): T {
+    /**
+     * Runs [read] on the base index of [root]'s repository with [root]'s worktree overlay on top. A [speculative] read
+     * starts while the worktree is checked and is thrown away when the check changed something: worth it for cheap
+     * reads only.
+     */
+    suspend fun <T> query(root: String, speculative: Boolean = true, read: (View) -> T): T {
         val arrived = System.nanoTime()
         val location = locate(root)
         val repo = base(repo(location.commonDir))
@@ -112,7 +116,7 @@ class Registry(
             val (baseFile, baseCommit) = synchronized(repo) { repo.baseFile!! to repo.baseCommit!! }
             val answer = coroutineScope {
                 // Read the overlay as it is while the worktree is checked: the answer stands when the check changed nothing.
-                val known = overlays.known(location.worktree, baseCommit)
+                val known = if (speculative) overlays.known(location.worktree, baseCommit) else null
                 val early = known?.let { async(Dispatchers.IO) { runCatching { read(repo, baseFile, baseCommit, it.file, read) } } }
                 val overlay = overlays.fresh(repo, location.worktree, baseCommit, baseFile, arrived) ?: return@coroutineScope null
                 if (overlay == known) {

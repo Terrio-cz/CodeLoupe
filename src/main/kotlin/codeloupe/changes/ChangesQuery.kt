@@ -7,7 +7,7 @@ import codeloupe.query.usages.UsageFinder
 /**
  * `changes`: the declarations a worktree changed against the merge-base with the default branch — `+` added, `~` body
  * changed, `^` signature changed, `-` removed — each with its callers and the tests that use it. The answer grows with
- * the changed declarations, not with the size of the files.
+ * the changed declarations, not with the size of the files; files are compared one at a time.
  */
 object ChangesQuery {
     data class Args(val bodies: Boolean = false, val limit: Int = 60)
@@ -15,31 +15,31 @@ object ChangesQuery {
     /** [after] reads the worktree as it is now, [before] the merge-base version of the changed files. */
     fun run(set: ChangeSet, after: View, before: View?, args: Args): String {
         val callers = Callers(UsageFinder(after))
-        val files = set.files.sortedWith(compareBy(PathOrder) { it.path }).map { it to changes(it, after, before) }
-        val all = files.flatMap { it.second }
-        val visible = files.sumOf { collapse(it.second).size }
+        val counts = LinkedHashMap(MARKS.associateWith { 0 })
         val shown = ArrayList<String>()
+        val quiet = ArrayList<String>()
         var listed = 0
-        for ((file, changes) in files) {
-            if (changes.isEmpty()) continue
-            shown += "${file.path}${if (file.status == 'A') "  (new)" else if (file.status == 'D') "  (deleted)" else ""}"
+        for (file in set.files.sortedWith(compareBy(PathOrder) { it.path })) {
+            val changes = changes(file, after, before)
+            if (changes.isEmpty()) {
+                quiet += file.path
+                continue
+            }
+            changes.forEach { counts.merge(it.mark, 1, Int::plus) }
             for ((change, nested) in collapse(changes)) {
                 if (listed++ >= args.limit) continue
-                shown += line(change) + if (nested > 0) "  (with $nested ${if (nested == 1) "member" else "members"})" else ""
+                if (shown.lastOrNull { !it.startsWith(" ") } != heading(file)) shown += heading(file)
+                shown += line(change) + note(change, nested)
                 details(change, callers).forEach { shown += "      $it" }
-                if (args.bodies && change.before != null && change.after != null) shown += TextDiff.of(change.before.text, change.after.text)
+                if (args.bodies) body(change, changes)?.let { shown += it }
             }
         }
-        val quiet = files.filter { it.second.isEmpty() }.map { it.first.path }
         return buildString {
-            append(header(set, all))
+            append(header(set, counts))
             if (shown.isNotEmpty()) append('\n').append(shown.joinToString("\n"))
-            if (visible > args.limit) append("\n… +${visible - args.limit} more declarations (raise limit)")
-            if (quiet.isNotEmpty()) append("\nno declaration changed (imports, comments, formatting): ${quiet.joinToString(", ")}")
-            if (set.otherFiles.isNotEmpty()) {
-                append("\nother changed files: ${set.otherFiles.take(OTHER_FILES).joinToString(", ")}")
-                if (set.otherFiles.size > OTHER_FILES) append(", … +${set.otherFiles.size - OTHER_FILES}")
-            }
+            if (listed > args.limit) append("\n… +${listed - args.limit} more declarations (raise limit)")
+            if (quiet.isNotEmpty()) append("\nno declaration changed (imports, comments, formatting): ").append(capped(quiet))
+            if (set.otherFiles.isNotEmpty()) append("\nother changed files: ").append(capped(set.otherFiles))
         }
     }
 
@@ -77,11 +77,17 @@ object ChangesQuery {
         return DeclVersion.of(view.decls("f.path = :path", mapOf("path" to path), "ORDER BY start_line"), content)
     }
 
-    private fun header(set: ChangeSet, all: List<DeclChange>): String {
-        val counts = listOf(DeclChange.ADDED, DeclChange.BODY, DeclChange.SIGNATURE, DeclChange.REMOVED)
-            .mapNotNull { mark -> all.count { it.mark == mark }.takeIf { it > 0 }?.let { "$mark$it" } }
-        val summary = if (all.isEmpty()) "no declaration changed" else "${all.size} declarations (${counts.joinToString(" ")})"
+    private fun header(set: ChangeSet, counts: Map<Char, Int>): String {
+        val total = counts.values.sum()
+        val marks = counts.filterValues { it > 0 }.entries.joinToString(" ") { (mark, n) -> "$mark$n" }
+        val summary = if (total == 0) "no declaration changed" else "$total declarations ($marks)"
         return "changes vs ${set.defaultRef} (merge-base ${set.mergeBase.take(7)}): ${set.files.size} source files, $summary"
+    }
+
+    private fun heading(file: ChangedFile) = file.path + when (file.status) {
+        'A' -> "  (new)"
+        'D' -> "  (deleted)"
+        else -> ""
     }
 
     /** `  ^ 120-140  [Container] signature` with the line range of the current version (the old one when removed). */
@@ -91,10 +97,31 @@ object ChangesQuery {
         return "  ${change.mark} ${row.startLine}-${row.endLine}  $container${row.sig}"
     }
 
-    private fun details(change: DeclChange, callers: Callers): List<String> = buildList {
-        if (change.mark == DeclChange.SIGNATURE) add("was: ${change.before!!.row.sig}")
-        addAll(if (change.after == null) callers.ofRemoved(change.before!!.row) else callers.of(change.after.row))
+    private fun note(change: DeclChange, nested: Int): String = when {
+        nested > 0 -> "  (with $nested ${if (nested == 1) "member" else "members"})"
+        change.mark == DeclChange.BODY && change.before!!.sameCode(change.after!!) -> "  (KDoc only)"
+        else -> ""
     }
 
-    private const val OTHER_FILES = 15
+    private fun details(change: DeclChange, callers: Callers): List<String> = buildList {
+        if (change.mark == DeclChange.SIGNATURE) add("was: ${change.before!!.row.sig}")
+        when {
+            change.after == null -> addAll(callers.ofRemoved(change.before!!.row))
+            change.mark == DeclChange.SIGNATURE -> addAll(callers.ofChangedSignature(change.after.row, change.before!!.row))
+            else -> addAll(callers.of(change.after.row))
+        }
+    }
+
+    // A type's own lines only: its members' changes are listed, and diffed, on their own.
+    private fun body(change: DeclChange, changes: List<DeclChange>): String? {
+        val (old, new) = (change.before ?: return null) to (change.after ?: return null)
+        if (!new.isType) return TextDiff.of(old.text, new.text)
+        return TextDiff.of(old.ownText(changes.mapNotNull { it.before }), new.ownText(changes.mapNotNull { it.after }))
+    }
+
+    private fun capped(paths: List<String>) =
+        paths.take(LISTED_FILES).joinToString(", ") + if (paths.size > LISTED_FILES) ", … +${paths.size - LISTED_FILES}" else ""
+
+    private val MARKS = listOf(DeclChange.ADDED, DeclChange.BODY, DeclChange.SIGNATURE, DeclChange.REMOVED)
+    private const val LISTED_FILES = 15
 }

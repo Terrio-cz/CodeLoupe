@@ -14,18 +14,45 @@ import codeloupe.query.usages.UsageFinder
 internal class Callers(private val finder: UsageFinder) {
     /** The declaration as it is now: its usages, resolved exact or candidate. */
     fun of(decl: DeclRow): List<String> {
-        val usages = finder.usages(listOf(decl)).filter { it.label != Label.OTHER && !sameDecl(it.owner, decl) }
-        return lines(usages.map { Site(it.ref, it.owner, it.label == Label.CANDIDATE) }, "callers")
+        tooCommon(decl)?.let { return listOf(it) }
+        return lines(sites(decl), "callers")
+    }
+
+    /**
+     * A changed signature: its usages, and calls that still fit the old parameters but now resolve to another overload
+     * of the same name — the ones the change may have silently redirected.
+     */
+    fun ofChangedSignature(decl: DeclRow, old: DeclRow): List<String> {
+        tooCommon(decl)?.let { return listOf(it) }
+        val redirected = finder.cache.refsNamed(decl.name).filter { ref ->
+            val args = ref.args ?: return@filter false
+            ref.kind == "call" && finder.context.arguments.fits(old, args) &&
+                finder.resolve(ref).decls.any { it.container == decl.container && it.kind == decl.kind && !(it.id == decl.id && it.src == decl.src) }
+        }
+        val redirectedLine = line("may be redirected (fit the old signature, now resolve to another overload)", redirected.map { site(it) }, Site::user)
+        return lines(sites(decl), "callers") + listOfNotNull(redirectedLine)
     }
 
     /** A removed declaration: references with its name that do not surely resolve to another one may still mean it ("by name" says how sure). */
     fun ofRemoved(decl: DeclRow): List<String> {
+        tooCommon(decl)?.let { return listOf(it) }
         val kinds = KINDS[decl.kind] ?: return emptyList()
         val sites = finder.cache.refsNamed(decl.name)
             .filter { it.kind in kinds }
             .filter { ref -> finder.resolve(ref).let { it.decls.isEmpty() || !it.complete } }
-            .map { Site(it, finder.cache.owner(finder.cache.file(it.path)?.decl(it.declId)), candidate = false) }
+            .map { site(it) }
         return lines(sites, "still referenced by name")
+    }
+
+    private fun sites(decl: DeclRow): List<Site> =
+        finder.usages(listOf(decl)).filter { it.label != Label.OTHER && !sameDecl(it.owner, decl) }.map { Site(it.ref, it.owner, it.label == Label.CANDIDATE) }
+
+    private fun site(ref: RefRow) = Site(ref, finder.cache.owner(finder.cache.file(ref.path)?.decl(ref.declId)), candidate = false)
+
+    // Resolving every reference of a name like `id` or `get` costs seconds and says little; usages pages through them.
+    private fun tooCommon(decl: DeclRow): String? {
+        val refs = finder.cache.refsNamed(decl.name).size
+        return if (refs > MAX_REFS) "callers: $refs references named ${decl.name}, too common to resolve here (usages lists them)" else null
     }
 
     private fun lines(sites: List<Site>, what: String): List<String> {
@@ -70,6 +97,7 @@ internal class Callers(private val finder: UsageFinder) {
 
     private companion object {
         const val TOP = 10
+        const val MAX_REFS = 2_000
         private val TYPE_REFS = setOf("type", "call", "nav", "name", "callable_ref")
         val KINDS = mapOf(
             "fun" to setOf("call", "callable_ref"),

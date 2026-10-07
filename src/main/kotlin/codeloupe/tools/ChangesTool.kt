@@ -16,6 +16,6 @@ object ChangesTool : Tool {
     override val required = emptyList<String>()
 
     override suspend fun answer(registry: Registry, root: String, args: ToolArgs): String = registry.changes(root) { set, after, before ->
-        ChangesQuery.run(set, after, before, ChangesQuery.Args(bodies = args.bool("bodies") ?: false, limit = args.int("limit") ?: 60))
+        ChangesQuery.run(set, after, before, ChangesQuery.Args(bodies = args.bool("bodies") ?: false, limit = (args.int("limit") ?: 60).coerceIn(1, 500)))
     }
 }

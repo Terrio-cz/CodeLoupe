@@ -9,6 +9,7 @@ import codeloupe.tools.ChangesTool
 import codeloupe.tools.ToolArgs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -77,8 +78,58 @@ class ChangesTest {
         assertContains(text, "other changed files: docs/notes.md")
     }
 
-    private fun changes(bodies: Boolean = false): String = runBlocking {
-        ChangesTool.answer(registry, feature.toString(), ToolArgs(buildJsonObject { put("bodies", JsonPrimitive(bodies)) }))
+    @Test
+    fun `an added member does not change its class, a KDoc edit is labelled, limit bounds the listing`() {
+        write(feature, BILLING, billing(extra = "\n    fun discount(): Int = 5\n").replace("    fun keep()", "    /** Kept. */\n    fun keep()"))
+        for (i in 0 until 5) write(feature, "src/main/kotlin/demo/More$i.kt", "package demo\n\nfun more$i() = $i\n")
+        val text = changes(limit = 3)
+        assertFalse("class Billing" in text, text)
+        assertContains(text, "fun keep(): Int  (KDoc only)")
+        assertContains(text, "… +4 more declarations (raise limit)")
+        assertEquals(1, text.lines().count { it.startsWith("src/main/kotlin/demo/More") }, "no file headings past the limit")
+    }
+
+    @Test
+    fun `a signature change lists calls an overload now takes`() {
+        write(repo, PAY, "package demo\n\nclass Pay {\n    fun pay(a: Int): Int = a\n\n    fun pay(a: String, b: Int = 0): Int = b\n}\n")
+        write(repo, PAY_USE, "package demo\n\nfun payAll(): Int = Pay().pay(1) + Pay().pay(\"x\")\n")
+        commit(repo, "pay")
+        git(feature, "merge", "-q", "main")
+        write(feature, PAY, "package demo\n\nclass Pay {\n    fun pay(a: Int, c: Int): Int = a + c\n\n    fun pay(a: String, b: Int = 0): Int = b\n}\n")
+        val text = changes()
+        assertContains(text, "  ^ 4-4  [Pay] fun pay(a: Int, c: Int): Int\n      was: fun pay(a: Int): Int")
+        assertContains(text, "may be redirected (fit the old signature, now resolve to another overload) 2: payAll (PayUse.kt) ×2")
+    }
+
+    @Test
+    fun `two worktrees on one merge-base at once each get their own old versions`() {
+        val other = TestRepos.tmpDir("wt").resolve("other").also { git(repo, "worktree", "add", "-q", "-b", "other", it.toString()) }
+        write(feature, BILLING, billing(total = "return a + 1"))
+        write(other, USE, USE_TEXT.replace("total(1)", "total(2)"))
+        val (a, b) = runBlocking {
+            val args = ToolArgs(buildJsonObject { })
+            val first = async(Dispatchers.Default) { ChangesTool.answer(registry, feature.toString(), args) }
+            val second = async(Dispatchers.Default) { ChangesTool.answer(registry, other.toString(), args) }
+            first.await() to second.await()
+        }
+        assertContains(a, "  ~ 4-6  [Billing] fun total(a: Int): Int")
+        assertContains(b, "  ~ 3-3  fun useAll(): Int")
+    }
+
+    @Test
+    fun `a file removed from the index but still on disk is changed, not deleted`() {
+        git(feature, "rm", "-q", "--cached", USE)
+        write(feature, USE, USE_TEXT.replace("total(1)", "total(5)"))
+        val text = changes()
+        assertContains(text, "$USE\n  ~ 3-3  fun useAll(): Int")
+    }
+
+    private fun changes(bodies: Boolean = false, limit: Int = 60): String = runBlocking {
+        val args = buildJsonObject {
+            put("bodies", JsonPrimitive(bodies))
+            put("limit", JsonPrimitive(limit))
+        }
+        ChangesTool.answer(registry, feature.toString(), ToolArgs(args))
     }
 
     private fun write(root: Path, path: String, text: String) {
@@ -96,6 +147,8 @@ class ChangesTest {
         const val TEST = "src/test/kotlin/demo/BillingTest.kt"
         const val OLD = "src/main/kotlin/demo/Old.kt"
         const val NEW = "src/main/kotlin/demo/Fresh.kt"
+        const val PAY = "src/main/kotlin/demo/Pay.kt"
+        const val PAY_USE = "src/main/kotlin/demo/PayUse.kt"
         const val USE_TEXT = "package demo\n\nfun useAll(): Int = Billing().total(1) + Billing().tax(2) + Billing().legacy()\n"
         const val TEST_TEXT = "package demo\n\nclass BillingTest {\n    fun totals() = Billing().total(3)\n}\n"
 
