@@ -1,0 +1,36 @@
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { CH, type CodeLoupeBridge, type DaemonState } from '../shared/ipc';
+
+// The renderer's only access to anything outside the page; every call is validated again in main.
+const bridge: CodeLoupeBridge = {
+  api: req => ipcRenderer.invoke(CH.api, req),
+  daemon: {
+    state: () => ipcRenderer.invoke(CH.daemonState),
+    start: () => ipcRenderer.invoke(CH.daemonStart),
+    stop: () => ipcRenderer.invoke(CH.daemonStop),
+    restart: () => ipcRenderer.invoke(CH.daemonRestart),
+    onState: cb => {
+      const listener = (_e: IpcRendererEvent, s: DaemonState) => cb(s);
+      ipcRenderer.on(CH.daemonPush, listener);
+      return () => ipcRenderer.removeListener(CH.daemonPush, listener);
+    },
+  },
+  settings: {
+    get: () => ipcRenderer.invoke(CH.settingsGet),
+    set: s => ipcRenderer.invoke(CH.settingsSet, s),
+    proposeCli: (command, args) => ipcRenderer.invoke(CH.settingsProposeCli, command, args),
+  },
+  metrics: () => ipcRenderer.invoke(CH.metrics),
+  open: {
+    worktree: id => ipcRenderer.invoke(CH.openWorktree, id),
+    config: () => ipcRenderer.invoke(CH.openConfig),
+    external: url => ipcRenderer.invoke(CH.openExternal, url),
+  },
+  onNavigate: cb => {
+    const listener = (_e: IpcRendererEvent, hash: string) => cb(hash);
+    ipcRenderer.on(CH.navigate, listener);
+    return () => ipcRenderer.removeListener(CH.navigate, listener);
+  },
+};
+
+contextBridge.exposeInMainWorld('codeloupe', bridge);
