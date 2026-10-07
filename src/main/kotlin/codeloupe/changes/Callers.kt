@@ -11,7 +11,7 @@ import codeloupe.query.usages.UsageFinder
  * that may mean it) are counted; they are named only when there are few and no exact one, since a common name such
  * as `id` has hundreds. `usages` lists them all with code lines.
  */
-internal class Callers(private val finder: UsageFinder) {
+internal class Callers(private val finder: UsageFinder, private val maxRefs: Int = MAX_REFS, private val budget: Int = BUDGET) {
     private var spent = 0
 
     /** The declaration as it is now: its usages, resolved exact or candidate. */
@@ -53,12 +53,12 @@ internal class Callers(private val finder: UsageFinder) {
 
     /**
      * Resolving every reference of a name like `id` or `get` costs seconds and says little, and one call resolves at most
-     * [BUDGET] references in all: past either, a declaration gets a note instead (usages pages through them).
+     * [budget] references in all: past either, a declaration gets a note instead (usages pages through them).
      */
     private fun tooCommon(decl: DeclRow): String? {
-        val refs = finder.cache.view.refCount(decl.name, MAX_REFS + 1)
-        if (refs > MAX_REFS) return "callers: over $MAX_REFS references named ${decl.name}, too common to resolve here (usages lists them)"
-        if (spent + refs > BUDGET) return "callers: not resolved, this call's budget of $BUDGET references is spent (usages lists them)"
+        val refs = finder.cache.view.refCount(decl.name, maxRefs + 1)
+        if (refs > maxRefs) return "callers: over $maxRefs references named ${decl.name}, too common to resolve here (usages lists them)"
+        if (spent + refs > budget) return "callers: not resolved, this call's budget of $budget references is spent (usages lists them)"
         spent += refs
         return null
     }

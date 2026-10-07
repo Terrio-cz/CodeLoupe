@@ -444,9 +444,10 @@ celou dobu vytížený jinými okny (CPU 40–97 %), `main` měřený souběžn�
   změny signatury (2–9) → ~15–80 tahů; `changes` 1 tah (+ `symbol`/`usages` jen pro to, co chce vidět celé).
 - Volající u `^` navíc: volání, která sedí na starou signaturu a teď vedou na jiný overload („may be redirected").
   Jména s víc než 2 000 odkazy (`id`, `get`) jen počtem. RSS daemonu po měření 188 MB.
-- Testy: 65 (nově `ChangesTest` 7: větev s `+ ~ ^ -`, novým a smazaným souborem, CRLF bez falešného `~`, posunutý
+- Testy: 68 (nově `CallersTest` — limity jmen a rozpočtu; `ChangesTest` 9: větev s `+ ~ ^ -`, novým a smazaným souborem, CRLF bez falešného `~`, posunutý
   main mimo výstup, `bodies`, soubory bez změny deklarací, přidaný člen bez `~` třídy, `(KDoc only)`, limit,
-  přesměrovaný overload, dva worktree na jedné merge-base souběžně, `git rm --cached`).
+  přesměrovaný overload a stejnojmenná funkce jiného balíčku, dva worktree na jedné merge-base souběžně, `git rm --cached`,
+  chybějící git objekt = chyba, ne špatná odpověď).
 
 ## 10. Rizika
 

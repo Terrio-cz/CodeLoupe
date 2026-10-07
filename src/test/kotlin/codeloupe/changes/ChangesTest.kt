@@ -20,6 +20,7 @@ import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -105,6 +106,31 @@ class ChangesTest {
         val text = changes()
         assertContains(text, "  ^ 4-4  [Pay] fun pay(a: Int, c: Int): Int\n      was: fun pay(a: Int): Int")
         assertContains(text, "may be redirected (fit the old signature, now resolve to another overload) 2: payAll (PayUse.kt) ×2")
+    }
+
+    @Test
+    fun `a same-named top-level function in another package is no overload`() {
+        write(repo, "src/main/kotlin/one/Of.kt", "package one\n\nfun of(a: Int): Int = a\n")
+        write(repo, "src/main/kotlin/two/Of.kt", "package two\n\nfun of(a: Int): Int = a\n")
+        write(repo, "src/main/kotlin/two/UseOf.kt", "package two\n\nfun useOf(): Int = of(1)\n")
+        commit(repo, "of")
+        git(feature, "merge", "-q", "main")
+        write(feature, "src/main/kotlin/one/Of.kt", "package one\n\nfun of(a: Int, b: Int): Int = a + b\n")
+        val text = changes()
+        assertContains(text, "  ^ 3-3  fun of(a: Int, b: Int): Int")
+        assertFalse("may be redirected" in text, text)
+    }
+
+    @Test
+    fun `an old version git no longer has is an error, not a wrong answer`() {
+        changes()
+        val blob = git(repo, "rev-parse", "HEAD:$USE")
+        // Deleted, so git itself never reads the old blob; changes needs it for the old declarations.
+        Files.delete(feature.resolve(USE))
+        // Git writes objects read-only.
+        repo.resolve(".git/objects/${blob.take(2)}/${blob.drop(2)}").also { it.toFile().setWritable(true) }.let(Files::delete)
+        val error = assertFailsWith<IllegalStateException> { changes() }
+        assertContains(error.message!!, "are not in this clone")
     }
 
     @Test
