@@ -1,14 +1,12 @@
 import type { ReactNode } from 'react';
-import { bridge, useApi } from '../api';
+import { bridge } from '../api';
 
 /**
  * Renders untrusted markdown from the YouTrack mirror as React elements: headings, paragraphs, lists,
  * checkboxes, inline code, code blocks and links. Never raw HTML. A link is clickable only when its origin
  * is a configured YouTrack instance (main checks the same again); any other link stays text.
  */
-export function MarkdownView({ source }: { source: string }) {
-  const settings = useApi('settings');
-  const allowed = new Set((settings.data?.youtrack ?? []).map(y => originOf(y.url)).filter((o): o is string => !!o));
+export function MarkdownView({ source, allowed }: { source: string; allowed: ReadonlySet<string> }) {
   const blocks: ReactNode[] = [];
   // Every line break form becomes \n: a lone \r would otherwise match no block rule.
   const lines = source.replace(/\r\n?|\u2028|\u2029/g, '\n').split('\n');
@@ -53,7 +51,7 @@ export function MarkdownView({ source }: { source: string }) {
   return <div className="md">{blocks}</div>;
 }
 
-function inline(text: string, allowed: Set<string>): ReactNode[] {
+function inline(text: string, allowed: ReadonlySet<string>): ReactNode[] {
   const out: ReactNode[] = [];
   const re = /`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*/g;
   let last = 0;
@@ -74,6 +72,11 @@ function inline(text: string, allowed: Set<string>): ReactNode[] {
   }
   if (last < text.length) out.push(text.slice(last));
   return out;
+}
+
+/** Origins of the configured YouTrack instances: the only links markdown may open. */
+export function allowedOrigins(urls: string[]): ReadonlySet<string> {
+  return new Set(urls.map(originOf).filter((o): o is string => !!o));
 }
 
 export function originOf(url: string): string | null {

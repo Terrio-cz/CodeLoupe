@@ -36,11 +36,22 @@ export class DaemonHome {
   }
 
   /**
-   * `<home>/stopped`: a manual stop (here, or `codeloupe stop` once the CLI writes it, CL-62) that keeps the
+   * `<home>/stopped`: a manual stop (in the app, or `codeloupe stop` once the CLI writes it, CL-62) that keeps the
    * app from starting the daemon against the user's will, also across app restarts.
    */
   stoppedByUser(): boolean {
     return fs.existsSync(this.stopMarker);
+  }
+
+  /** Whether the running daemon was started after the stop marker was written (someone started it again). */
+  startedAfterStop(): boolean {
+    try {
+      const markedAt = fs.statSync(this.stopMarker).mtimeMs;
+      const started = Date.parse(this.info()?.startedAt ?? '');
+      return Number.isFinite(started) && started > markedAt;
+    } catch {
+      return false;
+    }
   }
 
   setStoppedByUser(stopped: boolean): void {

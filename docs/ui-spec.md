@@ -324,9 +324,8 @@ main procesu jako v § 3.7.1 — nikdy přes daemon HTTP.
   ve kterém transcript leží (ingest CL-62). Přehled půjde filtrovat podle účtu.
 - YouTrack účet nahrazuje jedinou instanci z CL-29: URL, projekty, token (jen „nastaven ✓“), stav mirroru,
   test spojení.
-- API: `GET /ui-api/v1/accounts` → `{ claude: { id, label, configDir, isDefault, windows, weighted7d,
-  savedPct7d, lastUsedAt }[], youtrack: { id, url, projects, tokenConfigured, mirror: { state, syncedAt } }[] }`
-  — jen metadata, nikdy tokeny.
+- API: `GET /ui-api/v1/accounts` (§ 9.13a) — jen metadata, nikdy tokeny. „Okna“ = MCP klienti účtu, kteří
+  volali CodeLoupe za posledních 15 min (stejně jako „Aktivní okna“ v § 3.1), ne sledování agentů.
 
 ## 4. Tray a notifikace
 
@@ -448,9 +447,12 @@ s ikonou a textem.
   s `CODELOUPE_PORT` = port, který aplikace sleduje. Spouští se bez shellu, takže CLI musí být `.exe`, nebo
   `node`/`java` + cesta ke skriptu; `.cmd`/`.bat` (npm shim, Gradle launcher) aplikace odmítne s vysvětlením. Backoff 5 s → 60 s, max 5 pokusů za 10 min, pak
   notifikace a stav `error`.
-- **Stop / restart**: `… stop` (CLI posílá `POST /shutdown`), restart = stop + start. Ruční stop — z aplikace
-  **i z CLI** — vypne autostart do dalšího ručního startu: `codeloupe stop` zapíše `<home>/stopped`,
-  `codeloupe start` ho smaže (požadavek na CLI v CL-39), aplikace ho respektuje.
+- **Stop / restart**: `… stop` (CLI posílá `POST /shutdown`), restart = stop + start. Ruční stop vypne
+  autostart do dalšího ručního startu, i přes restart aplikace: aplikace při stopu zapíše `<home>/stopped`,
+  při startu a restartu ho smaže. Stejný marker zapíše `codeloupe stop` a smaže `codeloupe start` (požadavek
+  na CLI v CL-62; Node prototyp ho zatím nepíše, takže stop z terminálu aplikace bere jako výpadek). Když
+  odpovídá daemon spuštěný **po** zapsání markeru (`daemon.json.startedAt` > mtime markeru), někdo ho spustil
+  znovu a aplikace marker smaže; daemon spuštěný před markerem se teprve vypíná a stop platí dál.
 - **Přežije restart daemonu**: HTTP bez keep-alive, každé volání nové spojení; renderer jen zobrazí stav
   `restarting` a data se po návratu obnoví.
 - Single instance (`requestSingleInstanceLock`), druhé spuštění zaostří okno.
@@ -614,6 +616,19 @@ interface Environment {
 }
 ```
 
+### 9.13a `GET /ui-api/v1/accounts` (CL-63; jen metadata, nikdy tokeny)
+```ts
+interface Accounts {
+  claude: { id: string; label: string; configDir: string; isDefault: boolean;
+            windows: number;          // MCP klienti tohoto účtu, kteří volali CodeLoupe za posledních 15 min (jako „Aktivní okna“)
+            weighted7d: number; savedPct7d: number; lastUsedAt: Iso | null }[];
+  youtrack: { id: string; url: string; projects: string[]; tokenConfigured: boolean;
+              mirror: { state: 'synced' | 'syncing' | 'error' | 'off'; syncedAt: Iso | null } }[];
+}
+```
+Test spojení YouTrack účtu dělá main proces (IPC `accounts.testYoutrack(id)`, token ze storu CL-50,
+`GET /api/users/me`), ne daemon — read-only API zůstává bez zápisů a bez síťových akcí na povel.
+
 ### 9.14 `GET /ui-api/v1/settings` (efektivní konfigurace daemonu, bez tajemství)
 ```ts
 interface DaemonSettings {
@@ -650,6 +665,7 @@ nim nemá časovač (plan.md § 5.1).
 | Index | `index` |
 | Mezery | `gaps` |
 | Prostředí | `environment` |
+| Účty (CL-63) | `accounts` |
 | Nastavení | `settings`, `/status` |
 | Tray, notifikace | `/status`, `events` |
 

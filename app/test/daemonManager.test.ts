@@ -14,14 +14,15 @@ const status = (pid: number, name = 'codeloupe'): DaemonStatus => ({
 });
 
 /** A fake daemon: `up` decides whether /status answers, `pid` what it reports, daemon.json holds `filePid`. */
-function setup(opts: { up?: boolean; pid?: number; filePid?: number | null; stoppedMarker?: boolean } = {}) {
-  const world = { up: opts.up ?? false, pid: opts.pid ?? 100, filePid: opts.filePid === undefined ? 100 : opts.filePid, name: 'codeloupe', marker: !!opts.stoppedMarker };
+function setup(opts: { up?: boolean; pid?: number; filePid?: number | null; stoppedMarker?: boolean; startedAfterStop?: boolean } = {}) {
+  const world = { up: opts.up ?? false, pid: opts.pid ?? 100, filePid: opts.filePid === undefined ? 100 : opts.filePid, name: 'codeloupe', marker: !!opts.stoppedMarker, startedAfterStop: opts.startedAfterStop ?? true };
   const client = { status: vi.fn(async () => { if (!world.up) throw new Error('down'); return status(world.pid, world.name); }) } as unknown as DaemonClient;
   const home = {
     port: () => 47391,
     info: (): DaemonInfo | null => (world.filePid === null ? null : { pid: world.filePid, port: 47391 }),
     stoppedByUser: () => world.marker,
     setStoppedByUser: (v: boolean) => { world.marker = v; },
+    startedAfterStop: () => world.startedAfterStop,
   } as unknown as DaemonHome;
   const cli = vi.fn(async (verb: 'start' | 'stop') => { world.up = verb === 'start'; return ''; });
   const m = new DaemonManager(client, home, () => DEFAULT_SETTINGS, () => 1000, cli);
@@ -104,6 +105,17 @@ describe('DaemonManager', () => {
     expect(world.marker).toBe(false);
   });
 
+  it('keeps the stop while the stopped daemon is still shutting down', async () => {
+    const { m, world, cli } = setup({ up: true, stoppedMarker: true, startedAfterStop: false });
+    await m.check(true);
+    expect(world.marker).toBe(true);
+    expect(m.current.manualStop).toBe(true);
+    world.up = false;
+    for (let i = 0; i < 4; i++) await m.check(true);
+    expect(m.current.phase).toBe('stopped');
+    expect(cli).not.toHaveBeenCalled();
+  });
+
   it('checks asked for by the page never count as missed ticks', async () => {
     const { m, world, cli } = setup({ up: true });
     await m.check(true);
@@ -159,5 +171,9 @@ describe('resolveCommand', () => {
     expect(resolveCommand('clx', { PATH: dir }, 'win32')).toBe(path.join(dir, 'clx.exe'));
     expect(resolveCommand('C:/x/node.exe', { PATH: dir }, 'win32')).toBe('C:/x/node.exe');
     expect(resolveCommand('codeloupe', { PATH: dir }, 'linux')).toBe('codeloupe');
+    // An .exe later on PATH wins over an earlier .cmd shim.
+    const later = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-path-'));
+    fs.writeFileSync(path.join(later, 'codeloupe.exe'), '');
+    expect(resolveCommand('codeloupe', { PATH: `${dir};${later}` }, 'win32')).toBe(path.join(later, 'codeloupe.exe'));
   });
 });

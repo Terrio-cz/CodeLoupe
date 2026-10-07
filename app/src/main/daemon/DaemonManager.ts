@@ -87,9 +87,14 @@ export class DaemonManager extends EventEmitter {
       const foreign = this.foreign(status);
       if (!foreign) {
         this.mismatchTicks = 0;
-        // Running again after a manual stop means someone started it: the stop no longer applies.
-        if (this.state.manualStop || this.home.stoppedByUser()) this.home.setStoppedByUser(false);
-        this.set({ phase: 'running', status, port, message: null, manualStop: false });
+        // A daemon started after the stop marker means someone started it again: the stop no longer applies.
+        // One that started before it is still shutting down, so the stop stays.
+        let manualStop = this.home.stoppedByUser();
+        if (manualStop && this.home.startedAfterStop()) {
+          this.home.setStoppedByUser(false);
+          manualStop = false;
+        }
+        this.set({ phase: 'running', status, port, message: null, manualStop });
       } else if (foreign.hard || (tick && ++this.mismatchTicks >= 3)) {
         this.set({ phase: 'error', status: null, port, message: foreign.message });
       } else {
@@ -237,8 +242,14 @@ export class DaemonManager extends EventEmitter {
  */
 export function resolveCommand(command: string, env: NodeJS.ProcessEnv = process.env, platform = process.platform): string {
   if (platform !== 'win32' || /[\\/]/.test(command) || path.extname(command)) return command;
-  for (const dir of (env.PATH ?? env.Path ?? '').split(';').filter(Boolean)) {
-    if (fs.existsSync(path.join(dir, `${command}.exe`))) return path.join(dir, `${command}.exe`);
+  const dirs = (env.PATH ?? env.Path ?? '').split(';').filter(Boolean);
+  // Like the OS: the first real executable anywhere on PATH wins over a script shim.
+  for (const dir of dirs) {
+    for (const ext of ['.exe', '.com']) {
+      if (fs.existsSync(path.join(dir, command + ext))) return path.join(dir, command + ext);
+    }
+  }
+  for (const dir of dirs) {
     for (const ext of ['.cmd', '.bat']) {
       if (fs.existsSync(path.join(dir, command + ext))) {
         throw new Error(`„${command}“ je skript ${ext}, který nejde spustit bez shellu; v Nastavení zadejte node.exe (nebo java) a cestu ke CLI`);
