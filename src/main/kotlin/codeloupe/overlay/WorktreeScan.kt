@@ -35,21 +35,22 @@ object WorktreeScan {
      * Relative path -> stamp; [prune] holds relative directories to skip (what git ignores as a whole). An unexpected
      * listing error fails the whole walk: a partial walk would read as deleted files.
      */
-    fun scan(root: Path, prune: Set<String>): Map<String, Stamp> = Timings.measure(TimedPart.SCAN) { Walk(prune).run(root) }
+    fun scan(root: Path, prune: Set<String>): WorktreeFiles = Timings.measure(TimedPart.SCAN) { Walk(prune).run(root) }
 
     private class Walk(private val prune: Set<String>) {
         val stamps = ConcurrentHashMap<String, Stamp>()
+        val ignoreFiles = ConcurrentHashMap<String, Stamp>()
         private val pending = AtomicInteger()
         private val done = CompletableFuture<Unit>()
 
-        fun run(root: Path): Map<String, Stamp> {
+        fun run(root: Path): WorktreeFiles {
             fork(root, "")
             try {
                 done.get()
             } catch (e: ExecutionException) {
                 throw IOException("cannot walk $root: ${e.cause?.message}", e.cause)
             }
-            return stamps
+            return WorktreeFiles(stamps, ignoreFiles)
         }
 
         private fun fork(dir: Path, rel: String) {
@@ -75,10 +76,14 @@ object WorktreeScan {
                 if (attrs.isDirectory && name != ".git" && path !in prune) {
                     fork(entry, path)
                 } else if (attrs.isRegularFile && Languages.languageOf(name) != null) {
-                    stamps[path] = Stamp(attrs.lastModifiedTime().to(TimeUnit.MICROSECONDS), attrs.size())
+                    stamps[path] = stampOf(attrs)
+                } else if (attrs.isRegularFile && name == ".gitignore") {
+                    ignoreFiles[path] = stampOf(attrs)
                 }
             }
         }
+
+        private fun stampOf(attrs: BasicFileAttributes) = Stamp(attrs.lastModifiedTime().to(TimeUnit.MICROSECONDS), attrs.size())
 
         /** Entries of one directory with the attributes its listing carries; links are not followed. */
         private fun list(dir: Path): List<Pair<Path, BasicFileAttributes>> {

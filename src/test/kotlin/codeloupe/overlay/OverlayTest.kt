@@ -217,7 +217,7 @@ class OverlayTest {
     }
 
     @Test
-    fun `new ignore rules apply on the next query, also when written while the daemon was down`() {
+    fun `new ignore rules apply on the next query, also in a nested ignore file written while the daemon was down`() {
         write(feature, BETA, "package demo\n\nclass Beta\n")
         write(feature, DELTA, "package demo\n\nclass Delta\n")
         val registry = Registry(config, queue)
@@ -227,7 +227,7 @@ class OverlayTest {
         assertContains(find(registry, feature, "Delta"), "class Delta")
         registry.close()
 
-        write(feature, ".gitignore", "build/\n*.gen.kt\nBeta.kt\nDelta.kt\n")
+        write(feature, "src/main/kotlin/demo/.gitignore", "Delta.kt\n")
         val restarted = Registry(config, JobQueue(CoroutineScope(Dispatchers.Default)))
         assertNone(find(restarted, feature, "Delta"), "ignored while the daemon was down")
         assertNone(find(restarted, feature, "Beta"), "still ignored")

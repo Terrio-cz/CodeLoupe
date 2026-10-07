@@ -28,13 +28,14 @@ internal object OverlayPlanner {
      */
     fun reconcile(state: OverlayState, baseCommit: String, baseFile: Path, previous: Path? = null): OverlayChange {
         val worktree = state.worktree
-        val (differing, prune, scan) = Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+        val (differing, prune, walk) = Executors.newVirtualThreadPerTaskExecutor().use { executor ->
             val changed = CompletableFuture.supplyAsync({ WorktreeGit.changedSince(worktree, baseCommit) }, executor)
             val untracked = CompletableFuture.supplyAsync({ WorktreeGit.untracked(worktree) }, executor)
             val prune = WorktreeGit.ignoredDirs(worktree)
-            val scan = WorktreeScan.scan(Path.of(worktree), prune)
-            Triple((changed.get() + untracked.get()).filterTo(HashSet()) { Languages.languageOf(it) != null }, prune, scan)
+            val walk = WorktreeScan.scan(Path.of(worktree), prune)
+            Triple((changed.get() + untracked.get()).filterTo(HashSet()) { Languages.languageOf(it) != null }, prune, walk)
         }
+        val scan = walk.sources
         val basePaths = BaseFiles(baseFile).use { it.paths() }
         val target = HashMap<String, Stamp>()
         val missing = ArrayList<String>()
@@ -48,12 +49,15 @@ internal object OverlayPlanner {
         // Seen by the walk, neither tracked nor reported untracked: git ignores them.
         val ignored = scan.keys.filterTo(HashSet()) { it !in differing && it !in basePaths }
         val unchanged = if (previous == null) emptySet() else target.keys.filterTo(HashSet()) { it !in state.entries && state.scan[it] == target[it] }
-        return change(state, target, scan, prune, ignored, baseCommit, previous, unchanged)
+        return change(state, target, scan, prune, ignored, walk.ignoreFiles, baseCommit, previous, unchanged)
     }
 
     /** Null when no stamp moved since the last check. [state] must be relative to [baseCommit]. */
     fun incremental(state: OverlayState, baseCommit: String, baseFile: Path): OverlayChange? {
-        val scan = WorktreeScan.scan(Path.of(state.worktree), state.prune)
+        val walk = WorktreeScan.scan(Path.of(state.worktree), state.prune)
+        // New ignore rules change what git ignores without touching a source file: git settles that.
+        if (walk.ignoreFiles != state.ignoreFiles) return reconcile(state, baseCommit, baseFile)
+        val scan = walk.sources
         val moved = (scan.keys + state.scan.keys).filter { scan[it] != state.scan[it] }
         if (moved.isEmpty()) return null
         if (moved.size > INCREMENTAL_MAX) return reconcile(state, baseCommit, baseFile)
@@ -107,7 +111,7 @@ internal object OverlayPlanner {
             // Typically a module's first build output: leave the whole directory out of later walks.
             if (gitIgnores.isNotEmpty()) prune = WorktreeGit.ignoredDirs(state.worktree)
         }
-        return change(state, target, remembered, prune, ignored, baseCommit)
+        return change(state, target, remembered, prune, ignored, state.ignoreFiles, baseCommit)
     }
 
     private fun change(
@@ -116,6 +120,7 @@ internal object OverlayPlanner {
         scan: Map<String, Stamp>,
         prune: Set<String>,
         ignored: Set<String>,
+        ignoreFiles: Map<String, Stamp>,
         baseCommit: String,
         copySource: Path? = null,
         copyable: Set<String> = emptySet(),
@@ -135,7 +140,7 @@ internal object OverlayPlanner {
         val removes = state.entries.keys.filter { it !in target }
         val meta = mapOf("base" to baseCommit, "worktree" to state.worktree, "format" to Store.FORMAT)
         val update = StoreUpdate(puts, removes, tombstones, copies, copySource?.toString(), meta)
-        return OverlayChange(update, target, scan, prune, ignored)
+        return OverlayChange(update, target, scan, prune, ignored, ignoreFiles)
     }
 
     // A file that differs from its base copy only in line ends or a BOM has the same facts.

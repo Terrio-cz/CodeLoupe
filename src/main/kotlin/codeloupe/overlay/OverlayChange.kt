@@ -9,6 +9,8 @@ internal data class OverlayChange(
     val scan: Map<String, Stamp>,
     val prune: Set<String>,
     val ignored: Set<String>,
-    /** [ScanSnapshot.gitState] when git was asked; null when this check did not ask git about ignored files. */
+    /** Stamps of the `.gitignore` files [prune] and [ignored] were worked out under. */
+    val ignoreFiles: Map<String, Stamp>,
+    /** [ScanSnapshot.gitState] when git was asked; null when this check took it over from the last one. */
     val gitState: Map<String, Stamp>? = null,
 )

@@ -11,7 +11,9 @@ import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.fileSize
 import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.readLines
 
 /**
  * Repositories read in-process with JGit, one per git common dir, opened on first use and closed after [IDLE_MS]
@@ -75,10 +77,13 @@ object JGitRepos {
         if (handle.users == 0) close(handle)
     }
 
+    // Objects borrowed through `objects/info/alternates` have their indexes loaded too.
     private fun packIndexBytes(commonDir: String): Long {
-        val packs = Path.of(commonDir, "objects", "pack")
-        if (!packs.isDirectory()) return 0
-        return packs.listDirectoryEntries("*.idx").sumOf { it.fileSize() }
+        val objects = Path.of(commonDir, "objects")
+        val alternates = objects.resolve("info/alternates").takeIf { it.isRegularFile() }?.readLines().orEmpty()
+            .map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }.map { objects.resolve(it).normalize() }
+        return (listOf(objects) + alternates).map { it.resolve("pack") }.filter { it.isDirectory() }
+            .sumOf { packs -> packs.listDirectoryEntries("*.idx").sumOf { it.fileSize() } }
     }
 
     private fun close(handle: Handle) {

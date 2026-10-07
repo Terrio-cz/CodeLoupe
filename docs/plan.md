@@ -199,9 +199,10 @@ Pozice jen řádek/sloupec (CRLF vs LF nevadí).
   nic nezměnila, odpověď platí.
 - Stav poslední kontroly (razítka, ignorované soubory a adresáře, báze) leží vedle vrstvy v `overlays/<hash>.scan`
   (CL-96): první dotaz po restartu daemonu nebo po vyřazení stavu z paměti worktree jen projde, bez gitu. Snapshot
-  platí, jen když jeho položky přesně odpovídají souboru vrstvy (zapisuje se až po něm) a razítka `HEAD`, indexu,
-  `info/exclude` a kořenového `.gitignore` jsou stejná jako při posledním dotazu gitu; jinak git. Změna `HEAD` nebo
-  těchto ignore pravidel za běhu vynutí git i živě (index ne: IDE ho obnovuje pořád).
+  platí, jen když jeho položky přesně odpovídají souboru vrstvy (zapisuje se až po něm) a razítka `HEAD`, indexu a
+  `info/exclude` jsou stejná jako při poslední kontrole; jinak git. Výpis worktree sbírá i razítka všech `.gitignore`:
+  změněný (i za vypnutého daemonu) vynutí git, stejně jako změna `HEAD` nebo `info/exclude` za běhu. Index za běhu
+  ne (IDE ho obnovuje pořád) — snapshot si jen zapamatuje jeho nové razítko.
 - Lokace worktree (`.git`, `gitdir:`, `commondir`), výchozí větev, seznam worktree a refy se čtou ze souborů
   v procesu, merge-base a git objekty přes JGit; git proces jen pro stav pracovního stromu (diff, untracked,
   ignorované) a jako záloha, když JGit repozitář neotevře (CL-96).
@@ -491,7 +492,7 @@ view, SQL, zbytek nástroje (resolver + formát), HTTP (klient − nástroj). Te
   poprvé / 6–10 ms vs `git merge-base` 37–42 ms; velikosti 50 blobů 1–1,5 ms vs `cat-file --batch-check` 34 ms;
   obsah 50 blobů 0,6 ms vs spawn 35 ms. Repozitář se zavře po 1 s nečinnosti (otevřené packy by Windows nedovolily
   smazat uživatelovu `git gc`; dávka čtení jednoho `changes` sdílí jedno otevření, další stojí ~22 ms). Indexy packů
-  drží JGit celé v heapu (~28 B na objekt): nad 16 MB indexů (~600k objektů) čte git. Blob, který JGit lokálně nemá
+  drží JGit celé v heapu (~28 B na objekt): nad 16 MB indexů včetně alternates (~600k objektů) čte git. Blob, který JGit lokálně nemá
   (partial clone), čte git — ten ho dotáhne. JGit nečte systémový ani uživatelský config (hledání systémového spouští git) a
   neměří rozlišení časových razítek (zapisoval by sondy do `.git` a výsledek do `~/.config/jgit`); WindowCache 4 MB,
   delta cache 2 MB. Repozitář, který JGit neotevře (např. SHA-256), čte git (test).
@@ -513,12 +514,13 @@ view, SQL, zbytek nástroje (resolver + formát), HTTP (klient − nástroj). Te
   (pool bez `shrink_memory` 208–234 MB). Teplé dotazy 132–138 MB.
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
-  Vnořené `.gitignore` se dál projeví až při nové bázi nebo hromadné změně (jako dosud).
+  Globální `core.excludesFile` a `git add -f` / `git rm --cached` za běhu daemonu se projeví až při nové bázi nebo
+  hromadné změně (jako dosud).
 - Opraveno cestou: `MergeBases` otevíral DB merge-base zapisovatelně jen kvůli čtení — souběžný zápis dával
   `SQLITE_BUSY`, čerstvě založený soubor bez schématu „no such table“ (`ChangesTest` souběh dvou worktree).
 - Testy: 74 (nově `GitLayoutTest`, `GitObjectsTest` — refy, merge-base, bloby jako git, žádný proces, chybějící blob a
   SHA-256 přes git; `OverlayTest`: teplé dotazy a první dotaz po restartu bez git procesu, nesedící snapshot → git,
-  nové ignore pravidlo za běhu i při vypnutém daemonu).
+  nové ignore pravidlo za běhu i ve vnořeném `.gitignore` při vypnutém daemonu).
 
 ## 10. Rizika
 
