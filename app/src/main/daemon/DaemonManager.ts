@@ -252,7 +252,7 @@ export function resolveCommand(command: string, env: NodeJS.ProcessEnv = process
   for (const dir of dirs) {
     for (const ext of ['.cmd', '.bat']) {
       if (fs.existsSync(path.join(dir, command + ext))) {
-        throw new Error(`„${command}“ je skript ${ext}, který nejde spustit bez shellu; v Nastavení zadejte node.exe (nebo java) a cestu ke CLI`);
+        throw new Error(`„${command}“ je skript ${ext}, který nejde spustit bez shellu; v Nastavení zadejte java a argumenty -cp <instalace>/lib/* codeloupe.MainKt`);
       }
     }
   }
@@ -271,7 +271,7 @@ function execCli(s: AppSettings, verb: 'start' | 'stop', port: number): Promise<
       if (err) {
         const code = (err as NodeJS.ErrnoException).code;
         if (code === 'ENOENT') return reject(new Error(`příkaz „${s.cliCommand}“ nebyl nalezen`));
-        if (code === 'EINVAL') return reject(new Error(`„${s.cliCommand}“ nejde spustit bez shellu; zadejte node.exe a cestu k bin/codeloupe.mjs`));
+        if (code === 'EINVAL') return reject(new Error(`„${s.cliCommand}“ nejde spustit bez shellu; zadejte java a argumenty -cp <instalace>/lib/* codeloupe.MainKt`));
         return reject(new Error(String(stderr || err.message).trim().split(/\r?\n/).slice(-1)[0]));
       }
       resolve(String(stdout));

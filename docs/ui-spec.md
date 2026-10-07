@@ -279,7 +279,7 @@ Inspirace: [Attio Developers](https://mobbin.com/screens/04bc7a2a-d006-4bb5-b200
 Nastavení
 ┌ Aplikace (uloženo lokálně, userData/settings.json) ─────────────────────────────────┐
 │ Zdroj dat        (•) Daemon  ( ) Mock data                                            │
-│ Příkaz CLI       node.exe …\bin\codeloupe.mjs               [Změnit…] (potvrzuje main)│
+│ Příkaz CLI       java -cp …\lib\* codeloupe.MainKt        [Změnit…] (potvrzuje main)│
 │ Port daemonu     47391 (z daemon.json)          ☐ Přepsat: [     ]                    │
 │ ☑ Spustit daemon, když neběží    ☐ Spouštět aplikaci po přihlášení                    │
 │ Vzhled           (•) Systém ( ) Světlý ( ) Tmavý    ☑ Klávesové zkratky               │
@@ -443,7 +443,7 @@ s ikonou a textem.
   nesoulad (soubor chybí nebo je starý) je stav `starting`; teprve nesoulad trvající 3 ticky je `error`
   (cizí proces na portu) — pak žádná data ani otevírání cest.
 - **Start**: když je `down` a `autoStartDaemon` je zapnuto a daemon nebyl zastaven ručně → spustí
-  `<cli.command> <cli.args…> start` (konfigurovatelné; dnes `node bin/codeloupe.mjs`, po CL-56 Kotlin CLI)
+  `<cli.command> <cli.args…> start` (konfigurovatelné; Kotlin CLI: `java -cp <instalace>/lib/* codeloupe.MainKt`)
   s `CODELOUPE_PORT` = port, který aplikace sleduje. Spouští se bez shellu, takže CLI musí být `.exe`, nebo
   `node`/`java` + cesta ke skriptu; `.cmd`/`.bat` (npm shim, Gradle launcher) aplikace odmítne s vysvětlením. Backoff 5 s → 60 s, max 5 pokusů za 10 min, pak
   notifikace a stav `error`.

@@ -47,7 +47,7 @@ export function Settings() {
           <label className="label" htmlFor="cli-cmd">Příkaz CLI</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input id="cli-cmd" className="input mono" style={{ flex: 2 }} value={cmd} onChange={e => setCmd(e.target.value)} />
-            <input aria-label="Argumenty CLI" className="input mono" style={{ flex: 3 }} value={args} onChange={e => setArgs(e.target.value)} placeholder="argumenty, např. C:\…\bin\codeloupe.mjs" />
+            <input aria-label="Argumenty CLI" className="input mono" style={{ flex: 3 }} value={args} onChange={e => setArgs(e.target.value)} placeholder="argumenty, např. -cp C:/…/codeloupe/lib/* codeloupe.MainKt" />
             <button className="btn" onClick={() => void bridge().settings.proposeCli(cmd.trim(), splitArgs(args)).then(s => { publishSettings(s); flash(s.cliCommand === cmd.trim() ? 'Příkaz uložen.' : 'Příkaz nezměněn.'); })}>
               Změnit…
             </button>

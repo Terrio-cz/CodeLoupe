@@ -30,12 +30,12 @@ Settings are saved in `<userData>/settings.json` and edited on the Settings scre
 | Setting | Default | Notes |
 |---|---|---|
 | Data source | `mock` | `mock` serves the contract from deterministic data, `daemon` calls `/ui-api/v1/*` (CL-39). Daemon status and start/stop are always real. |
-| CLI command | `codeloupe` | Used for `start`/`stop`, without a shell. Only a native confirmation dialog can change it, never the page. It must be an `.exe` or `node`/`java` plus a script path; a `.cmd`/`.bat` shim is refused with an explanation. On Windows today: `node.exe` plus the path to `bin/codeloupe.mjs`. |
+| CLI command | `codeloupe` | Used for `start`/`stop`, without a shell. Only a native confirmation dialog can change it, never the page. It must be an `.exe` or `node`/`java` plus a script path; a `.cmd`/`.bat` shim is refused with an explanation. For the Kotlin CLI: `java` with the arguments `-cp <install>/lib/* codeloupe.MainKt` (Java expands the `*` itself, no shell needed). |
 | Port | from `<home>/daemon.json`, then `CODELOUPE_PORT`, `config.json`, 47391 | An explicit override is passed to the daemon it starts. |
 | Start the daemon when it is down | on | Off after a manual stop (in the app or `codeloupe stop`) until the next manual start. |
 | Open at login | off | |
 
-Overrides that apply to one run only: `CODELOUPE_APP_CLI='["node","C:/…/bin/codeloupe.mjs"]'` and `CODELOUPE_APP_API=mock|daemon`.
+Overrides that apply to one run only: `CODELOUPE_APP_CLI='["java","-cp","C:/…/codeloupe/lib/*","codeloupe.MainKt"]'` and `CODELOUPE_APP_API=mock|daemon`.
 
 Verification modes (development builds only):
 - `CODELOUPE_APP_SCREENSHOTS=<dir>` captures every screen in light and dark mode, writes `metrics.json`, then quits.

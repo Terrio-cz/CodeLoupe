@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS, isValidCli, sanitizeSettings, type AppSettings } from
 /** Settings of the app in <userData>/settings.json, plus start-up overrides from the environment. */
 export class SettingsStore {
   private value: AppSettings;
-  /** Overrides for this run only: CODELOUPE_APP_CLI='["node","C:/…/bin/codeloupe.mjs"]', CODELOUPE_APP_API=mock|daemon. */
+  /** Overrides for this run only: CODELOUPE_APP_CLI='["java","-cp","C:/…/codeloupe/lib/*","codeloupe.MainKt"]', CODELOUPE_APP_API=mock|daemon. */
   private overlay: Partial<AppSettings> = {};
   private readonly file: string;
 

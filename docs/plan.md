@@ -14,7 +14,7 @@ Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56) · 2026-10-07 · repo 
 
 ## 0a. Rozhodnutí: Kotlin/JVM (uživatel 2026-10-07)
 
-Jazyk, který uživatel zná a chce číst. Node.js prototyp fáze 1 (b7d0166, CL-9) zůstává jako referenční chování
+Jazyk, který uživatel zná a chce číst. Node.js prototyp fáze 1 (b7d0166, CL-9) byl referenčním chováním
 a po dosažení parity byl odstraněn (CL-56); jeho chování drží golden testy (`ParityTest`).
 
 - Dotazy: stejně rychlé (rozhoduje SQLite). Build báze: rychlejší s nativním parserem. Start procesu 0,5–1 s
