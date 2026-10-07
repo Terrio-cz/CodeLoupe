@@ -1,7 +1,7 @@
 # CodeLoupe
 
-On-demand code index for AI coding agents. Ask for a declaration, a file outline or (soon) usages and
-branch changes, and get exactly that piece of code instead of grepping and reading whole files.
+On-demand code index for AI coding agents. Ask for a declaration, a file outline, its usages, callers or type
+hierarchy (branch changes soon), and get exactly that piece of code instead of grepping and reading whole files.
 
 - **Any git repository**, no configuration: the base index follows the default branch and is built
   from git objects; every worktree of the repository shares it.

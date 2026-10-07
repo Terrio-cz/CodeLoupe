@@ -26,7 +26,7 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
            supertypes, start_line, decl_line, end_line, sig, hash, local, parent_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         Statement.RETURN_GENERATED_KEYS,
     )
-    private val insertRef = db.prepareStatement("INSERT INTO refs(file_id, name, line, col, kind, recv, decl_id) VALUES(?, ?, ?, ?, ?, ?, ?)")
+    private val insertRef = db.prepareStatement("INSERT INTO refs(file_id, name, line, col, kind, recv, decl_id, bind, recv_type, args) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
     fun remove(path: String) {
         val id = fileId.run { setString(1, path); executeQuery().use { if (it.next()) it.getLong(1) else null } } ?: return
@@ -77,6 +77,8 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
         for (r in facts.refs) insertRef.run {
             setLong(1, id); setString(2, r.name); setInt(3, r.line); setInt(4, r.col); setString(5, r.kind); setNullableString(6, r.recv)
             if (r.decl >= 0) setLong(7, declIds[r.decl]) else setNull(7, Types.INTEGER)
+            setNullableString(8, r.bind); setNullableString(9, r.recvType)
+            if (r.args != null) setInt(10, r.args) else setNull(10, Types.INTEGER)
             addBatch()
         }
         insertRef.executeBatch()

@@ -11,12 +11,16 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiErrorElement
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtAnonymousInitializer
+import org.jetbrains.kotlin.psi.KtBlockExpression
 import org.jetbrains.kotlin.psi.KtCatchClause
+import org.jetbrains.kotlin.psi.KtClassBody
 import org.jetbrains.kotlin.psi.KtClassLiteralExpression
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtDestructuringDeclaration
 import org.jetbrains.kotlin.psi.KtEnumEntry
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtForExpression
+import org.jetbrains.kotlin.psi.KtFunctionLiteral
 import org.jetbrains.kotlin.psi.KtImportDirective
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtObjectDeclaration
@@ -27,13 +31,17 @@ import org.jetbrains.kotlin.psi.KtPropertyAccessor
 import org.jetbrains.kotlin.psi.KtScriptInitializer
 import org.jetbrains.kotlin.psi.KtSecondaryConstructor
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
+import org.jetbrains.kotlin.psi.KtSuperTypeList
 import org.jetbrains.kotlin.psi.KtTypeAlias
 import org.jetbrains.kotlin.psi.KtWhenExpression
 
 /** Kotlin PSI -> facts of one file: package, imports, declarations, references. */
 internal class KotlinExtractor(private val source: Source) {
     private val shapes = DeclShapes(source)
-    private val references = References(source)
+    private val scopes = LocalScopes()
+    private val localTypes = LocalTypes(source, scopes)
+    private val lambdaTypes = LambdaTypes(localTypes)
+    private val references = References(source, scopes, localTypes)
     private var packageName = ""
     private val imports = ArrayList<ImportFact>()
     private val decls = ArrayList<DeclFact>()
@@ -42,6 +50,9 @@ internal class KotlinExtractor(private val source: Source) {
 
     /** Enclosing declarations, innermost last; [OBJECT_LITERAL] for an anonymous object. */
     private val stack = ArrayList<Int>()
+
+    /** Plain (non-property) primary constructor parameters of the enclosing classes, visible in their initializers. */
+    private val constructorScopes = ArrayList<Map<String, String>>()
 
     fun extract(file: KtFile): FileFacts {
         walk(file)
@@ -58,16 +69,22 @@ internal class KotlinExtractor(private val source: Source) {
             is KtObjectDeclaration -> if (element.isObjectLiteral()) nested(OBJECT_LITERAL, element) else classLike(element)
             is KtClassOrObject -> classLike(element)
             // A function without a name is an anonymous function: an expression, not a declaration.
-            is KtNamedFunction ->
-                if (element.nameIdentifier == null) walkChildren(element) else nested(declare(element, shapes.function(element)), element)
-            is KtProperty ->
-                if (isWhenSubject(element)) walkChildren(element) else nested(declare(element, shapes.property(element)), element)
+            is KtNamedFunction -> function(element)
+            is KtProperty -> property(element)
             is KtDestructuringDeclaration ->
-                if (element.parent is KtParameter) walkChildren(element) else nested(declare(element, shapes.destructuring(element)), element)
-            is KtSecondaryConstructor -> nested(declare(element, shapes.constructor(element, ownerName())), element)
+                if (element.parent is KtParameter) walkChildren(element) else destructuring(element)
+            is KtSecondaryConstructor ->
+                scopes.within(parameters(element.valueParameters)) { nested(declare(element, shapes.constructor(element, ownerName())), element) }
+            is KtPropertyAccessor -> scopes.within(parameters(element.valueParameters)) { walkChildren(element) }
+            is KtFunctionLiteral ->
+                scopes.within(lambdaParameters(element)) { scopes.withReceiver(lambdaTypes.receiver(element)) { walkChildren(element) } }
+            is KtForExpression -> forLoop(element)
+            is KtCatchClause -> scopes.within(parameters(listOfNotNull(element.catchParameter))) { walkChildren(element) }
+            is KtBlockExpression, is KtWhenExpression -> scopes.within(emptyMap()) { walkChildren(element) }
             // PSI wraps each top-level statement of a script in an initializer; the index sees plain statements.
             is KtScriptInitializer -> walkChildren(element)
-            is KtAnonymousInitializer -> nested(declare(element, shapes.initializer(element)), element)
+            is KtAnonymousInitializer -> inConstructorScope { nested(declare(element, shapes.initializer(element)), element) }
+            is KtSuperTypeList -> inConstructorScope { walkChildren(element) }
             is KtTypeAlias -> {
                 declare(element, shapes.typeAlias(element))
                 walkChildren(element)
@@ -99,8 +116,80 @@ internal class KotlinExtractor(private val source: Source) {
         for (parameter in element.primaryConstructorParameters) {
             if (parameter.hasValOrVar()) declare(parameter, shapes.constructorProperty(parameter))
         }
+        constructorScopes += parameters(element.primaryConstructorParameters.filter { !it.hasValOrVar() })
         walkChildren(element)
+        constructorScopes.removeLast()
         stack.removeLast()
+    }
+
+    private fun function(element: KtNamedFunction) {
+        if (element.nameIdentifier == null) {
+            scopes.within(parameters(element.valueParameters)) { walkChildren(element) }
+            return
+        }
+        // Bound before its body: a local function may call itself.
+        if (element.isLocal) scopes.bind(JsText.bare(source.of(element.nameIdentifier!!)), "")
+        val index = declare(element, shapes.function(element))
+        scopes.within(parameters(element.valueParameters)) { nested(index, element) }
+    }
+
+    private fun property(element: KtProperty) {
+        val type = { localTypes.of(element.typeReference, element.initializer) }
+        when {
+            isWhenSubject(element) -> {
+                walkChildren(element)
+                bindName(element.nameIdentifier, type())
+            }
+            element.parent is KtClassBody -> inConstructorScope { nested(declare(element, shapes.property(element)), element) }
+            else -> {
+                nested(declare(element, shapes.property(element)), element)
+                if (element.isLocal) bindName(element.nameIdentifier, type())
+            }
+        }
+    }
+
+    private fun destructuring(element: KtDestructuringDeclaration) {
+        nested(declare(element, shapes.destructuring(element)), element)
+        for (entry in element.entries) bindName(entry.nameIdentifier, localTypes.of(entry.typeReference, null))
+    }
+
+    // The loop variable is not visible in the range it iterates.
+    private fun forLoop(element: KtForExpression) {
+        val range = element.loopRange
+        val bindings = HashMap<String, String>()
+        element.loopParameter?.let { p ->
+            p.nameIdentifier?.let { bindings[JsText.bare(source.of(it))] = localTypes.of(p.typeReference, null).ifEmpty { localTypes.elementOf(range) } }
+            p.destructuringDeclaration?.entries?.forEach { e -> e.nameIdentifier?.let { bindings[JsText.bare(source.of(it))] = "" } }
+        }
+        for (child in element.childList()) {
+            if (child == range?.parent || child == range) walk(child) else scopes.within(bindings) { walk(child) }
+        }
+    }
+
+    private fun inConstructorScope(block: () -> Unit) = scopes.within(constructorScopes.lastOrNull() ?: emptyMap()) { block() }
+
+    private fun parameters(list: List<KtParameter>): Map<String, String> {
+        val bindings = HashMap<String, String>()
+        for (p in list) {
+            p.nameIdentifier?.let { bindings[JsText.bare(source.of(it))] = localTypes.of(p.typeReference, null) }
+            p.destructuringDeclaration?.entries?.forEach { e -> e.nameIdentifier?.let { bindings[JsText.bare(source.of(it))] = "" } }
+        }
+        return bindings
+    }
+
+    private fun lambdaParameters(literal: KtFunctionLiteral): Map<String, String> {
+        val implied = lambdaTypes.parameter(literal)
+        if (literal.valueParameterList == null) return mapOf("it" to implied)
+        val bindings = HashMap(parameters(literal.valueParameters))
+        val typed = literal.valueParameters.getOrNull(if (lambdaTypes.isIndexed(literal)) 1 else 0)
+        if (typed != null && typed.typeReference == null && literal.valueParameters.size == (if (lambdaTypes.isIndexed(literal)) 2 else 1)) {
+            typed.nameIdentifier?.let { bindings[JsText.bare(source.of(it))] = implied }
+        }
+        return bindings
+    }
+
+    private fun bindName(identifier: PsiElement?, type: String) {
+        if (identifier != null) scopes.bind(JsText.bare(source.of(identifier)), type)
     }
 
     // Catch and setter parameter names are recorded as uses, like the index has always done.
@@ -154,7 +243,10 @@ internal class KotlinExtractor(private val source: Source) {
 
     private fun addRef(reference: Reference) {
         val lines = source.lines
-        refs += RefFact(reference.name, lines.line(reference.offset), lines.column(reference.offset) + 1, reference.kind, reference.recv, innermost())
+        refs += RefFact(
+            reference.name, lines.line(reference.offset), lines.column(reference.offset) + 1, reference.kind, reference.recv, innermost(),
+            reference.bind, reference.recvType, reference.args,
+        )
     }
 
     private fun innermost(): Int = stack.lastOrNull { it >= 0 } ?: -1

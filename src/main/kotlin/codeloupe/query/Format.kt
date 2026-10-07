@@ -3,7 +3,10 @@ package codeloupe.query
 /** The compact text lines every tool answers with. */
 internal object Format {
     /** `path:start-end  [Container] signature` */
-    fun head(d: DeclRow): String = "${d.path}:${d.startLine}-${d.endLine}  ${if (d.container.isNotEmpty()) "[${d.container}] " else ""}${d.sig}"
+    fun head(d: DeclRow): String = "${d.path}:${d.startLine}-${d.endLine}  ${inContainer(d)}"
+
+    /** `[Container] signature` */
+    fun inContainer(d: DeclRow): String = "${if (d.container.isNotEmpty()) "[${d.container}] " else ""}${d.sig}"
 
     /** `  start-end  signature`, indented by nesting depth. */
     fun member(d: DeclRow, depth: Int): String = "  ".repeat(depth + 1) + "${d.startLine}-${d.endLine}  ${d.sig}"

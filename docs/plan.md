@@ -158,11 +158,20 @@ jeden soubor.
 - `imports`: FQN, alias, star
 - `decls`: kind, name, container, FQN, receiver, parametry (jména, typy, počet), návratový typ, modifikátory,
   anotace, supertypy, řádky deklarace/těla/KDocu, hash textu
-- `refs`: jméno, řádek, sloupec, druh (`call`, `nav`, `type`, `callable_ref`, `ctor`), receiver, id
-  obklopující deklarace
+- `refs`: jméno, řádek, sloupec, druh (`call`, `nav`, `type`, `callable_ref`, `named_arg`, `name`), text
+  receiveru, id obklopující deklarace; od formátu `2/kotlin-psi-2` navíc (CL-13):
+  - `bind` — jméno je vázané v kódu (parametr, parametr lambdy včetně `it`, proměnná `for`/`catch`, lokální
+    `val`/`fun`, subjekt `when`); hodnota = typový spec vazby, `""` = typ neznámý;
+  - `recv_type` — typový spec receiveru `x.m()`, je-li receiver lokální vazba nebo výraz (volání, řetěz, `as`,
+    `!!`, `?:`); u nekvalifikovaného jména spec implicitního receiveru lambdy (`x.apply {}`, `x.run {}`, `with(x) {}`);
+  - `args` — počet argumentů volání (trailing lambda se počítá, spread = −1), pro rozlišení overloadů.
+- typový spec: text typu (`Foo`, `List<Foo>`), `@řádek:sloupec` = deklarovaný typ toho, na co ukazuje reference
+  na té pozici (návratový typ funkce, typ property, třída konstruktoru), `*spec` = prvek kolekce, `a|b` = `a`,
+  jinak `b` (`xs.first()` je metoda z indexu, nebo prvek `xs`). Lambdy `let/also/takeIf` dostanou za `it` typ
+  receiveru, `forEach/map/filter/first {…}` a spol. typ prvku. Spec se vyhodnotí až při dotazu — fakta zůstávají
+  jen z jednoho souboru.
 - `modules`: z `settings.gradle(.kts)` / `pom.xml` — moduly a závislosti `project(":x")` (náhrada IDEA
   `get_project_modules`)
-- lokální typy pro resolver: parametry a property s explicitním typem, `val x = Foo(...)`
 
 Pozice jen řádek/sloupec (CRLF vs LF nevadí).
 
@@ -186,10 +195,31 @@ Receiver: `this`/implicitní, `Typ.m()`, `x.m()` s typem z lokální inference. 
 `exact` (jediný viditelný kandidát) / `candidate` (víc možností, vrací všechny). **Nikdy nevynechat**:
 `usages` je nadmnožina `rg -w`. Žádný fallback na IDE.
 
+Implementace (CL-13, `query/usages`), pro každou referenci se jménem cíle (nebo aliasem jeho importu):
+
+1. Vázané jméno (`bind`) → jen lokální deklarace té funkce; jinak cokoli jiného je mimo.
+2. Bez receiveru: implicitní receiver lambdy (`apply`/`run`/`with`), pak členy obklopujících tříd a receiverů
+   extension funkcí (od nejvnitřnější, včetně nadtypů, companionů a vnořených typů), pak top-level v pořadí
+   explicitní import (alias) → stejný package → star import. Nenajde-li nic, může jít o člen receiveru lambdy z DSL —
+   odpověď je neúplná (`candidate`).
+3. S receiverem: `this`/`this@L`/`super`, typ nebo package jako kvalifikátor (`Type.m` → companion, object, vnořené
+   typy, enum entry), typový spec z indexu, property s deklarovaným typem nebo `= Type(…)`; velké jméno, které nic
+   v dosahu nedeklaruje, je knihovní typ (`ByteBuffer.allocate`). Členy se hledají v nejbližší úrovni nadtypů, výš
+   = dispatch (`candidate` pro přepsané členy); extension funkce podle jména receiveru.
+4. Overloady se zužují počtem argumentů (výchozí hodnoty a `vararg` dávají rozsah); `private` deklarace je mimo
+   svůj soubor nedosažitelná.
+5. Neznámý receiver: všechny členy a extension daného jména → `candidate`; je-li v indexu jediná, není to běžné
+   knihovní jméno (`LibraryNames`) a žádná jiná reference toho jména nevede jistě mimo index, je `exact`.
+
+Značky: `exact` = jistě jen cíl, `candidate` = může být cíl (i přes dispatch nebo named argument konstruktoru),
+`other` = vede jinam; ve výstupu je jen počet (`all=true` je vypíše). Řádky `import`/`package` nejsou výskyty.
+
 ## 6. Nástroje
 
 `root` = cesta do repozitáře nebo worktree (výchozí: výchozí větev repozitáře z `cwd` klienta). Výstup:
-kompaktní text, řádky 1-based, `limit` + `… +N dalších`.
+kompaktní text, řádky 1-based, `limit` + `… +N dalších`. Strop: **≤ 12 nástrojů** celkem (popisy stojí tokeny
+v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`); dnes 6 (`find`, `outline`, `symbol`,
+`usages`, `calls`, `hierarchy`).
 
 ### Čtení
 

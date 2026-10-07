@@ -20,9 +20,10 @@ import org.jetbrains.kotlin.psi.KtValueArgumentName
 
 /**
  * Classifies a name use: `call` (callee of a call or an infix call), `nav` (selector after `.`, `?.` or `Recv::`),
- * `type`, `callable_ref` (`::name`), `named_arg`, otherwise `name`. Calls and navigations keep their receiver text.
+ * `type`, `callable_ref` (`::name`), `named_arg`, otherwise `name`. Calls and navigations keep their receiver text;
+ * names bound inside code carry their local type (see [LocalScopes]).
  */
-internal class References(private val source: Source) {
+internal class References(private val source: Source, private val scopes: LocalScopes, private val types: LocalTypes) {
     fun of(expression: KtSimpleNameExpression): Reference? = when (expression) {
         is KtLabelReferenceExpression -> label(expression)
         is KtOperationReferenceExpression -> infixCall(expression)
@@ -37,22 +38,45 @@ internal class References(private val source: Source) {
     private fun name(expression: KtNameReferenceExpression): Reference? {
         if (expression.getReferencedNameElementType() != KtTokens.IDENTIFIER) return null
         val parent = expression.parent
-        val (kind, recv) = when {
-            parent is KtUserType -> TYPE to null
+        val name = JsText.bare(source.of(expression))
+        val offset = expression.textRange.startOffset
+        return when {
+            parent is KtUserType -> Reference(name, offset, TYPE, null)
             parent is KtCallableReferenceExpression && parent.callableReference == expression ->
-                parent.receiverExpression?.let { NAV to receiver(it) } ?: (CALLABLE_REF to null)
-            parent is KtCallExpression && parent.calleeExpression == expression -> CALL to qualifierOf(parent)
-            parent is KtQualifiedExpression && parent.selectorExpression == expression -> NAV to receiver(parent.receiverExpression)
-            parent is KtValueArgumentName -> NAMED_ARG to null
-            else -> NAME to null
+                parent.receiverExpression?.let { qualified(name, offset, NAV, it, null) }
+                    ?: unqualified(name, offset, CALLABLE_REF, null)
+            parent is KtCallExpression && parent.calleeExpression == expression -> {
+                val args = argumentCount(parent)
+                val qualifier = (parent.parent as? KtQualifiedExpression)?.takeIf { it.selectorExpression == parent }
+                if (qualifier != null) qualified(name, offset, CALL, qualifier.receiverExpression, args)
+                else unqualified(name, offset, CALL, args)
+            }
+            parent is KtQualifiedExpression && parent.selectorExpression == expression -> qualified(name, offset, NAV, parent.receiverExpression, null)
+            parent is KtValueArgumentName -> Reference(name, offset, NAMED_ARG, null)
+            else -> unqualified(name, offset, NAME, null)
         }
-        return Reference(JsText.bare(source.of(expression)), expression.textRange.startOffset, kind, recv)
     }
+
+    // A name bound in code is that binding; any other may be a member of a lambda's implicit receiver.
+    private fun unqualified(name: String, offset: Int, kind: String, args: Int?): Reference {
+        val bind = scopes.typeOf(name)
+        return Reference(name, offset, kind, null, bind = bind, recvType = if (bind == null) scopes.implicitReceiver else null, args = args)
+    }
+
+    private fun qualified(name: String, offset: Int, kind: String, receiver: KtExpression, args: Int?): Reference =
+        Reference(name, offset, kind, receiver(receiver), recvType = localType(receiver), args = args)
+
+    private fun localType(receiver: KtExpression): String? = types.ofReceiver(receiver)
+
+    // `valueArguments` includes trailing lambdas.
+    private fun argumentCount(call: KtCallExpression): Int =
+        if (call.valueArguments.any { it.getSpreadElement() != null }) -1 else call.valueArguments.size
 
     private fun infixCall(expression: KtOperationReferenceExpression): Reference? {
         if (expression.getReferencedNameElementType() != KtTokens.IDENTIFIER) return null
         val binary = expression.parent as? KtBinaryExpression ?: return null
-        return Reference(JsText.bare(source.of(expression)), expression.textRange.startOffset, CALL, binary.left?.let(::receiver))
+        val left = binary.left
+        return Reference(JsText.bare(source.of(expression)), expression.textRange.startOffset, CALL, left?.let(::receiver), recvType = left?.let(::localType), args = 1)
     }
 
     // `return@forEach`, `this@Outer` use a label; `loop@ for` defines one.
@@ -62,11 +86,6 @@ internal class References(private val source: Source) {
         val nameElement = expression.getReferencedNameElement()
         val raw = source.of(nameElement).removePrefix("@")
         return Reference(JsText.bare(raw), nameElement.textRange.endOffset - raw.length, NAME, null)
-    }
-
-    private fun qualifierOf(call: KtCallExpression): String? {
-        val qualified = call.parent as? KtQualifiedExpression ?: return null
-        return if (qualified.selectorExpression == call) receiver(qualified.receiverExpression) else null
     }
 
     /** `Type::class` is recorded as navigating to a member named `class`. */

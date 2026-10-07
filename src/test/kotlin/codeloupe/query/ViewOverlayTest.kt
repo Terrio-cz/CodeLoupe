@@ -35,6 +35,8 @@ class ViewOverlayTest {
             assertEquals(listOf("src/main/kotlin/com/example/shop/Constructs.kt"), view.filesBySuffix("/Constructs.kt"))
             assertTrue(view.filesBySuffix("/Big.kt").isEmpty())
             assertEquals("no declaration matches \"m1\"", FindQuery.run(view, FindQuery.Args("m1")))
+            assertTrue(view.refs("r.name = :name", mapOf("name" to "register")).isEmpty(), "base references of a changed file are hidden")
+            assertTrue(view.imports("f.path = :path", mapOf("path" to "src/main/kotlin/com/example/shop/Constructs.kt")).isEmpty(), "the overlay copy has no imports")
         }
         View(base).use { assertEquals(listOf("base"), it.decls("d.name = :name AND d.kind = 'class'", mapOf("name" to "OrderService")).map { d -> d.src }) }
     }

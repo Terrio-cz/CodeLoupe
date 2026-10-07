@@ -9,10 +9,10 @@ import java.sql.Connection
  * worktree overlay. Only the daemon and its build worker write.
  */
 object Store {
-    const val SCHEMA_VERSION = 1
+    const val SCHEMA_VERSION = 2
 
     /** Schema and extractor of an index; bump the extractor part whenever the facts of a file can change. */
-    const val FORMAT = "$SCHEMA_VERSION/kotlin-psi-1"
+    const val FORMAT = "$SCHEMA_VERSION/kotlin-psi-2"
 
     private val SCHEMA = listOf(
         "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)",
@@ -25,7 +25,8 @@ object Store {
   fqn TEXT NOT NULL, receiver TEXT, params TEXT, param_count INTEGER, returns TEXT, modifiers TEXT, supertypes TEXT,
   start_line INTEGER, decl_line INTEGER, end_line INTEGER, sig TEXT, hash TEXT, local INTEGER, parent_id INTEGER)""",
         """CREATE TABLE IF NOT EXISTS refs (
-  file_id INTEGER NOT NULL, name TEXT NOT NULL, line INTEGER, col INTEGER, kind TEXT, recv TEXT, decl_id INTEGER)""",
+  file_id INTEGER NOT NULL, name TEXT NOT NULL, line INTEGER, col INTEGER, kind TEXT, recv TEXT, decl_id INTEGER,
+  bind TEXT, recv_type TEXT, args INTEGER)""",
         "CREATE INDEX IF NOT EXISTS decls_name ON decls(name)",
         "CREATE INDEX IF NOT EXISTS decls_file ON decls(file_id)",
         "CREATE INDEX IF NOT EXISTS refs_name ON refs(name)",
