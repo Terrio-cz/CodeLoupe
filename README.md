@@ -45,6 +45,11 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `outline` | members of a file or type with line ranges, no bodies |
 | `symbol` | one declaration's source (KDoc, annotations, body) by `Type.member`, `member(ParamType)`, `pkg.Type` or `File.kt:line`; large types collapse to header + members |
 
+## Desktop app
+
+`app/` holds the Electron desktop app (tray, notifications, daemon start/stop, screens over the daemon's
+read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
+
 ## Configuration
 
 | | Default | Override |
