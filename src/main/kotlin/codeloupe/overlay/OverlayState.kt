@@ -38,6 +38,9 @@ internal class OverlayState(val worktree: String, val repoId: String, val file: 
     /** Files the walk sees but git ignores (an ignored file in a directory that is not ignored as a whole). */
     var ignored: Set<String> = emptySet()
 
+    /** [ScanSnapshot.gitState] when git last told which files it ignores ([prune], [ignored]). */
+    var gitState: Map<String, Stamp> = emptyMap()
+
     /** The refresh job that is writing the overlay, if any. */
     var running: Deferred<*>? = null
 

@@ -50,7 +50,8 @@ object GitLayout {
             val pointer = entry.resolve("gitdir").takeIf { it.isRegularFile() } ?: return@mapNotNull null
             entry.resolve(pointer.readText().trim()).normalize().parent
         }
-        (listOf(common.parent) + linked).map { it.toString().replace('\\', '/') }
+        // Real paths, as locate() gives them: a worktree reached through a junction is still the same worktree.
+        (listOf(common.parent) + linked).map { unix(runCatching { it.toRealPath() }.getOrDefault(it)) }
     }.getOrNull()
 
     /** The git dir of the worktree rooted at [worktree]: `.git` itself, or what a `.git` file points to. */

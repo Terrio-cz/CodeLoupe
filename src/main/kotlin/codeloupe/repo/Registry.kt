@@ -7,10 +7,10 @@ import codeloupe.daemon.JobQueue
 import codeloupe.git.Git
 import codeloupe.git.GitLayout
 import codeloupe.git.GitObjects
+import codeloupe.git.JGitRepos
 import codeloupe.index.Store
 import codeloupe.overlay.Overlays
 import codeloupe.platform.Sha1
-import codeloupe.git.JGitRepos
 import codeloupe.query.View
 import codeloupe.query.ViewPool
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +49,8 @@ class Registry(
         GitLayout.locate(path)?.let { return RepoLocation(it.worktree, it.commonDir) }
         val out = Git.run(path.toString(), "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir", allowFail = true)
             ?: throw IllegalArgumentException("not inside a git repository: $root")
-        val (worktree, commonDir) = out.trim().lines().map(::normalize)
+        // Real paths, as GitLayout gives them: one repository must not be known under two spellings.
+        val (worktree, commonDir) = out.trim().lines().map { normalize(Path.of(it).toRealPath().toString()) }
         return RepoLocation(worktree, commonDir)
     }
 

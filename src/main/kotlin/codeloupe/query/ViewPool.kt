@@ -24,7 +24,13 @@ class ViewPool {
             val i = idle.indexOfLast { it.baseFile == baseFile && it.overlayFile == overlayFile }
             (if (i >= 0) idle.removeAt(i) else null) to ++clock
         }
-        return Lease(pooled ?: View(baseFile, overlayFile), takenAt)
+        val view = pooled ?: try {
+            View(baseFile, overlayFile)
+        } catch (e: Exception) {
+            synchronized(this) { returned() }
+            throw e
+        }
+        return Lease(view, takenAt)
     }
 
     /** Takes [lease] back after a query; a view whose query failed, or whose file was released meanwhile, is closed. */
@@ -32,11 +38,10 @@ class ViewPool {
         val view = lease.view
         val usable = healthy && view.reset()
         val closing = synchronized(this) {
-            val released = listOfNotNull(view.baseFile, view.overlayFile).any { (releasedAt[it] ?: 0) > lease.takenAt }
-            if (usable && !released) idle += view
-            if (--leased == 0) releasedAt.clear()
-            val beyond = (idle.size - MAX_IDLE).coerceAtLeast(0)
-            (if (usable && !released) emptyList() else listOf(view)) + idle.take(beyond).also { idle.removeAll(it) }
+            val kept = usable && !releasedSince(view, lease.takenAt)
+            if (kept) idle += view
+            returned()
+            (if (kept) emptyList() else listOf(view)) + overflow()
         }
         closing.forEach(View::close)
         timer.touch()
@@ -55,6 +60,17 @@ class ViewPool {
         val closing = synchronized(this) { ArrayList(idle).also { idle.clear() } }
         closing.forEach(View::close)
     }
+
+    // The three below run with the pool's lock held.
+    private fun releasedSince(view: View, takenAt: Long) =
+        listOfNotNull(view.baseFile, view.overlayFile).any { (releasedAt[it] ?: 0) > takenAt }
+
+    private fun returned() {
+        if (--leased == 0) releasedAt.clear()
+    }
+
+    /** The oldest idle views beyond [MAX_IDLE], taken out of the pool for closing. */
+    private fun overflow(): List<View> = idle.take((idle.size - MAX_IDLE).coerceAtLeast(0)).also { idle.removeAll(it) }
 
     /** A view taken from the pool at [takenAt] (the pool's clock). */
     class Lease(val view: View, val takenAt: Long)

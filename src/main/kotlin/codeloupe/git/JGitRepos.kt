@@ -8,14 +8,25 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 import org.eclipse.jgit.storage.file.WindowCacheConfig
 import org.eclipse.jgit.util.SystemReader
 import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.fileSize
+import kotlin.io.path.isDirectory
+import kotlin.io.path.listDirectoryEntries
 
 /**
  * Repositories read in-process with JGit, one per git common dir, opened on first use and closed after [IDLE_MS]
  * unused: an open repository holds its pack files, and Windows refuses to let the user's `git gc` delete a pack
- * that is open.
+ * that is open. First use also installs [ReadOnlySystemReader] for the whole process.
  */
 object JGitRepos {
-    private const val IDLE_MS = 10_000L
+    /** Long enough for one burst of reads (a `changes` call, a base sync) to share the open packs. */
+    private const val IDLE_MS = 1_000L
+
+    /**
+     * JGit holds every pack index in the heap (~28 B per object, beyond its window cache). Above this much index
+     * (~600k objects) the daemon's small heap is left alone and git answers instead.
+     */
+    private const val MAX_PACK_INDEX_BYTES = 16L shl 20
     private val open = HashMap<String, Handle>()
 
     init {
@@ -47,6 +58,7 @@ object JGitRepos {
     @Synchronized
     private fun lease(commonDir: String): Handle {
         val handle = open.getOrPut(commonDir) {
+            check(packIndexBytes(commonDir) <= MAX_PACK_INDEX_BYTES) { "pack indexes of $commonDir too large for the daemon's heap" }
             Handle(commonDir, FileRepositoryBuilder().setGitDir(File(commonDir)).setMustExist(true).build())
         }
         handle.users++
@@ -61,6 +73,12 @@ object JGitRepos {
     @Synchronized
     private fun closeIfIdle(handle: Handle) {
         if (handle.users == 0) close(handle)
+    }
+
+    private fun packIndexBytes(commonDir: String): Long {
+        val packs = Path.of(commonDir, "objects", "pack")
+        if (!packs.isDirectory()) return 0
+        return packs.listDirectoryEntries("*.idx").sumOf { it.fileSize() }
     }
 
     private fun close(handle: Handle) {

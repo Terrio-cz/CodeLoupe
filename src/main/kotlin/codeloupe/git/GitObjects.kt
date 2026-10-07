@@ -38,6 +38,8 @@ object GitObjects {
         { repo ->
             RevWalk(repo).use { walk ->
                 walk.revFilter = RevFilter.MERGE_BASE
+                // A walk across a long branch would otherwise keep every commit message in the small heap.
+                walk.isRetainBody = false
                 walk.markStart(walk.parseCommit(ObjectId.fromString(a)))
                 walk.markStart(walk.parseCommit(ObjectId.fromString(b)))
                 walk.next()?.name
@@ -46,23 +48,32 @@ object GitObjects {
         { Git.run(commonDir, "merge-base", a, b, allowFail = true)?.trim()?.ifEmpty { null } },
     )
 
-    /** Size in bytes of each blob the repository has; missing ones are left out. */
+    /**
+     * Size in bytes of each blob the repository has; missing ones are left out. Blobs JGit does not find locally go to
+     * git, which fetches them in a partial clone.
+     */
     fun blobSizes(commonDir: String, shas: Collection<String>): Map<String, Long> {
         if (shas.isEmpty()) return emptyMap()
-        return jgitOr(
+        val local = jgitOr(
             commonDir,
             { repo ->
                 repo.newObjectReader().use { reader ->
                     shas.mapNotNull { sha -> missingAsNull { sha to reader.getObjectSize(ObjectId.fromString(sha), Constants.OBJ_BLOB) } }.toMap()
                 }
             },
-            { Git.blobSizes(commonDir, shas) },
+            { emptyMap() },
         )
+        val rest = shas.filter { it !in local }
+        return if (rest.isEmpty()) local else local + Git.blobSizes(commonDir, rest)
     }
 
-    /** Blob contents of the repository at [commonDir]; from the first blob JGit fails to read on, `git cat-file` reads the rest. */
+    /**
+     * Blob contents of the repository at [commonDir]. `git cat-file` reads the blobs JGit does not find locally (a
+     * partial clone fetches them) and, from the first one JGit fails to read on, all the rest.
+     */
     fun blobs(commonDir: String): BlobSource = BlobSource { shas, onBlob ->
         val all = shas.toList()
+        val absent = ArrayList<String>()
         var count = 0
         for ((i, sha) in all.withIndex()) {
             // Read outside onBlob: a failure there is the caller's, never a reason to read the blob again with git.
@@ -73,12 +84,17 @@ object GitObjects {
                     }
                 }
             } catch (_: Exception) {
-                return@BlobSource count + BlobReader.read(commonDir, all.subList(i, all.size), onBlob)
-            } ?: continue
+                absent += all.subList(i, all.size)
+                break
+            }
+            if (bytes == null) {
+                absent += sha
+                continue
+            }
             onBlob(sha, bytes.toString(Charsets.UTF_8))
             count++
         }
-        count
+        count + if (absent.isEmpty()) 0 else BlobReader.read(commonDir, absent, onBlob)
     }
 
     private inline fun <T> missingAsNull(block: () -> T): T? = try {

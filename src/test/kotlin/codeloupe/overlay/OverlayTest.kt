@@ -216,6 +216,23 @@ class OverlayTest {
         assertTrue(Timings.gitSpawns() > warm, "reconciled with git")
     }
 
+    @Test
+    fun `new ignore rules apply on the next query, also when written while the daemon was down`() {
+        write(feature, BETA, "package demo\n\nclass Beta\n")
+        write(feature, DELTA, "package demo\n\nclass Delta\n")
+        val registry = Registry(config, queue)
+        assertContains(find(registry, feature, "Beta"), "class Beta")
+        write(feature, ".gitignore", "build/\n*.gen.kt\nBeta.kt\n")
+        assertNone(find(registry, feature, "Beta"), "ignored while running")
+        assertContains(find(registry, feature, "Delta"), "class Delta")
+        registry.close()
+
+        write(feature, ".gitignore", "build/\n*.gen.kt\nBeta.kt\nDelta.kt\n")
+        val restarted = Registry(config, JobQueue(CoroutineScope(Dispatchers.Default)))
+        assertNone(find(restarted, feature, "Delta"), "ignored while the daemon was down")
+        assertNone(find(restarted, feature, "Beta"), "still ignored")
+    }
+
     private fun overlayFiles(): List<Path> = Files.walk(config.home).use { paths ->
         paths.filter { it.parent.fileName.toString() == "overlays" && it.toString().endsWith(".db") }.toList()
     }
@@ -267,6 +284,7 @@ class OverlayTest {
     private companion object {
         const val ALPHA = "src/main/kotlin/demo/Alpha.kt"
         const val BETA = "src/main/kotlin/demo/Beta.kt"
+        const val DELTA = "src/main/kotlin/demo/Delta.kt"
         const val GONE = "src/main/kotlin/demo/Gone.kt"
         const val GENERATED = "src/main/kotlin/many/Generated.kt"
         const val BOM = "﻿"

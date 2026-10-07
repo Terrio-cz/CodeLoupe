@@ -30,13 +30,17 @@ class GitObjectsTest {
         assertEquals(first, GitObjects.mergeBase(commonDir, git(repo, "rev-parse", "main"), git(repo, "rev-parse", "side")))
 
         val blobs = git(repo, "ls-tree", "-r", "main").lines().map { it.split(' ', '\t')[2] }
-        val missing = "0".repeat(40)
-        val sizes = GitObjects.blobSizes(commonDir, blobs + missing)
+        val sizes = GitObjects.blobSizes(commonDir, blobs)
         assertEquals(blobs.associateWith { git(repo, "cat-file", "-s", it).toLong() }, sizes)
         val texts = HashMap<String, String>()
-        assertEquals(blobs.size, GitObjects.blobs(commonDir).read(blobs + missing) { sha, text -> texts[sha] = text })
+        assertEquals(blobs.size, GitObjects.blobs(commonDir).read(blobs) { sha, text -> texts[sha] = text })
         assertEquals(blobs.associateWith { git(repo, "cat-file", "blob", it) }, texts.mapValues { it.value.trim() })
         assertEquals(spawns, Timings.gitSpawns(), "no git process")
+
+        // Not in the object store: asked of git, which would fetch it in a partial clone; here it stays missing.
+        val missing = "0".repeat(40)
+        assertEquals(sizes, GitObjects.blobSizes(commonDir, blobs + missing))
+        assertEquals(blobs.size, GitObjects.blobs(commonDir).read(blobs + missing) { _, _ -> })
     }
 
     @Test

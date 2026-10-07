@@ -118,13 +118,15 @@ class Overlays(
     }
 
     private fun plan(repo: RepoState, state: OverlayState, baseCommit: String, baseFile: Path): OverlayChange? {
+        val gitState = ScanSnapshot.gitState(state.worktree)
         if (state.base == null) {
             load(state)
-            restore(state)
+            restore(state, gitState)
         }
-        if (state.base == baseCommit) return OverlayPlanner.incremental(state, baseCommit, baseFile)
+        // A checkout or new ignore rules change what git ignores without touching a source file: git settles that.
+        if (state.base == baseCommit && !ScanSnapshot.rulesMoved(state.gitState, gitState)) return OverlayPlanner.incremental(state, baseCommit, baseFile)
         val previous = synchronized(repo) { repo.previousFile?.takeIf { state.base != null && repo.previousCommit == state.base } }
-        return OverlayPlanner.reconcile(state, baseCommit, baseFile, previous?.takeIf { it.exists() })
+        return OverlayPlanner.reconcile(state, baseCommit, baseFile, previous?.takeIf { it.exists() }).copy(gitState = gitState)
     }
 
     /** An overlay file from an earlier daemon run: its files are reused where their stamps still match. */
@@ -144,9 +146,11 @@ class Overlays(
     }
 
     /** The worktree as the last check of an earlier daemon run saw it, when its snapshot matches the overlay file. */
-    private fun restore(state: OverlayState) {
+    private fun restore(state: OverlayState, gitState: Map<String, Stamp>) {
         val snapshot = ScanSnapshot.read(ScanSnapshot.fileOf(state.file)) ?: return
         if (snapshot.format != Store.FORMAT || snapshot.entries != state.entries) return
+        if (gitState.isEmpty() || snapshot.gitState != gitState) return
+        state.gitState = gitState
         if (state.entries.isNotEmpty() && snapshot.base != state.fileBase) return
         state.base = snapshot.base
         state.scan = snapshot.scan
@@ -204,6 +208,7 @@ class Overlays(
         state.scan = scan
         state.prune = change.prune
         state.ignored = change.ignored
+        change.gitState?.let { state.gitState = it }
         val base = change.update.meta.getValue("base")
         state.base = base
         val previous = state.view
@@ -211,7 +216,7 @@ class Overlays(
             state.view = OverlayVersion(state.file.takeIf { entries.isNotEmpty() }, base, (previous?.version ?: 0) + 1)
         }
         // Written after the overlay file: a snapshot never runs ahead of the entries the file holds.
-        ScanSnapshot.write(ScanSnapshot.fileOf(state.file), ScanSnapshot(Store.FORMAT, base, entries, scan, state.prune, state.ignored))
+        ScanSnapshot.write(ScanSnapshot.fileOf(state.file), ScanSnapshot(Store.FORMAT, base, state.gitState, entries, scan, state.prune, state.ignored))
     }
 
     private fun busy(state: OverlayState) = BusyException("indexing the changes of ${state.worktree}; retry in a few seconds")

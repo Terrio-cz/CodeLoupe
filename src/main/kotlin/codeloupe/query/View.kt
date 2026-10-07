@@ -22,9 +22,15 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
 
     init {
         if (overlayFile != null) {
-            db.createStatement().use { it.execute("ATTACH DATABASE '${overlayFile.toString().replace("'", "''")}' AS ov") }
-            // One read transaction: every statement sees the same version of an overlay that a refresh may be rewriting.
-            db.autoCommit = false
+            try {
+                db.createStatement().use { it.execute("ATTACH DATABASE '${overlayFile.toString().replace("'", "''")}' AS ov") }
+                // One read transaction: every statement sees the same version of an overlay that a refresh may be rewriting.
+                db.autoCommit = false
+            } catch (e: Exception) {
+                // Left open, the base connection would keep Windows from ever deleting the base.
+                db.close()
+                throw e
+            }
         }
         Timings.add(TimedPart.OPEN, System.nanoTime() - openedAt)
     }

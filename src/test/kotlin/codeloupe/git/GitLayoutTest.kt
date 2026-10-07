@@ -18,8 +18,8 @@ class GitLayoutTest {
         for (path in listOf(repo, repo.resolve("src/main"), linked, linked.resolve("src"))) {
             assertEquals(fromGit(path), GitLayout.locate(path), "$path")
         }
-        assertEquals(git(repo, "worktree", "list", "--porcelain").lines().filter { it.startsWith("worktree ") }.map { it.removePrefix("worktree ") },
-            GitLayout.worktrees(fromGit(repo).commonDir))
+        val listed = git(repo, "worktree", "list", "--porcelain").lines().filter { it.startsWith("worktree ") }
+        assertEquals(listed.map { Path.of(it.removePrefix("worktree ")).toRealPath().unix() }, GitLayout.worktrees(fromGit(repo).commonDir))
     }
 
     @Test
