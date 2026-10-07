@@ -8,7 +8,7 @@ branch changes, and get exactly that piece of code instead of grepping and readi
   and deleted files, checked when a query arrives (no file watchers, no CPU while idle).
 - **No IDE**: the Kotlin compiler's own parser (syntax only, no classpath) and SQLite.
 - **One daemon per machine** for every agent window, started on demand; heavy builds run one at a time
-  in a short-lived child JVM at low priority, so the daemon stays small (~135 MB).
+  in a short-lived child JVM at low priority, so the daemon stays small (140–190 MB).
 - **MCP** over Streamable HTTP (stateless) plus the same tools on a CLI.
 
 Languages: Kotlin (Java next). Status and roadmap: [docs/plan.md](docs/plan.md) (Czech).

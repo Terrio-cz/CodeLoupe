@@ -127,6 +127,33 @@ class OverlayTest {
     }
 
     @Test
+    fun `files outside a sparse checkout are answered from the base, not hidden`() {
+        git(feature, "sparse-checkout", "set", "--no-cone", "/src/main/kotlin/demo/")
+        assertTrue(!feature.resolve("src/main/kotlin/com/example/shop/Constructs.kt").exists())
+        val registry = Registry(config, queue)
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        write(repo, "src/main/kotlin/com/example/shop/Constructs.kt", "package com.example.shop\n\nclass Moved\n")
+        commit(repo, "change outside the cone")
+        assertContains(find(registry, feature, "Moved"), "class Moved")
+    }
+
+    @Test
+    fun `queries waiting for a slow refresh share the wait instead of queueing behind each other`() {
+        val gate = CompletableDeferred<Unit>()
+        val launcher = CountingLauncher(overlayGate = gate)
+        val registry = Registry(config.copy(queryTimeoutMs = 1_500), queue, launcher)
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        for (i in 0 until 250) write(feature, "src/main/kotlin/many/Many$i.kt", "package many\n\nclass Many$i\n")
+        val started = System.currentTimeMillis()
+        val answers = (0 until 4).map { Thread.ofVirtual().start { runCatching { find(registry, feature, "Many1") } } }
+        answers.forEach { it.join() }
+        assertTrue(System.currentTimeMillis() - started < 4_000, "four waits of 1.5 s ran side by side")
+        gate.complete(Unit)
+        waitFor("refresh done") { queue.snapshot().heavy.running == null }
+        assertContains(find(registry, feature, "Many249"), "class Many249")
+    }
+
+    @Test
     fun `the overlay of a removed worktree is deleted, a live one survives a restart`() {
         val other = worktree("other")
         write(feature, BETA, "package demo\n\nclass Beta\n")
@@ -172,14 +199,18 @@ class OverlayTest {
         }
     }
 
-    /** The real build worker, counted; base syncs wait for [gate]. */
-    private class CountingLauncher(private val gate: CompletableDeferred<Unit>? = null) : BuildLauncher(512, 120_000) {
+    /** The real build worker, counted; base syncs wait for [gate], overlay refreshes for [overlayGate]. */
+    private class CountingLauncher(
+        private val gate: CompletableDeferred<Unit>? = null,
+        private val overlayGate: CompletableDeferred<Unit>? = null,
+    ) : BuildLauncher(512, 120_000) {
         val syncs = AtomicInteger()
         val overlays = AtomicInteger()
 
         override fun update(commonDir: String, commit: String?, dbFile: Path, update: StoreUpdate, workDir: Path): BuildResult {
             if (commit == null) {
                 overlays.incrementAndGet()
+                overlayGate?.let { runBlocking { it.await() } }
             } else {
                 syncs.incrementAndGet()
                 gate?.let { runBlocking { it.await() } }

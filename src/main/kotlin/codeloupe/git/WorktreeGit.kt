@@ -23,6 +23,15 @@ object WorktreeGit {
         return names(out.orEmpty()).toSet()
     }
 
+    /** The [paths] marked skip-worktree: outside a sparse checkout, not deleted. */
+    fun skipWorktree(worktree: String, paths: Collection<String>): Set<String> {
+        // Batched to stay under Windows' command-line limit; `:(literal)` keeps names with * or ? from matching others.
+        return paths.chunked(PATHS_PER_CALL).flatMapTo(HashSet()) { batch ->
+            val out = Git.run(worktree, "ls-files", "-t", "-z", "--", *batch.map { ":(literal)$it" }.toTypedArray())!!
+            names(out).filter { it.startsWith("S ") }.map { it.substring(2) }
+        }
+    }
+
     /** Paths of the worktrees git knows for the repository at [commonDir], main worktree included. */
     fun list(commonDir: String): List<String> =
         Git.run(commonDir, "worktree", "list", "--porcelain", "-z")!!.split('\u0000')
@@ -30,4 +39,6 @@ object WorktreeGit {
             .map { it.removePrefix("worktree ") }
 
     private fun names(out: String): List<String> = out.split('\u0000').filter { it.isNotEmpty() }
+
+    private const val PATHS_PER_CALL = 100
 }

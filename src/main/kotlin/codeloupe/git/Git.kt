@@ -23,9 +23,10 @@ object Git {
     }
 
     // The daemon only reads: --no-optional-locks keeps it from refreshing a worktree's index under the user's feet.
+    // A repository's own config must not make a query run a command: core.fsmonitor can name one.
     fun start(cwd: String, vararg args: String): Process =
         try {
-            ProcessBuilder(listOf("git", "--no-optional-locks", "-C", cwd) + args).start()
+            ProcessBuilder(listOf("git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", cwd) + args).start()
         } catch (e: IOException) {
             throw GitException("git is not available: ${e.message}")
         }

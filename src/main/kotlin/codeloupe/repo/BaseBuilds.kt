@@ -39,12 +39,16 @@ internal class BaseBuilds(
 
     /** Starts (or joins) the sync of [repo]'s base to [commit]. Asks git for the changed files once per commit. */
     fun sync(repo: RepoState, commit: String): BaseSync {
-        synchronized(repo) { repo.sync?.takeIf { it.commit == commit }?.let { return it } }
-        val from = synchronized(repo) { repo.baseCommit!! }
+        // A sync that ended (failed, or swapped out by a newer one) is not joined: base() decides when to try again.
+        synchronized(repo) { repo.sync?.takeIf { it.commit == commit && it.job.isActive }?.let { return it } }
+        val from = synchronized(repo) {
+            repo.syncTarget = commit
+            repo.baseCommit!!
+        }
         val planned = changes(repo, from, commit)
         val inline = InlineParse.fits(planned.puts)
         val job = queue.run(if (inline) JobQueue.Lane.FAST else JobQueue.Lane.HEAVY, "sync:${repo.id}:$commit") {
-            build(repo, commit) { tmp ->
+            build(repo, commit, current = { repo.syncTarget == commit }) { tmp ->
                 // Copied under the lock that guards pruning, so the source cannot vanish mid-copy.
                 val source = synchronized(repo) {
                     Files.copy(repo.baseFile!!, tmp, StandardCopyOption.REPLACE_EXISTING)
@@ -70,7 +74,20 @@ internal class BaseBuilds(
         )
     }
 
-    private suspend fun build(repo: RepoState, commit: String, produce: (Path) -> BuildResult): BuildResult = withContext(Dispatchers.IO) {
+    /** Delete what a killed daemon left behind: half-built bases and update files of build workers. */
+    fun clean(repo: RepoState) {
+        for (file in repo.dir.listDirectoryEntries()) {
+            if (".tmp." in file.name || (file.name.startsWith("update-") && file.name.endsWith(".json"))) runCatching { Files.deleteIfExists(file) }
+        }
+    }
+
+    /** [current] is false once a newer sync took over: the base it built is then dropped, never swapped in over a newer one. */
+    private suspend fun build(
+        repo: RepoState,
+        commit: String,
+        current: () -> Boolean = { true },
+        produce: (Path) -> BuildResult,
+    ): BuildResult = withContext(Dispatchers.IO) {
         val name = "base-${commit.take(12)}"
         val tmp = repo.dir.resolve("$name.tmp.db")
         val out = repo.dir.resolve("$name.db")
@@ -85,7 +102,8 @@ internal class BaseBuilds(
             log("build ${repo.id} ${commit.take(7)} failed: ${e.message}")
             throw e
         }
-        synchronized(repo) {
+        val swappedIn = synchronized(repo) {
+            if (!current()) return@synchronized false
             for (suffix in listOf("", "-wal", "-shm")) Files.deleteIfExists(Path.of("$out$suffix"))
             Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING)
             if (repo.baseCommit != commit) {
@@ -97,6 +115,12 @@ internal class BaseBuilds(
             repo.lastBuild = LastBuild(IsoTime.now(), result.ok, result.files, result.errors, result.ms, result.peakRssMb)
             repo.failure = null
             prune(repo)
+            true
+        }
+        if (!swappedIn) {
+            for (suffix in listOf("", "-wal", "-shm")) runCatching { Files.deleteIfExists(Path.of("$tmp$suffix")) }
+            log("build ${repo.id} ${commit.take(7)} dropped: a newer sync took over")
+            return@withContext result
         }
         save(repo)
         log("build ${repo.id} ${commit.take(7)}: ${result.files} files in ${result.ms} ms, peak ${result.peakRssMb} MB")
@@ -113,7 +137,7 @@ internal class BaseBuilds(
     private fun prune(repo: RepoState) {
         val keep = listOfNotNull(repo.baseFile?.name, repo.previousFile?.name)
         for (file in repo.dir.listDirectoryEntries("base-*")) {
-            // A .tmp file is a build still in progress in the other lane.
+            // A .tmp file is a build still in progress in the other lane; clean() removes those a killed daemon left.
             if (".tmp." in file.name || keep.any { file.name == it || file.name.startsWith("$it-") }) continue
             runCatching { Files.deleteIfExists(file) }
         }

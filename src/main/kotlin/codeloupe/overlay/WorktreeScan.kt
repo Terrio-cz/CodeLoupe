@@ -4,14 +4,17 @@ import codeloupe.lang.Languages
 import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.Phaser
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Stamps of every indexable file under a worktree, without a git process. Attributes come with the directory
@@ -25,54 +28,76 @@ object WorktreeScan {
         Executors.newFixedThreadPool(THREADS) { Thread(it, "codeloupe-scan").apply { isDaemon = true } }
     }
 
-    /** Relative path -> stamp; [prune] holds relative directories to skip (what git ignores as a whole). */
-    fun scan(root: Path, prune: Set<String>): Map<String, Stamp> {
+    /**
+     * Relative path -> stamp; [prune] holds relative directories to skip (what git ignores as a whole). A directory
+     * that cannot be read fails the whole walk: a partial walk would read as deleted files.
+     */
+    fun scan(root: Path, prune: Set<String>): Map<String, Stamp> = Walk(prune).run(root)
+
+    private class Walk(private val prune: Set<String>) {
         val stamps = ConcurrentHashMap<String, Stamp>()
-        val pending = Phaser(1)
-        fun visit(dir: Path, rel: String) {
-            val entries = list(dir) ?: return
+        private val pending = AtomicInteger()
+        private val done = CompletableFuture<Unit>()
+
+        fun run(root: Path): Map<String, Stamp> {
+            fork(root, "")
+            try {
+                done.get()
+            } catch (e: ExecutionException) {
+                throw IOException("cannot walk $root: ${e.cause?.message}", e.cause)
+            }
+            return stamps
+        }
+
+        private fun fork(dir: Path, rel: String) {
+            pending.incrementAndGet()
+            pool.execute {
+                try {
+                    visit(dir, rel)
+                    if (pending.decrementAndGet() == 0) done.complete(Unit)
+                } catch (e: Throwable) {
+                    done.completeExceptionally(e)
+                }
+            }
+        }
+
+        private fun visit(dir: Path, rel: String) {
+            if (done.isDone) return
+            val entries = list(dir)
             // A nested repository or worktree belongs to itself, as for git.
             if (rel.isNotEmpty() && entries.any { it.first.fileName.toString() == ".git" }) return
             for ((entry, attrs) in entries) {
                 val name = entry.fileName.toString()
                 val path = if (rel.isEmpty()) name else "$rel/$name"
                 if (attrs.isDirectory && name != ".git" && path !in prune) {
-                    pending.register()
-                    pool.execute {
-                        try {
-                            visit(entry, path)
-                        } finally {
-                            pending.arriveAndDeregister()
-                        }
-                    }
+                    fork(entry, path)
                 } else if (attrs.isRegularFile && Languages.languageOf(name) != null) {
                     stamps[path] = Stamp(attrs.lastModifiedTime().to(TimeUnit.MICROSECONDS), attrs.size())
                 }
             }
         }
-        visit(root, "")
-        pending.arriveAndAwaitAdvance()
-        return stamps
-    }
 
-    /** Entries of one directory with the attributes its listing carries; links are not followed. Null when unreadable. */
-    private fun list(dir: Path): List<Pair<Path, BasicFileAttributes>>? {
-        val entries = ArrayList<Pair<Path, BasicFileAttributes>>()
-        try {
-            Files.walkFileTree(
-                dir, emptySet(), 1,
-                object : SimpleFileVisitor<Path>() {
-                    override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                        entries += file to attrs
-                        return FileVisitResult.CONTINUE
-                    }
+        /** Entries of one directory with the attributes its listing carries; links are not followed. */
+        private fun list(dir: Path): List<Pair<Path, BasicFileAttributes>> {
+            val entries = ArrayList<Pair<Path, BasicFileAttributes>>()
+            try {
+                Files.walkFileTree(
+                    dir, emptySet(), 1,
+                    object : SimpleFileVisitor<Path>() {
+                        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                            entries += file to attrs
+                            return FileVisitResult.CONTINUE
+                        }
 
-                    override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-                },
-            )
-        } catch (_: IOException) {
-            return null
+                        // An entry deleted while listed is simply gone.
+                        override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult =
+                            if (exc is NoSuchFileException) FileVisitResult.CONTINUE else throw exc
+                    },
+                )
+            } catch (_: NoSuchFileException) {
+                // Deleted while the walk ran (a build cleaning up): its files are gone.
+            }
+            return entries
         }
-        return entries
     }
 }

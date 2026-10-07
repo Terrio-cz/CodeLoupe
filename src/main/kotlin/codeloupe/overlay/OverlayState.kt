@@ -14,6 +14,14 @@ internal class OverlayState(val worktree: String, val repoId: String, val file: 
     /** `System.nanoTime()` when the last check started; meaningful once [base] is set. */
     var checkedAt = 0L
 
+    /** Set when a refresh failed: the next query checks again whatever [checkedAt] says. */
+    @Volatile
+    var mustCheck = false
+
+    /** `System.nanoTime()` of the last query: idle worktrees are evicted first. */
+    @Volatile
+    var usedAt = System.nanoTime()
+
     /** The base commit [entries] and [scan] are relative to; null until the first check. */
     var base: String? = null
 

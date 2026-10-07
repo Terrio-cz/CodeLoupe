@@ -2,6 +2,7 @@ package codeloupe.overlay
 
 import codeloupe.git.WorktreeGit
 import codeloupe.index.FilePut
+import codeloupe.index.InlineParse
 import codeloupe.index.Store
 import codeloupe.index.StoreUpdate
 import codeloupe.lang.Languages
@@ -35,10 +36,14 @@ internal object OverlayPlanner {
         }
         val basePaths = BaseFiles(baseFile).use { it.paths() }
         val target = HashMap<String, Stamp>()
+        val missing = ArrayList<String>()
         for (path in differing) {
             val stamp = scan[path]
-            if (stamp != null) target[path] = stamp else if (path in basePaths) target[path] = Stamp.MISSING
+            if (stamp != null) target[path] = stamp else if (path in basePaths) missing += path
         }
+        // Outside a sparse checkout's cone a file is absent but not deleted: the base answers for it.
+        val sparse = WorktreeGit.skipWorktree(worktree, missing)
+        for (path in missing) if (path !in sparse) target[path] = Stamp.MISSING
         // Seen by the walk, neither tracked nor reported untracked: git ignores them.
         val ignored = scan.keys.filterTo(HashSet()) { it !in differing && it !in basePaths }
         val unchanged = if (previous == null) emptySet() else target.keys.filterTo(HashSet()) { it !in state.entries && state.scan[it] == target[it] }
@@ -60,15 +65,20 @@ internal object OverlayPlanner {
                 val stamp = scan[path]
                 if (stamp == null) {
                     ignored -= path
-                    if (base.content(path) != null) target[path] = Stamp.MISSING else target -= path
+                    if (base.has(path)) target[path] = Stamp.MISSING else target -= path
                     continue
                 }
                 if (path in ignored) continue
-                val baseText = base.content(path)
-                if (baseText == null) {
+                if (!base.has(path)) {
                     if (path in state.entries) target[path] = stamp else unknown += path
                     continue
                 }
+                // Too large to read into the daemon's heap: taken as changed, a build worker parses it.
+                if (stamp.size > InlineParse.MAX_FILE_BYTES) {
+                    target[path] = stamp
+                    continue
+                }
+                val baseText = base.content(path)!!
                 val text = read(Path.of(state.worktree, path))
                 when {
                     // Locked or gone while we looked: keep the old stamp, so the next check reads it again.

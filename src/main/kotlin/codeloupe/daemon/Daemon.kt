@@ -45,6 +45,7 @@ import kotlinx.serialization.json.put
 import java.net.BindException
 import java.nio.file.Files
 import java.time.Instant
+import kotlin.io.path.listDirectoryEntries
 import kotlin.system.exitProcess
 
 /**
@@ -87,6 +88,8 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
 
     private fun start() {
         Files.createDirectories(config.home)
+        // Class-data archives of earlier versions; the daemon no longer writes one.
+        config.home.listDirectoryEntries("daemon-*.jsa").forEach { runCatching { Files.deleteIfExists(it) } }
         // CIO keeps a connection open until the client closes it or it idles; clients drop it on `Connection: close`.
         server = embeddedServer(
             CIO,

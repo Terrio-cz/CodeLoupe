@@ -60,7 +60,8 @@ class Registry(
                 baseFile = file
             }
             lastBuild = saved?.lastBuild
-            // Worktrees removed while the daemon was not running.
+            // Left behind by a daemon that was killed, and worktrees removed while it was not running.
+            builds.clean(this)
             collectOverlays(this)
         }
     }

@@ -20,6 +20,7 @@ import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
 
 /**
  * Worktree overlays: for each worktree, the files that differ from the repository's base, in a store of their own.
@@ -42,17 +43,25 @@ class Overlays(
      * before [arrived] (`System.nanoTime()` when the query came in).
      */
     suspend fun fresh(repo: RepoState, worktree: String, baseCommit: String, baseFile: Path, arrived: Long): OverlayVersion {
-        val state = states.computeIfAbsent(key(worktree)) { OverlayState(worktree, repo.id, fileOf(repo, worktree)) }
-        state.lock.withLock {
-            state.running?.let { if (!settled(it)) throw busy(state) }
-            if (state.base != baseCommit || arrived - state.checkedAt > checkNanos) {
+        val deadline = System.nanoTime() + waitMs * 1_000_000
+        while (true) {
+            val state = stateOf(repo, worktree)
+            val pending = state.lock.withLock {
+                // Evicted while we waited for the lock: a fresh state owns the overlay now.
+                if (states[key(worktree)] !== state) return@withLock null
+                state.running?.takeIf { it.isActive }?.let { return@withLock it }
+                if (state.base == baseCommit && !state.mustCheck && arrived - state.checkedAt <= checkNanos) return state.view!!
                 state.checkedAt = System.nanoTime()
+                state.mustCheck = false
                 val reconcile = state.base != baseCommit
                 val change = withContext(Dispatchers.IO) { plan(repo, state, baseCommit, baseFile) }
                 if (reconcile) log("overlay $worktree: checked against ${baseCommit.take(7)} in ${(System.nanoTime() - state.checkedAt) / 1_000_000} ms")
-                if (change != null) apply(repo, state, change)
-            }
-            return state.view!!
+                change?.let { start(repo, state, it) } ?: return state.view!!
+            } ?: continue
+            // Waited for outside the lock: every query of the worktree waits for the same job, none queues behind another.
+            val outcome = withTimeoutOrNull(maxOf(1, (deadline - System.nanoTime()) / 1_000_000)) { runCatching { pending.await() } }
+                ?: throw busy(state)
+            outcome.getOrThrow()
         }
     }
 
@@ -62,18 +71,37 @@ class Overlays(
     /** Overlays of a repository that hold files. */
     fun count(repoId: String): Int = states.values.count { it.repoId == repoId && it.entries.isNotEmpty() }
 
-    /** Deletes the overlays of worktrees that are gone (`git worktree list`, or the directory no longer exists). */
+    /**
+     * Deletes the overlays of worktrees that are gone (`git worktree list`, or the directory no longer exists). Files
+     * are matched by name, never opened: one a refresh is still writing belongs to a live worktree.
+     */
     fun collect(repo: RepoState) {
         val live = WorktreeGit.list(repo.commonDir).filter { Path.of(it).exists() }.mapTo(HashSet(), ::key)
         states.entries.removeIf { (key, state) -> state.repoId == repo.id && key !in live }
         val dir = repo.dir.resolve(DIR)
         if (!dir.exists()) return
-        for (file in dir.listDirectoryEntries("*.db")) {
-            val worktree = runCatching { Store.open(file, readOnly = true).use { Store.getMeta(it, "worktree") } }.getOrNull()
-            if (worktree != null && key(worktree) in live) continue
-            // Windows refuses to delete a file a reader still has open: best effort, the next collection retries.
-            for (suffix in listOf("", "-wal", "-shm")) runCatching { Files.deleteIfExists(Path.of("$file$suffix")) }
-            log("overlay of ${worktree ?: file.fileName} removed: the worktree is gone")
+        val keep = live.mapTo(HashSet(), ::nameOf)
+        val gone = dir.listDirectoryEntries().filter { it.name.substringBefore('.') !in keep }
+        // Windows refuses to delete a file a reader still has open: best effort, the next collection retries.
+        for (file in gone) runCatching { Files.deleteIfExists(file) }
+        if (gone.isNotEmpty()) log("overlays of removed worktrees deleted: ${gone.map { it.name.substringBefore('.') }.distinct().joinToString()}")
+    }
+
+    // A state per worktree that was queried; the least recently used go first beyond MAX_STATES. An evicted overlay
+    // keeps its file and is checked against git on its next query.
+    private fun stateOf(repo: RepoState, worktree: String): OverlayState {
+        val key = key(worktree)
+        states[key]?.let { return it.also { it.usedAt = System.nanoTime() } }
+        val state = states.computeIfAbsent(key) { OverlayState(worktree, repo.id, fileOf(repo, worktree)) }
+        if (states.size > MAX_STATES) evictIdle()
+        return state
+    }
+
+    private fun evictIdle() {
+        for ((key, state) in states.entries.sortedBy { it.value.usedAt }.take(states.size - MAX_STATES)) {
+            if (state.running?.isActive == true || !state.lock.tryLock()) continue
+            states.remove(key, state)
+            state.lock.unlock()
         }
     }
 
@@ -100,17 +128,27 @@ class Overlays(
         if (!usable) deleteFile(state)
     }
 
-    private suspend fun apply(repo: RepoState, state: OverlayState, change: OverlayChange) {
+    /** The refresh job that writes [change], or null when nothing needs writing and [change] is already committed. */
+    private fun start(repo: RepoState, state: OverlayState, change: OverlayChange): Deferred<*>? {
         val update = change.update
         val base = update.meta.getValue("base")
-        if (update.size == 0 && (change.entries.isEmpty() || state.fileBase == base)) return commit(state, change, emptyList())
+        if (update.size == 0 && (change.entries.isEmpty() || state.fileBase == base)) {
+            commit(state, change, emptyList())
+            return null
+        }
         val heavy = !InlineParse.fits(update.puts)
         val job = queue.run(if (heavy) JobQueue.Lane.HEAVY else JobQueue.Lane.FAST, "overlay:${state.worktree}") {
             withContext(Dispatchers.IO) {
-                val result = if (heavy) {
-                    launcher.update(repo.commonDir, null, state.file, update, repo.dir)
-                } else {
-                    Store.open(state.file).use { StoreUpdater.apply(it, update, repo.commonDir) }
+                val result = try {
+                    if (heavy) {
+                        launcher.update(repo.commonDir, null, state.file, update, repo.dir)
+                    } else {
+                        Store.open(state.file).use { StoreUpdater.apply(it, update, repo.commonDir) }
+                    }
+                } catch (e: Exception) {
+                    state.mustCheck = true
+                    log("overlay ${state.worktree}: refresh failed: ${e.message}")
+                    throw e
                 }
                 state.fileBase = base
                 commit(state, change, result.unread)
@@ -122,7 +160,7 @@ class Overlays(
             }
         }
         state.running = job
-        withTimeoutOrNull(waitMs) { job.await() } ?: throw busy(state)
+        return job
     }
 
     private fun commit(state: OverlayState, change: OverlayChange, unread: List<String>) {
@@ -145,9 +183,6 @@ class Overlays(
         }
     }
 
-    /** False while [job] still runs after a query's wait. A failed job counts as settled: the next check plans again. */
-    private suspend fun settled(job: Deferred<*>): Boolean = withTimeoutOrNull(waitMs) { runCatching { job.await() } } != null
-
     private fun busy(state: OverlayState) = BusyException("indexing the changes of ${state.worktree}; retry in a few seconds")
 
     private fun deleteFile(state: OverlayState) {
@@ -159,8 +194,10 @@ class Overlays(
     private fun fileOf(repo: RepoState, worktree: String): Path {
         val dir = repo.dir.resolve(DIR)
         Files.createDirectories(dir)
-        return dir.resolve("${Sha1.hex(key(worktree)).take(12)}.db")
+        return dir.resolve("${nameOf(key(worktree))}.db")
     }
+
+    private fun nameOf(key: String) = Sha1.hex(key).take(12)
 
     // Windows paths compare case-insensitively; git and the caller may spell the drive letter differently.
     private fun key(path: String): String {
@@ -169,6 +206,9 @@ class Overlays(
     }
 
     private companion object {
-        private const val DIR = "overlays"
+        const val DIR = "overlays"
+
+        /** Worktrees whose last walk stays in memory (~150 B per file each). */
+        const val MAX_STATES = 16
     }
 }

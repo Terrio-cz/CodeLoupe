@@ -7,9 +7,15 @@ import java.nio.file.Path
 internal class BaseFiles(file: Path) : AutoCloseable {
     private val db = Store.open(file, readOnly = true)
     private val content = db.prepareStatement("SELECT content FROM files WHERE path = ?")
+    private val exists = db.prepareStatement("SELECT 1 FROM files WHERE path = ?")
 
     fun paths(): Set<String> = db.createStatement().use { s ->
         s.executeQuery("SELECT path FROM files").use { rs -> buildSet { while (rs.next()) add(rs.getString(1)) } }
+    }
+
+    fun has(path: String): Boolean {
+        exists.setString(1, path)
+        return exists.executeQuery().use { it.next() }
     }
 
     /** Text of [path] in the base, null when the base has no such file. */
@@ -20,6 +26,7 @@ internal class BaseFiles(file: Path) : AutoCloseable {
 
     override fun close() {
         content.close()
+        exists.close()
         db.close()
     }
 }
