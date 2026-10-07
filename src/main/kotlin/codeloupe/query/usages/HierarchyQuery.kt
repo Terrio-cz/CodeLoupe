@@ -3,7 +3,6 @@ package codeloupe.query.usages
 import codeloupe.query.DeclRow
 import codeloupe.query.Format
 import codeloupe.query.Members
-import codeloupe.query.PathOrder
 import codeloupe.query.Resolver
 import codeloupe.query.View
 
@@ -20,10 +19,10 @@ object HierarchyQuery {
         val targets = found.filter { it.kind != "constructor" }.ifEmpty { found }
         if (targets.size > 1) return TargetLines.ambiguity(query, targets) ?: "${targets.size} overloads of \"$query\" — give the parameters: member(ParamType)"
         val target = targets.single()
-        val context = IndexContext(view)
+        val finder = UsageFinder(view)
         val lines = arrayListOf(Format.head(target))
-        if (target.kind in Kinds.CLASSIFIERS) type(target, context.types, lines) else member(target, context.overrides, lines)
-        if (target.kind == "interface" && FUN_INTERFACE.containsMatchIn(target.sig)) lambdas(view, target, lines)
+        if (target.kind in Kinds.CLASSIFIERS) type(target, finder.context.types, lines) else member(target, finder.context.overrides, lines)
+        if (target.kind == "interface" && FUN_INTERFACE.containsMatchIn(target.sig)) lambdas(finder, target, lines)
         return lines.take(MAX_LINES).joinToString("\n") + Format.more(lines.size, MAX_LINES)
     }
 
@@ -51,15 +50,15 @@ object HierarchyQuery {
         lines += if (subtypes.isEmpty()) listOf("subtypes: (none indexed)") else listOf("subtypes:") + subtypes
     }
 
-    /** `Iface { … }`: a lambda converted to a `fun interface` implements it too. */
-    private fun lambdas(view: View, type: DeclRow, lines: MutableList<String>) {
-        val finder = UsageFinder(view)
-        val conversions = finder.usages(listOf(type)).filter { it.ref.kind == "call" && it.label != Label.OTHER }
+    /**
+     * `Iface { … }`: a lambda converted to a `fun interface` implements it too. A lambda passed straight to a parameter
+     * of that type is not listed — finding those means typing every call's parameters.
+     */
+    private fun lambdas(finder: UsageFinder, type: DeclRow, lines: MutableList<String>) {
+        val conversions = HitLines.lines(finder.usages(listOf(type)).filter { it.ref.kind == "call" && it.label != Label.OTHER })
         if (conversions.isEmpty()) return
-        lines += "lambda implementations:"
-        conversions.sortedWith(compareBy<Usage, String>(PathOrder) { it.ref.path }.thenBy { it.ref.line }).forEach {
-            lines += "  ${it.label.mark} ${it.ref.path}:${it.ref.line}  ${finder.cache.line(it.ref.path, it.ref.line).trim().take(MAX_CODE)}"
-        }
+        lines += "lambda implementations (${type.name} { … }):"
+        conversions.forEach { lines += "  ${it.label.mark} ${it.ref.path}:${it.ref.line}  ${finder.cache.line(it.ref.path, it.ref.line).trim().take(MAX_CODE)}" }
     }
 
     private fun member(member: DeclRow, overrides: Overrides, lines: MutableList<String>) {

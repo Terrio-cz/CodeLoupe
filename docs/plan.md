@@ -257,7 +257,7 @@ v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`
 | `symbol(name, body=true)` | text deklarace (anotace, KDoc, tělo) + `hash`; overloady podle parametrů |
 | `usages(name, all?, limit?)` ✅ | výskyty seskupené podle souboru a obklopující deklarace, 1 řádek každý, `=` exact / `?` candidate; počet výskytů vedoucích jinam |
 | `calls(name, direction=callers\|callees, depth≤3)` ✅ | strom volání; pod první úrovní jen exact vazby, kandidáti jako počet (jeden nástroj místo dvou — strop 12 nástrojů) |
-| `hierarchy(type \| member)` ✅ | supertypy (i mimo index jménem), podtypy včetně enum entry, override nahoru i dolů |
+| `hierarchy(type \| member)` ✅ | supertypy (i mimo index jménem), podtypy včetně enum entry a `object : I {}`, lambdy převedené na `fun interface` (`I { … }`), override nahoru i dolů |
 | `grep(pattern)` | `rg` nad rootem, zásahy označené obklopující deklarací |
 | `changes(root)` | změněné deklarace proti merge-base: `+ ~ ^ -`, volající, testy, volitelně tělo před/po |
 | `context(name)` | `symbol` + volající + volané jedním voláním |
@@ -395,9 +395,10 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 - Index: formát `2/kotlin-psi-4` (sloupce `bind`, `recv_type`, `args` v `refs`) → báze se po upgradu přestaví.
 - Stejná fixture sada v repu (`fixtures/kotlin/usages`) kryje super, cast, lambdy, alias, companion, enum, extension,
   override/dispatch, overloady, private, `::`, smart cast, DSL receivery, sekundární konstruktor, FQ typ a nadmnožinu.
-- `hierarchy` vidí i implementace přes `object : I {}` a jejich override (CL-81).
-- Známé meze: typ výsledku `let {}`,
-  indexace `xs[0]` a generik se neodvozuje (→ `candidate`); povýšení na `exact` u neznámého receiveru je heuristika.
+- `hierarchy` vidí i implementace přes `object : I {}` a jejich override a lambdy `I { … }` u `fun interface` (CL-81).
+- Známé meze: typ výsledku `let {}`, indexace `xs[0]` a generik se neodvozuje (→ `candidate`); povýšení na `exact`
+  u neznámého receiveru je heuristika; lambda předaná rovnou do parametru typu `fun interface` (`takes { … }`) se
+  v `hierarchy` jako implementace neukáže.
 
 ### Výsledek fáze 3a — vrstvy worktree a líný sync báze (CL-16, 2026-10-07)
 

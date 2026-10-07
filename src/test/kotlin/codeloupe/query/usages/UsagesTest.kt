@@ -75,7 +75,7 @@ class UsagesTest {
 
     @Test
     fun `scopes - shadowing bindings, private declarations elsewhere, nested types of supertypes, qualified types`() {
-        assertEquals(mapOf("Edge.kt:14" to Label.EXACT), labels("com.example.model.helper"), "a Boolean binding cannot be called")
+        assertEquals(mapOf("Edge.kt:14" to Label.EXACT, "Edge.kt:60" to Label.OTHER), labels("com.example.model.helper"), "a Boolean binding cannot be called")
         assertEquals(mapOf("Edge.kt:16" to Label.EXACT), labels("com.example.model.shared"), "a private shared() in another file hides nothing")
         assertEquals(mapOf("Shapes.kt:12" to Label.EXACT), labels("Nested.make"))
         assertEquals(Label.EXACT, labels("com.example.model.Point")["Edge.kt:20"], "a package-qualified type")
@@ -139,7 +139,11 @@ class UsagesTest {
         assertContains(HierarchyQuery.run(view, "AccountStore.find"), "overrides:\n  src/main/kotlin/com/example/model/Account.kt:5  [Store] fun find(…)")
         assertContains(HierarchyQuery.run(view, "Shape"), "subtypes:\n  src/main/kotlin/com/example/model/Shapes.kt:23  class Circle : Shape()")
         assertContains(HierarchyQuery.run(view, "Named"), "subtypes:\n  src/main/kotlin/com/example/other/Edge.kt:22  [Edge.lit] object : Named", message = "an object expression")
-        assertContains(HierarchyQuery.run(view, "Validator"), "lambda implementations:\n  = src/main/kotlin/com/example/other/Edge.kt:45  val positive = Validator { it > 0 }")
+        val validator = HierarchyQuery.run(view, "Validator")
+        assertContains(validator, "lambda implementations (Validator { … }):\n  = src/main/kotlin/com/example/other/Edge.kt:45  val positive = Validator { it > 0 }")
+        assertEquals(1, validator.lines().count { "Edge.kt:47" in it }, "two conversions on one line, one line")
+        assertEquals(mapOf("Edge.kt:14" to Label.OTHER, "Edge.kt:60" to Label.OTHER), labels("Outer.helper"), "inside an object expression its own member wins")
+        assertEquals(mapOf("Edge.kt:61" to Label.OTHER), labels("Outer.label2"))
         assertContains(HierarchyQuery.run(view, "Named.label"), "overridden by:\n  src/main/kotlin/com/example/other/Edge.kt:23  [Edge.lit.<anonymous>] override val label")
     }
 

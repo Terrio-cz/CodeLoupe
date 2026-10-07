@@ -43,3 +43,26 @@ fun Enum<*>.lower() = name.lowercase()
 fun probes(validate: Validator, e: MyEx, level: Level) = listOf(validate(1), e.report(), level.lower())
 
 val positive = Validator { it > 0 }
+
+val pair = listOf(Validator { it > 1 }, Validator { it > 2 })
+
+open class Base2(val n: Int) {
+    open fun run() = n
+}
+
+class Outer {
+    fun helper() = 1
+
+    val label2 = "outer"
+
+    fun f() = object : Base2(1) {
+        override fun run(): Int {
+            helper()
+            return label2.length
+        }
+
+        fun helper() = 2
+
+        val label2 = "inner"
+    }
+}

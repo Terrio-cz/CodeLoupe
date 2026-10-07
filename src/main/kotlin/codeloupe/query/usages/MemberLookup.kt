@@ -8,7 +8,8 @@ internal class MemberLookup(private val cache: IndexCache, private val types: Ty
     /** Instance members on [closure]: the nearest supertype level that declares one wins, the rest are reached by dispatch. */
     fun instance(closure: TypeClosure, name: String, accept: (DeclRow) -> Boolean): Resolution {
         val levels = closure.levels.map { level ->
-            level.flatMap { t -> cache.children(t).filter { it.name == name && !it.local && it.kind !in Kinds.CLASSIFIERS && accept(it) } }
+            // Members of a local class or an object expression are local declarations themselves.
+            level.flatMap { t -> cache.children(t).filter { it.name == name && (!it.local || t.local) && it.kind !in Kinds.CLASSIFIERS && accept(it) } }
         }
         val nearest = levels.indexOfFirst { it.isNotEmpty() }
         if (nearest < 0) return Resolution.NOTHING

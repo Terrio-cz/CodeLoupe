@@ -71,11 +71,6 @@ internal class DeclShapes(private val source: Source) {
         return DeclShape("enum_entry", name, modifiers(element), sig = name)
     }
 
-    companion object {
-        /** Name of an object expression; no declared name can contain `<`. */
-        const val ANONYMOUS = "<anonymous>"
-    }
-
     private fun modifiers(element: org.jetbrains.kotlin.psi.KtModifierListOwner) = Modifiers.of(element.modifierList, source)
 
     private fun nameOf(identifier: org.jetbrains.kotlin.com.intellij.psi.PsiElement?): String = identifier?.let(source::of) ?: "?"
@@ -98,5 +93,10 @@ internal class DeclShapes(private val source: Source) {
         var type = entry.typeReference?.typeElement as? KtUserType ?: return@mapNotNull null
         while (true) type = type.qualifier ?: break
         type.referenceExpression?.let { JsText.bare(source.of(it)) }
+    }
+
+    companion object {
+        /** Name of an object expression; no declared name can contain `<`. */
+        const val ANONYMOUS = "<anonymous>"
     }
 }

@@ -5,6 +5,7 @@ import codeloupe.query.DeclRow
 /** `[Container] fun Type.name(…)`: a declaration named compactly, parameters elided, for lines that only locate code. */
 internal object ShortSignature {
     private const val MAX = 100
+    private const val MIN_CONTAINER = 20
 
     /** `path:line  [Container] fun name(…)` */
     fun located(d: DeclRow): String = "${d.path}:${d.declLine}  ${of(d)}"
@@ -18,7 +19,12 @@ internal object ShortSignature {
         } else {
             sig
         }
-        val text = (if (d.container.isNotEmpty()) "[${d.container}] " else "") + head
-        return if (text.length <= MAX) text else text.take(MAX - 1) + "…"
+        if (d.container.isEmpty()) return clip(head, MAX)
+        // A long container (a backticked test name) gives way before the signature does.
+        val room = MAX - head.length - 3
+        val container = if (d.container.length <= room) d.container else "…" + d.container.takeLast(maxOf(room - 1, MIN_CONTAINER))
+        return clip("[$container] $head", MAX)
     }
+
+    private fun clip(text: String, max: Int) = if (text.length <= max) text else text.take(max - 1) + "…"
 }

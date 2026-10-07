@@ -5,7 +5,8 @@ import codeloupe.query.usages.HierarchyQuery
 
 object HierarchyTool : Tool {
     override val name = "hierarchy"
-    override val description = "Supertypes and subtypes (implementations) of a type, or what a member overrides and what overrides it."
+    override val description = "Supertypes and subtypes (implementations, object expressions included) of a type, and lambdas " +
+        "converted to a fun interface; or what a member overrides and what overrides it."
     override val properties = Schema.properties("name" to Schema.string("Type, pkg.Type or Type.member"))
     override val required = listOf("name")
 

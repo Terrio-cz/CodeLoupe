@@ -259,7 +259,7 @@ internal class KotlinExtractor(private val source: Source) {
             sig = shape.sig ?: Signature.of(element, span, shape.modifiers, source),
             hash = Sha1.hex(source.of(span)).take(HASH_LENGTH),
             // An object expression and all inside it are code, wherever the expression stands.
-            local = shape.name == DeclShapes.ANONYMOUS || stack.any { decls[it].kind in CODE_KINDS || decls[it].name == DeclShapes.ANONYMOUS },
+            local = shape.name == DeclShapes.ANONYMOUS || stack.lastOrNull()?.let { decls[it].local || decls[it].kind in CODE_KINDS } == true,
             parent = innermost(),
         )
         return decls.size - 1

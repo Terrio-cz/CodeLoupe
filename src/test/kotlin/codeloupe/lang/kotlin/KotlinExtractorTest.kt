@@ -138,6 +138,23 @@ class KotlinExtractorTest {
     }
 
     @Test
+    fun `object expressions are local objects with their supertypes, also directly under a class`() {
+        val text = "interface I { fun f() }\nclass A(val i: I = object : I { override fun f() {} }) : I by object : I { override fun f() {} }\n"
+        val decls = Languages.extract("A.kt", text)!!.decls
+        val objects = decls.withIndex().filter { it.value.name == "<anonymous>" }
+        assertEquals(2, objects.size)
+        for ((index, o) in objects) {
+            assertEquals("object", o.kind)
+            assertEquals(listOf("I"), o.supertypes)
+            assertTrue(o.local)
+            val member = decls.single { it.parent == index }
+            assertEquals("f", member.name)
+            assertTrue(member.local)
+        }
+        assertFalse(decls.single { it.name == "A" }.local)
+    }
+
+    @Test
     fun `CRLF and a BOM change only the hashes`() {
         val crlf = Languages.extract("Constructs.kt", Char(0xFEFF) + TEXT.replace("\n", "\r\n"))!!
         assertEquals(0, crlf.errors)

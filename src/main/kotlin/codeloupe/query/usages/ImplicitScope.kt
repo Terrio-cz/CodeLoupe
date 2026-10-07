@@ -51,7 +51,7 @@ internal class ImplicitScope(
 
     private fun onInstance(receiver: ReceiverType.Instance, name: String, file: FileScope, accept: (DeclRow) -> Boolean): Resolution? {
         val members = receiver.types.map { lookup.instance(types.closure(it), name, accept) }
-        val found = members.flatMap { it.decls }
+        val found = members.flatMap { it.decls }.distinct()
         if (found.isNotEmpty()) return Resolution(found, complete = true, further = members.flatMap { it.further })
         return lookup.extensions(name, receiver.names, file, accept).takeIf { it.isNotEmpty() }?.let { Resolution(it, complete = true) }
     }
@@ -62,7 +62,8 @@ internal class ImplicitScope(
             val receiver = receiverTypes(outer, file) ?: continue
             val members = receiver.types.map { lookup.instance(types.closure(it), name, accept) }
             val statics = if (outer.kind in Kinds.CLASSIFIERS) lookup.static(outer, name, accept) else Resolution.NOTHING
-            val found = members.flatMap { it.decls } + statics.decls
+            // An object's members are both its instance and its static members.
+            val found = (members.flatMap { it.decls } + statics.decls).distinct()
             val answer = when {
                 found.isNotEmpty() -> Resolution(found, complete = true, further = members.flatMap { it.further } + statics.further)
                 else -> lookup.extensions(name, receiver.names, file, accept).takeIf { it.isNotEmpty() }?.let { Resolution(it, complete = true) }
