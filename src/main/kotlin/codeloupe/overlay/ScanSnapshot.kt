@@ -1,9 +1,12 @@
 package codeloupe.overlay
 
 import codeloupe.git.GitLayout
+import codeloupe.git.GlobalExcludes
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
+import java.io.RandomAccessFile
+import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -31,27 +34,34 @@ internal data class ScanSnapshot(
     companion object {
         private const val MAGIC = "codeloupe-scan/3"
         private const val INDEX = "index"
+        private const val INDEX_ENTRIES = "index entries"
+        private const val GLOBAL_EXCLUDES = "global excludes "
 
         fun fileOf(overlay: Path): Path = overlay.resolveSibling(overlay.name.removeSuffix(".db") + ".scan")
 
         /**
          * Stamps of what can change which files git ignores or tracks without touching a source file or a `.gitignore`:
-         * HEAD, the index (`git add -f`, `git rm --cached`) and `info/exclude`. Empty when the layout is not readable,
-         * which no snapshot matches.
+         * HEAD, the index, the number of files the index tracks (`git add -f`, `git rm --cached`), `info/exclude` and
+         * the global excludes file. Empty when the layout is not readable, which no snapshot matches.
          */
         fun gitState(worktree: String): Map<String, Stamp> {
             val root = Path.of(worktree)
             val gitDir = runCatching { GitLayout.gitDir(root) }.getOrNull() ?: return emptyMap()
+            val common = GitLayout.commonDir(gitDir)
+            val globalExcludes = GlobalExcludes.file(common)
             return mapOf(
                 "HEAD" to stampOf(gitDir.resolve("HEAD")),
                 INDEX to stampOf(gitDir.resolve("index")),
-                "exclude" to stampOf(GitLayout.commonDir(gitDir).resolve("info/exclude")),
+                INDEX_ENTRIES to indexEntries(gitDir.resolve("index")),
+                "exclude" to stampOf(common.resolve("info/exclude")),
+                GLOBAL_EXCLUDES + globalExcludes to stampOf(globalExcludes),
             )
         }
 
         /**
-         * True when HEAD or the exclude rules moved between two [gitState]s. The index is left out: IDEs refresh it all
-         * the time, and only a restart (a snapshot) has to distrust what happened to it unseen.
+         * True when HEAD, the exclude rules or the number of tracked files moved between two [gitState]s. The index
+         * stamp is left out: IDEs refresh the index all the time, and only a restart (a snapshot) has to distrust what
+         * happened to it unseen. Its entry count moves only when a file starts or stops being tracked.
          */
         fun rulesMoved(old: Map<String, Stamp>, new: Map<String, Stamp>): Boolean = old - INDEX != new - INDEX
 
@@ -86,6 +96,17 @@ internal data class ScanSnapshot(
 
         fun delete(file: Path) {
             for (path in listOf(file, file.resolveSibling("${file.name}.tmp"))) runCatching { Files.deleteIfExists(path) }
+        }
+
+        /** The entry count in the 12-byte index header (`DIRC`, version, count); [Stamp.MISSING] when it cannot be read. */
+        private fun indexEntries(index: Path): Stamp = try {
+            RandomAccessFile(index.toFile(), "r").use { file ->
+                val header = ByteArray(12)
+                file.readFully(header)
+                if (String(header, 0, 4, Charsets.US_ASCII) == "DIRC") Stamp(ByteBuffer.wrap(header, 8, 4).int.toLong() and 0xFFFFFFFFL, 0) else Stamp.MISSING
+            }
+        } catch (_: IOException) {
+            Stamp.MISSING
         }
 
         private fun stampOf(file: Path): Stamp = try {

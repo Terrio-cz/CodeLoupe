@@ -240,6 +240,45 @@ class OverlayTest {
         assertNone(find(restarted, feature, "Beta"), "still ignored")
     }
 
+    @Test
+    fun `a global excludes file that changes applies on the next query, also one edited while the daemon was down`() {
+        val excludes = TestRepos.tmpDir("excludes").resolve("ignore")
+        excludes.writeText("Epsilon.kt\n")
+        git(repo, "config", "core.excludesFile", excludes.toString().replace('\\', '/'))
+        val registry = Registry(config, queue)
+        write(feature, EPSILON, "package demo\n\nclass Epsilon\n")
+        assertNone(find(registry, feature, "Epsilon"), "ignored by the global file")
+
+        excludes.writeText("")
+        assertContains(find(registry, feature, "Epsilon"), "class Epsilon")
+        excludes.writeText("# off\nEpsilon.kt\n")
+        assertNone(find(registry, feature, "Epsilon"), "ignored again")
+        registry.close()
+
+        excludes.writeText("Other.kt\n")
+        val restarted = Registry(config, JobQueue(CoroutineScope(Dispatchers.Default)))
+        assertContains(find(restarted, feature, "Epsilon"), "class Epsilon")
+    }
+
+    @Test
+    fun `git add -f and git rm --cached of a file show in the next query, an index refresh asks git nothing`() {
+        val registry = Registry(config, queue)
+        write(feature, FORCED, "package demo\n\nclass Forced\n")
+        assertNone(find(registry, feature, "Forced"), "ignored")
+
+        git(feature, "add", "-f", FORCED)
+        assertContains(find(registry, feature, "Forced"), "class Forced")
+        git(feature, "rm", "--cached", "-q", FORCED)
+        assertNone(find(registry, feature, "Forced"), "untracked and ignored again")
+
+        // The index is rewritten without a file starting or stopping to be tracked, as an IDE does all day.
+        val spawns = Timings.gitSpawns()
+        write(feature, ALPHA, alpha("one"))
+        git(feature, "status", "--short")
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertEquals(spawns, Timings.gitSpawns(), "index refresh")
+    }
+
     private fun overlayFiles(): List<Path> = Files.walk(config.home).use { paths ->
         paths.filter { it.parent.fileName.toString() == "overlays" && it.toString().endsWith(".db") }.toList()
     }
@@ -292,6 +331,8 @@ class OverlayTest {
         const val ALPHA = "src/main/kotlin/demo/Alpha.kt"
         const val BETA = "src/main/kotlin/demo/Beta.kt"
         const val DELTA = "src/main/kotlin/demo/Delta.kt"
+        const val EPSILON = "src/main/kotlin/demo/Epsilon.kt"
+        const val FORCED = "src/main/kotlin/demo/Forced.gen.kt"
         const val GONE = "src/main/kotlin/demo/Gone.kt"
         const val GENERATED = "src/main/kotlin/many/Generated.kt"
         const val BOM = "﻿"
