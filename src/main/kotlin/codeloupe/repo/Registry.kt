@@ -102,7 +102,7 @@ class Registry(
                 // Read the overlay as it is while the worktree is checked: the answer stands when the check changed nothing.
                 val known = overlays.known(location.worktree, baseCommit)
                 val early = known?.let { async(Dispatchers.IO) { runCatching { read(repo, baseFile, baseCommit, it.file, read) } } }
-                val overlay = overlays.fresh(repo, location.worktree, baseCommit, baseFile, arrived)
+                val overlay = overlays.fresh(repo, location.worktree, baseCommit, baseFile, arrived) ?: return@coroutineScope null
                 if (overlay == known) {
                     early!!.await().getOrThrow()
                 } else {

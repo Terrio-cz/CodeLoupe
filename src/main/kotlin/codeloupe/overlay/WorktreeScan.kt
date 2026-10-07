@@ -2,6 +2,7 @@ package codeloupe.overlay
 
 import codeloupe.lang.Languages
 import java.io.IOException
+import java.nio.file.AccessDeniedException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
@@ -29,8 +30,8 @@ object WorktreeScan {
     }
 
     /**
-     * Relative path -> stamp; [prune] holds relative directories to skip (what git ignores as a whole). A directory
-     * that cannot be read fails the whole walk: a partial walk would read as deleted files.
+     * Relative path -> stamp; [prune] holds relative directories to skip (what git ignores as a whole). An unexpected
+     * listing error fails the whole walk: a partial walk would read as deleted files.
      */
     fun scan(root: Path, prune: Set<String>): Map<String, Stamp> = Walk(prune).run(root)
 
@@ -89,15 +90,18 @@ object WorktreeScan {
                             return FileVisitResult.CONTINUE
                         }
 
-                        // An entry deleted while listed is simply gone.
                         override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult =
-                            if (exc is NoSuchFileException) FileVisitResult.CONTINUE else throw exc
+                            if (skippable(exc)) FileVisitResult.CONTINUE else throw exc
                     },
                 )
-            } catch (_: NoSuchFileException) {
-                // Deleted while the walk ran (a build cleaning up): its files are gone.
+            } catch (e: IOException) {
+                if (!skippable(e)) throw e
             }
             return entries
         }
+
+        // Deleted while the walk ran (a build cleaning up): gone. Unreadable (a root-owned bind mount, a deny ACL): the
+        // same every walk, so skipping it never reads as a deletion; git skips it too.
+        private fun skippable(e: IOException) = e is NoSuchFileException || e is AccessDeniedException
     }
 }

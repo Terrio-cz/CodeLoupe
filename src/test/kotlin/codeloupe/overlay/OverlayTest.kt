@@ -127,6 +127,21 @@ class OverlayTest {
     }
 
     @Test
+    fun `a large base file rewritten unchanged is compared by hash, not handed to a worker`() {
+        val big = TestRepos.bigClass("many", "Generated", 12_000)
+        write(repo, GENERATED, big)
+        commit(repo, "generated code")
+        val launcher = CountingLauncher()
+        val registry = Registry(config, queue, launcher)
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        write(feature, GENERATED, big)
+        Files.setLastModifiedTime(feature.resolve(GENERATED), java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 5_000))
+        assertContains(find(registry, feature, "Generated.m11999"), "fun m11999")
+        assertEquals(0, launcher.overlays.get())
+        assertEquals(0, registry.snapshot().single().overlays)
+    }
+
+    @Test
     fun `files outside a sparse checkout are answered from the base, not hidden`() {
         git(feature, "sparse-checkout", "set", "--no-cone", "/src/main/kotlin/demo/")
         assertTrue(!feature.resolve("src/main/kotlin/com/example/shop/Constructs.kt").exists())
@@ -223,6 +238,7 @@ class OverlayTest {
         const val ALPHA = "src/main/kotlin/demo/Alpha.kt"
         const val BETA = "src/main/kotlin/demo/Beta.kt"
         const val GONE = "src/main/kotlin/demo/Gone.kt"
+        const val GENERATED = "src/main/kotlin/many/Generated.kt"
 
         fun alpha(member: String) = "package demo\n\nclass Alpha {\n    fun $member() = 1\n}\n"
     }

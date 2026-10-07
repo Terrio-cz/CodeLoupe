@@ -40,15 +40,17 @@ class Overlays(
 
     /**
      * The overlay of [worktree] against [baseCommit], brought up to date by a check that started at most `checkMs`
-     * before [arrived] (`System.nanoTime()` when the query came in).
+     * before [arrived] (`System.nanoTime()` when the query came in). Null when the base moved on: the caller starts over.
      */
-    suspend fun fresh(repo: RepoState, worktree: String, baseCommit: String, baseFile: Path, arrived: Long): OverlayVersion {
+    suspend fun fresh(repo: RepoState, worktree: String, baseCommit: String, baseFile: Path, arrived: Long): OverlayVersion? {
         val deadline = System.nanoTime() + waitMs * 1_000_000
         while (true) {
             val state = stateOf(repo, worktree)
             val pending = state.lock.withLock {
                 // Evicted while we waited for the lock: a fresh state owns the overlay now.
                 if (states[key(worktree)] !== state) return@withLock null
+                // The base moved since the caller read it: checking against the old one would only flip the overlay back.
+                if (synchronized(repo) { repo.baseCommit } != baseCommit) return null
                 state.running?.takeIf { it.isActive }?.let { return@withLock it }
                 if (state.base == baseCommit && !state.mustCheck && arrived - state.checkedAt <= checkNanos) return state.view!!
                 state.checkedAt = System.nanoTime()

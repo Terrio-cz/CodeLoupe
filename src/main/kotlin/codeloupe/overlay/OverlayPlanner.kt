@@ -6,6 +6,7 @@ import codeloupe.index.InlineParse
 import codeloupe.index.Store
 import codeloupe.index.StoreUpdate
 import codeloupe.lang.Languages
+import codeloupe.platform.Sha1
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -60,12 +61,13 @@ internal object OverlayPlanner {
         val ignored = HashSet(state.ignored)
         val remembered = HashMap(scan)
         val unknown = ArrayList<String>()
+        val gone = ArrayList<String>()
         BaseFiles(baseFile).use { base ->
             for (path in moved) {
                 val stamp = scan[path]
                 if (stamp == null) {
                     ignored -= path
-                    if (base.has(path)) target[path] = Stamp.MISSING else target -= path
+                    if (base.has(path)) gone += path else target -= path
                     continue
                 }
                 if (path in ignored) continue
@@ -73,9 +75,13 @@ internal object OverlayPlanner {
                     if (path in state.entries) target[path] = stamp else unknown += path
                     continue
                 }
-                // Too large to read into the daemon's heap: taken as changed, a build worker parses it.
+                // Too large to read into the daemon's heap: compared by hash as a stream, a build worker parses it.
                 if (stamp.size > InlineParse.MAX_FILE_BYTES) {
-                    target[path] = stamp
+                    when (Sha1.ofFile(Path.of(state.worktree, path))) {
+                        null -> state.scan[path]?.let { remembered[path] = it } ?: remembered.remove(path)
+                        base.hash(path) -> target -= path
+                        else -> target[path] = stamp
+                    }
                     continue
                 }
                 val baseText = base.content(path)!!
@@ -88,6 +94,9 @@ internal object OverlayPlanner {
                 }
             }
         }
+        // A narrowed sparse checkout removes files from disk without deleting them: the base answers for those.
+        val sparse = WorktreeGit.skipWorktree(state.worktree, gone)
+        for (path in gone) if (path in sparse) target -= path else target[path] = Stamp.MISSING
         var prune = state.prune
         if (unknown.isNotEmpty()) {
             val gitIgnores = WorktreeGit.ignored(state.worktree, unknown)
