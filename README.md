@@ -53,7 +53,9 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 
 Usages are resolved without an IDE or compiler: the scopes, imports and aliases a file sees, the receiver's
 type where syntax tells it (declared types, `Type(…)`, what a call returns, collection elements in lambdas), and
-overloads by argument count. Unsure hits are marked, never dropped.
+overloads by argument count. Unsure hits are marked, never dropped. One heuristic: on a receiver of unknown type,
+a name the index declares only once (and no library declares, judging by the core API and the files' imports) is
+taken as exact. A name that matches several unrelated declarations must be qualified (`Type.member`).
 
 ## Desktop app
 

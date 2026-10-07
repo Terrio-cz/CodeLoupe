@@ -159,17 +159,22 @@ jeden soubor.
 - `decls`: kind, name, container, FQN, receiver, parametry (jména, typy, počet), návratový typ, modifikátory,
   anotace, supertypy, řádky deklarace/těla/KDocu, hash textu
 - `refs`: jméno, řádek, sloupec, druh (`call`, `nav`, `type`, `callable_ref`, `named_arg`, `name`), text
-  receiveru, id obklopující deklarace; od formátu `2/kotlin-psi-2` navíc (CL-13):
+  receiveru (u `type` kvalifikátor `pkg` z `pkg.Type`, u `Type::m` typ, u `named_arg` jméno volané funkce či
+  konstruktoru), id obklopující deklarace; od formátu `2/kotlin-psi-2` navíc (CL-13):
   - `bind` — jméno je vázané v kódu (parametr, parametr lambdy včetně `it`, proměnná `for`/`catch`, lokální
-    `val`/`fun`, subjekt `when`); hodnota = typový spec vazby, `""` = typ neznámý;
+    `val`/`fun`, subjekt `when`); hodnota = typový spec vazby, `""` = typ neznámý, prefix `^` = mezi vazbou a
+    použitím leží tělo třídy (jméno může být i jejím členem);
   - `recv_type` — typový spec receiveru `x.m()`, je-li receiver lokální vazba nebo výraz (volání, řetěz, `as`,
-    `!!`, `?:`); u nekvalifikovaného jména spec implicitního receiveru lambdy (`x.apply {}`, `x.run {}`, `with(x) {}`);
+    `!!`, `?:`, `this` v lambdě s receiverem); u nekvalifikovaného jména spec implicitního receiveru lambdy
+    (`x.apply {}`, `x.run {}`, `with(x) {}`; lambda předaná jiné než známé knihovní funkci má receiver neznámý `""`);
   - `args` — počet argumentů volání (trailing lambda se počítá, spread = −1), pro rozlišení overloadů.
-- typový spec: text typu (`Foo`, `List<Foo>`), `@řádek:sloupec` = deklarovaný typ toho, na co ukazuje reference
-  na té pozici (návratový typ funkce, typ property, třída konstruktoru), `*spec` = prvek kolekce, `a|b` = `a`,
-  jinak `b` (`xs.first()` je metoda z indexu, nebo prvek `xs`). Lambdy `let/also/takeIf` dostanou za `it` typ
-  receiveru, `forEach/map/filter/first {…}` a spol. typ prvku. Spec se vyhodnotí až při dotazu — fakta zůstávají
-  jen z jednoho souboru.
+- `decls.returns` bez deklarovaného typu = typový spec inicializátoru, `by lazy { … }` nebo těla výrazem;
+  parametry nesou příznaky `default` a `vararg`.
+- typový spec (`lang/TypeSpec`): text typu (`Foo`, `List<Foo>`), `@řádek:sloupec` = deklarovaný typ toho, na co
+  ukazuje reference na té pozici (návratový typ funkce, typ property, třída konstruktoru), `*spec` = prvek kolekce,
+  `a|b` = `a`, jinak `b` (`xs.first()` je metoda z indexu, nebo prvek `xs`). Lambdy `let/also/takeIf` dostanou za
+  `it` typ receiveru, `forEach/map/filter/first {…}` a spol. typ prvku. Spec se vyhodnotí až při dotazu — fakta
+  zůstávají jen z jednoho souboru.
 - `modules`: z `settings.gradle(.kts)` / `pom.xml` — moduly a závislosti `project(":x")` (náhrada IDEA
   `get_project_modules`)
 
@@ -197,22 +202,29 @@ Receiver: `this`/implicitní, `Typ.m()`, `x.m()` s typem z lokální inference. 
 
 Implementace (CL-13, `query/usages`), pro každou referenci se jménem cíle (nebo aliasem jeho importu):
 
-1. Vázané jméno (`bind`) → jen lokální deklarace té funkce; jinak cokoli jiného je mimo.
-2. Bez receiveru: implicitní receiver lambdy (`apply`/`run`/`with`), pak členy obklopujících tříd a receiverů
-   extension funkcí (od nejvnitřnější, včetně nadtypů, companionů a vnořených typů), pak top-level v pořadí
-   explicitní import (alias) → stejný package → star import. Nenajde-li nic, může jít o člen receiveru lambdy z DSL —
-   odpověď je neúplná (`candidate`).
+1. Vázané jméno (`bind`) → lokální deklarace té funkce. Volání jde přes vazbu, kterou nejde zavolat (`flag()` při
+   `flag: Boolean` volá funkci); vazba za tělem třídy (`^`) může být i členem té třídy → `candidate`.
+2. Bez receiveru: implicitní receiver lambdy (`apply`/`run`/`with`; u neznámého receiveru DSL lambdy jsou ve hře
+   všechny členy toho jména), pak členy obklopujících tříd a receiverů extension funkcí (od nejvnitřnější, včetně
+   nadtypů, companionů a vnořených typů), pak top-level v pořadí explicitní import (alias) → stejný package → star
+   import. Úroveň, jejíž typ či nadtypy leží mimo index (`fun Route.x()`, `object T : Table()`), může jméno
+   deklarovat sama → odpověď nalezená za ní je neúplná.
 3. S receiverem: `this`/`this@L`/`super`, typ nebo package jako kvalifikátor (`Type.m` → companion, object, vnořené
-   typy, enum entry), typový spec z indexu, property s deklarovaným typem nebo `= Type(…)`; velké jméno, které nic
-   v dosahu nedeklaruje, je knihovní typ (`ByteBuffer.allocate`). Členy se hledají v nejbližší úrovni nadtypů, výš
-   = dispatch (`candidate` pro přepsané členy); extension funkce podle jména receiveru.
-4. Overloady se zužují počtem argumentů (výchozí hodnoty a `vararg` dávají rozsah); `private` deklarace je mimo
-   svůj soubor nedosažitelná.
-5. Neznámý receiver: všechny členy a extension daného jména → `candidate`; je-li v indexu jediná, není to běžné
-   knihovní jméno (`LibraryNames`) a žádná jiná reference toho jména nevede jistě mimo index, je `exact`.
+   typy, enum entry; `Type::m` i instanční člen), typový spec z indexu, property s deklarovaným nebo odvozeným
+   typem; velké jméno, které nic v dosahu nedeklaruje a nenese ho žádný typ v indexu, je knihovní typ
+   (`ByteBuffer.allocate`). Členy se hledají v nejbližší úrovni nadtypů, výš = dispatch (`candidate` pro přepsané
+   členy); extension funkce podle jména receiveru. Nic na typu z indexu → členy podtypů (smart cast, `candidate`);
+   nic na knihovním typu → extension na knihovních typech (`fun Throwable.f()` na `IOException`, `candidate`).
+4. Overloady se zužují počtem argumentů (výchozí hodnoty a `vararg` dávají rozsah); `x()` na property (`invoke`) jen
+   když žádná funkce nesedí. `private` deklarace je mimo svůj soubor nedosažitelná a neschová další úroveň.
+5. Neznámý receiver: všechny členy a extension daného jména → `candidate`. **Heuristika** (měří ji golden test): je-li
+   v indexu jediná, jméno není knihovní (členy jádra Kotlin/JDK + vše, co soubory importují z knihoven — odvozeno
+   z indexu, ne z pevného seznamu frameworků) a žádná jiná reference toho jména nevede jistě mimo index, je `exact`.
 
-Značky: `exact` = jistě jen cíl, `candidate` = může být cíl (i přes dispatch nebo named argument konstruktoru),
-`other` = vede jinam; ve výstupu je jen počet (`all=true` je vypíše). Řádky `import`/`package` nejsou výskyty.
+Značky: `exact` = jistě jen cíl, `candidate` = může být cíl (dispatch, smart cast, sekundární konstruktor, named
+argument konstruktoru nebo `copy` vlastníka property), `other` = vede jinam; ve výstupu je jen počet (`all=true` je
+vypíše). Řádky `import`/`package` nejsou výskyty. Dotaz na víc různých deklarací (`usages id`) chce upřesnění;
+overloady a třída s konstruktory jsou jeden symbol.
 
 ## 6. Nástroje
 
@@ -357,15 +369,19 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 
 - Golden test (`UsagesGoldenTest`, oracle `src/test/resources/golden/terrio-usages.json`): 40 symbolů Terria na
   commitu 22d02d3f (třídy, rozhraní, object, enum a entry, companion členy, extension funkce včetně 10 stejnojmenných
-  podle receiveru, routy, repository, override, overloady podle počtu parametrů, private). Oracle ručně ověřený
-  čtením kódu (296 řádků), bez IDE. Výsledek: nadmnožina `rg -w` **100 %** (577/577 pozic), přesnost `exact`
-  **100 %** (289/289), každé skutečné použití je `exact` nebo `candidate` (296/296), `exact` samo pokryje 97,6 %,
-  podíl `candidate` **4 %**. Dotaz v testu p50 **11 ms**, max 46 ms; přes daemon a CLI ~1,4 s (start JVM).
+  podle receiveru, routy, repository, override, overloady podle počtu parametrů, private, `Type::member`, smart
+  cast, extension na knihovním typu, `this.x` v `apply`). Oracle ručně ověřený čtením kódu (316 řádků), bez IDE.
+  Výsledek: nadmnožina `rg -w` **100 %** (1 591/1 591 pozic), přesnost `exact` **100 %** (307/307), každé skutečné
+  použití je `exact` nebo `candidate` (316/316), `exact` samo pokryje 97,2 %, podíl `candidate` **13,8 %**. Dotaz
+  v testu p50 **16 ms**, max 164 ms.
+- Daemon (heap 96 MB): běžný dotaz desítky ms, `usages ApiKey.id` (3 446 referencí) 1,0 s poprvé / 0,65 s znovu,
+  `calls … depth 3` ~0,1–0,2 s; cache jsou LRU a obsah souborů se drží jen pro vypisované řádky. RSS po velkém dotazu
+  ~205 MB (budget 200) — sledovat v CL fáze 5.
 - Index: formát `2/kotlin-psi-2` (sloupce `bind`, `recv_type`, `args` v `refs`) → báze se po upgradu přestaví.
 - Stejná fixture sada v repu (`fixtures/kotlin/usages`) kryje super, cast, lambdy, alias, companion, enum, extension,
-  override/dispatch, overloady, private a nadmnožinu.
+  override/dispatch, overloady, private, `::`, smart cast, DSL receivery, sekundární konstruktor, FQ typ a nadmnožinu.
 - Známé meze: implementace přes `object : I {}` nejsou v `hierarchy` (výraz, ne deklarace); typ výsledku `let {}`,
-  řetězů přes knihovní API a generik se neodvozuje (→ `candidate`); `with`/`apply` jen přímé volání.
+  indexace `xs[0]` a generik se neodvozuje (→ `candidate`); povýšení na `exact` u neznámého receiveru je heuristika.
 
 ## 10. Rizika
 

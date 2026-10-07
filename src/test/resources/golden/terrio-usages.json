@@ -4,19 +4,6 @@
  "verified": "Each usage line read in the TerrioImporter source at the commit and confirmed to denote the symbol, statically or by dispatch through a member it overrides; named arguments of a constructor property count. No IDE involved.",
  "symbols": [
   {
-   "query": "InvitationService",
-   "kind": "class",
-   "usages": [
-    "accounts/src/main/kotlin/cz/terrio/accounts/AccountModule.kt:56",
-    "accounts/src/main/kotlin/cz/terrio/accounts/AccountModule.kt:166",
-    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountInputRefusalTest.kt:199",
-    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountInputRefusalTest.kt:201",
-    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1013",
-    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1282",
-    "accounts/src/test/kotlin/cz/terrio/accounts/service/StaffOrganizationAccessTest.kt:54"
-   ]
-  },
-  {
    "query": "SourceSchemaDiffReport",
    "kind": "data class",
    "usages": [
@@ -356,14 +343,6 @@
    ]
   },
   {
-   "query": "ApiUsageStore.addDailyUsage",
-   "kind": "repository method",
-   "usages": [
-    "public-api/src/main/kotlin/cz/terrio/api/usage/ApiUsageService.kt:93",
-    "public-api/src/main/kotlin/cz/terrio/api/usage/ApiUsageService.kt:398"
-   ]
-  },
-  {
    "query": "TourismQueryRepository.findTourismArea",
    "kind": "repository override of an interface method",
    "usages": [
@@ -408,14 +387,6 @@
    ]
   },
   {
-   "query": "TourismDatabaseImporter.logRepublication",
-   "kind": "private fun, same name elsewhere",
-   "usages": [
-    "app/src/main/kotlin/cz/terrio/importer/database/imports/TourismDatabaseImporter.kt:219",
-    "app/src/main/kotlin/cz/terrio/importer/database/imports/TourismDatabaseImporter.kt:391"
-   ]
-  },
-  {
    "query": "LocationSearchSchema.ensure",
    "kind": "object fun, same name elsewhere",
    "usages": [
@@ -445,13 +416,6 @@
     "public-api/src/test/kotlin/cz/terrio/api/provenance/HeritageTourismProvenanceCoverageTest.kt:151",
     "public-api/src/test/kotlin/cz/terrio/api/provenance/HeritageTourismProvenanceCoverageTest.kt:173",
     "public-api/src/test/kotlin/cz/terrio/api/provenance/HeritageTourismProvenanceCoverageTest.kt:183"
-   ]
-  },
-  {
-   "query": "BoundedPasswordHasher.admit",
-   "kind": "private suspend fun, same name elsewhere",
-   "usages": [
-    "accounts/src/main/kotlin/cz/terrio/accounts/security/BoundedPasswordHasher.kt:66"
    ]
   },
   {
@@ -537,6 +501,62 @@
    "kind": "overload (3 of 2/3 params), private generic",
    "usages": [
     "importers/cuzk/src/main/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/RuianVfrXml.kt:39"
+   ]
+  },
+  {
+   "query": "AcceptStep.Done.accepted",
+   "kind": "sealed subclass property reached through a smart cast",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:174"
+   ]
+  },
+  {
+   "query": "Throwable.hasBadContentTypeCause",
+   "kind": "private extension on a library type, called on a library subtype",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/http/PublicRequestBody.kt:55"
+   ]
+  },
+  {
+   "query": "RuianVfrElement.text",
+   "kind": "var property, this.x in apply, same name in many types",
+   "usages": [
+    "importers/cuzk/src/main/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/RuianVfrElement.kt:27",
+    "importers/cuzk/src/main/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/RuianVfrElement.kt:35",
+    "importers/cuzk/src/main/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/RuianVfrElement.kt:36",
+    "importers/cuzk/src/main/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/RuianVfrGmlGeometry.kt:135",
+    "importers/cuzk/src/main/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/RuianVfrRecordMapper.kt:49",
+    "importers/cuzk/src/main/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/RuianVfrXml.kt:83",
+    "importers/cuzk/src/test/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/CuzkRuianVfrSourceFieldsTest.kt:11",
+    "importers/cuzk/src/test/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/CuzkRuianVfrSourceFieldsTest.kt:57"
+   ]
+  },
+  {
+   "query": "ApiReferenceIds.administrativeDistrict",
+   "kind": "object fun, mostly as Type::member callable references",
+   "usages": [
+    "app/src/test/kotlin/cz/terrio/importer/database/imports/CsuEconomicEntityDatabaseImporterTest.kt:1897",
+    "app/src/test/kotlin/cz/terrio/importer/database/imports/CsuSampleContractTest.kt:78",
+    "app/src/test/kotlin/cz/terrio/importer/database/imports/CsuSampleContractTest.kt:103",
+    "public-api/src/main/kotlin/cz/terrio/api/http/SchoolOpenApiExamples.kt:34",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/AddressRepository.kt:604",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/AdministrativeRepository.kt:142",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/AdministrativeRepository.kt:211",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/AmenityRepository.kt:313",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/AmenitySourceDetailLoader.kt:412",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/CadastralTerritoryRepository.kt:128",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/HeritageQueryRepository.kt:866",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/LocationResolverRepository.kt:253",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/MsmtSchoolDetailLoader.kt:143",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/MunicipalityRepository.kt:112",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/ParcelRepository.kt:233",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/StatisticsQueryRepository.kt:1346",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/StatisticsTargetResolver.kt:391",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/StatisticsTargetResolver.kt:430",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/TourismQueryRepository.kt:767",
+    "public-api/src/test/kotlin/cz/terrio/api/provenance/HeritageTourismProvenanceCoverageTest.kt:367",
+    "public-api/src/test/kotlin/cz/terrio/api/provenance/HeritageTourismProvenanceCoverageTest.kt:495",
+    "public-api/src/test/kotlin/cz/terrio/api/query/LocationResolverPlanTest.kt:195"
    ]
   }
  ]
