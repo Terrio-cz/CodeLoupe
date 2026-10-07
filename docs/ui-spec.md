@@ -61,8 +61,10 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 - Deep link na krok běhu: `#/runs/:id?step=<seq>` (z Mezer) — drawer vybere krok a odscrolluje na něj.
 - Klávesy (vypínatelné v Nastavení → „Klávesové zkratky“, WCAG 2.1.4): `g o / g b / g r / g t / g i / g g /
   g e / g s` navigace, `/` fokus hledání, `Esc` zavře drawer; `j/k` a `Enter` jen když má fokus tabulka;
-  obnovení `Ctrl+R` (žádná samostatná písmena mimo tabulku). Aplikace nemá výchozí menu Electronu
-  (`Menu.setApplicationMenu(null)`), takže `Ctrl+R` nepřenačte renderer — obsluhuje ho aplikace sama.
+  obnovení `Ctrl+R` (žádná samostatná písmena mimo tabulku). Aplikace nemá výchozí menu Electronu:
+  na Windows a Linuxu `Menu.setApplicationMenu(null)`, na macOS minimální menu jen s rolemi `appMenu` a
+  `editMenu` (Cmd+C/V/X/A/Z v polích), bez `reload`, `forceReload` a `toggleDevTools` — `Ctrl/Cmd+R` tak
+  nepřenačte renderer a obsluhuje ho aplikace sama.
 
 ## 3. Obrazovky (wireframy)
 
