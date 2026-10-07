@@ -54,10 +54,14 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 - **Proklik**: větev → běh, úkol · běh → větev, úkol · úkol → běhy, větve · Přehled (tabulka běhů) → běh ·
   notifikace → obrazovka z `event.ref`. Deep link = hash route, drawer se otevře nad seznamem.
 - Sidebar ukazuje počty (aktivní worktree, otevřené úkoly v mirroru, nové mezery od posledního otevření)
-  a tečku stavu indexu (§ 7 StatusBadge).
-- Rozsah času (`24h | 7d | 30d`, výchozí `7d`) platí pro Přehled, Běhy, Mezery a pamatuje se.
-- Klávesy: `g o / g b / g r / g t / g i / g g / g s` navigace, `/` fokus hledání, `Esc` zavře drawer,
-  `j/k` pohyb v tabulce, `Enter` otevře detail, `r` obnoví data.
+  a stav indexu — jedním voláním `nav` (§ 9.4a) při startu, po obnovení (`Ctrl+R`) a s každým `/status` tickem okna
+  (ne víc než 1× za 15 s).
+- Rozsah času (`24h | 7d | 30d`, výchozí `7d`) platí pro Přehled, Běhy, Mezery a pamatuje se. Popisky KPI
+  nesou zvolený rozsah („Cena 7 d“ / „Cena 30 d“).
+- Deep link na krok běhu: `#/runs/:id?step=<seq>` (z Mezer) — drawer vybere krok a odscrolluje na něj.
+- Klávesy (vypínatelné v Nastavení → „Klávesové zkratky“, WCAG 2.1.4): `g o / g b / g r / g t / g i / g g /
+  g e / g s` navigace, `/` fokus hledání, `Esc` zavře drawer; `j/k` a `Enter` jen když má fokus tabulka;
+  obnovení `Ctrl+R` (žádná samostatná písmena mimo tabulku).
 
 ## 3. Obrazovky (wireframy)
 
@@ -77,6 +81,8 @@ Přehled                                             [24h|7d|30d]  ⟳
 │ Cena dnes    │ Cena 7 d     │ Úspora 7 d   │ Aktivní okna │ Volání CL    │ Mezery 7 d   │
 │ 1,24M        │ 18,9M        │ 14,2 %       │ 6            │ 3 412        │ 17           │
 │ ▲ 8 % vs vč. │ baseline 22M │ 3,1M tok.    │ 3 běží teď   │ 9 ms p50     │ ▲ 4 nové     │
+│ ▓▓▓▓▓░ 62 %  │              │              │              │              │              │
+│ rozpočtu 25M │              │              │              │              │              │
 └──────────────┴──────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
 ┌ Cena v čase (vážené tokeny) ───────────────────────┐ ┌ Daemon ─────────────────────────┐
 │  ── skutečnost   ┄┄ baseline                       │ │ ● běží · v0.4.0 · pid 1234      │
@@ -96,7 +102,9 @@ Přehled                                             [24h|7d|30d]  ⟳
 ```
 
 - KPI dlaždice: hodnota + jedna řádka kontextu (delta vůči předchozímu období nebo baseline). Delta s
-  šipkou a slovem, nikdy jen barvou.
+  šipkou a slovem, nikdy jen barvou. „Cena dnes“ se srovnává se včerejškem **do stejné hodiny**
+  (`weightedYesterdaySameTime`) a ukazuje čerpání denního rozpočtu (`budget`); rozpočet běhu
+  (`runWeighted`) zvýrazní v Bězích řádky nad limitem.
 - Graf: 2 série (skutečnost, baseline přerušovaně) → legenda nad grafem + přímé popisky; tabulkový pohled
   (přepínač „Tabulka“). Jedna osa Y.
 - Úspora podle nástroje: vodorovné pruhy, jedna série, seřazeno sestupně, hodnota přímo u pruhu.
@@ -138,8 +146,7 @@ Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hle
 - Změny: značky `+` přidaná, `~` upravené tělo, `^` změněná signatura, `-` odstraněná (stejné jako `changes()`
   v plan.md § 6), vždy s textovým popiskem v `title`/`aria-label`.
 - Sekce draweru jsou sbalitelné; dlouhé seznamy po 20 + „zobrazit dalších N“.
-- „Otevřít složku“ = IPC `shell.openPath` jen pro cestu, kterou vrátil daemon (main ji ověří proti seznamu
-  worktree).
+- „Otevřít složku“ = IPC `open.worktree(id)`: main vezme cestu z daemonu a otevře ji jen jako adresář s `.git` (§ 10).
 
 ### 3.3 Běhy agentů + detail s časovou osou
 
@@ -161,12 +168,12 @@ Běhy agentů     [Role ▾] [Úkol ▾] [Větev ▾] [Jen s mezerami ☐] [24h|
 │ 1,0M vážených · 52 tahů · peak 182k · 41 min · opus-5.5 · [Větev →] [Úkol →]           │
 │ Cena podle nástroje: Read 31 % · Bash(rg) 22 % · yt_get_issue 9 % · symbol 4 % …       │
 │ Filtr: [Vše|Nástroje|Text] [Jen velké výsledky ☐] [Jen mezery ☐]  Řadit: [Čas|Cena]    │
-│ ┌ # ┬ Čas ──┬ Krok ─────────────────────┬ Znaky ─┬ Cena tahu ┬ Nesená ┬ ▁▂▃ podíl ───┐ │
-│ │ 1 │ 0:00  │ prompt                     │ 4,1k   │ 61k       │ —      │ █             │ │
-│ │ 2 │ 0:04  │ Read Order.kt (celý)  ⚠ velký│ 38k    │ 22k       │ 410k   │ ██████████    │ │
-│ │ 3 │ 0:09  │ symbol OrderService.handle │ 1,2k   │ 14k       │ 12k    │ ▏             │ │
-│ │ 4 │ 0:11  │ Bash rg -n "handle"  ⚑ mezera│ 6,0k  │ 15k       │ 70k    │ ██            │ │
-│ └───┴───────┴────────────────────────────┴────────┴───────────┴────────┴───────────────┘ │
+│ ┌ # ┬ Čas ──┬ Krok ─────────────────────┬ Znaky ─┬ Latence ┬ Cena tahu ┬ Nesená ┬ podíl ──┐ │
+│ │ 1 │ 0:00  │ prompt                     │ 4,1k   │ —       │ 61k       │ —      │ █       │ │
+│ │ 2 │ 0:04  │ Read Order.kt (celý)  ⚠ velký│ 38k  │ 40 ms   │ 22k       │ 410k   │ ███████ │ │
+│ │ 3 │ 0:09  │ symbol OrderService.handle │ 1,2k   │ 12 ms   │ 14k       │ 12k    │ ▏       │ │
+│ │ 4 │ 0:11  │ Bash rg -n "handle"  ⚑ mezera│ 6,0k │ 310 ms  │ 15k       │ 70k    │ ██      │ │
+│ └───┴───────┴────────────────────────────┴────────┴─────────┴───────────┴────────┴─────────┘ │
 │ Vybraný krok: vstup (zkrácený, redigovaný), tokeny input/cache write/cache read/output, │
 │ latence, příznaky.                                                                     │
 └────────────────────────────────────────────────────────────────────────────────────────┘
@@ -176,7 +183,10 @@ Běhy agentů     [Role ▾] [Úkol ▾] [Větev ▾] [Jen s mezerami ☐] [24h|
   podstatné číslo; časový waterfall je sekundární (sloupec Čas).
 - Příznaky: `⚠ velký výsledek` (> 10k znaků), `⚑ mezera` (gap detector CL-22), `✕ chyba`, `◆ CodeLoupe`
   volání — ikona + text.
-- Řazení podle ceny i nesené ceny, filtr velkých výsledků a mezer (CL-42 kritéria).
+- Řazení podle ceny i nesené ceny, filtr velkých výsledků a mezer (CL-42 kritéria) — na serveru
+  (`runs/{id}/steps`, § 9.8a), po stránkách 200 kroků; dlouhé session (tisíce kroků) se tak nikdy nenačítají celé.
+- Seznam běhů řadí server podle všech číselných sloupců (§ 9.7); sloupec bez serverového řazení nemá
+  `aria-sort` ani šipku.
 
 ### 3.4 Úkoly (YouTrack mirror) + detail
 
@@ -209,12 +219,17 @@ Detail (#/tasks/TER-671):
 ```
 
 - Jen čtení; zápisy do YouTracku dělají agenti (CL-28). „Otevřít v YouTracku“ = `shell.openExternal` jen
-  pro URL instance z nastavení daemonu.
+  pro URL, jejíž `new URL(x).origin` je přesně origin některé instance z nastavení daemonu (§ 10).
+- Popis a aktivita jsou nedůvěryhodný markdown: renderuje ho vlastní malý převodník na React elementy
+  (nadpisy, odstavce, seznamy, checkboxy, `code`, bloky kódu, odkazy) — **nikdy raw HTML** ani
+  `dangerouslySetInnerHTML`; odkazy jdou přes stejný allow-list jako „Otevřít v YouTracku“, ostatní se
+  zobrazí jako text.
+- Hlavička seznamu ukazuje čas synchronizace mirroru (`mirrorSyncedAt` v odpovědi `tasks`).
 - „Čtení“ = kolikrát agenti issue četli (analysis.md § 2: průměr 6,5×) — cílová metrika modulu 3.
 
 ### 3.5 Index
 
-Inspirace: [Cloudflare Deployments](https://mobbin.com/screens/2dfb1cd3-26ac-4e63-9866-f293a0306177) (aktivní stav + historie),
+Inspirace: [Railway deployments](https://mobbin.com/screens/cf56574a-01d3-4efe-b841-e091c9ecc39d) (aktivní stav + historie),
 [Cofounder Launches](https://mobbin.com/screens/3f704e54-eb37-425e-b3a2-096ba3e894c0).
 
 ```
@@ -244,7 +259,7 @@ Mezery                                      [Nástroj ▾] [Důvod ▾] [24h|7d|
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Rozbalený řádek: jednotlivé výskyty (čas, běh → odkaz na krok v časové ose, cíl).
+- Rozbalený řádek: jednotlivé výskyty (čas, běh → `#/runs/:id?step=<seq>`, cíl).
 
 ### 3.7 Prostředí (CL-54)
 
@@ -259,14 +274,29 @@ tok přidání: [Replit account secret](https://mobbin.com/flows/4ecfe9d3-cb0a-4
 Prostředí                       [Rozsah ▾] [🔍 hledat klíč]          [Importovat…] [+ Přidat]
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │ Klíč               Rozsah        Zdroj     Hodnota    Spotřebitelé        Naposledy  Upraveno│
-│ YOUTRACK_TOKEN     global        keychain  ••••••••   youtrack-mcp, cl    před 3 min 09-30   │
-│ TERRIO_API_KEY     repo Terrio   keychain  ••••••••   run/terrio.mjs      včera      09-24   │
+│ YOUTRACK_TOKEN     global        store     ••••••••   youtrack-mcp, cl    před 3 min 09-30   │
+│ TERRIO_API_KEY     repo Terrio   store     ••••••••   run/terrio.mjs      včera      09-24   │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Hodnota se nikdy nezobrazí** po uložení; API ji nevrací vůbec (§ 9.11). Zápisy (přidat/upravit/rotovat,
-  import wizard) jsou CL-54: formulář jen v main procesu přes IPC, ne přes daemon HTTP, reveal jen po OS
-  re-auth. Ve verzi CL-43 je obrazovka jen ke čtení a tlačítka zápisu jsou neaktivní s popiskem „CL-54“.
+- **Hodnota se nikdy nezobrazí** po uložení; API ji nevrací vůbec (§ 9.13). Ve verzi CL-43 je obrazovka
+  jen ke čtení; tlačítka zápisu jsou neaktivní s popiskem „CL-54“.
+- „Naposledy“ a „Spotřebitelé“ = audit injektáže tajemství do procesů (CL-51, CL-55): každé vydání hodnoty
+  procesu zapíše `name, consumer, at` (bez hodnoty).
+
+#### 3.7.1 Zápisové toky (CL-54)
+
+Úložiště: šifrovaný store (CL-50); aplikace hodnoty nikdy nedrží déle, než je nutné. Kanály IPC
+`env.set`, `env.rotate`, `env.delete`, `env.import.*`, `env.reveal` existují až s CL-54 a mají vlastní
+validaci (jméno `^[A-Z][A-Z0-9_]{0,63}$`, hodnota ≤ 16 KB).
+
+| Tok | Kroky |
+|---|---|
+| Přidat / upravit | Drawer „Přidat klíč“: jméno, rozsah, hodnota (`type=password`, bez autocomplete a spellchecku). Odeslání pošle hodnotu jediným voláním `env.set` do main procesu, renderer ihned vymaže stav pole a hodnotu nikdy nedostane zpět. Main ji uloží do storu (CL-50, klíč storu chráněný `safeStorage` / OS keychainem) a vrátí jen metadata. |
+| Rotovat | Stejný drawer s předvyplněným jménem; stará hodnota se nezobrazí, po uložení audit „rotated“. |
+| Import (wizard) | 1) Inventář: main projde Claude složky (CL-52) a vrátí jen jména, zdroj a počet výskytů. 2) Potvrzení: uživatel zaškrtne, co importovat. 3) Import: main přesune hodnoty do storu, renderer vidí jen průběh. 4) Volitelně nahrazení zdroje odkazem na store (CL-53) s náhledem změn (jen cesty a jména). |
+| Odhalit | Jen po OS re-auth: Windows Hello přes nativní helper (Electron nemá API), macOS `systemPreferences.promptTouchID`, Linux heslo přes polkit. Hodnota se ukáže v modálním okně vlastněném main procesem (ne v rendereru aplikace), zkopírovat jde jedním tlačítkem, okno se samo zavře po 30 s a schránka se vyčistí po 60 s. |
+| Smazat | Potvrzovací dialog main procesu se jménem klíče a jeho spotřebiteli. |
 
 ### 3.8 Nastavení
 
@@ -277,10 +307,10 @@ Inspirace: [Attio Developers](https://mobbin.com/screens/04bc7a2a-d006-4bb5-b200
 Nastavení
 ┌ Aplikace (uloženo lokálně, userData/settings.json) ─────────────────────────────────┐
 │ Zdroj dat        (•) Daemon  ( ) Mock data                                            │
-│ Příkaz CLI       [codeloupe                    ] Argumenty [                      ]   │
-│ Port daemonu     [47391]                                                              │
+│ Příkaz CLI       node.exe …\bin\codeloupe.mjs               [Změnit…] (potvrzuje main)│
+│ Port daemonu     47391 (z daemon.json)          ☐ Přepsat: [     ]                    │
 │ ☑ Spustit daemon, když neběží    ☐ Spouštět aplikaci po přihlášení                    │
-│ Vzhled           (•) Systém ( ) Světlý ( ) Tmavý                                      │
+│ Vzhled           (•) Systém ( ) Světlý ( ) Tmavý    ☑ Klávesové zkratky               │
 │ Notifikace       ☑ rozpočty  ☑ dokončené buildy  ☑ nové mezery  ☑ daemon spadl        │
 │                                                                    [Uložit]           │
 ├ Daemon (jen čtení, z GET settings) ─────────────────────────────────────────────────┤
@@ -291,11 +321,19 @@ Nastavení
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Daemon config se v aplikaci needituje (API je read-only); „Otevřít“ otevře `config.json` v editoru.
+- Daemon config se v aplikaci needituje (API je read-only); „Otevřít“ ukáže `config.json` v průzkumníku
+  (`shell.showItemInFolder`, cestu skládá main z home, ne z odpovědi API).
+- **Příkaz CLI renderer nezmění**: `settings.set` příkaz a argumenty ignoruje. „Změnit…“ pošle návrh do
+  main procesu, ten ukáže nativní potvrzovací dialog s celým příkazem a uloží ho jen po potvrzení
+  uživatelem; přepsání také proměnnou `CODELOUPE_APP_CLI` (JSON pole) při spuštění aplikace.
+- Port: výchozí z `<home>/daemon.json` (zapisuje daemon), jinak `CODELOUPE_PORT` / `config.json` / 47391;
+  ruční přepsání je explicitní a předá se spouštěnému daemonu jako `CODELOUPE_PORT`.
 
 ## 4. Tray a notifikace
 
-Tray ikona: kruh se stavem (běží / zastaven / chyba / build). Tooltip: `CodeLoupe — běží · 82 MB · fronta 0`.
+Tray ikona: každý stav má vlastní tvar, ne jen barvu — běží = plný kruh, build = kruh s výsečí,
+zastaven = prázdný kroužek, nedostupný/chyba = kroužek s křížkem. Tooltip a první řádek menu nesou stav
+slovy: `CodeLoupe — běží · 82 MB · fronta 0`.
 
 ```
 ● Daemon běží · 82 MB · fronta 0
@@ -338,6 +376,7 @@ Notifikace se slučují (max 1 za typ za minutu), každá se dá vypnout v Nasta
 | `ActivityFeed` | úkol | tečka, čas, autor, text |
 | `EmptyState` / `ErrorState` | všude | jedna věta + akce (Obnovit, Spustit daemon, Přepnout na mock) |
 | `Toast` | potvrzení akcí daemonu | `role="status"`, 4 s |
+| `MarkdownView` | popis a aktivita úkolu | vlastní převodník na React elementy, bez raw HTML (§ 3.4) |
 | Tray menu | main proces | § 4 |
 
 ## 6. Design tokeny
@@ -352,17 +391,25 @@ Radius 6 (prvky), 8 (karty). Řádek tabulky 32 px, topbar 48 px, sidebar 216 px
 | `--surface` | `#ffffff` | `#161615` | karty, tabulky |
 | `--surface-2` | `#f3f3f0` | `#1f1f1d` | hlavička tabulky, hover |
 | `--sidebar` | `#f3f3f0` | `#121211` | sidebar |
-| `--border` | `#e4e3dd` | `#2c2c2a` | hairline |
+| `--border` | `#e4e3dd` | `#2c2c2a` | hairline mezi oblastmi (dekorativní) |
+| `--border-control` | `#8a8984` | `#6b6a66` | okraj inputů, selectů, checkboxů (≥ 3:1, WCAG 1.4.11) |
 | `--text` | `#0b0b0b` | `#f5f5f3` | primární text |
 | `--text-2` | `#52514e` | `#c3c2b7` | sekundární |
-| `--text-muted` | `#6f6e69` | `#9a9993` | popisky, osy (≥ 4,5:1 na `--surface`) |
-| `--accent` | `#2a78d6` | `#3987e5` | odkazy, výběr, fokus |
+| `--text-muted` | `#65645f` | `#9a9993` | popisky, osy |
+| `--accent` | `#2a78d6` | `#3987e5` | výplně (pruhy, indikátor výběru), fokus |
+| `--accent-text` | `#1f66c2` | `#5b9cec` | odkazy a text v barvě akcentu |
 | `--accent-weak` | `#e8f1fc` | `#16263a` | vybraný řádek |
+| `--btn-primary-bg` / `-fg` | `#1f66c2` / `#ffffff` | `#3987e5` / `#0d0d0d` | primární tlačítko |
 | `--focus` | `#2a78d6` | `#6da7ec` | 2 px focus ring + 2 px offset |
 | `--ok` | `#0ca30c` (text `#006300`) | `#0ca30c` | stav ok |
 | `--warning` | `#fab219` (text `#8a5a00`) | `#fab219` | varování |
 | `--serious` | `#ec835a` (text `#a8431a`) | `#ec835a` | vážné |
-| `--critical` | `#d03b3b` | `#e66767` | chyba |
+| `--critical` | `#d03b3b` (text `#b83232`) | `#e66767` | chyba |
+
+Kontrast textových tokenů (`--text*`, `--accent-text`, stavové `text`) je ≥ 4,5:1 proti **všem čtyřem**
+pozadím (`--bg`, `--surface`, `--surface-2`, `--accent-weak`) v obou režimech; kontroluje to test
+`app/test/tokens.test.ts`. Stavové tečky v světlém režimu (warning, serious) jsou pod 3:1, proto vždy
+s ikonou a textem.
 | `--series-1` | `#2a78d6` | `#3987e5` | graf: skutečnost |
 | `--series-baseline` | `#898781` | `#898781` | graf: baseline (přerušovaná) |
 | `--grid` | `#e1e0d9` | `#2c2c2a` | mřížka grafu |
@@ -377,8 +424,13 @@ Radius 6 (prvky), 8 (karty). Řádek tabulky 32 px, topbar 48 px, sidebar 216 px
 
 - WCAG 2.2 AA: kontrast textu ≥ 4,5:1, ovládacích prvků a grafických prvků ≥ 3:1 v obou režimech.
 - Vše ovladatelné klávesnicí (§ 2 klávesy), viditelný fokus, žádné pasti mimo modální drawer.
-- Sémantika: `<nav>`, `<main>`, `<table>` s `<th scope>`, `aria-sort`, `aria-live="polite"` pro stav
-  daemonu a toasty, ikony s `aria-hidden` + textový popisek.
+- Sémantika: `<nav>`, `<main>`, `<table>` s `<th scope>`, `aria-sort`, ikony s `aria-hidden` + textový
+  popisek. `aria-live="polite"` jen pro **změnu stavu** daemonu (běží / nedostupný / restartuje) a toasty;
+  RSS a fronta se mění mimo live region.
+- Cíle kliknutí min. 24×24 px (WCAG 2.5.8) včetně ✕, ⟳, ▸ a přepínačů.
+- Fokus nezakrytý (2.4.11): `scroll-padding-top` = výška sticky hlavičky; vybraný řádek se při otevřeném
+  draweru odscrolluje mimo jeho plochu.
+- Reflow (1.4.10): pod ~900 CSS px (200 % zoom) je drawer přes celou šířku a sidebar sbalený.
 - Grafy: `role="img"` + `aria-label` se shrnutím, tabulkový pohled, legenda pro ≥ 2 série.
 - Stav nikdy jen barvou (StatusBadge, ChangeMark, příznaky kroků).
 - `prefers-reduced-motion`: bez animací draweru; jinak max 150 ms.
@@ -387,11 +439,16 @@ Radius 6 (prvky), 8 (karty). Řádek tabulky 32 px, topbar 48 px, sidebar 216 px
 ## 8. Správa daemonu (main proces)
 
 - **Stav**: `GET /status` každých 5 s při viditelném okně, 15 s v trayi. Tři neúspěchy = `down`.
-- **Start**: když je `down` a `autoStartDaemon` je zapnuto a uživatel daemon nezastavil ručně → spustí
-  `<cli.command> <cli.args…> start` (konfigurovatelné; dnes `node bin/codeloupe.mjs`, po CL-56 Kotlin CLI).
-  Backoff 5 s → 60 s, max 5 pokusů za 10 min, pak notifikace a stav `error`.
-- **Stop / restart**: `… stop` (CLI posílá `POST /shutdown`), restart = stop + start. Ruční stop vypne
-  autostart do dalšího ručního startu.
+- **Port a identita**: port z `<home>/daemon.json` (`pid`, `port`, `version`, `startedAt` — zapisuje daemon),
+  jinak `CODELOUPE_PORT` / `config.json` / 47391, nebo explicitní přepsání v Nastavení. `/status.pid` se
+  porovná s `daemon.json`; nesouhlasí-li (cizí proces na portu), stav `error`, žádná data ani otevírání cest.
+- **Start**: když je `down` a `autoStartDaemon` je zapnuto a daemon nebyl zastaven ručně → spustí
+  `<cli.command> <cli.args…> start` (konfigurovatelné; dnes `node bin/codeloupe.mjs`, po CL-56 Kotlin CLI)
+  s `CODELOUPE_PORT` = port, který aplikace sleduje. Backoff 5 s → 60 s, max 5 pokusů za 10 min, pak
+  notifikace a stav `error`.
+- **Stop / restart**: `… stop` (CLI posílá `POST /shutdown`), restart = stop + start. Ruční stop — z aplikace
+  **i z CLI** — vypne autostart do dalšího ručního startu: `codeloupe stop` zapíše `<home>/stopped`,
+  `codeloupe start` ho smaže (požadavek na CLI v CL-39), aplikace ho respektuje.
 - **Přežije restart daemonu**: HTTP bez keep-alive, každé volání nové spojení; renderer jen zobrazí stav
   `restarting` a data se po návratu obnoví.
 - Single instance (`requestSingleInstanceLock`), druhé spuštění zaostří okno.
@@ -415,8 +472,10 @@ Radius 6 (prvky), 8 (karty). Řádek tabulky 32 px, topbar 48 px, sidebar 216 px
 - Rozsah: `range=24h|7d|30d` (výchozí `7d`).
 - Chyby: `{ "error": { "code": "bad_request|not_found|busy|unavailable", "message": "…" } }` se stavem
   400 / 404 / 503. `busy` = data se právě počítají (fronta), klient zkusí znovu.
-- ID: worktree = prvních 12 hex SHA-1 normalizované absolutní cesty; repo = repo-id daemonu; běh = id agenta /
-  session z transcriptu; úkol = `idReadable`.
+- ID: worktree = prvních 12 hex SHA-1 normalizované cesty (absolutní `path.resolve`, lomítka `/`, na Windows
+  malými písmeny, bez koncového lomítka — stejně pro `git worktree list` i cesty z transcriptů); worktree,
+  který už neexistuje, má v běhu `worktreeId: null` a jen textové `branch`. Repo = repo-id daemonu; běh = id
+  agenta / session z transcriptu; úkol = `idReadable`.
 - **Žádná tajemství**: žádné hodnoty proměnných; `summary` kroků max 200 znaků, redigované (vzory klíčů,
   `Authorization`, `*_TOKEN=…`).
 - Kanonická kopie typů: `app/src/shared/contract.ts` (aplikace) — změna kontraktu mění obojí.
@@ -428,7 +487,8 @@ type Iso = string;
 type Range = '24h' | '7d' | '30d';
 interface Page<T> { items: T[]; total: number; nextCursor: string | null }
 interface Tokens { input: number; cacheWrite5m: number; cacheWrite1h: number; cacheRead: number; output: number }
-type LayerState = 'fresh' | 'stale' | 'building' | 'error' | 'none';
+type LayerState = 'fresh' | 'stale' | 'building' | 'error' | 'none';           // vrstva worktree (plan.md § 5.3)
+type RepoIndexState = 'ready' | 'building' | 'stale' | 'error' | 'none';      // báze repozitáře
 type RunStatus = 'running' | 'done' | 'error';
 
 interface RunSummary {
@@ -458,11 +518,18 @@ Bez hlavičky `x-codeloupe` (jen Host/Origin kontrola). Tray a Daemon karta.
 ```ts
 interface DaemonStatus {
   name: 'codeloupe'; version: string; pid: number; port: number; home: string;
-  uptimeSec: number; rssMb: number; heapMb: number; cpuSec: number; calls: number;
-  queue: { fast: Lane; heavy: Lane; [stat: string]: unknown };
-  repos: { id: string; commonDir: string; defaultRef: string; baseCommit: string | null; lastBuild: unknown }[];
+  uptimeSec: number; rssMb: number; heapMb: number; cpuSec: number;
+  calls: { total: number; errors: number; busy: number };
+  queue: { fast: Lane; heavy: Lane; [stat: string]: unknown };   // build běží ⇔ heavy.running != null
+  repos: { id: string; commonDir: string; defaultRef: string; baseCommit: string | null; lastBuild: LastBuild | null }[];
 }
 interface Lane { running: string | null; waiting: string[] }
+interface LastBuild { at: Iso; ok: boolean; files: number; errors: number; ms: number; peakRssMb?: number }
+```
+
+### 9.4a `GET /ui-api/v1/nav?gapsSince=<Iso>` (počty sidebaru)
+```ts
+interface Nav { activeWorktrees: number; openTasks: number; newGaps: number; indexState: RepoIndexState }
 ```
 
 ### 9.4 `GET /ui-api/v1/overview?range=`
@@ -470,7 +537,7 @@ interface Lane { running: string | null; waiting: string[] }
 interface Overview {
   range: Range; generatedAt: Iso;
   kpis: {
-    weightedToday: number; weightedYesterday: number;
+    weightedToday: number; weightedYesterdaySameTime: number;   // včera do stejné hodiny
     weightedRange: number; baselineRange: number;   // baseline = medián role z baseline × počet běhů role
     savedTokens: number; savedPct: number;          // odhad úspory nástrojů CodeLoupe (CL-21/CL-24)
     runs: number; activeWindows: number; runningRuns: number;
@@ -500,25 +567,34 @@ interface WorktreeDetail extends WorktreeSummary {
 }
 ```
 
-### 9.7 `GET /ui-api/v1/runs?range=&role=&task=&worktree=&gapsOnly=&sort=started|weighted|turns&order=asc|desc&limit=&cursor=` → `Page<RunSummary>`
+### 9.7 `GET /ui-api/v1/runs?range=&role=&task=&worktree=&gapsOnly=&sort=&order=asc|desc&limit=&cursor=` → `Page<RunSummary>`
+
+`sort` = `started | duration | turns | weighted | peakContext | toolResultShare | gaps` (výchozí `started`).
+Agregace běhů jsou předpočítané při ingestu (§ 9.17), dotaz je indexovaný select — cíl < 200 ms i pro `30d`.
 
 ### 9.8 `GET /ui-api/v1/runs/{id}`
 ```ts
 interface RunDetail extends RunSummary {
   byTool: { tool: string; calls: number; resultChars: number; weighted: number; carriedWeighted: number }[];
-  steps: {
-    seq: number; at: Iso; kind: 'prompt' | 'text' | 'tool';
-    tool: string | null;              // 'Read', 'Bash', 'mcp__codeloupe__symbol', …
-    summary: string;                  // ≤ 200 znaků, redigováno
-    resultChars: number; tokens: Tokens; weighted: number;
-    carriedWeighted: number;          // výsledek × následující tahy (plan.md § 8.1)
-    latencyMs: number | null;
-    flags: ('large_result' | 'gap' | 'error' | 'codeloupe')[];
-  }[];
+  stepCount: number;                  // kroky po stránkách: § 9.8a
 }
 ```
 
-### 9.9 `GET /ui-api/v1/tasks?project=&state=&q=&limit=&cursor=` → `Page<TaskSummary>`
+### 9.8a `GET /ui-api/v1/runs/{id}/steps?sort=seq|weighted|carried|resultChars|latency&order=&flags=&kind=&limit=&cursor=` → `Page<RunStep>`
+```ts
+interface RunStep {
+  seq: number; at: Iso; kind: 'prompt' | 'text' | 'tool';
+  tool: string | null;              // 'Read', 'Bash', 'mcp__codeloupe__symbol', …
+  summary: string;                  // ≤ 200 znaků, redigováno
+  resultChars: number; tokens: Tokens; weighted: number;
+  carriedWeighted: number;          // výsledek × následující tahy (plan.md § 8.1)
+  latencyMs: number | null;
+  flags: ('large_result' | 'gap' | 'error' | 'codeloupe')[];
+}
+```
+`flags` = čárkou oddělený seznam (krok musí mít všechny), `kind` = `prompt|text|tool`; `limit` max 200.
+
+### 9.9 `GET /ui-api/v1/tasks?project=&state=&q=&limit=&cursor=` → `Page<TaskSummary> & { mirrorSyncedAt: Iso | null }`
 
 ### 9.10 `GET /ui-api/v1/tasks/{id}`
 ```ts
@@ -537,7 +613,7 @@ interface TaskDetail extends TaskSummary {
 ```ts
 interface IndexHealth {
   repos: { id: string; name: string; path: string; baseRef: string; baseCommit: string | null;
-           state: 'ready' | 'building' | 'stale' | 'error' | 'none'; builtAt: Iso | null; buildMs: number | null;
+           state: RepoIndexState; builtAt: Iso | null; buildMs: number | null;
            dbBytes: number; files: number; decls: number; refs: number; errorFiles: number; layers: number }[];
   builds: { id: string; repoId: string; kind: 'full' | 'sync' | 'layer'; startedAt: Iso; durationMs: number | null;
             peakRssMb: number | null; files: number; status: 'running' | 'ok' | 'failed'; error: string | null }[];
@@ -579,21 +655,26 @@ interface DaemonSettings {
 ### 9.15 `GET /ui-api/v1/events?since=<seq>&limit=` (notifikace)
 ```ts
 interface Events {
+  epoch: string;                       // mění se, když daemon začne číslovat znovu (seq je v SQLite, epoch = id DB)
   lastSeq: number;
   items: { seq: number; at: Iso; kind: 'budget_breach' | 'build_finished' | 'build_failed' | 'gap_new';
            severity: 'info' | 'warning' | 'critical'; title: string; body: string;
            ref: { screen: 'overview' | 'runs' | 'index' | 'gaps'; id: string | null } }[];
 }
 ```
-`since` chybí → jen `lastSeq` a prázdné `items` (aplikace po startu nenotifikuje historii).
+`since` chybí → jen `epoch`, `lastSeq` a prázdné `items` (aplikace po startu nenotifikuje historii). Události
+se ukládají v SQLite, takže restart daemonu číslování nezmění; když se `epoch` přesto změní (smazaný home),
+aplikace se znovu zarovná bez notifikací. Události vznikají líně při dotazu (`events`, ingest), daemon kvůli
+nim nemá časovač (plan.md § 5.1).
 
 ### 9.16 Mapování obrazovka → endpoint
 
 | Obrazovka | Endpointy |
 |---|---|
+| Sidebar | `nav` |
 | Přehled | `overview`, `/status` |
 | Větve, detail | `worktrees`, `worktrees/{id}` |
-| Běhy, detail | `runs`, `runs/{id}` |
+| Běhy, detail | `runs`, `runs/{id}`, `runs/{id}/steps` |
 | Úkoly, detail | `tasks`, `tasks/{id}` |
 | Index | `index` |
 | Mezery | `gaps` |
@@ -601,37 +682,57 @@ interface Events {
 | Nastavení | `settings`, `/status` |
 | Tray, notifikace | `/status`, `events` |
 
-Zdroje dat v daemonu: běhy a kroky z metrik (CL-21), telemetrie volání (CL-24), mezery (CL-22), úkoly
-z mirroru (CL-26), změny z `changes()` (CL-17) a vrstev (CL-16), rozpočty a události — nová karta v CL-7.
-Dokud zdroj chybí, endpoint vrací prázdná data (ne 404), aby obrazovky fungovaly.
+### 9.17 Zdroje dat a implementace
+
+- CL-39 se staví v **Kotlin portu** (závisí na CL-56); Node prototyp ho nedostane.
+- Běhy, kroky, mezery, rozpočty a události: **inkrementální ingest transcriptů do SQLite daemonu** (CL-62;
+  metodika `codeloupe metrics` CL-21, detektor mezer CL-22), spouštěný líně voláním UI API — bez časovače.
+- Telemetrie volání CodeLoupe (CL-24), úkoly z mirroru (CL-26), změny z `changes()` (CL-17) a vrstev (CL-16).
+- Dokud zdroj chybí, endpoint vrací prázdná data (ne 404), aby obrazovky fungovaly.
+- Rozpočet < 1 s na obrazovku (CL-40) se měří na ingestovaném baseline (2 651 běhů).
 
 ## 10. Bezpečnost aplikace
 
 - `BrowserWindow`: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`,
   `webSecurity: true`, `spellcheck: false`; preload vystaví jen `window.codeloupe` (§ níže).
+- Bundle se načítá přes vlastní schéma `app://codeloupe/` (`protocol.handle`, jen soubory z adresáře
+  bundlu) — CSP `'self'` i kontrola odesílatele IPC tak mají pevný origin místo `file://`.
 - **Renderer nemá síť**: CSP `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
   connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`.
   Všechna data přes IPC; main volá jen `http://127.0.0.1:<port>` (Node `http`, bez `Origin`).
-- IPC allow-list: `api.get(path)` — main ověří, že `path` odpovídá jedné z cest § 9 (regex), jinak odmítne;
-  `daemon.status|start|stop|restart`; `settings.get|set` (schéma, typy, rozsahy); `app.metrics`;
-  `shell.openPath(path)` jen pro cesty worktree/config z daemonu; `shell.openExternal(url)` jen pro
-  `https://` URL YouTrack instance z nastavení daemonu. Odesílatel IPC se ověřuje (`event.senderFrame.url`
-  musí být bundle aplikace).
-- Navigace a nová okna zakázané (`will-navigate`, `setWindowOpenHandler` → deny). Žádný `remote`,
-  `webview`, ani načítání vzdáleného obsahu.
-- Příkaz daemonu se spouští přes `execFile`/`spawn` bez shellu, s argumenty jako polem.
+- IPC allow-list (odesílatel se ověřuje: `event.senderFrame.url` musí začínat `app://codeloupe/`):
+  - `api.get({ resource, id?, query? })` — `resource` z výčtu § 9, `id` `^[A-Za-z0-9._:-]{1,100}$`,
+    povolené klíče query pro daný resource; URL skládá main přes `URLSearchParams`, renderer nikdy nepošle cestu.
+  - `daemon.state|start|stop|restart`; `settings.get|set` (schéma, typy, rozsahy; bez příkazu CLI),
+    `settings.proposeCli` (nativní potvrzení, § 3.8); `app.metrics`.
+  - `open.worktree(id)` — main vezme cestu z `worktrees` daemonu, ověří, že je to **adresář** obsahující
+    `.git`, a otevře ho (`shell.openPath`); soubory se nikdy nespouští. `open.config()` — `showItemInFolder`
+    na `<home>/config.json` složené v main.
+  - `open.youtrack(taskId)` — URL `<instance>/issue/<id>`; povolí se jen `https:` a origin přesně shodný s
+    instancí z nastavení daemonu (`new URL().origin`, žádné porovnání prefixu).
+  - Obojí `open.*` jen když `/status.pid` odpovídá `daemon.json` (§ 8) — cizí proces na portu nic neotevře.
+- `setPermissionRequestHandler` a `setPermissionCheckHandler` → vše zamítnout; `will-attach-webview` → zamítnout;
+  navigace a nová okna zakázané (`will-navigate`, `setWindowOpenHandler` → deny); žádný `remote`.
+- Příkaz daemonu se spouští přes `execFile` bez shellu, s argumenty jako polem.
+- Balení (CL-45): Electron fuses `RunAsNode` off, `EnableNodeOptionsEnvironmentVariable` off,
+  `EnableNodeCliInspectArguments` off, `OnlyLoadAppFromAsar` on, `EnableEmbeddedAsarIntegrityValidation` on —
+  main bude s CL-54 držet tajemství.
 
 ## 11. Výkon a RAM
 
 | Cíl | Hodnota |
 |---|---|
-| RSS aplikace s oknem | ≤ 300 MB (cíl ~200 MB), měří `app.getAppMetrics()` |
-| RSS jen v trayi | ~100 MB (okno zničeno) |
+| RSS aplikace s oknem | ≤ 300 MB (cíl ~200 MB) |
+| RSS jen v trayi | ≤ 150 MB (okno zničeno; zůstává main, network service, crashpad) |
 | Načtení obrazovky | < 1 s (CL-40); seznamy max 200 řádků na stránku |
-| Polling | `/status` 5 s / 15 s; data obrazovky jen při otevření a `r`; `events` 15 s |
+| Polling | `/status` 5 s / 15 s; data obrazovky jen při otevření a `Ctrl+R`; `events` 15 s |
 
-- Žádná grafová knihovna (vlastní SVG), žádný router ani state manager — React + React DOM jsou jediné
-  runtime závislosti.
+- Metrika: součet `workingSetSize` všech procesů z `app.getAppMetrics()` (sdílené stránky se započítají
+  vícekrát — konzervativní horní mez), ověřeno i součtem `WorkingSet64` procesů z OS. Měří se po startu a s
+  otevřeným největším během; hodnota je v Nastavení → O aplikaci.
+- `app.disableHardwareAcceleration()` — tabulky a SVG GPU nepotřebují, ušetří GPU proces.
+- Žádná grafová knihovna (vlastní SVG), žádný router ani state manager, vlastní převodník markdownu —
+  React + React DOM jsou jediné runtime závislosti.
 - Jeden renderer; `backgroundThrottling` zapnutý; okno se po zavření ničí.
 
 ## 12. Mobbin reference (souhrn)
