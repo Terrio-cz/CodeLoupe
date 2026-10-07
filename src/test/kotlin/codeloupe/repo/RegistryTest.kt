@@ -21,7 +21,14 @@ class RegistryTest {
     private val repo = TestRepos.fixtureRepo("kotlin/sample")
     private val commonDir = repo.resolve(".git").toString().replace('\\', '/')
 
-    private fun config(heapMb: Int = 512) = Config(TestRepos.tmpDir("home"), 0, 60_000, 120_000, heapMb, null)
+    private fun config(heapMb: Int = 512, buildTimeoutMs: Long = 120_000) = Config(TestRepos.tmpDir("home"), 0, 60_000, buildTimeoutMs, heapMb, null)
+
+    @Test
+    fun `a build over its time limit says so`(): Unit = runBlocking {
+        val registry = Registry(config(buildTimeoutMs = 200), JobQueue(this))
+        val failure = assertFailsWith<IllegalStateException> { registry.query(repo.toString()) { } }
+        assertEquals("build timed out after 200 ms", failure.message)
+    }
 
     @Test
     fun `a failed build is not retried for the same commit and shows in the status`(): Unit = runBlocking {

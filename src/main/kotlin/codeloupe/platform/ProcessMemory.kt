@@ -33,12 +33,16 @@ object ProcessMemory {
         return Files.readAllLines(status).firstOrNull { it.startsWith(field) }?.filter(Char::isDigit)?.toLong()?.div(1024)
     }
 
-    // macOS has no /proc; `/status` is rare enough for one `ps` call.
+    // macOS has no /proc: ask `ps`, at most every PS_TTL_MS, since every CLI call reads /status.
+    @Volatile
+    private var psSample: Pair<Long, Long?>? = null
+
     private fun psRssMb(): Long? {
+        psSample?.takeIf { System.currentTimeMillis() - it.first < PS_TTL_MS }?.let { return it.second }
         val process = ProcessBuilder("ps", "-o", "rss=", "-p", ProcessHandle.current().pid().toString()).start()
         val kb = process.inputStream.readAllBytes().toString(Charsets.UTF_8).trim().toLongOrNull()
         process.waitFor()
-        return kb?.div(1024)
+        return kb?.div(1024).also { psSample = System.currentTimeMillis() to it }
     }
 
     // macOS: getrusage(RUSAGE_SELF).ru_maxrss is in bytes and follows two 16-byte timevals.
@@ -51,6 +55,7 @@ object ProcessMemory {
         }
     }
 
+    private const val PS_TTL_MS = 10_000L
     private const val COUNTERS_SIZE = 72L
     private const val PEAK_WORKING_SET = 8L
     private const val WORKING_SET = 16L

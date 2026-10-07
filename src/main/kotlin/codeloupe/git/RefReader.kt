@@ -16,9 +16,11 @@ import kotlin.io.path.readText
 object RefReader {
     private val SHA = Regex("[0-9a-f]{40}([0-9a-f]{24})?")
     private const val MAX_SYMREF_DEPTH = 5
+    private const val MISSING = ""
 
-    // Repositories with many tags have megabyte-sized packed-refs; parse each version of the file once.
-    private val packedCache = ConcurrentHashMap<Path, Pair<Pair<Long, Long>, Map<String, String>>>()
+    // Repositories with many tags have megabyte-sized packed-refs: each version of the file is scanned once per
+    // ref name asked for, and only those few answers are kept.
+    private val packedLookups = ConcurrentHashMap<Path, PackedLookups>()
 
     /** Commit of HEAD in the worktree at [worktree]. */
     fun head(worktree: String): String? = runCatching {
@@ -57,14 +59,17 @@ object RefReader {
         val file = commonDir.resolve("packed-refs")
         if (!file.exists()) return null
         val stamp = Files.getLastModifiedTime(file).toMillis() to Files.size(file)
-        val cached = packedCache[file]?.takeIf { it.first == stamp }
-            ?: (stamp to parsePacked(file)).also { packedCache[file] = it }
-        return cached.second[ref]
+        val lookups = packedLookups.compute(file) { _, old -> old?.takeIf { it.stamp == stamp } ?: PackedLookups(stamp) }!!
+        return lookups.answers.getOrPut(ref) { scanPacked(file, ref) ?: MISSING }.takeUnless { it == MISSING }
     }
 
-    private fun parsePacked(file: Path): Map<String, String> = Files.newBufferedReader(file).useLines { lines ->
-        lines.filter { !it.startsWith("#") && !it.startsWith("^") && ' ' in it }
-            .associate { it.substringAfter(' ') to it.substringBefore(' ') }
+    private fun scanPacked(file: Path, ref: String): String? = Files.newBufferedReader(file).useLines { lines ->
+        lines.firstOrNull { !it.startsWith("#") && !it.startsWith("^") && it.endsWith(" $ref") }?.substringBefore(' ')
+    }
+
+    /** Answers already read from one version of a packed-refs file, misses included. */
+    private class PackedLookups(val stamp: Pair<Long, Long>) {
+        val answers = ConcurrentHashMap<String, String>()
     }
 
     /** `.git` is the git dir itself, or a file `gitdir: <path>` in a linked worktree. */

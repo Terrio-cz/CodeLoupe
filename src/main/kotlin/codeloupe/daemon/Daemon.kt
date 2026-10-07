@@ -20,7 +20,7 @@ import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.receiveChannel
-import io.ktor.server.request.uri
+import io.ktor.server.request.path
 import io.ktor.server.response.header
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
@@ -124,8 +124,10 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log("request ${call.request.httpMethod.value} ${call.request.uri} failed: $e")
-                if (!call.response.isCommitted) call.respondJson(HttpStatusCode.InternalServerError, error(e.message ?: e.toString()))
+                // First line only: parser messages quote the request body, and logs never hold content.
+                val reason = "${e::class.simpleName}: ${e.message.orEmpty().lineSequence().first()}"
+                log("request ${call.request.httpMethod.value} ${call.request.path()} failed: $reason")
+                if (!call.response.isCommitted) call.respondJson(HttpStatusCode.InternalServerError, error(reason))
             }
         }
         val mcp = McpTools(runner)

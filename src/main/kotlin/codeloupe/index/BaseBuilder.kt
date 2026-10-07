@@ -60,6 +60,7 @@ object BaseBuilder {
     private fun extract(extractor: ExecutorService, path: String, text: String): FileFacts = try {
         extractor.submit<FileFacts> { Languages.extract(path, text)!! }.get()
     } catch (e: ExecutionException) {
+        System.err.println("codeloupe: $path indexed without facts: ${e.cause ?: e}")
         FileFacts("", emptyList(), emptyList(), emptyList(), errors = 1)
     }
 }

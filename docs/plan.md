@@ -320,8 +320,8 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 - Odolnost: extrakce běží na vlákně s velkým zásobníkem (zvládne i výraz s 20 000 členy); soubor, který přesto selže,
   se uloží s chybou a build nepoloží; neúspěšný commit se 5 min nezkouší znovu (`/status` ukáže `failure`).
   Báze nese verzi formátu (`format` v `repo.json`) — báze z prototypu nebo starého extraktoru se přestaví.
-- Testy: 33 (17 portovaných z Node + parita, CRLF/BOM, uzavírání spojení, chyby API, overlay ve View, čtení refů,
-  řazení, fronta, hluboký soubor, opakování po selhání buildu, formát indexu).
+- Testy: 34 (17 portovaných z Node + parita, CRLF/BOM, uzavírání spojení, chyby API, overlay ve View, čtení refů,
+  řazení, fronta, hluboký soubor, opakování po selhání a timeout buildu, formát indexu).
 
 ## 10. Rizika
 
@@ -332,6 +332,7 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 | Daemon neběží při startu okna | autostart hook, CLI, doctor; volitelně služba OS |
 | Pád daemonu | bezstavové HTTP, autostart, ověření fáze 1, záložní shim |
 | Zastaralá data | kontrola změn při každém dotazu; vrstva vůči `B` |
+| Parser PSI je superlineární u jednoho výrazu s desítkami tisíc operandů (20 000 → 0,7 s, 80 000 → 9 s; jen generovaný kód) | build běží v podprocesu s timeoutem a nízkou prioritou; dotazy nečeká |
 | Gramatika nezvládne nový Kotlin | počet ERROR uzlů v doctoru, degradovaný režim, pinnutá verze, upgrade = golden test |
 | Zápis poškodí soubor | hash zámek, validace + rollback, atomický zápis, journal, fuzz + compile |
 | MCP obchází guard hooky klienta | zápisová politika v daemonu; testy guardů |

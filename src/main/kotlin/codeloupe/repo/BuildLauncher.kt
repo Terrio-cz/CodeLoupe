@@ -15,12 +15,17 @@ class BuildLauncher(private val heapMb: Int, private val timeoutMs: Long) {
         val process = ProcessBuilder(command).directory(workDir.toFile()).start().apply { outputStream.close() }
         val stderr = CompletableFuture.supplyAsync { tail(process.errorStream.readAllBytes().toString(Charsets.UTF_8)) }
         val stdout = CompletableFuture.supplyAsync { process.inputStream.readAllBytes().toString(Charsets.UTF_8) }
-        if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) process.destroyForcibly().waitFor()
+        if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
+            process.destroyForcibly().waitFor()
+            throw IllegalStateException("build timed out after $timeoutMs ms")
+        }
         val code = process.exitValue()
         val result = stdout.join().trim().lines().lastOrNull()
             ?.let { runCatching { JsonFormat.json.decodeFromString(BuildResult.serializer(), it) }.getOrNull() }
         if (code != 0 || result?.ok != true) {
-            throw IllegalStateException(result?.error ?: "build exited $code: ${stderr.join().trim().lines().lastOrNull().orEmpty()}")
+            // Skip the JVM's own WARNING lines; the reason is the last other line.
+            val reason = stderr.join().lines().lastOrNull { it.isNotBlank() && !it.startsWith("WARNING") }.orEmpty()
+            throw IllegalStateException(result?.error ?: "build exited $code: $reason")
         }
         return result
     }
