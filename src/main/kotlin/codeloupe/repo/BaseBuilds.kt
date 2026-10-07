@@ -2,6 +2,7 @@ package codeloupe.repo
 
 import codeloupe.JsonFormat
 import codeloupe.daemon.JobQueue
+import codeloupe.events.EventTypes
 import codeloupe.git.Git
 import codeloupe.index.BaseBuilder
 import codeloupe.index.BuildResult
@@ -15,6 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -31,6 +35,7 @@ internal class BaseBuilds(
     private val launcher: BuildLauncher,
     private val log: (String) -> Unit,
     private val swapped: (RepoState) -> Unit,
+    private val emit: (String, JsonObject) -> Unit = { _, _ -> },
 ) {
     fun full(repo: RepoState, commit: String): Deferred<BuildResult> =
         queue.run(JobQueue.Lane.HEAVY, "build:${repo.id}:$commit") {
@@ -100,6 +105,15 @@ internal class BaseBuilds(
             }
             for (suffix in listOf("", "-wal", "-shm")) runCatching { Files.deleteIfExists(Path.of("$tmp$suffix")) }
             log("build ${repo.id} ${commit.take(7)} failed: ${e.message}")
+            emit(
+                EventTypes.BUILD_DONE,
+                buildJsonObject {
+                    put("repo", repo.id)
+                    put("commit", commit)
+                    put("ok", false)
+                    put("error", e.message.orEmpty().take(300))
+                },
+            )
             throw e
         }
         val swappedIn = synchronized(repo) {
@@ -125,6 +139,17 @@ internal class BaseBuilds(
         save(repo)
         log("build ${repo.id} ${commit.take(7)}: ${result.files} files in ${result.ms} ms, peak ${result.peakRssMb} MB")
         swapped(repo)
+        emit(
+            EventTypes.BUILD_DONE,
+            buildJsonObject {
+                put("repo", repo.id)
+                put("commit", commit)
+                put("ok", true)
+                put("files", result.files)
+                put("errors", result.errors)
+                put("ms", result.ms)
+            },
+        )
         result
     }
 

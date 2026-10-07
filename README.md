@@ -51,6 +51,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `usages` | every reference to a declaration, grouped by file and enclosing declaration, one code line each, `=` exact or `?` candidate; a superset of what `rg -w` finds in code, references that resolve elsewhere only counted (`all=true` lists them) |
 | `calls` | callers (default) or callees as a tree, depth ≤ 3; below the first level only exact links |
 | `hierarchy` | supertypes and subtypes of a type (object expressions included, and lambdas converted to a `fun interface`), or what a member overrides and what overrides it |
+| `job` | start a long command in the daemon (status, cancel); see [Jobs and events](#jobs-and-events); takes `cwd`, not `root` |
 | `changes` | what the worktree changed against the merge-base with the default branch (committed and uncommitted), by declaration: `+` added, `~` body changed, `^` signature changed (with the old one), `-` removed; each with its callers and tests; `bodies=true` adds a line diff per declaration |
 
 Usages are resolved without an IDE or compiler: the scopes, imports and aliases a file sees, the receiver's
@@ -58,6 +59,54 @@ type where syntax tells it (declared types, `Type(…)`, what a call returns, co
 overloads by argument count. Unsure hits are marked, never dropped. One heuristic: on a receiver of unknown type,
 a name the index declares only once (and no library declares, judging by the core API and the files' imports) is
 taken as exact. A name that matches several unrelated declarations must be qualified (`Type.member`).
+
+## Jobs and events
+
+Long commands (tests, builds, deploys) run in the daemon instead of in an agent's turn: the agent starts a job, ends
+its turn, and is woken once when it ends — or not at all when the follow-up is deterministic.
+
+```bash
+codeloupe job start --slot gradle-test -- ./gradlew test     # prints the id at once
+codeloupe job wait J261007-142233-x7k2                       # as a background task: blocks, no time limit
+codeloupe job start --wait -- node run/build.mjs              # both in one call
+codeloupe job status [id]  ·  codeloupe job cancel <id>
+```
+
+- **Detached**: a job is a child of the daemon, not of the agent session; it outlives the turn and the session. On
+  Windows the daemon is started outside the caller's job object (headless `claude -p` runs kill theirs at turn end),
+  and jobs run in the daemon's own kill-on-close job object: if the daemon dies they end too, never as orphans.
+- Output and errors go straight to `<home>/jobs/<id>.log`; the record (`<home>/jobs.db`) keeps exit code, duration and a
+  **compact summary**: test counts (Gradle, Maven, node:test, Jest, pytest), the first failure lines, the last 15 lines.
+- **Slots**: `--slot <name>` holds a named resource while running; a busy slot queues the job in the daemon (first come,
+  first served). `config.json` `slots` sets capacities (`{ "gradle-test": 2 }`); a slot not listed holds one job.
+- **Policy**: commands run by the daemon never pass the agent host's guard hooks, so every job — follow-ups included,
+  and again after a slot wait — is first fed to `policyHook` exactly as Claude Code feeds a PreToolUse hook for a Bash
+  call (`tool_name` `Bash`, `tool_input.command` = the argv quoted for Bash with `--env` values as `K=v` prefixes, `cwd`).
+  Only an allow (or no output) starts it; deny, ask, exit 2, a crash, a timeout or unreadable output refuse it (exit 2,
+  no record). The hook runs in the daemon's environment, so a caller cannot redirect it with variables of its own.
+- No shell: the command is an argv (`bash -c '…'` for pipes). On Windows `./gradlew` or `npm` resolve to their
+  `.bat`/`.cmd` like in a shell. The job gets the daemon's environment plus `--env K=V` (values never stored or emitted).
+- **Wait once**: `job wait` long-polls the daemon (5 min per request, re-sent, across daemon restarts) until the job and
+  its follow-ups end, prints the compact report and exits with the job's code. A restarted daemon reports queued and
+  running jobs as `lost`, keeps their logs and ends what survived of them. `codeloupe stop` refuses while jobs run
+  (`--force` ends them).
+- **Completion actions** (`--then` after success, `--on-failure` after a failure, in order): a closed set of typed
+  steps, never a shell string — `job[@slot]:<command line>` (a follow-up job; the steps after it continue when it ends),
+  `notify[:message]` (a `job.notify` event that wakes the agent), `webhook:<url>` (the `job.finished` event to a URL).
+  Any step can carry a condition on exit code and summary: `failed==0 && tests>0 ? notify:green` (fields `exit`,
+  `tests`, `passed`, `failed`, `skipped`, `seconds`; a count the log did not report never matches).
+- **Wake**: the last `job.finished` of a chain carries `wake` — by default true only when something failed if the job
+  declared `--then` steps, else always (`--wake always|failure|never`). A launcher subscribed to `job.finished` /
+  `job.notify` resumes a headless session only when `wake` is true; `--tag` (default `CODELOUPE_JOB_TAG`) tells it which.
+- MCP: one tool, `job` (`action` start / status / cancel); waiting is the CLI's job.
+
+**Events**: `job.started`, `job.finished`, `job.notify`, `build.done`, `overlay.refreshed`, numbered (`seq`) and kept in
+`<home>/events.db`, scrubbed of secret-looking values (tokens, passwords, `Authorization`, URL credentials) before they are
+stored. `GET /events?since=<seq>`; `GET /events/stream` is a server-sent-events stream that resumes after `Last-Event-ID`.
+**Webhooks**: `codeloupe webhook add <url> [--event job.*]` persists a subscription; each delivery is a JSON POST signed with
+`x-codeloupe-signature: sha256=HMAC(<home>/webhook.key, "<x-codeloupe-timestamp>.<body>")`, retried after 2 s, 10 s,
+1 min, 5 min and 30 min (also after a daemon restart), logged (`webhook deliveries`). Targets are this machine only, any
+port but the daemon's, unless `remoteWebhooks` lists the https origin; redirects are not followed.
 
 ## Desktop app
 
@@ -74,6 +123,9 @@ read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-s
 | Base branch of a repository | `origin/HEAD`, else `origin/main`, `origin/master`, `main`, `master` | `.codeloupe.json` `{ "baseBranch": "origin/master" }` in the main worktree |
 | Build worker heap, timeouts | 512 MB, query wait 10 s, build 10 min | `config.json` `buildHeapMb`, `queryTimeoutMs`, `buildTimeoutMs` |
 | Reuse of a worktree check | 1 s: queries within a second of the last check of their worktree share it | `config.json` `overlayCheckMs` (1 = check on every query) |
+| Job slots | any name, one job each | `config.json` `slots` `{ "gradle-test": 2, "vps-test": 1 }` |
+| Policy for jobs | none (every command allowed) | `config.json` `policyHook` — argv of a PreToolUse hook, e.g. `["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/ws/.claude/hooks/guard.ps1"]`; `policyTimeoutMs` (30 s) |
+| Remote webhook targets | none (local only) | `config.json` `remoteWebhooks` `["https://hooks.example.com"]` |
 
 The daemon listens on 127.0.0.1 only and refuses requests with a foreign `Host`, any `Origin`, or
 without the `x-codeloupe` header; responses carry `Connection: close`. Calls are logged (tool, latency,
@@ -96,6 +148,8 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 | `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |
+| `jobs` | commands run for agents: policy hook, slots, processes, summaries, completion actions, `job` tool |
+| `events` | event log, server-sent-events stream, webhook subscriptions and deliveries |
 | `cli` | `codeloupe` commands and the daemon client |
 
 `ParityTest` compares every tool answer with golden output of the Node.js prototype (phase 1); the

@@ -1,5 +1,6 @@
 package codeloupe.daemon
 
+import codeloupe.jobs.JobsSnapshot
 import codeloupe.repo.RepoSummary
 import kotlinx.serialization.Serializable
 
@@ -18,4 +19,5 @@ data class DaemonStatus(
     val calls: CallStats,
     val queue: QueueSnapshot,
     val repos: List<RepoSummary>,
+    val jobs: JobsSnapshot,
 )
