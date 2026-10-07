@@ -67,6 +67,12 @@ class ChangesTest {
         val text = changes(bodies = true)
         assertContains(text, "    - return a\n    + return a + 1".replace("return", "        return"))
         assertTrue(text.lines().size < 12, text)
+        // A type's own change is diffed without its members.
+        write(feature, BILLING, billing().replace("class Billing {\n", "class Billing {\n    // pricing rules live here\n"))
+        val own = changes(bodies = true)
+        assertContains(own, Regex("  ~ 3-\\d+  class Billing"))
+        assertContains(own, "    +     // pricing rules live here")
+        assertFalse("return a" in own, own)
     }
 
     @Test

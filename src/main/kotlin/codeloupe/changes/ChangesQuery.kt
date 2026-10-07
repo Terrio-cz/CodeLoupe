@@ -20,7 +20,9 @@ object ChangesQuery {
         val quiet = ArrayList<String>()
         var listed = 0
         for (file in set.files.sortedWith(compareBy(PathOrder) { it.path })) {
-            val changes = changes(file, after, before)
+            val old = if (file.status == 'A' || before == null) emptyList() else versions(before, file.path)
+            val new = if (file.status == 'D') emptyList() else versions(after, file.path)
+            val changes = DeclDiff.of(old, new).sortedBy { it.current.row.startLine }
             if (changes.isEmpty()) {
                 quiet += file.path
                 continue
@@ -31,7 +33,7 @@ object ChangesQuery {
                 if (shown.lastOrNull { !it.startsWith(" ") } != heading(file)) shown += heading(file)
                 shown += line(change) + note(change, nested)
                 details(change, callers).forEach { shown += "      $it" }
-                if (args.bodies) body(change, changes)?.let { shown += it }
+                if (args.bodies) body(change, old, new)?.let { shown += it }
             }
         }
         return buildString {
@@ -41,12 +43,6 @@ object ChangesQuery {
             if (quiet.isNotEmpty()) append("\nno declaration changed (imports, comments, formatting): ").append(capped(quiet))
             if (set.otherFiles.isNotEmpty()) append("\nother changed files: ").append(capped(set.otherFiles))
         }
-    }
-
-    private fun changes(file: ChangedFile, after: View, before: View?): List<DeclChange> {
-        val old = if (file.status == 'A' || before == null) emptyList() else versions(before, file.path)
-        val new = if (file.status == 'D') emptyList() else versions(after, file.path)
-        return DeclDiff.of(old, new).sortedBy { it.current.row.startLine }
     }
 
     /**
@@ -113,10 +109,10 @@ object ChangesQuery {
     }
 
     // A type's own lines only: its members' changes are listed, and diffed, on their own.
-    private fun body(change: DeclChange, changes: List<DeclChange>): String? {
+    private fun body(change: DeclChange, before: List<DeclVersion>, after: List<DeclVersion>): String? {
         val (old, new) = (change.before ?: return null) to (change.after ?: return null)
         if (!new.isType) return TextDiff.of(old.text, new.text)
-        return TextDiff.of(old.ownText(changes.mapNotNull { it.before }), new.ownText(changes.mapNotNull { it.after }))
+        return TextDiff.of(old.ownText(before), new.ownText(after))
     }
 
     private fun capped(paths: List<String>) =

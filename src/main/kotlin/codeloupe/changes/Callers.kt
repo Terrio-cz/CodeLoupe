@@ -12,6 +12,8 @@ import codeloupe.query.usages.UsageFinder
  * as `id` has hundreds. `usages` lists them all with code lines.
  */
 internal class Callers(private val finder: UsageFinder) {
+    private var spent = 0
+
     /** The declaration as it is now: its usages, resolved exact or candidate. */
     fun of(decl: DeclRow): List<String> {
         tooCommon(decl)?.let { return listOf(it) }
@@ -27,7 +29,7 @@ internal class Callers(private val finder: UsageFinder) {
         val redirected = finder.cache.refsNamed(decl.name).filter { ref ->
             val args = ref.args ?: return@filter false
             ref.kind == "call" && finder.context.arguments.fits(old, args) &&
-                finder.resolve(ref).decls.any { it.container == decl.container && it.kind == decl.kind && !(it.id == decl.id && it.src == decl.src) }
+                finder.resolve(ref).decls.any { it.fqn == decl.fqn && it.kind == decl.kind && !(it.id == decl.id && it.src == decl.src) }
         }
         val redirectedLine = line("may be redirected (fit the old signature, now resolve to another overload)", redirected.map { site(it) }, Site::user)
         return lines(sites(decl), "callers") + listOfNotNull(redirectedLine)
@@ -49,10 +51,16 @@ internal class Callers(private val finder: UsageFinder) {
 
     private fun site(ref: RefRow) = Site(ref, finder.cache.owner(finder.cache.file(ref.path)?.decl(ref.declId)), candidate = false)
 
-    // Resolving every reference of a name like `id` or `get` costs seconds and says little; usages pages through them.
+    /**
+     * Resolving every reference of a name like `id` or `get` costs seconds and says little, and one call resolves at most
+     * [BUDGET] references in all: past either, a declaration gets a note instead (usages pages through them).
+     */
     private fun tooCommon(decl: DeclRow): String? {
-        val refs = finder.cache.refsNamed(decl.name).size
-        return if (refs > MAX_REFS) "callers: $refs references named ${decl.name}, too common to resolve here (usages lists them)" else null
+        val refs = finder.cache.view.refCount(decl.name, MAX_REFS + 1)
+        if (refs > MAX_REFS) return "callers: over $MAX_REFS references named ${decl.name}, too common to resolve here (usages lists them)"
+        if (spent + refs > BUDGET) return "callers: not resolved, this call's budget of $BUDGET references is spent (usages lists them)"
+        spent += refs
+        return null
     }
 
     private fun lines(sites: List<Site>, what: String): List<String> {
@@ -98,6 +106,7 @@ internal class Callers(private val finder: UsageFinder) {
     private companion object {
         const val TOP = 10
         const val MAX_REFS = 2_000
+        const val BUDGET = 20_000
         private val TYPE_REFS = setOf("type", "call", "nav", "name", "callable_ref")
         val KINDS = mapOf(
             "fun" to setOf("call", "callable_ref"),

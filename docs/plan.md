@@ -436,14 +436,17 @@ celou dobu vytížený jinými okny (CPU 40–97 %), `main` měřený souběžn�
 
 | Worktree | Souborů (.kt) | Deklarací | `git diff` | + změněné soubory celé | `changes` | `bodies=true` | Čas (první / znovu) |
 |---|---|---|---|---|---|---|---|
-| TER-591 | 15 (13) | 52 (+29 ~14 ^9) | 35 084 zn. | 59 198 zn. | **8 284 zn.** (24 %) | 26 383 | 0,72 / 0,30 s |
-| TER-656 | 21 (20) | 53 (+14 ~37 ^2) | 38 689 zn. | 171 317 zn. | **10 367 zn.** (27 %) | 36 067 | 0,79 / 0,51 s |
-| TER-477 | 81 (72) | 516 (+431 ~70 ^3 -12) | 254 337 zn. | 730 951 zn. | **17 742 zn.** limit 60 / 34 403 vše (14 %) | 75 562 | 0,85 / 0,67 s |
+| TER-591 | 15 (13) | 47 (+29 ~9 ^9) | 35 084 zn. | 59 198 zn. | **6 935 zn.** (20 %) | 13 383 | 0,73 / 0,38 s |
+| TER-656 | 21 (20) | 50 (+14 ~34 ^2) | 38 689 zn. | 171 317 zn. | **10 213 zn.** (26 %) | 28 136 | 0,73 / 0,56 s |
+| TER-477 | 81 (72) | 507 (+431 ~61 ^3 -12) | 254 337 zn. | 730 951 zn. | **14 960 zn.** limit 60 / 33 017 vše (13 %) | 56 498 | 0,99 / 0,74 s |
 
 - Tahy: reviewer dnes `git diff --stat` + `git diff` + čtení změněných souborů (13–72) + `rg` na volající každé
   změny signatury (2–9) → ~15–80 tahů; `changes` 1 tah (+ `symbol`/`usages` jen pro to, co chce vidět celé).
-- Testy: 61 (nově `ChangesTest`: větev s `+ ~ ^ -`, novým a smazaným souborem, CRLF bez falešného `~`, posunutý
-  main mimo výstup, `bodies`, soubory bez změny deklarací a nekódové soubory).
+- Volající u `^` navíc: volání, která sedí na starou signaturu a teď vedou na jiný overload („may be redirected").
+  Jména s víc než 2 000 odkazy (`id`, `get`) jen počtem. RSS daemonu po měření 188 MB.
+- Testy: 65 (nově `ChangesTest` 7: větev s `+ ~ ^ -`, novým a smazaným souborem, CRLF bez falešného `~`, posunutý
+  main mimo výstup, `bodies`, soubory bez změny deklarací, přidaný člen bez `~` třídy, `(KDoc only)`, limit,
+  přesměrovaný overload, dva worktree na jedné merge-base souběžně, `git rm --cached`).
 
 ## 10. Rizika
 

@@ -67,18 +67,11 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
         val dir = repo.dir.resolve(DIR).also { Files.createDirectories(it) }
         val file = dir.resolve("${mergeBase.take(12)}.db")
         val deadline = System.currentTimeMillis() + waitMs
-        var requested = emptySet<String>()
-        var stalled = 0
         while (true) {
             if (!file.exists()) prune(dir)
             val missing = old.filter { it.path !in present(file) }
             if (missing.isEmpty()) return file
-            // Once may be a joined job for other files; twice means git cannot give us these blobs.
-            if (missing.map { it.path }.toSet() == requested && ++stalled >= 2) {
-                throw IllegalStateException("git objects of ${missing.size} files at merge-base ${mergeBase.take(7)} are not in this clone (partial or shallow?)")
-            }
             val job = start(repo, mergeBase, file, missing)
-            requested = missing.map { it.path }.toSet()
             withTimeoutOrNull(maxOf(1, deadline - System.currentTimeMillis())) { job.await() }
                 ?: throw BusyException("indexing ${missing.size} files of merge-base ${mergeBase.take(7)}; retry in a few seconds")
         }
@@ -90,6 +83,9 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
 
     private fun start(repo: RepoState, mergeBase: String, file: Path, missing: List<DiffEntry>): Deferred<*> {
         val sizes = Git.blobSizes(repo.commonDir, missing.map { it.oldBlob!! })
+        // A blob git does not have (a partial or shallow clone) would be asked for again on every call.
+        val absent = missing.count { it.oldBlob !in sizes }
+        if (absent > 0) throw IllegalStateException("git objects of $absent files at merge-base ${mergeBase.take(7)} are not in this clone (partial or shallow?)")
         val update = StoreUpdate(
             puts = missing.map { FilePut(it.path, blob = it.oldBlob, size = sizes[it.oldBlob] ?: 0) },
             meta = mapOf("commit" to mergeBase, "built_at" to IsoTime.now()),
