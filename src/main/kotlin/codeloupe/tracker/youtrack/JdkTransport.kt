@@ -12,16 +12,22 @@ import java.time.Duration
 class JdkTransport(private val baseUrl: String, private val token: TokenSource, private val timeout: Duration = Duration.ofSeconds(30)) : HttpTransport {
     private val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build()
 
-    override fun get(path: String): HttpReply {
+    override fun get(path: String): HttpReply = send(path) { it.GET() }
+
+    override fun post(path: String, body: String): HttpReply = send(path) {
+        it.header("Content-Type", "application/json; charset=utf-8").POST(HttpRequest.BodyPublishers.ofString(body))
+    }
+
+    private fun send(path: String, method: (HttpRequest.Builder) -> HttpRequest.Builder): HttpReply {
         val secret = token.read()
         val where = path.substringBefore('?')
         return try {
-            val request = HttpRequest.newBuilder(URI(baseUrl + path))
-                .timeout(timeout)
-                .header("Authorization", "Bearer $secret")
-                .header("Accept", "application/json")
-                .GET()
-                .build()
+            val request = method(
+                HttpRequest.newBuilder(URI(baseUrl + path))
+                    .timeout(timeout)
+                    .header("Authorization", "Bearer $secret")
+                    .header("Accept", "application/json"),
+            ).build()
             // A body may quote the request (a proxy's echo page); it never leaves here with the token in it.
             client.send(request, HttpResponse.BodyHandlers.ofString()).let { HttpReply(it.statusCode(), it.body().replace(secret, "[redacted]")) }
         } catch (e: InterruptedException) {

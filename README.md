@@ -57,12 +57,13 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `job` | start a long command in the daemon (status, cancel); see [Jobs and events](#jobs-and-events); takes `cwd`, not `root` |
 | `changes` | what the worktree changed against the merge-base with the default branch (committed and uncommitted), by declaration: `+` added, `~` body changed, `^` signature changed (with the old one), `-` removed; each with its callers and tests; `bodies=true` adds a line diff per declaration |
 
-With a tracker configured (see Configuration) two more tools answer from a local mirror of its projects:
+With a tracker configured (see Configuration) three more tools work on a local mirror of its projects:
 
 | Tool | Returns |
 |---|---|
 | `issue` | one issue as compact markdown: `view=brief` (fields, links, criteria checklist, section index), `full`, or `sections=[…]` (description headings by prefix, `criteria`, `fields`, `links`, `comments`, `attachments`, `history`). A second read from the same `root` answers `unchanged since …` or only what changed; `since=<ISO time>` diffs against that time, `since=none` shows it again |
 | `tasks` | one line per task (`id state · type · priority ‹epic› title ⛔blockers`). `mode=list` with a YouTrack-like `query` (`project: TER state: -Done #unresolved epic: TER-1 type: Bug {Fix versions}: 1.0 sort: id` plus full-text words), `graph` (an issue's epic, dependencies, subtasks, relations; `depth` ≤ 3), `ready` (open tasks without open subtasks whose dependencies are resolved and that no git worktree branch holds), `progress` (an epic: counts by state, criteria, blockers, open tasks) |
+| `update` | writes to the tracker: `set={Field: value}` (State, Assignee, Priority, Type, `summary`, `description` or any custom field; comma-separated for multi-value fields; an empty value clears) and/or `comment=<text>`. Answers one line of at most 300 characters — the fields that changed (`State: To do→Done`), `+comment <id>`, and the state when it did not change — instead of the issue. The mirror stores the tracker's own answer to the write, so the next `issue` read needs no request |
 
 Usages are resolved without an IDE or compiler: the scopes, imports and aliases a file sees, the receiver's
 type where syntax tells it (declared types, `Type(…)`, what a call returns, collection elements in lambdas), and
@@ -160,7 +161,7 @@ variables, not the shell that happened to start it — see [Jobs and events](#jo
 "key": "NAME" }`), read by the daemon on each request; it never appears in answers, errors, `/status` or logs. The
 mirror (`<home>/trackers/<name>.db`, SQLite + FTS5) loads each project once, then a watcher asks only for issues whose
 `updated` moved — and only while tool calls arrive: no client, no polling. A read more than 30 s after the project's
-last sync checks that one issue's `updated` first. Mirroring is read-only. `repos` are git repositories whose worktree
+last sync checks that one issue's `updated` first. The mirror only reads; `update` is the one way CodeLoupe writes to the tracker (YouTrack: field values, `summary`, `description`, comments), with the token's own permissions. `repos` are git repositories whose worktree
 branch names (`ABC-5`, `feature/ABC-5-x`) mark tasks as taken for `tasks mode=ready`, besides every repository the
 daemon has indexed.
 

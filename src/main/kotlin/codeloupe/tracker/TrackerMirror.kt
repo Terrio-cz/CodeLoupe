@@ -2,6 +2,7 @@ package codeloupe.tracker
 
 import codeloupe.tracker.mirror.MirrorStore
 import codeloupe.tracker.mirror.MirrorSync
+import codeloupe.tracker.mirror.WriteResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -66,6 +67,19 @@ class TrackerMirror(
             log("tracker ${instance.name} refresh $id failed: $reason")
             if (known) "(offline, mirror of ${Times.short(store.state(project).syncedAt)}: $reason)" else "error: $reason"
         }
+    }
+
+    /**
+     * Writes [fields] and/or a [comment] to the mirrored issue [id] (canonical); the mirror takes the tracker's answer
+     * as it is, with no second request. Throws a [TrackerException] the caller can show.
+     */
+    suspend fun write(id: String, fields: Map<String, String>, comment: String?): WriteResult = try {
+        withContext(Dispatchers.IO) { sync.write(id, fields, comment) }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log("tracker ${instance.name} write $id failed: ${safe(e)}")
+        throw TrackerException(safe(e))
     }
 
     private fun young(project: String, maxAgeMs: Long): Boolean = store.state(project).syncedAt?.let { clock() - it < maxAgeMs } ?: false

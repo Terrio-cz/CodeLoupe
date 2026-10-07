@@ -50,6 +50,7 @@ class TrackerDaemonTest {
                 auth != "Bearer $token" -> HttpReply(401, """{"error":"Unauthorized"}""")
                 // A misbehaving proxy that echoes the request headers in its error page.
                 failWith != null -> HttpReply(failWith!!, """{"error":"x","error_description":"echo: $auth"}""")
+                exchange.requestMethod == "POST" -> fake.post(exchange.requestURI.rawPath + "?" + exchange.requestURI.rawQuery, exchange.requestBody.readBytes().decodeToString())
                 else -> fake.get(exchange.requestURI.rawPath + "?" + exchange.requestURI.rawQuery)
             }
             val bytes = reply.body.toByteArray()
@@ -82,8 +83,9 @@ class TrackerDaemonTest {
         server.stop(0)
     }
 
-    private fun call(tool: String, vararg args: Pair<String, String>): JsonObject {
-        val body = buildJsonObject { args.forEach { (k, v) -> put(k, v) } }
+    private fun call(tool: String, vararg args: Pair<String, String>): JsonObject = callJson(tool, buildJsonObject { args.forEach { (k, v) -> put(k, v) } })
+
+    private fun callJson(tool: String, body: JsonObject): JsonObject {
         val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$tool")).header(CodeLoupe.HEADER, "1")
             .POST(HttpRequest.BodyPublishers.ofString(body.toString())).build()
         val text = http.send(request, HttpResponse.BodyHandlers.ofString()).body()
@@ -135,6 +137,22 @@ class TrackerDaemonTest {
 
     @Test
     @Order(5)
+    fun `update writes through the daemon and answers in one short line`() {
+        val body = buildJsonObject {
+            put("id", "cl-27")
+            put("set", buildJsonObject { put("State", "Done") })
+            put("comment", "Landed")
+        }
+        val reply = text(callJson("update", body))
+        assertTrue(reply.matches(Regex("CL-27 State: .+→Done · \\+comment \\S+")), reply)
+        assertTrue(reply.length <= 300)
+        assertContains(text(call("issue", "id" to "CL-27", "root" to "C:/work/d")), "Done")
+        assertEquals("nothing to write: pass set={Field: value} and/or comment=<text>", text(call("update", "id" to "CL-27")))
+        assertContains(text(call("update", "id" to "ABC-1", "comment" to "x")), "no tracker mirrors")
+    }
+
+    @Test
+    @Order(6)
     fun `the token is in no output, status, log or mirror file`() {
         val status = http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/status")).build(), HttpResponse.BodyHandlers.ofString()).body()
         assertContains(status, "\"trackers\"")

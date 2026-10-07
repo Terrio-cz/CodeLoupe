@@ -28,4 +28,13 @@ interface TrackerAdapter {
 
     /** Field changes of [project]'s issues at or after [since], oldest first. */
     fun fieldChanges(project: String, since: Long): List<FieldChange>
+
+    /**
+     * Sets [fields] (tracker field name → text; `summary` and `description` are the issue's own; blank clears) and returns
+     * the issue as the tracker now holds it, from the write's own response.
+     */
+    fun update(id: String, fields: Map<String, String>): TrackerIssue = throw TrackerException("this tracker is read only")
+
+    /** Adds a comment to [id]. */
+    fun comment(id: String, text: String): NewComment = throw TrackerException("this tracker is read only")
 }
