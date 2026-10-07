@@ -86,9 +86,12 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 | `index` | SQLite store, base build from git objects, build worker entry point |
 | `repo` | repositories and worktrees → base index, child-process builds |
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
+| `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |
 | `cli` | `codeloupe` commands and the daemon client |
 
 `ParityTest` compares every tool answer with golden output of the Node.js prototype (phase 1); the
-TerrioImporter part runs where that repository is checked out (`CODELOUPE_TERRIO`).
+TerrioImporter part runs where that repository is checked out (`CODELOUPE_TERRIO`). `UsagesGoldenTest` checks
+`usages` on 40 TerrioImporter symbols against a manually verified oracle (`src/test/resources/golden`) and writes
+`build/reports/codeloupe/golden-usages.md`: superset of `rg -w`, precision of `exact` (≥ 95 %), candidate share.

@@ -353,12 +353,26 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 - Testy: 34 (17 portovaných z Node + parita, CRLF/BOM, uzavírání spojení, chyby API, overlay ve View, čtení refů,
   řazení, fronta, hluboký soubor, opakování po selhání a timeout buildu, formát indexu).
 
+### Výsledek navigace: usages, calls, hierarchy (CL-13, CL-14, CL-20, 2026-10-07)
+
+- Golden test (`UsagesGoldenTest`, oracle `src/test/resources/golden/terrio-usages.json`): 40 symbolů Terria na
+  commitu 22d02d3f (třídy, rozhraní, object, enum a entry, companion členy, extension funkce včetně 10 stejnojmenných
+  podle receiveru, routy, repository, override, overloady podle počtu parametrů, private). Oracle ručně ověřený
+  čtením kódu (296 řádků), bez IDE. Výsledek: nadmnožina `rg -w` **100 %** (577/577 pozic), přesnost `exact`
+  **100 %** (289/289), každé skutečné použití je `exact` nebo `candidate` (296/296), `exact` samo pokryje 97,6 %,
+  podíl `candidate` **4 %**. Dotaz v testu p50 **11 ms**, max 46 ms; přes daemon a CLI ~1,4 s (start JVM).
+- Index: formát `2/kotlin-psi-2` (sloupce `bind`, `recv_type`, `args` v `refs`) → báze se po upgradu přestaví.
+- Stejná fixture sada v repu (`fixtures/kotlin/usages`) kryje super, cast, lambdy, alias, companion, enum, extension,
+  override/dispatch, overloady, private a nadmnožinu.
+- Známé meze: implementace přes `object : I {}` nejsou v `hierarchy` (výraz, ne deklarace); typ výsledku `let {}`,
+  řetězů přes knihovní API a generik se neodvozuje (→ `candidate`); `with`/`apply` jen přímé volání.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
 |---|---|
 | RAM/CPU při 8–10 oknech | jedna instance, fronta, build jen v podprocesu max 1, budget test fáze 5 |
-| Bez IDE horší přesnost | značky exact/candidate, nadmnožina `rg -w`, golden test; oracle se nahraje jednou (IDEA na 10 min, nebo ručně ověřená sada) a pak se IDE nepotřebuje; typy dál ověřuje build |
+| Bez IDE horší přesnost | značky exact/candidate, nadmnožina `rg -w`, golden test s ručně ověřeným oracle (40 symbolů, exact 100 %, CL-20) běží při každé změně extraktoru i resolveru; typy dál ověřuje build |
 | Daemon neběží při startu okna | autostart hook, CLI, doctor; volitelně služba OS |
 | Pád daemonu | bezstavové HTTP, autostart, ověření fáze 1, záložní shim |
 | Zastaralá data | kontrola změn při každém dotazu; vrstva vůči `B` |

@@ -1,0 +1,543 @@
+{
+ "repo": "TerrioImporter",
+ "commit": "22d02d3f200932a64f53257f3ad76dc401f04a60",
+ "verified": "Each usage line read in the TerrioImporter source at the commit and confirmed to denote the symbol, statically or by dispatch through a member it overrides; named arguments of a constructor property count. No IDE involved.",
+ "symbols": [
+  {
+   "query": "InvitationService",
+   "kind": "class",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/AccountModule.kt:56",
+    "accounts/src/main/kotlin/cz/terrio/accounts/AccountModule.kt:166",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountInputRefusalTest.kt:199",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountInputRefusalTest.kt:201",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1013",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1282",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/StaffOrganizationAccessTest.kt:54"
+   ]
+  },
+  {
+   "query": "SourceSchemaDiffReport",
+   "kind": "data class",
+   "usages": [
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/PublisherSchemaChecks.kt:52",
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/PublisherSchemaChecks.kt:59",
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/PublisherSchemaChecks.kt:66",
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/PublisherSchemaChecks.kt:85",
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/PublisherSchemaChecks.kt:91",
+    "app/src/test/kotlin/cz/terrio/importer/database/ImportLedgerTest.kt:787",
+    "common/src/main/kotlin/cz/terrio/importer/imports/contract/SourceFieldAuditLog.kt:16",
+    "common/src/main/kotlin/cz/terrio/importer/imports/contract/SourceFieldAuditLog.kt:22",
+    "common/src/main/kotlin/cz/terrio/importer/imports/contract/SourceFieldAuditLog.kt:32",
+    "common/src/main/kotlin/cz/terrio/importer/imports/contract/SourceFieldContract.kt:47",
+    "common/src/main/kotlin/cz/terrio/importer/imports/contract/SourceFieldContract.kt:83",
+    "common/src/main/kotlin/cz/terrio/importer/imports/contract/SourceSchemaDiffReport.kt:35",
+    "common/src/main/kotlin/cz/terrio/importer/imports/contract/SourceSchemaDiffReport.kt:36",
+    "common/src/main/kotlin/cz/terrio/importer/imports/ledger/ImportLedger.kt:249",
+    "common/src/main/kotlin/cz/terrio/importer/imports/ledger/ImportStageSourceAudit.kt:19",
+    "common/src/test/kotlin/cz/terrio/importer/imports/contract/SourceSchemaDiffTest.kt:55"
+   ]
+  },
+  {
+   "query": "PasswordHasher",
+   "kind": "interface",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/AccountModule.kt:118",
+    "accounts/src/main/kotlin/cz/terrio/accounts/security/Argon2PasswordHasher.kt:18",
+    "accounts/src/main/kotlin/cz/terrio/accounts/security/BoundedPasswordHasher.kt:32",
+    "accounts/src/main/kotlin/cz/terrio/accounts/security/BoundedPasswordHasher.kt:36",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/AccountService.kt:49",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:39",
+    "accounts/src/test/kotlin/cz/terrio/accounts/security/BoundedPasswordHasherTest.kt:261",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1163",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1295",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/LoginThrottleTest.kt:499",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/LoginThrottleTest.kt:541",
+    "app/src/test/kotlin/cz/terrio/importer/integration/accounts/PasswordHashingCapacityTest.kt:245"
+   ]
+  },
+  {
+   "query": "MailSender",
+   "kind": "fun interface",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/AccountModule.kt:117",
+    "accounts/src/main/kotlin/cz/terrio/accounts/mail/LoggingMailSender.kt:13",
+    "accounts/src/main/kotlin/cz/terrio/accounts/mail/MailSenderFactory.kt:12",
+    "accounts/src/main/kotlin/cz/terrio/accounts/mail/ResendMailSender.kt:22",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/AccountService.kt:52",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:42",
+    "accounts/src/test/kotlin/cz/terrio/accounts/AccountModuleMaintenanceTest.kt:77",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountInputRefusalTest.kt:226",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:999",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1124",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1440",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AuditTrailRecordingTest.kt:348",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/LoginThrottleTest.kt:528",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/StaffOrganizationAccessTest.kt:209",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/UserWriteConcurrencyTest.kt:430",
+    "app/src/test/kotlin/cz/terrio/importer/AccountMaintenanceStartupTest.kt:147",
+    "app/src/test/kotlin/cz/terrio/importer/http/OpenApiDocumentFixture.kt:48",
+    "app/src/test/kotlin/cz/terrio/importer/integration/accounts/RecordingMailSender.kt:7",
+    "app/src/test/kotlin/cz/terrio/importer/integration/accounts/RequestLogRedactionTest.kt:78"
+   ]
+  },
+  {
+   "query": "LoginFailures",
+   "kind": "object (Exposed table)",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/AccountsPostgresSetup.kt:39",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:21",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:22",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:28",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:39",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:40",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:46",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:50",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:53",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:54",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:55",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:56",
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/LoginFailureStore.kt:57",
+    "accounts/src/test/kotlin/cz/terrio/accounts/persistence/AccountsPostgresSetupTest.kt:206",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1117",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1118",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1120",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/LoginThrottleTest.kt:414",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/LoginThrottleTest.kt:421",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/LoginThrottleTest.kt:584"
+   ]
+  },
+  {
+   "query": "AccountOperationAccess",
+   "kind": "enum",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/AccountOpenApi.kt:23",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/AccountOpenApi.kt:47",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/ApiKeyRoutes.kt:53",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/ApiKeyRoutes.kt:72",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/ApiKeyRoutes.kt:92",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/AuditRoutes.kt:45",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/AuditRoutes.kt:72",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/InvitationRoutes.kt:64",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/InvitationRoutes.kt:85",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/InvitationRoutes.kt:104",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:52",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:66",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:77",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:93",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:115",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:137",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:42",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:56",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:74",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:90",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:111",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:126",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:150",
+    "app/src/main/kotlin/cz/terrio/importer/http/InternalOpenApiErrorResponses.kt:114",
+    "app/src/main/kotlin/cz/terrio/importer/http/InternalOpenApiErrorResponses.kt:122",
+    "app/src/main/kotlin/cz/terrio/importer/http/InternalOpenApiErrorResponses.kt:123"
+   ]
+  },
+  {
+   "query": "ImportRunStatus.RUNNING",
+   "kind": "enum entry",
+   "usages": [
+    "common/src/main/kotlin/cz/terrio/importer/database/tables/imports/ImportRuns.kt:156",
+    "common/src/main/kotlin/cz/terrio/importer/database/tables/imports/ImportRuns.kt:157",
+    "common/src/main/kotlin/cz/terrio/importer/imports/ledger/AbandonedImportStages.kt:39",
+    "common/src/main/kotlin/cz/terrio/importer/imports/ledger/AbandonedImportStages.kt:49",
+    "common/src/main/kotlin/cz/terrio/importer/imports/ledger/ImportLedger.kt:144",
+    "common/src/main/kotlin/cz/terrio/importer/imports/ledger/ImportLedger.kt:179"
+   ]
+  },
+  {
+   "query": "DownloadedImportFile.fromLocalFile",
+   "kind": "companion fun",
+   "usages": [
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/OsmDatabaseImportCli.kt:137",
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/SafetyDatabaseImportCli.kt:141",
+    "app/src/test/kotlin/cz/terrio/importer/database/StatisticsPeriodCompletionUpgradeTest.kt:128",
+    "app/src/test/kotlin/cz/terrio/importer/database/imports/AdministrativeContextPropagatorTest.kt:401",
+    "app/src/test/kotlin/cz/terrio/importer/database/imports/AdministrativeContextPropagatorTest.kt:515",
+    "app/src/test/kotlin/cz/terrio/importer/database/imports/CsuUapSldbDatabaseImporterTest.kt:671",
+    "app/src/test/kotlin/cz/terrio/importer/database/imports/UzisHealthcareDatabaseImporterTest.kt:377",
+    "app/src/test/kotlin/cz/terrio/importer/database/imports/UzisHealthcareDatabaseImporterTest.kt:772",
+    "common/src/test/kotlin/cz/terrio/importer/imports/DownloadedImportFileTest.kt:22",
+    "common/src/test/kotlin/cz/terrio/importer/imports/DownloadedImportFileTest.kt:39",
+    "common/src/test/kotlin/cz/terrio/importer/imports/DownloadedImportFileTest.kt:51",
+    "common/src/test/kotlin/cz/terrio/importer/imports/DownloadedImportFileTest.kt:58",
+    "common/src/test/kotlin/cz/terrio/importer/imports/PublishedMd5VerifierTest.kt:24",
+    "common/src/test/kotlin/cz/terrio/importer/imports/PublishedMd5VerifierTest.kt:41",
+    "common/src/test/kotlin/cz/terrio/importer/imports/PublishedMd5VerifierTest.kt:57",
+    "common/src/test/kotlin/cz/terrio/importer/imports/PublishedMd5VerifierTest.kt:69",
+    "importers/chmi/chmi-climate-historical-metadata-csv/src/test/kotlin/cz/terrio/importer/imports/jobs/chmi/ChmiClimateHistoricalMetadataCsvImportJobTest.kt:58",
+    "importers/chmi/chmi-climate-historical-metadata-csv/src/test/kotlin/cz/terrio/importer/imports/jobs/chmi/ChmiClimateHistoricalMetadataCsvImportJobTest.kt:78"
+   ]
+  },
+  {
+   "query": "MsmtSchoolType.fromCode",
+   "kind": "companion fun, same name in 5 enums",
+   "usages": [
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/MsmtSchoolDatabaseImporter.kt:283",
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/MsmtSchoolDatabaseImporter.kt:345",
+    "importers/msmt/src/main/kotlin/cz/terrio/importer/imports/jobs/msmt/MsmtSchoolRegisterReader.kt:150",
+    "importers/msmt/src/main/kotlin/cz/terrio/importer/imports/jobs/msmt/MsmtSchoolRegisterReader.kt:159",
+    "importers/msmt/src/test/kotlin/cz/terrio/importer/imports/jobs/msmt/MsmtSchoolRecordMappingTest.kt:114",
+    "importers/msmt/src/test/kotlin/cz/terrio/importer/imports/jobs/msmt/MsmtSchoolRecordMappingTest.kt:130",
+    "importers/msmt/src/test/kotlin/cz/terrio/importer/imports/jobs/msmt/MsmtSchoolRecordMappingTest.kt:131",
+    "importers/msmt/src/test/kotlin/cz/terrio/importer/imports/jobs/msmt/MsmtSchoolRecordMappingTest.kt:132"
+   ]
+  },
+  {
+   "query": "RequestDatabase.unpooled",
+   "kind": "companion fun, same name elsewhere",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/persistence/AccountDatabase.kt:12",
+    "accounts/src/test/kotlin/cz/terrio/accounts/AccountModuleMaintenanceTest.kt:43",
+    "accounts/src/test/kotlin/cz/terrio/accounts/persistence/DatabaseClockTest.kt:42",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountTimestampComparisonTest.kt:145",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AuditTrailRecordingTest.kt:380",
+    "app/src/main/kotlin/cz/terrio/importer/database/ApplicationDatabases.kt:37",
+    "app/src/main/kotlin/cz/terrio/importer/database/ApplicationDatabases.kt:38",
+    "app/src/test/kotlin/cz/terrio/importer/RequestDatabaseLifecycleTest.kt:68",
+    "app/src/test/kotlin/cz/terrio/importer/RequestDatabaseLifecycleTest.kt:69",
+    "public-api/src/main/kotlin/cz/terrio/api/persistence/PublicApiDatabase.kt:25",
+    "public-api/src/test/kotlin/cz/terrio/api/PublicApiModuleMaintenanceTest.kt:25",
+    "public-api/src/test/kotlin/cz/terrio/api/http/IdempotentMeteredCallTest.kt:540",
+    "public-api/src/test/kotlin/cz/terrio/api/http/IdempotentMeteredCallTest.kt:549",
+    "public-api/src/test/kotlin/cz/terrio/api/http/IdempotentMeteredCallTest.kt:694",
+    "public-api/src/test/kotlin/cz/terrio/api/http/route/StatisticsRoutesTest.kt:965",
+    "public-api/src/test/kotlin/cz/terrio/api/usage/ApiPricingCatalogRoutesTest.kt:714"
+   ]
+  },
+  {
+   "query": "ApiException.forbidden",
+   "kind": "companion fun, same name elsewhere",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/ApiKeyService.kt:131",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/AuditService.kt:51",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:55",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:57",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:95",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:104",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/OrganizationService.kt:148",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/OrganizationService.kt:171",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/OrganizationService.kt:284"
+   ]
+  },
+  {
+   "query": "TourismAreaReference.stableKey",
+   "kind": "companion fun, same name in 5 types",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/repository/TourismQueryRepository.kt:705"
+   ]
+  },
+  {
+   "query": "requireStaff",
+   "kind": "extension fun (ApplicationCall)",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/AuditRoutes.kt:53",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:32",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:48",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:62",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:80",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:97",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:119",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/StaffRoutes.kt:129"
+   ]
+  },
+  {
+   "query": "pageLimit",
+   "kind": "extension fun (ApplicationCall)",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/AddressRoutes.kt:207",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/AddressRoutes.kt:221",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/AdministrativeRoutes.kt:41",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/AdministrativeRoutes.kt:81",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/AdministrativeRoutes.kt:122",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/AmenityRoutes.kt:144",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/AmenityRoutes.kt:213",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/CadastralTerritoryRoutes.kt:40",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/HeritageRoutes.kt:73",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/HeritageRoutes.kt:126",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/MunicipalityRoutes.kt:45",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/MunicipalityRoutes.kt:110",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/MunicipalityRoutes.kt:170",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/ParcelRoutes.kt:143",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/StatisticsRoutes.kt:59",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/StatisticsRoutes.kt:98",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/TourismRoutes.kt:70",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/TourismRoutes.kt:115",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/UsageRoutes.kt:124"
+   ]
+  },
+  {
+   "query": "requireVerifiedUser",
+   "kind": "extension fun (ApplicationCall)",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/ApiKeyRoutes.kt:36",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/ApiKeyRoutes.kt:61",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/ApiKeyRoutes.kt:79",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/AuditRoutes.kt:25",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/InvitationRoutes.kt:45",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/InvitationRoutes.kt:74",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/InvitationRoutes.kt:92",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:33",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:59",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:69",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:83",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:99",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/OrganizationRoutes.kt:124",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/security/AccountAuthorization.kt:28"
+   ]
+  },
+  {
+   "query": "BillingSubscriptionStore.toVersion",
+   "kind": "private member extension (ResultRow)",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/billing/BillingSubscriptionStore.kt:104",
+    "public-api/src/main/kotlin/cz/terrio/api/billing/BillingSubscriptionStore.kt:136",
+    "public-api/src/main/kotlin/cz/terrio/api/billing/BillingSubscriptionStore.kt:141"
+   ]
+  },
+  {
+   "query": "IssuedApiKey.toResponse",
+   "kind": "extension fun, 10 same-name overloads by receiver",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/route/ApiKeyRoutes.kt:45"
+   ]
+  },
+  {
+   "query": "Table.generated",
+   "kind": "private extension fun (Table)",
+   "usages": [
+    "common/src/main/kotlin/cz/terrio/importer/database/postgis/StoredWgs84Columns.kt:17",
+    "common/src/main/kotlin/cz/terrio/importer/database/postgis/StoredWgs84Columns.kt:24",
+    "common/src/main/kotlin/cz/terrio/importer/database/postgis/StoredWgs84Columns.kt:31",
+    "common/src/main/kotlin/cz/terrio/importer/database/postgis/StoredWgs84Columns.kt:39"
+   ]
+  },
+  {
+   "query": "apiKeyProtected",
+   "kind": "route DSL extension (Route)",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/AmenityRoutes.kt:40",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/HeritageRoutes.kt:57",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/SourceRoutes.kt:23",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/StatisticsRoutes.kt:49",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/TourismRoutes.kt:58",
+    "public-api/src/test/kotlin/cz/terrio/api/http/IdempotentMeteredCallTest.kt:846",
+    "public-api/src/test/kotlin/cz/terrio/api/http/PublicApiSecurityTest.kt:199"
+   ]
+  },
+  {
+   "query": "AddressRoutes.register",
+   "kind": "route registration, same name in 14 classes",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/PublicApiModule.kt:80",
+    "public-api/src/test/kotlin/cz/terrio/api/http/route/AddressRoutesTest.kt:1265",
+    "public-api/src/test/kotlin/cz/terrio/api/http/route/ParcelRoutesTest.kt:959"
+   ]
+  },
+  {
+   "query": "healthRoutes",
+   "kind": "route extension (Route)",
+   "usages": [
+    "app/src/main/kotlin/cz/terrio/importer/Application.kt:257"
+   ]
+  },
+  {
+   "query": "BillingPurchaseStore.findDispute",
+   "kind": "repository method",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/billing/BillingPurchaseStore.kt:281",
+    "public-api/src/test/kotlin/cz/terrio/api/billing/BillingPurchaseStoreTest.kt:120"
+   ]
+  },
+  {
+   "query": "ApiUsageStore.addDailyUsage",
+   "kind": "repository method",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/usage/ApiUsageService.kt:93",
+    "public-api/src/main/kotlin/cz/terrio/api/usage/ApiUsageService.kt:398"
+   ]
+  },
+  {
+   "query": "TourismQueryRepository.findTourismArea",
+   "kind": "repository override of an interface method",
+   "usages": [
+    "app/src/test/kotlin/cz/terrio/importer/database/imports/TourismDatabaseImporterTest.kt:2100",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/TourismRoutes.kt:112",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismQueryRepositoryTest.kt:214",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismQueryRepositoryTest.kt:353",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismQueryRepositoryTest.kt:437",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismQueryRepositoryTest.kt:665",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:80",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:112",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:131",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:199",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:235",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:250",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:280",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:300",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:345",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:352",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:357",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:361",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:373",
+    "public-api/src/test/kotlin/cz/terrio/api/heritagetourism/TourismStatisticsVisibilityTest.kt:376",
+    "public-api/src/test/kotlin/cz/terrio/api/query/HeritageTourismPlanVerificationTest.kt:701"
+   ]
+  },
+  {
+   "query": "HeritageQueryProvider",
+   "kind": "repository interface",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/HeritageRoutes.kt:53",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/HeritageQueryRepository.kt:87"
+   ]
+  },
+  {
+   "query": "AddressRepository.findBuildings",
+   "kind": "repository method",
+   "usages": [
+    "public-api/src/test/kotlin/cz/terrio/api/http/route/AddressRoutesTest.kt:218",
+    "public-api/src/test/kotlin/cz/terrio/api/http/route/AddressRoutesTest.kt:454",
+    "public-api/src/test/kotlin/cz/terrio/api/http/route/AddressRoutesTest.kt:795"
+   ]
+  },
+  {
+   "query": "TourismDatabaseImporter.logRepublication",
+   "kind": "private fun, same name elsewhere",
+   "usages": [
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/TourismDatabaseImporter.kt:219",
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/TourismDatabaseImporter.kt:391"
+   ]
+  },
+  {
+   "query": "LocationSearchSchema.ensure",
+   "kind": "object fun, same name elsewhere",
+   "usages": [
+    "app/src/main/kotlin/cz/terrio/importer/database/TerrioPostgresSetup.kt:303",
+    "app/src/test/kotlin/cz/terrio/importer/database/search/LocationSearchSchemaSetupTest.kt:50",
+    "app/src/test/kotlin/cz/terrio/importer/database/search/LocationSearchSchemaSetupTest.kt:73",
+    "public-api/src/test/kotlin/cz/terrio/api/query/LocationSearchProjectionPlanTest.kt:205",
+    "public-api/src/test/kotlin/cz/terrio/api/repository/LocationSearchProjectionFixture.kt:40"
+   ]
+  },
+  {
+   "query": "CsuHostedGeoJsonArchiveCrs.readHeader",
+   "kind": "private fun, same name elsewhere",
+   "usages": [
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/CsuHostedGeoJsonArchiveCrs.kt:103"
+   ]
+  },
+  {
+   "query": "TourismProvenance.tourismQuery",
+   "kind": "object fun, same-name property elsewhere",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/http/TourismOpenApiExamples.kt:161",
+    "public-api/src/main/kotlin/cz/terrio/api/http/route/TourismRoutes.kt:183",
+    "public-api/src/test/kotlin/cz/terrio/api/http/TourismOpenApiExamplesTest.kt:116",
+    "public-api/src/test/kotlin/cz/terrio/api/http/TourismOpenApiExamplesTest.kt:209",
+    "public-api/src/test/kotlin/cz/terrio/api/provenance/CsuDerivedValueLabellingTest.kt:26",
+    "public-api/src/test/kotlin/cz/terrio/api/provenance/HeritageTourismProvenanceCoverageTest.kt:151",
+    "public-api/src/test/kotlin/cz/terrio/api/provenance/HeritageTourismProvenanceCoverageTest.kt:173",
+    "public-api/src/test/kotlin/cz/terrio/api/provenance/HeritageTourismProvenanceCoverageTest.kt:183"
+   ]
+  },
+  {
+   "query": "BoundedPasswordHasher.admit",
+   "kind": "private suspend fun, same name elsewhere",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/security/BoundedPasswordHasher.kt:66"
+   ]
+  },
+  {
+   "query": "TokenConsumptionPolicy.allocate",
+   "kind": "object fun, library name (ByteBuffer.allocate)",
+   "usages": [
+    "domain/src/test/kotlin/cz/terrio/domain/billing/TokenConsumptionPolicyTest.kt:20",
+    "domain/src/test/kotlin/cz/terrio/domain/billing/TokenConsumptionPolicyTest.kt:22",
+    "domain/src/test/kotlin/cz/terrio/domain/billing/TokenConsumptionPolicyTest.kt:30",
+    "domain/src/test/kotlin/cz/terrio/domain/billing/TokenConsumptionPolicyTest.kt:37",
+    "domain/src/test/kotlin/cz/terrio/domain/billing/TokenConsumptionPolicyTest.kt:38",
+    "domain/src/test/kotlin/cz/terrio/domain/billing/TokenConsumptionPolicyTest.kt:44",
+    "domain/src/test/kotlin/cz/terrio/domain/billing/TokenConsumptionPolicyTest.kt:50",
+    "domain/src/test/kotlin/cz/terrio/domain/billing/TokenConsumptionPolicyTest.kt:51"
+   ]
+  },
+  {
+   "query": "OrganizationRole.atLeast",
+   "kind": "enum member fun",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/ApiKeyService.kt:130",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/AuditService.kt:50",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:55",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:56",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:95",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:104",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/OrganizationService.kt:147",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/OrganizationService.kt:170",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/OrganizationService.kt:284"
+   ]
+  },
+  {
+   "query": "Invitation.statusAt",
+   "kind": "member fun",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/domain/Invitation.kt:56",
+    "accounts/src/main/kotlin/cz/terrio/accounts/http/dto/AccountDtoMappings.kt:81",
+    "accounts/src/main/kotlin/cz/terrio/accounts/service/InvitationService.kt:236",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:412"
+   ]
+  },
+  {
+   "query": "RankedRevision.publicationOrder",
+   "kind": "nested private class property",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/repository/CurrentDatasetRevision.kt:138",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/CurrentDatasetRevision.kt:195",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/CurrentDatasetRevision.kt:264",
+    "public-api/src/main/kotlin/cz/terrio/api/repository/CurrentDatasetRevision.kt:265"
+   ]
+  },
+  {
+   "query": "LocationSearchKindVersion.rowCount",
+   "kind": "data class property, same name in 6 types",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/repository/LocationSearchIndexVersionRepository.kt:23",
+    "public-api/src/test/kotlin/cz/terrio/api/repository/LocationSearchIndexVersionRepositoryTest.kt:49"
+   ]
+  },
+  {
+   "query": "PostgresSchemaCatalog.dependentObjects",
+   "kind": "override fun",
+   "usages": [
+    "app/src/main/kotlin/cz/terrio/importer/database/DeclarativeMigrationFilter.kt:200"
+   ]
+  },
+  {
+   "query": "DeclaredIndexValidity.nameFindings(_, _)",
+   "kind": "overload (2 of 2/3 params)",
+   "usages": [
+    "app/src/test/kotlin/cz/terrio/importer/database/DeclaredIndexValidityPins.kt:41"
+   ]
+  },
+  {
+   "query": "BillingPurchaseStore.findRefund(_)",
+   "kind": "overload (1 of 1/2 params)",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/billing/BillingPurchaseStore.kt:225"
+   ]
+  },
+  {
+   "query": "RuianVfrXml.withReader(_, _, _)",
+   "kind": "overload (3 of 2/3 params), private generic",
+   "usages": [
+    "importers/cuzk/src/main/kotlin/cz/terrio/importer/imports/jobs/cuzk/vfr/RuianVfrXml.kt:39"
+   ]
+  }
+ ]
+}
