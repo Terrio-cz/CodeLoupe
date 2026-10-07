@@ -4,6 +4,7 @@ import codeloupe.TestRepos
 import codeloupe.index.BaseBuilder
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
+import codeloupe.tools.ViewTool
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -41,7 +42,7 @@ class ParityTest {
         BaseBuilder.build(repo, commit, db)
         View(db).use { view ->
             for (case in golden(name)["results"]!!.jsonArray.map { it.jsonObject }) {
-                val tool = Tools.named(case["tool"]!!.jsonPrimitive.content)!!
+                val tool = Tools.named(case["tool"]!!.jsonPrimitive.content) as ViewTool
                 val args = case["args"]!!.jsonObject
                 assertEquals(case["text"]!!.jsonPrimitive.content, tool.run(view, ToolArgs(args)), "${tool.name} $args")
             }

@@ -3,7 +3,7 @@ package codeloupe.tools
 import codeloupe.query.View
 import codeloupe.query.usages.HierarchyQuery
 
-object HierarchyTool : Tool {
+object HierarchyTool : ViewTool {
     override val name = "hierarchy"
     override val description = "Supertypes and subtypes (implementations, object expressions included) of a type, and lambdas " +
         "converted to a fun interface; or what a member overrides and what overrides it."

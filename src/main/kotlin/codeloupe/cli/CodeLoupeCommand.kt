@@ -9,7 +9,8 @@ class CodeLoupeCommand : CliktCommand(name = "codeloupe") {
     init {
         subcommands(
             DaemonCommand(), StartCommand(), StopCommand(), StatusCommand(),
-            FindCommand(), OutlineCommand(), SymbolCommand(), UsagesCommand(), CallsCommand(), HierarchyCommand(), McpConfigCommand(),
+            FindCommand(), OutlineCommand(), SymbolCommand(), UsagesCommand(), CallsCommand(), HierarchyCommand(), ChangesCommand(),
+            McpConfigCommand(),
         )
     }
 

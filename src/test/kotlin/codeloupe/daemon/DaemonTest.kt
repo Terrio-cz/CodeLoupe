@@ -126,7 +126,7 @@ class DaemonTest {
             headers.append(CodeLoupe.HEADER, "1")
         }
         client.connect(transport)
-        assertEquals(listOf("calls", "find", "hierarchy", "outline", "symbol", "usages"), client.listTools().tools.map { it.name }.sorted())
+        assertEquals(listOf("calls", "changes", "find", "hierarchy", "outline", "symbol", "usages"), client.listTools().tools.map { it.name }.sorted())
         val first = client.callTool("symbol", mapOf("root" to repo.toString(), "name" to "total"))
         assertContains((first.content.single() as TextContent).text, "fun total")
         daemon.stop()

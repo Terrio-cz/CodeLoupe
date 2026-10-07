@@ -51,6 +51,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `usages` | every reference to a declaration, grouped by file and enclosing declaration, one code line each, `=` exact or `?` candidate; a superset of what `rg -w` finds in code, references that resolve elsewhere only counted (`all=true` lists them) |
 | `calls` | callers (default) or callees as a tree, depth ≤ 3; below the first level only exact links |
 | `hierarchy` | supertypes and subtypes of a type (object expressions included, and lambdas converted to a `fun interface`), or what a member overrides and what overrides it |
+| `changes` | what the worktree changed against the merge-base with the default branch (committed and uncommitted), by declaration: `+` added, `~` body changed, `^` signature changed (with the old one), `-` removed; each with its callers and tests; `bodies=true` adds a line diff per declaration |
 
 Usages are resolved without an IDE or compiler: the scopes, imports and aliases a file sees, the receiver's
 type where syntax tells it (declared types, `Type(…)`, what a call returns, collection elements in lambdas), and
@@ -90,6 +91,7 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 | `index` | SQLite store, base build from git objects, build worker entry point |
 | `repo` | repositories and worktrees → base index, base syncs, child-process builds |
 | `overlay` | per-worktree overlays: change checks, refreshes, cleanup of removed worktrees |
+| `changes` | a worktree's declarations compared with the merge-base: matching, line diffs, callers and tests |
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
 | `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |

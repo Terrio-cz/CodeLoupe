@@ -49,6 +49,13 @@ class View(baseFile: Path, overlayFile: Path? = null) : AutoCloseable {
         return query(sql, params, RefRow::of)
     }
 
+    /** How many references are named [name], counted up to [cap]: a size check that loads no rows. */
+    fun refCount(name: String, cap: Int): Int {
+        val base = "SELECT 1 FROM main.refs r JOIN main.files f ON f.id = r.file_id WHERE r.name = :name"
+        val rows = if (overlay) "SELECT 1 FROM ov.refs r WHERE r.name = :name UNION ALL $base AND f.path NOT IN (SELECT path FROM ov.files)" else base
+        return query("SELECT count(*) FROM ($rows LIMIT :cap)", mapOf("name" to name, "cap" to cap)) { it.getInt(1) }.single()
+    }
+
     /** Imports matching [where] (aliases `i`/`f`), masked like [decls]. */
     fun imports(where: String, params: Map<String, Any?> = emptyMap()): List<ImportRow> {
         val base = "SELECT i.fqn, i.alias, i.star, f.path FROM main.imports i JOIN main.files f ON f.id = i.file_id WHERE ($where)"
