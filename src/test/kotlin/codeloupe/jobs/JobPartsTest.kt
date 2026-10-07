@@ -86,9 +86,9 @@ class JobPartsTest {
         assertEquals(2, first.rest.size, "the deploy step is passed on unjudged")
         val tests = record(JobSummary(tests = 4, failed = 0))
         assertEquals(listOf("deploy"), StepPlan.of(first.rest, tests, startJobs = true).next!!.command)
-        val cancelled = StepPlan.of(steps, build, startJobs = false)
+        val cancelled = StepPlan.of(listOf("notify:stopped", "job:./rollback", "notify:rolled back").map(ActionParser::parse), build, startJobs = false)
         assertEquals(null, cancelled.next)
-        assertEquals(1, cancelled.now.size, "a cancelled job starts no job, notifies still run")
+        assertEquals(listOf("stopped"), cancelled.now.map { (it as Action.Notify).message }, "a cancelled job starts no job and says nothing of it")
     }
 
     @Test

@@ -64,6 +64,8 @@ class JobRunner(
         @Volatile var process: JobProcess? = null
 
         @Volatile var cancelled = false
+
+        @Volatile var entered = false
         lateinit var task: Job
         val id: String get() = record.id
     }
@@ -108,8 +110,9 @@ class JobRunner(
         val live = chain(id).firstOrNull { !it.status.terminal } ?: return get(id)
         val job = active[live.id] ?: return live
         job.cancelled = true
-        // A task not launched yet sees the flag when it is; a started one is woken from its slot queue.
-        job.process?.kill() ?: run { if (job.task.isActive) job.task.cancel() }
+        // A task whose body has not run yet sees the flag when it does (cancelling it then would skip finish());
+        // one already inside is woken from its slot queue. Both flags are volatile, so one side always sees the other.
+        job.process?.kill() ?: run { if (job.entered) job.task.cancel() }
         return job.record
     }
 
@@ -189,6 +192,7 @@ class JobRunner(
     }
 
     private suspend fun execute(job: Active) {
+        job.entered = true
         val ended = try {
             val slot = job.record.slot
             when {
@@ -219,18 +223,23 @@ class JobRunner(
             return Ended(JobStatus.ERROR, reason = e.message?.substringAfter("error=")?.let { "cannot run ${job.command.first()}: $it" } ?: e.toString())
         }
         job.process = process
-        job.record = job.record.copy(
-            status = JobStatus.RUNNING, startedAt = IsoTime.now(), pid = process.process.pid(),
-            pidStart = process.process.info().startInstant().map(Instant::toString).orElse(null),
-        )
-        store.put(job.record)
-        log("job ${job.id} started: ${job.record.command.take(200)}")
-        bus.emit(EventTypes.JOB_STARTED, JobEvents.started(job.record))
-        changed()
-        if (job.cancelled) process.kill()
-        val exit = process.process.onExit().await().exitValue()
-        process.release()
-        return if (job.cancelled) Ended(JobStatus.CANCELLED, exit, "cancelled") else Ended(JobStatus.DONE, exit)
+        try {
+            job.record = job.record.copy(
+                status = JobStatus.RUNNING, startedAt = IsoTime.now(), pid = process.process.pid(),
+                pidStart = process.process.info().startInstant().map(Instant::toString).orElse(null),
+            )
+            store.put(job.record)
+            log("job ${job.id} started: ${job.record.command.take(200)}")
+            bus.emit(EventTypes.JOB_STARTED, JobEvents.started(job.record))
+            changed()
+            if (job.cancelled) process.kill()
+            val exit = process.process.onExit().await().exitValue()
+            return if (job.cancelled) Ended(JobStatus.CANCELLED, exit, "cancelled") else Ended(JobStatus.DONE, exit)
+        } finally {
+            // Whatever ended the wait, no process outlives its record untracked, and the job object is closed.
+            if (process.process.isAlive) process.kill()
+            process.release()
+        }
     }
 
     /** Records the end, plans the completion steps, emits; the bookkeeping that unblocks waiters always happens. */

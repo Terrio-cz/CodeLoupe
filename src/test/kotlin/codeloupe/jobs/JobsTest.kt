@@ -128,6 +128,13 @@ class JobsTest {
     }
 
     @Test
+    fun `the CLI sends nothing to a daemon with another home on its port`() {
+        val foreign = DaemonClient(config(TestRepos.tmpDir("other-home"), port))
+        val error = kotlin.test.assertFailsWith<IllegalStateException> { foreign.send("GET", "/jobs") }
+        assertContains(error.message!!, "is served by a daemon with home")
+    }
+
+    @Test
     fun `a passing chain runs its typed steps without waking anyone, a failing one wakes once`() {
         val since = daemon.events.lastSeq()
         val pass = start(
@@ -198,7 +205,7 @@ class JobsTest {
         val root = start(
             "exit=0",
             then = listOf("job:${CommandLine.join(FakeJob.command("sleep=60000"))}"),
-            onFailure = listOf("job:${CommandLine.join(FakeJob.command("touch=${work.resolve("rollback")}"))}", "notify:stopped"),
+            onFailure = listOf("notify:stopped", "job:${CommandLine.join(FakeJob.command("touch=${work.resolve("rollback")}"))}"),
         ).getValue("id").jsonPrimitive.content
         val follow = waitFor(root) { it.nextId != null }.nextId!!
         waitFor(follow) { it.status == JobStatus.RUNNING }

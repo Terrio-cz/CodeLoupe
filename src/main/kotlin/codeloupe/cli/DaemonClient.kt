@@ -14,7 +14,9 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Duration
 
 /** CLI side: reach the daemon, starting it when it is not running. */
@@ -30,7 +32,7 @@ class DaemonClient(private val config: Config) {
     }.getOrNull()
 
     fun ensureDaemon(): JsonObject {
-        status()?.let { return it }
+        status()?.let { return checkedHome(it) }
         Files.createDirectories(config.home)
         // Its own home as working directory: the daemon outlives the CLI and must not hold the user's directory.
         val args = listOf("daemon", "--detached", "--home", config.home.toString(), "--port", config.port.toString()) +
@@ -38,9 +40,23 @@ class DaemonClient(private val config: Config) {
         DetachedStart.start(JavaProcess.command(MAIN_CLASS, DaemonJvm.args(), args), config.home)
         repeat(80) {
             Thread.sleep(100)
-            status(300)?.let { return it }
+            status(300)?.let { return checkedHome(it) }
         }
         throw IllegalStateException("daemon did not start on 127.0.0.1:${config.port}; see ${config.home.resolve("daemon.log")}")
+    }
+
+    /**
+     * The daemon on our port must be ours: one started with another home has another `config.json` (maybe no policy
+     * hook), and nothing is sent to it.
+     */
+    private fun checkedHome(status: JsonObject): JsonObject {
+        val home = status["home"]?.jsonPrimitive?.content ?: return status
+        val ours = config.home.toAbsolutePath().normalize().toString()
+        val theirs = Path.of(home).toAbsolutePath().normalize().toString()
+        if (!theirs.equals(ours, ignoreCase = File.separatorChar == '\\')) {
+            throw IllegalStateException("127.0.0.1:${config.port} is served by a daemon with home $theirs, not $ours")
+        }
+        return status
     }
 
     fun call(tool: String, args: JsonObject): ToolOutcome {

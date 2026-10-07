@@ -85,7 +85,8 @@ codeloupe job status [id]  ·  codeloupe job cancel <id>
   Only an allow (or no output) starts it; deny, ask, exit 2, a crash, a timeout or unreadable output refuse it (exit 2,
   no record). The hook runs in the daemon's environment, so a caller cannot redirect it with variables of its own; and
   the daemon's environment is not its starter's: on Windows it is the user's own (Win32_Process.Create), elsewhere the
-  starter's cut to `HOME`, `USER`, `PATH`, `LANG`, … Protect `config.json` like any other policy file.
+  starter's cut to `HOME`, `USER`, `PATH`, `LANG`, … Protect `config.json` like any other policy file; the CLI refuses a
+  daemon on its port whose home is not its own.
 - No shell: the command is an argv (`bash -c '…'` for pipes). On Windows `./gradlew` or `npm` resolve to their
   `.bat`/`.cmd` like in Bash (a bare name only on `PATH`); a batch file refuses arguments holding `& | < > ^ % ! " ( )`,
   which cmd.exe would parse again. The job gets the daemon's environment plus `--env K=V` (values never stored or

@@ -30,5 +30,9 @@ object Executables {
     }
 
     /** True for a batch file: Windows runs it through cmd.exe, which parses its arguments again. */
-    fun isBatch(path: String): Boolean = path.endsWith(".bat", ignoreCase = true) || path.endsWith(".cmd", ignoreCase = true)
+    fun isBatch(path: String): Boolean {
+        // Windows drops trailing dots and spaces from a file name: `x.bat.` still runs x.bat through cmd.exe.
+        val name = path.trimEnd('.', ' ')
+        return name.endsWith(".bat", ignoreCase = true) || name.endsWith(".cmd", ignoreCase = true)
+    }
 }

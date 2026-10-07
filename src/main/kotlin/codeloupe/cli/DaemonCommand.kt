@@ -23,10 +23,8 @@ class DaemonCommand : CliktCommand(name = "daemon") {
     override fun run() {
         val overrides = listOfNotNull(home?.let { "CODELOUPE_HOME" to it }, port?.let { "CODELOUPE_PORT" to it }, root?.let { "CODELOUPE_ROOT" to it })
         val config = ConfigLoader.load(System.getenv() + overrides)
-        if (detached) {
-            TerminalSignals.ignore()
-            JobObjects.enterSelf()
-        }
+        if (detached) TerminalSignals.ignore()
+        JobObjects.enterSelf()
         try {
             Daemon.start(config, exitOnShutdown = true)
         } catch (e: BindException) {

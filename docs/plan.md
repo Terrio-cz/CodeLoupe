@@ -504,8 +504,8 @@ rozhoduje launcher.
   jobu nedostala), holé jméno programu jen z PATH jako v Bash; cancel ukončí živý job řetězu i celý strom (job object na
   job) a nespustí další joby; podmínky kroků se vyhodnocují až u svého kroku; souhrn čte řádky max 4 KB; timeout hooku
   platí i na jeho roury; SSE doplní mezeru ze store; nekonfigurované sloty se po použití uklidí; URL webhooků v
-  odpovědích a logu očištěné.
-- Testy: 97 (nově `JobsTest` 13, `EventsTest` 5, `JobPartsTest` 8, `DetachedStartTest` 2).
+  odpovědích a logu očištěné; CLI nepošle nic daemonu s jiným home na svém portu (jiný `config.json`, třeba bez hooku).
+- Testy: 98 (nově `JobsTest` 14, `EventsTest` 5, `JobPartsTest` 8, `DetachedStartTest` 2).
 
 ## 10. Rizika
 
