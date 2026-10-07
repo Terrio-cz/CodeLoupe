@@ -489,6 +489,9 @@ view, SQL, zbytek nástroje (resolver + formát), HTTP (klient − nástroj). Te
 | Obnova vrstvy: návrat editace | 91 / 158 | 55 / 82 | 0 → 0 | výpis |
 | `changes` | — | — | 4–5 → 2 | merge-base, velikosti blobů v JGit; diff + untracked dál git |
 
+Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,8 a 3,5 / 9,3 ms, nezměněný worktree
+57 / 93 ms, první dotaz po startu 108 ms (SQLite se načte už při startu daemonu kvůli jobům), RSS v zátěži 194–196 MB.
+
 - Teplý dotaz bez změny worktree nespustí git proces (test `OverlayTest`, počítadlo `gitSpawns`); první dotaz po
   restartu v nezměněném worktree také ne. Git zbývá jen pro stav pracovního stromu nového worktree, nové báze a
   `changes` (diff a untracked).
