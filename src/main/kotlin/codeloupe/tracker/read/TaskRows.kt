@@ -12,8 +12,8 @@ object TaskRows {
      WHERE l.issue = i.id AND l.kind = 'DEPENDS_ON' AND o.resolved IS NULL)
 FROM issues i"""
 
-    fun select(db: Connection, where: String, order: String, args: List<Any?>, limit: Int? = null): List<TaskRow> =
-        db.query("$SELECT WHERE $where ORDER BY $order${limit?.let { " LIMIT $it" }.orEmpty()}", *args.toTypedArray()) { rs ->
+    fun select(db: Connection, where: String, order: String, args: List<Any?>): List<TaskRow> =
+        db.query("$SELECT WHERE $where ORDER BY $order", *args.toTypedArray()) { rs ->
             TaskRow(
                 id = rs.getString(1), summary = rs.getString(2), state = rs.getString(3), resolved = rs.getObject(4) != null,
                 parent = rs.getString(5), updated = rs.getLong(6), type = rs.getString(7), priority = rs.getString(8),

@@ -84,9 +84,10 @@ class MirrorTest {
         now += 60_000
         val ids = listOf("CL-90", "CL-91", "CL-92", "CL-93", "CL-94", "CL-95", "CL-27", "CL-28", "CL-29", "CL-30", "CL-1")
         ids.forEachIndexed { i, id -> fake.edit(id, now + i) { fake.setState(it, "Review") } }
+        fake.missedByPages += "CL-1"
         fake.requests.clear()
         sync()
-        assertEquals(0, fake.issueRequests(), fake.requests.toString())
+        assertEquals(listOf("/api/issues/CL-1"), fake.requests.filter { it.startsWith("/api/issues/") }.map { it.substringBefore('?') }, "only the one the pages missed")
         assertTrue(ids.all { store.issue(it)!!.state == "Review" })
     }
 
@@ -148,6 +149,18 @@ class MirrorTest {
         assertEquals(16, store.state("CL").issues)
         assertNotNull(store.state("CL").syncedAt)
         assertTrue(logs.any { "history of CL not updated: YouTrack HTTP 403 on /api/activities: no access to activities" in it }, logs.toString())
+    }
+
+    @Test
+    fun `a mirror of another schema version is dropped and loaded again`() {
+        val file = TestRepos.tmpDir("schema").resolve("old.db")
+        org.sqlite.SQLiteConfig().createConnection("jdbc:sqlite:$file").use { c ->
+            c.createStatement().use { it.execute("CREATE TABLE issues (id TEXT)"); it.execute("PRAGMA user_version = 0") }
+        }
+        MirrorStore(file).use { reopened ->
+            assertEquals(0, reopened.state("CL").issues)
+            assertNull(reopened.state("CL").syncedAt)
+        }
     }
 
     @Test

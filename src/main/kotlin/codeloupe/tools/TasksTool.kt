@@ -20,7 +20,7 @@ class TasksTool(private val trackers: Trackers, private val initialWaitMs: Long 
     override val description = "Tasks from the local tracker mirror, one line each. mode=list (default): query = filters (project: TER, " +
         "state: {In Progress}, state: -Done, #unresolved, epic: TER-1, type: Bug, any field: value, sort: created|id|priority) and " +
         "full-text words. graph: query = an issue id; epic, dependencies, subtasks, relations. ready: open leaf tasks in the query's " +
-        "scope with resolved dependencies, not on a git worktree branch. progress: query = epic id(s)."
+        "scope (add state: to leave out started ones) with resolved dependencies, not on a git worktree branch. progress: query = epic id(s)."
     override val properties = Schema.properties(
         "query" to Schema.string(),
         "mode" to Schema.enum(listOf("list", "graph", "ready", "progress")),

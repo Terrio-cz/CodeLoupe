@@ -27,8 +27,29 @@ class MirrorStore(file: Path) : AutoCloseable {
             setJournalMode(SQLiteConfig.JournalMode.WAL)
             setSynchronous(SQLiteConfig.SynchronousMode.NORMAL)
         }
-        db = config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
-        db.createStatement().use { s -> SCHEMA.forEach(s::execute) }
+        db = open(file, config)
+    }
+
+    /** The mirror is a cache: a file of another schema version is dropped and loaded again from the tracker. */
+    private fun open(file: Path, config: SQLiteConfig): Connection {
+        val existing = config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
+        val (version, tables) = try {
+            existing.createStatement().use { s -> s.executeQuery("PRAGMA user_version").use { it.next(); it.getInt(1) } } to
+                existing.query("SELECT count(*) FROM sqlite_master") { it.getInt(1) }.first()
+        } catch (e: Exception) {
+            existing.close()
+            throw e
+        }
+        val connection = if (version == SCHEMA_VERSION || tables == 0) existing else {
+            existing.close()
+            listOf("", "-wal", "-shm").forEach { Files.deleteIfExists(Path.of("$file$it")) }
+            config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
+        }
+        connection.createStatement().use { s ->
+            SCHEMA.forEach(s::execute)
+            s.execute("PRAGMA user_version = $SCHEMA_VERSION")
+        }
+        return connection
     }
 
     fun <T> read(block: (Connection) -> T): T = synchronized(db) { block(db) }
@@ -175,6 +196,8 @@ class MirrorStore(file: Path) : AutoCloseable {
     private fun ResultSet.long(column: Int): Long? = getLong(column).takeUnless { wasNull() }
 
     companion object {
+        const val SCHEMA_VERSION = 1
+
         /** Earlier versions kept per issue, and for how long: enough for "what changed since my last read". */
         const val REVISIONS = 5
         const val REVISION_MS = 30L * 24 * 3600_000

@@ -27,7 +27,8 @@ class ToolRunner(
         var wasBusy = false
         onCall()
         val outcome = try {
-            val root = args.string("root")?.takeIf { it.isNotEmpty() } ?: defaultRoot ?: "".takeUnless { tool.needsRoot }
+            // A tool without a repository keys per-caller state on root: only the caller's own, never the shared default.
+            val root = args.string("root")?.takeIf { it.isNotEmpty() } ?: (if (tool.needsRoot) defaultRoot else "")
                 ?: throw IllegalArgumentException("pass root: the absolute path of the repository or worktree to answer for")
             ToolOutcome(true, tool.answer(registry, root, args))
         } catch (e: CancellationException) {

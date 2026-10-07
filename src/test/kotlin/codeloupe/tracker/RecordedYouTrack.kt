@@ -31,6 +31,9 @@ class RecordedYouTrack(dump: String = load()) : HttpTransport {
 
     /** Old id → the id it moved to; YouTrack answers the old id with the moved issue. */
     val moved: MutableMap<String, String> = mutableMapOf()
+
+    /** Left out of full-issue pages only: updated again while the pages were read. */
+    val missedByPages: MutableSet<String> = mutableSetOf()
     var failActivities = false
 
     @Synchronized
@@ -47,7 +50,7 @@ class RecordedYouTrack(dump: String = load()) : HttpTransport {
                 val sorted = if ("updated desc" in query["query"].orEmpty()) mine.sortedByDescending { long(it, "updated") } else mine.sortedBy { long(it, "created") }
                 val page = sorted.drop(skip).take(top)
                 val stampsOnly = query["fields"] == "idReadable,updated"
-                ok(JsonArray(page.map { if (stampsOnly) stamp(it) else it }))
+                ok(JsonArray(if (stampsOnly) page.map(::stamp) else page.filter { id(it) !in missedByPages }))
             }
             decoded.startsWith("/api/issues/") -> {
                 val asked = decoded.removePrefix("/api/issues/").substringBefore('?')

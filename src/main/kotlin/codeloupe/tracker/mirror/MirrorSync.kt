@@ -22,11 +22,13 @@ class MirrorSync(
         val state = store.state(project)
         val first = state.syncedAt == null
         val (changed, watermark) = if (first) load(project, started) else update(project, state.watermark, started)
+        // A read may have stored a change already; the tracker listing something newer still means new history.
+        val moved = (watermark ?: 0) > (state.watermark ?: 0)
         val check = !first && started - (state.checkedAt ?: 0) >= CHECK_MS
         val pruned = if (check) prune(project, started) else 0
         store.markSynced(project, started, watermark, checked = first || check)
         // Field changes always move `updated`: no change, no history request.
-        if (first || changed + pruned > 0) history(project)
+        if (first || moved || changed + pruned > 0) history(project)
         return changed + pruned
     }
 
@@ -63,7 +65,10 @@ class MirrorSync(
         val fetched = when {
             stale.isEmpty() -> emptyList()
             // After an idle spell many issues moved: one paged query instead of a call each.
-            stale.size > ONE_BY_ONE && since != null -> adapter.changedSince(project, since).let { all -> stale.map { s -> s.id to all.firstOrNull { it.id == s.id } } }
+            // An issue updated while the pages are read jumps ahead and is missed: those few are asked for one by one.
+            stale.size > ONE_BY_ONE && since != null -> adapter.changedSince(project, since).associateBy { it.id }.let { all ->
+                stale.map { s -> s.id to (all[s.id] ?: adapter.issue(s.id)?.takeIf { it.id == s.id }) }
+            }
             else -> stale.map { it.id to adapter.issue(it.id) }
         }
         store.delete(fetched.filter { it.second == null }.map { it.first })

@@ -72,7 +72,7 @@ class TrackerDaemonTest {
         )
     }
     private val port = ServerSocket(0).use { it.localPort }
-    private val daemon = Daemon.start(Config(home, port, queryTimeoutMs = 60_000, buildTimeoutMs = 120_000, buildHeapMb = 512, defaultRoot = null))
+    private val daemon = Daemon.start(Config(home, port, queryTimeoutMs = 60_000, buildTimeoutMs = 120_000, buildHeapMb = 512, defaultRoot = "C:/shared/default"))
     private val http = HttpClient.newHttpClient()
     private val outputs = mutableListOf<String>()
 
@@ -111,6 +111,8 @@ class TrackerDaemonTest {
         assertTrue(text(call("issue", "id" to "cl-26", "root" to "C:\\work\\A\\")).startsWith("CL-26 unchanged"))
         assertContains(text(call("issue", "id" to "CL-26", "root" to "C:/work/b")), "Criteria 0/3")
         assertContains(text(call("issue", "id" to "ABC-1")), "no tracker mirrors the project of 'ABC-1'; mirrored: CL")
+        call("issue", "id" to "CL-27")
+        assertContains(text(call("issue", "id" to "CL-27")), "Criteria 0/2", message = "without root nothing is remembered, not even under the default root")
     }
 
     @Test

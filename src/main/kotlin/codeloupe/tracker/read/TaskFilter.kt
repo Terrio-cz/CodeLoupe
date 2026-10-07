@@ -69,8 +69,9 @@ class TaskFilter private constructor(val where: String, val args: List<Any?>, va
                 "epic", "parent" -> clause {
                     require(ID.matches(it)) { "epic: an issue id like TER-162" }
                     args += it
-                    // The epic's stored spelling first, so `parent` (binary) can use its index at every step.
-                    "i.id IN (WITH RECURSIVE d(id) AS (SELECT id FROM issues WHERE parent = (SELECT id FROM issues WHERE id = ?) " +
+                    args += it
+                    // The epic's stored spelling (or the id as given when the epic is not mirrored), so `parent` (binary) uses its index.
+                    "i.id IN (WITH RECURSIVE d(id) AS (SELECT id FROM issues WHERE parent = coalesce((SELECT id FROM issues WHERE id = ?), upper(?)) " +
                         "UNION SELECT x.id FROM issues x JOIN d ON x.parent = d.id) SELECT id FROM d)"
                 }
                 "id", "issue" -> clause { args += it; "i.id = ?" }

@@ -24,7 +24,12 @@ class Watcher(
 
     fun touch() = synchronized(this) {
         lastCall = clock()
-        if (job == null) job = scope.launch { loop() }
+        if (job == null) {
+            val started = scope.launch { loop() }
+            job = started
+            // However the loop ends (idle, failure, cancellation), the next call can start a new one.
+            started.invokeOnCompletion { synchronized(this) { if (job === started) job = null } }
+        }
     }
 
     private suspend fun loop() {

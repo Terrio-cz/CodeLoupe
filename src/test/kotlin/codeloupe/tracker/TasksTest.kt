@@ -41,6 +41,8 @@ class TasksTest {
         assertTrue(list("{Fix versions}: 0_3%").isEmpty(), "LIKE wildcards are literal")
         assertTrue(list("see https://example.com").isEmpty(), "a URL is text, not a field")
         assertEquals(listOf("CL-26"), list("assignee: dev1 epic: CL-4 state: {In Progress} type: Feature priority: Major"))
+        store.delete(listOf("CL-4"))
+        assertEquals(11, list("epic: cl-4").size, "children of an epic outside the mirror")
     }
 
     @Test
