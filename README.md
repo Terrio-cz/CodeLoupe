@@ -83,13 +83,18 @@ codeloupe job status [id]  ·  codeloupe job cancel <id>
   and again after a slot wait — is first fed to `policyHook` exactly as Claude Code feeds a PreToolUse hook for a Bash
   call (`tool_name` `Bash`, `tool_input.command` = the argv quoted for Bash with `--env` values as `K=v` prefixes, `cwd`).
   Only an allow (or no output) starts it; deny, ask, exit 2, a crash, a timeout or unreadable output refuse it (exit 2,
-  no record). The hook runs in the daemon's environment, so a caller cannot redirect it with variables of its own.
+  no record). The hook runs in the daemon's environment, so a caller cannot redirect it with variables of its own; and
+  the daemon's environment is not its starter's: on Windows it is the user's own (Win32_Process.Create), elsewhere the
+  starter's cut to `HOME`, `USER`, `PATH`, `LANG`, … Protect `config.json` like any other policy file.
 - No shell: the command is an argv (`bash -c '…'` for pipes). On Windows `./gradlew` or `npm` resolve to their
-  `.bat`/`.cmd` like in a shell. The job gets the daemon's environment plus `--env K=V` (values never stored or emitted).
+  `.bat`/`.cmd` like in Bash (a bare name only on `PATH`); a batch file refuses arguments holding `& | < > ^ % ! " ( )`,
+  which cmd.exe would parse again. The job gets the daemon's environment plus `--env K=V` (values never stored or
+  emitted).
 - **Wait once**: `job wait` long-polls the daemon (5 min per request, re-sent, across daemon restarts) until the job and
   its follow-ups end, prints the compact report and exits with the job's code. A restarted daemon reports queued and
   running jobs as `lost`, keeps their logs and ends what survived of them. `codeloupe stop` refuses while jobs run
-  (`--force` ends them).
+  (`--force` ends them). `job cancel <id>` ends the live job of the chain and its whole process tree; after a cancel no
+  job steps run, `notify` and `webhook` steps still do.
 - **Completion actions** (`--then` after success, `--on-failure` after a failure, in order): a closed set of typed
   steps, never a shell string — `job[@slot]:<command line>` (a follow-up job; the steps after it continue when it ends),
   `notify[:message]` (a `job.notify` event that wakes the agent), `webhook:<url>` (the `job.finished` event to a URL).

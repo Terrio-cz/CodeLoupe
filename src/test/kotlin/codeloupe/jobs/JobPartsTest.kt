@@ -78,6 +78,47 @@ class JobPartsTest {
     }
 
     @Test
+    fun `a later step's condition is judged against the job before it, not the first one`() {
+        val steps = listOf("job:./gradlew build", "failed==0 ? job:deploy", "notify").map(ActionParser::parse)
+        val build = record(JobSummary())
+        val first = StepPlan.of(steps, build, startJobs = true)
+        assertEquals(listOf("./gradlew", "build"), first.next!!.command)
+        assertEquals(2, first.rest.size, "the deploy step is passed on unjudged")
+        val tests = record(JobSummary(tests = 4, failed = 0))
+        assertEquals(listOf("deploy"), StepPlan.of(first.rest, tests, startJobs = true).next!!.command)
+        val cancelled = StepPlan.of(steps, build, startJobs = false)
+        assertEquals(null, cancelled.next)
+        assertEquals(1, cancelled.now.size, "a cancelled job starts no job, notifies still run")
+    }
+
+    @Test
+    fun `slow hooks and endless lines are cut off`() {
+        val hook = PolicyHook(FakePolicyHook.command(TestRepos.tmpDir("hook").resolve("calls")), 3000)
+        val began = System.nanoTime()
+        val decision = hook.check("slow-me", TestRepos.tmpDir("cwd").toString())
+        assertEquals(Verdict.DENY, decision.verdict)
+        assertTrue(System.nanoTime() - began < 20_000_000_000, decision.reason)
+        val log = TestRepos.tmpDir("log").resolve("j.log").also { Files.writeString(it, "x".repeat(2_000_000) + "\nlast\n") }
+        assertEquals(listOf(200, 4), SummaryReader.read(log).tail.map { it.length })
+    }
+
+    @Test
+    fun `program names resolve like Bash - bare names on PATH only - and read as programs`() {
+        val dir = TestRepos.tmpDir("exe")
+        Files.writeString(dir.resolve("tool.cmd"), "@echo off")
+        val env = mapOf("PATH" to TestRepos.tmpDir("empty").toString(), "PATHEXT" to ".EXE;.CMD")
+        assertEquals("tool", Executables.resolve("tool", dir, env, windows = true), "never from the job's directory")
+        assertEquals(dir.resolve("tool.cmd").toString(), Executables.resolve("./tool", dir, env, windows = true))
+        assertEquals("'X=1' status", CommandLine.join(listOf("X=1", "status")))
+        assertEquals("git --x=1", CommandLine.join(listOf("git", "--x=1")))
+    }
+
+    private fun record(summary: JobSummary) = JobRecord(
+        id = "J", rootId = "J", command = "x", cwd = "/", status = JobStatus.DONE, exit = 0, createdAt = "", log = "", wakeOn = Wake.ALWAYS,
+        summary = summary,
+    )
+
+    @Test
     fun `the scrubber masks secret-looking values but keeps the rest`() {
         assertEquals("curl -H 'Authorization: ***' https://***@host/x", Scrubber.text("curl -H 'Authorization: Bearer abcdefghijk' https://u:p4ss@host/x"))
         assertEquals("deploy --api-key=*** --region eu", Scrubber.text("deploy --api-key=abc123 --region eu"))

@@ -5,14 +5,17 @@ package codeloupe.jobs
  * that Bash would split it back into exactly that argv — what the hook judges is what runs.
  */
 object CommandLine {
-    fun join(argv: List<String>): String = argv.joinToString(" ", transform = ::quote)
+    fun join(argv: List<String>): String = words(argv).joinToString(" ")
 
     /** `K='v' … cmd args`: how Bash spells the same command with [env] set. */
     fun withEnv(env: Map<String, String>, argv: List<String>): String =
-        (env.map { (k, v) -> "$k=${quote(v)}" } + argv.map(::quote)).joinToString(" ")
+        (env.map { (k, v) -> "$k=${quote(v)}" } + words(argv)).joinToString(" ")
 
-    fun quote(word: String): String =
-        if (word.isNotEmpty() && word.all { it.isLetterOrDigit() || it in SAFE }) word else "'" + word.replace("'", "'\\''") + "'"
+    fun quote(word: String, safe: String = SAFE): String =
+        if (word.isNotEmpty() && word.all { it.isLetterOrDigit() || it in safe }) word else "'" + word.replace("'", "'\\''") + "'"
+
+    // A program name with `=` unquoted would read as a variable assignment.
+    private fun words(argv: List<String>) = argv.mapIndexed { i, word -> if (i == 0) quote(word, SAFE.replace("=", "")) else quote(word) }
 
     /** Splits [line] into words: whitespace separates, '…' is literal, "…" and \ escape. No expansion of any kind. */
     fun split(line: String): List<String> {

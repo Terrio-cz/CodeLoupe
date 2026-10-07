@@ -77,25 +77,19 @@ fun Route.eventRoutes(bus: EventBus, webhooks: Webhooks, key: WebhookKey) {
 
 /**
  * Stored events after [since], then live ones. The live subscription starts before the replay, so nothing falls
- * between them; a reader too slow for the buffer is cut off and resumes with its `Last-Event-ID`.
+ * between them; whenever a live event skips a number (the shared buffer dropped some), the gap is read from the
+ * store. A reader too slow for its own buffer is cut off and resumes with its `Last-Event-ID`.
  */
 private suspend fun ByteWriteChannel.stream(bus: EventBus, since: Long) = coroutineScope {
     val buffered = Channel<Event>(STREAM_BUFFER)
     val collector = launch(start = CoroutineStart.UNDISPATCHED) {
         bus.live.collect { if (buffered.trySend(it).isFailure) buffered.close() }
     }
-    var last = since
     writeStringUtf8("retry: 3000\n: connected\n\n")
-    flush()
-    while (true) {
-        val page = bus.since(last, REPLAY_PAGE)
-        page.forEach { write(it) }
-        last = page.lastOrNull()?.seq ?: break
-        flush()
-    }
-    flush()
+    var last = replay(bus, since)
     try {
         for (event in buffered) {
+            if (event.seq > last + 1) last = replay(bus, last)
             if (event.seq <= last) continue
             write(event)
             flush()
@@ -104,6 +98,18 @@ private suspend fun ByteWriteChannel.stream(bus: EventBus, since: Long) = corout
     } finally {
         collector.cancel()
     }
+}
+
+/** Writes the stored events after [after]; the last `seq` written. */
+private suspend fun ByteWriteChannel.replay(bus: EventBus, after: Long): Long {
+    var last = after
+    while (true) {
+        val page = bus.since(last, REPLAY_PAGE)
+        page.forEach { write(it) }
+        last = page.lastOrNull()?.seq ?: break
+    }
+    flush()
+    return last
 }
 
 private suspend fun ByteWriteChannel.write(event: Event) {

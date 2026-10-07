@@ -66,5 +66,5 @@ object JobReport {
         }
     }
 
-    private fun shorten(text: String, max: Int) = if (text.length > max) text.take(max - 1) + "..." else text
+    private fun shorten(text: String, max: Int) = if (text.length > max) text.take(max - 3) + "..." else text
 }

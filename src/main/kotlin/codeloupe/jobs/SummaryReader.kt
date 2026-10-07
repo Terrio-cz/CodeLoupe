@@ -1,5 +1,6 @@
 package codeloupe.jobs
 
+import java.io.Reader
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -11,6 +12,7 @@ object SummaryReader {
     private const val TAIL = 15
     private const val FAILURES = 10
     private const val WIDTH = 200
+    private const val MAX_LINE = 4096
 
     private val ANSI = Regex("\u001B\\[[0-9;?]*[ -/]*[@-~]")
     private val GRADLE = Regex("""(\d+) tests? completed, (\d+) failed(?:, (\d+) skipped)?""")
@@ -30,9 +32,10 @@ object SummaryReader {
         val tail = ArrayDeque<String>()
         // An InputStreamReader, not Files.newBufferedReader: bytes in the console code page read as U+FFFD instead of throwing.
         Files.newInputStream(log).reader(Charsets.UTF_8).buffered().use { reader ->
-            reader.lineSequence().forEach { raw ->
+            while (true) {
+                val raw = readLine(reader) ?: break
                 val line = ANSI.replace(raw, "").trimEnd()
-                if (line.isBlank()) return@forEach
+                if (line.isBlank()) continue
                 // A count line ("412 tests completed, 2 failed") is a total, not a failure.
                 if (!counts.take(line) && failures.size < FAILURES && FAILURE.containsMatchIn(line)) failures += shorten(line.trim())
                 tail.addLast(shorten(line))
@@ -42,7 +45,18 @@ object SummaryReader {
         return counts.summary(failures.toList(), tail.toList())
     }
 
-    private fun shorten(line: String) = if (line.length > WIDTH) line.take(WIDTH - 1) + "..." else line
+    /** The next line, cut at [MAX_LINE] characters: one 50 MB line (a minified bundle) must not fill the daemon's heap. */
+    private fun readLine(reader: Reader): String? {
+        val line = StringBuilder()
+        while (true) {
+            val c = reader.read()
+            if (c == -1) return line.takeIf { it.isNotEmpty() }?.toString()
+            if (c == '\n'.code) return line.toString()
+            if (line.length < MAX_LINE) line.append(c.toChar())
+        }
+    }
+
+    private fun shorten(line: String) = if (line.length > WIDTH) line.take(WIDTH - 3) + "..." else line
 
     private class Counts {
         var tests: Int? = null

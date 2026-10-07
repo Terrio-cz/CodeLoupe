@@ -20,6 +20,7 @@ object FakePolicyHook {
             "deny-me" in input -> decision("deny", "no deploys from tests")
             "ask-me" in input -> decision("ask", "needs a human")
             "crash-me" in input -> System.exit(1)
+            "slow-me" in input -> Thread.sleep(60_000)
             "block-me" in input -> {
                 System.err.println("blocked by exit code")
                 System.exit(2)

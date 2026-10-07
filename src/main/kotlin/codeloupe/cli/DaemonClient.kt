@@ -33,7 +33,9 @@ class DaemonClient(private val config: Config) {
         status()?.let { return it }
         Files.createDirectories(config.home)
         // Its own home as working directory: the daemon outlives the CLI and must not hold the user's directory.
-        DetachedStart.start(JavaProcess.command(MAIN_CLASS, DaemonJvm.args(), listOf("daemon", "--detached")), config.home)
+        val args = listOf("daemon", "--detached", "--home", config.home.toString(), "--port", config.port.toString()) +
+            config.defaultRoot?.let { listOf("--root", it) }.orEmpty()
+        DetachedStart.start(JavaProcess.command(MAIN_CLASS, DaemonJvm.args(), args), config.home)
         repeat(80) {
             Thread.sleep(100)
             status(300)?.let { return it }

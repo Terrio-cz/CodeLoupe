@@ -2,6 +2,7 @@ package codeloupe.cli
 
 import codeloupe.config.ConfigLoader
 import codeloupe.daemon.Daemon
+import codeloupe.platform.JobObjects
 import codeloupe.platform.TerminalSignals
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
@@ -12,11 +13,20 @@ import java.net.BindException
 class DaemonCommand : CliktCommand(name = "daemon") {
     private val detached by option("--detached", hidden = true).flag()
 
+    // A detached daemon does not inherit its starter's environment (DetachedStart), so these come as arguments.
+    private val home by option("--home", hidden = true)
+    private val port by option("--port", hidden = true)
+    private val root by option("--root", hidden = true)
+
     override fun help(context: Context) = "Run the daemon in the foreground (normally started on demand)."
 
     override fun run() {
-        val config = ConfigLoader.load()
-        if (detached) TerminalSignals.ignore()
+        val overrides = listOfNotNull(home?.let { "CODELOUPE_HOME" to it }, port?.let { "CODELOUPE_PORT" to it }, root?.let { "CODELOUPE_ROOT" to it })
+        val config = ConfigLoader.load(System.getenv() + overrides)
+        if (detached) {
+            TerminalSignals.ignore()
+            JobObjects.enterSelf()
+        }
         try {
             Daemon.start(config, exitOnShutdown = true)
         } catch (e: BindException) {

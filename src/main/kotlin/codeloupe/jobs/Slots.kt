@@ -1,58 +1,75 @@
 package codeloupe.jobs
 
-import kotlinx.coroutines.sync.Semaphore
-import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CompletableDeferred
 
 /**
  * Named resource slots (`gradle-test` ×2, `vps-test`, a docker stack per workspace). A job that needs a busy slot
  * suspends here, first come first served, until a holder ends — waiting costs neither a thread nor an agent turn.
+ * A slot that is not configured exists only while someone holds or waits for it.
  */
 class Slots(private val capacities: Map<String, Int>) {
-    private class Slot(val capacity: Int) {
-        val permits = Semaphore(capacity)
-        val running = LinkedHashSet<String>()
-        val waiting = LinkedHashSet<String>()
+    private class Waiter(val id: String) {
+        val turn = CompletableDeferred<Unit>()
     }
 
-    private val slots = ConcurrentHashMap<String, Slot>()
+    private class Slot(val capacity: Int) {
+        val running = LinkedHashSet<String>()
+        val waiting = ArrayDeque<Waiter>()
+    }
+
+    private val slots = HashMap<String, Slot>()
 
     fun capacity(name: String): Int = capacities[name] ?: 1
 
     /** Runs [block] holding [name]; [onQueued] runs once if the job has to wait. `waited` tells whether it did. */
     suspend fun <T> withSlot(name: String, id: String, onQueued: () -> Unit, block: suspend (waited: Boolean) -> T): T {
-        val slot = slots.computeIfAbsent(name) { Slot(capacity(it)) }
-        var waited = false
-        if (!slot.permits.tryAcquire()) {
-            synchronized(slot) { slot.waiting += id }
+        val waiter = synchronized(this) {
+            val slot = slots.getOrPut(name) { Slot(capacity(name)) }
+            if (slot.running.size < slot.capacity) {
+                slot.running += id
+                null
+            } else {
+                Waiter(id).also { slot.waiting += it }
+            }
+        }
+        if (waiter != null) {
             onQueued()
             try {
-                slot.permits.acquire()
-            } finally {
-                synchronized(slot) { slot.waiting -= id }
+                waiter.turn.await()
+            } catch (e: Throwable) {
+                // Cancelled while queued; if the slot was handed over in the meantime, pass it on.
+                val granted = synchronized(this) { slots[name]?.waiting?.remove(waiter) != true }
+                if (granted) release(name, id)
+                throw e
             }
-            waited = true
         }
-        synchronized(slot) { slot.running += id }
         try {
-            return block(waited)
+            return block(waiter != null)
         } finally {
-            synchronized(slot) { slot.running -= id }
-            slot.permits.release()
+            release(name, id)
         }
     }
 
     /** Jobs ahead of [id] in the queue of [name]. */
-    fun ahead(name: String, id: String): Int = slots[name]?.let { s -> synchronized(s) { s.waiting.indexOf(id).coerceAtLeast(0) } } ?: 0
+    fun ahead(name: String, id: String): Int = synchronized(this) {
+        slots[name]?.waiting?.indexOfFirst { it.id == id }?.coerceAtLeast(0) ?: 0
+    }
 
-    fun snapshot(): List<SlotSnapshot> {
-        val names = (capacities.keys + slots.keys).sorted()
-        return names.map { name ->
+    fun snapshot(): List<SlotSnapshot> = synchronized(this) {
+        (capacities.keys + slots.keys).sorted().map { name ->
             val slot = slots[name]
-            if (slot == null) {
-                SlotSnapshot(name, capacity(name), emptyList(), emptyList())
-            } else {
-                synchronized(slot) { SlotSnapshot(name, slot.capacity, slot.running.toList(), slot.waiting.toList()) }
-            }
+            SlotSnapshot(name, capacity(name), slot?.running?.toList().orEmpty(), slot?.waiting?.map { it.id }.orEmpty())
         }
+    }
+
+    private fun release(name: String, id: String) = synchronized(this) {
+        val slot = slots[name] ?: return@synchronized
+        slot.running -= id
+        while (slot.running.size < slot.capacity) {
+            val next = slot.waiting.removeFirstOrNull() ?: break
+            slot.running += next.id
+            next.turn.complete(Unit)
+        }
+        if (slot.running.isEmpty() && slot.waiting.isEmpty()) slots.remove(name)
     }
 }

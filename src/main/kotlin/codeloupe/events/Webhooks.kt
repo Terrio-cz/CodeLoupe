@@ -35,13 +35,13 @@ class Webhooks(
     private fun client(): HttpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build()
 
     fun add(url: String, events: List<String>): Webhook {
-        urls.problem(url)?.let { throw IllegalArgumentException("webhook $url refused: $it") }
+        urls.problem(url)?.let { throw IllegalArgumentException("webhook ${Scrubber.text(url)} refused: $it") }
         events.firstOrNull { !EventTypes.validFilter(it) }?.let {
             throw IllegalArgumentException("unknown event $it; known: ${EventTypes.ALL.joinToString()} (or a prefix like job.*)")
         }
         val webhook = Webhook("w" + UUID.randomUUID().toString().take(8), url, events, IsoTime.now())
         store.putWebhook(webhook)
-        return webhook
+        return webhook.copy(url = Scrubber.text(webhook.url))
     }
 
     /** Why [url] may not be a webhook target, or null. */
@@ -49,9 +49,10 @@ class Webhooks(
 
     fun remove(id: String): Boolean = store.removeWebhook(id)
 
-    fun list(): List<Webhook> = store.webhooks()
+    /** Subscriptions as shown to clients: a secret in a URL (`?token=…`) stays in the store. */
+    fun list(): List<Webhook> = store.webhooks().map { it.copy(url = Scrubber.text(it.url)) }
 
-    fun deliveries(limit: Int): List<Delivery> = store.deliveries(limit)
+    fun deliveries(limit: Int): List<Delivery> = store.deliveries(limit).map { it.copy(url = Scrubber.text(it.url)) }
 
     fun publish(event: Event) {
         for (webhook in store.webhooks()) if (EventTypes.matches(webhook.events, event.type)) enqueue(webhook.id, webhook.url, event)
@@ -59,7 +60,7 @@ class Webhooks(
 
     /** A job's `webhook:` action: [event] to [url] once, with the same signing and retries. */
     fun send(url: String, event: Event) {
-        urls.problem(url)?.let { throw IllegalArgumentException("webhook $url refused: $it") }
+        urls.problem(url)?.let { throw IllegalArgumentException("webhook ${Scrubber.text(url)} refused: $it") }
         enqueue(null, url, event)
     }
 
@@ -90,7 +91,7 @@ class Webhooks(
                 delivery = sending.withPermit { attempt(delivery, body) }
                 store.putDelivery(delivery)
             }
-            if (delivery.state == Delivery.FAILED) log("webhook ${delivery.id} to ${delivery.url} failed after ${delivery.attempts} attempts: ${delivery.lastError}")
+            if (delivery.state == Delivery.FAILED) log("webhook ${delivery.id} to ${Scrubber.text(delivery.url)} failed after ${delivery.attempts} attempts: ${delivery.lastError}")
         }
     }
 
@@ -115,7 +116,7 @@ class Webhooks(
         val (status, error) = try {
             client().use { it.sendAsync(request, HttpResponse.BodyHandlers.discarding()).await().statusCode() } to null
         } catch (e: Exception) {
-            null to "${e::class.simpleName}: ${e.message.orEmpty().take(200)}"
+            null to Scrubber.text("${e::class.simpleName}: ${e.message.orEmpty().take(200)}")
         }
         val state = when {
             status != null && status in 200..299 -> Delivery.DELIVERED

@@ -26,6 +26,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.TestInstance
 import java.net.ServerSocket
 import java.net.URI
@@ -188,6 +189,35 @@ class JobsTest {
         assertEquals(JobStatus.CANCELLED, await(queued[1]).single().status)
         assertNull(await(queued[1]).single().startedAt, "never started")
         await(queued[0])
+        assertTrue(daemon.status().jobs.slots.none { it.name == "solo" }, "a slot nobody holds or waits for is gone")
+    }
+
+    @Test
+    fun `cancelling a chain ends its live job and starts no failure jobs`() {
+        val since = daemon.events.lastSeq()
+        val root = start(
+            "exit=0",
+            then = listOf("job:${CommandLine.join(FakeJob.command("sleep=60000"))}"),
+            onFailure = listOf("job:${CommandLine.join(FakeJob.command("touch=${work.resolve("rollback")}"))}", "notify:stopped"),
+        ).getValue("id").jsonPrimitive.content
+        val follow = waitFor(root) { it.nextId != null }.nextId!!
+        waitFor(follow) { it.status == JobStatus.RUNNING }
+        post("/jobs/$root/cancel", JsonObject(emptyMap()))
+        val chain = await(root)
+        assertEquals(listOf(JobStatus.DONE, JobStatus.CANCELLED), chain.map { it.status })
+        assertFalse(Files.exists(work.resolve("rollback")), "no job step after a cancel")
+        assertTrue(daemon.events.since(since, 500).any { it.type == EventTypes.JOB_NOTIFY && it.data["rootId"]?.jsonPrimitive?.content == root })
+    }
+
+    @Test
+    fun `a batch file never gets arguments cmd_exe would run as commands`() {
+        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"))
+        Files.writeString(work.resolve("tool.cmd"), "@echo %*\r\n")
+        val (status, body) = post("/jobs", request(listOf("./tool", "test&calc")))
+        assertEquals(400, status)
+        assertContains(body.getValue("error").jsonPrimitive.content, "batch file")
+        val id = post("/jobs", request(listOf("./tool", "plain", "with space"))).second.getValue("job").jsonObject.getValue("id").jsonPrimitive.content
+        assertEquals(0, await(id).single().exit)
     }
 
     @Test

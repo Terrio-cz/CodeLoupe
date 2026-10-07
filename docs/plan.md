@@ -467,7 +467,8 @@ rozhoduje launcher.
   Ověřeno simulací konce headless běhu (PowerShell v job objectu s KILL_ON_JOB_CLOSE spustí `codeloupe job start` a
   skončí): **dřív daemon (a job) zemřel se session** — autostart byl obyčejný potomek CLI; teď daemon i job přežijí, job
   doběhl za 40 s. Joby běží v job objectu daemonu (kill-on-close): `taskkill /F` daemonu ukončil i proces jobu, nový daemon
-  ho ohlásil `lost` se zachovaným logem; po pádu bez job objectu (ne-Windows) přeživší ukončí podle pid + času startu.
+  ho ohlásil `lost` se zachovaným logem (daemon je sám v job objectu s KILL_ON_JOB_CLOSE, každý job má navíc vlastní
+  vnořený pro cancel); po pádu bez job objectu (ne-Windows) přeživší ukončí podle pid + času startu.
   `codeloupe stop` s běžícími joby odmítne (`--force`).
 - **Sloty**: `slots` v `config.json` (Terrio `gradle-test` ×2, `vps-test`), nekonfigurovaný slot = 1. Ověřeno: dva
   `gradle-test` obsazené, třetí job čekal v daemonu (`/status` `jobs.slots.waiting`) a spustil se po uvolnění; čekání
@@ -498,7 +499,13 @@ rozhoduje launcher.
 - MCP: jediný nový nástroj `job` (start/status/cancel); čekání je věc CLI. Daemon: RSS 110–113 MB po jobech, čerstvý daemon
   v klidu 16 ms CPU za 60 s (granularita Windows); webhooky vytváří HTTP klienta až pro pokus (klient JDK v klidu budí
   selector každé 3 s).
-- Testy: 92 (nově `JobsTest` 11, `EventsTest` 5, `JobPartsTest` 5, `DetachedStartTest` 2).
+- Review (3 kola max): nálezy opraveny — `.bat`/`.cmd` nedostane argumenty se znaky, které cmd.exe čte znovu (BatBadBut);
+  daemon nemá prostředí toho, kdo ho spustil (Windows: prostředí uživatele přes WMI, ověřeno — podstrčená proměnná se do
+  jobu nedostala), holé jméno programu jen z PATH jako v Bash; cancel ukončí živý job řetězu i celý strom (job object na
+  job) a nespustí další joby; podmínky kroků se vyhodnocují až u svého kroku; souhrn čte řádky max 4 KB; timeout hooku
+  platí i na jeho roury; SSE doplní mezeru ze store; nekonfigurované sloty se po použití uklidí; URL webhooků v
+  odpovědích a logu očištěné.
+- Testy: 97 (nově `JobsTest` 13, `EventsTest` 5, `JobPartsTest` 8, `DetachedStartTest` 2).
 
 ## 10. Rizika
 

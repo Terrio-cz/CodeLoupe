@@ -8,10 +8,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * The workspace policy for commands the daemon runs. A daemon-run command never passes the agent host's own guard
@@ -42,16 +44,28 @@ class PolicyHook(private val command: List<String>?, private val timeoutMs: Long
         } catch (e: Exception) {
             return deny("policy hook did not start: ${e.message}")
         }
-        val stdout = CompletableFuture.supplyAsync { process.inputStream.readAllBytes().toString(Charsets.UTF_8) }
-        val stderr = CompletableFuture.supplyAsync { process.errorStream.readAllBytes().toString(Charsets.UTF_8) }
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000
+        val stdout = read(process.inputStream)
+        val stderr = read(process.errorStream)
         runCatching { process.outputStream.use { it.write(input.toString().toByteArray(Charsets.UTF_8)) } }
-        if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
+        // The pipes are awaited within the same budget: a grandchild of the hook may hold them open after it exits.
+        val out = runCatching {
+            if (!process.waitFor(remaining(deadline), TimeUnit.MILLISECONDS)) throw TimeoutException()
+            stdout.get(remaining(deadline), TimeUnit.MILLISECONDS) to stderr.get(remaining(deadline), TimeUnit.MILLISECONDS)
+        }.getOrElse {
             process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly()
             return deny("policy hook timed out after $timeoutMs ms")
         }
-        return decide(process.exitValue(), stdout.join(), stderr.join())
+        return decide(process.exitValue(), out.first, out.second)
     }
+
+    private fun read(stream: InputStream): CompletableFuture<String> =
+        CompletableFuture<String>().also { result ->
+            Thread.ofVirtual().start { result.complete(runCatching { stream.readAllBytes().toString(Charsets.UTF_8) }.getOrDefault("")) }
+        }
+
+    private fun remaining(deadline: Long) = ((deadline - System.nanoTime()) / 1_000_000).coerceAtLeast(1)
 
     /** Claude Code's reading of a hook's result, minus its leniency: exit 2 or anything unreadable denies. */
     internal fun decide(exit: Int, stdout: String, stderr: String): PolicyDecision {
