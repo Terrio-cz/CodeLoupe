@@ -1,6 +1,6 @@
 # CodeLoupe — plán (code index pro AI agenty)
 
-Stav: fáze 1 hotová · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
+Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56) · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
 
 ## 0. Zadání
 
@@ -19,13 +19,32 @@ a smaže se po dosažení parity (CL-56).
 
 - Dotazy: stejně rychlé (rozhoduje SQLite). Build báze: rychlejší s nativním parserem. Start procesu 0,5–1 s
   (CLI, build worker). RAM daemonu vyšší než Node (80 MB) → budget **≤ 200 MB** (SerialGC, malý heap, CDS).
-- Parser podle spiku v CL-56: Kotlin compiler PSI (jen parse, kotlin-compiler-embeddable) vs. tree-sitter-ng
-  (JNI, nativní knihovny přibalené) vs. jtreesitter (FFM, Java 22+, gramatiku nutno buildit pro každý OS).
+- **Parser: Kotlin compiler PSI** (jen parse, `kotlin-compiler-embeddable` 2.4.20) — spike CL-56 níže.
 - SQLite `org.xerial:sqlite-jdbc`, MCP `io.modelcontextprotocol:kotlin-sdk-server` 0.15 (stateless Streamable
   HTTP, případně vlastní minimální JSON-RPC), Ktor server, CLI clikt, Gradle Kotlin DSL, toolchain JDK 25,
   jen Maven Central.
 - Distribuce pro ostatní: zip s jlink runtime (bez nutnosti JDK) + Claude Code plugin (CL-45).
 - Desktopová aplikace zůstává Electron (TypeScript), čte HTTP API daemonu.
+
+### Spike parseru (CL-56, 2026-10-07)
+
+Všech 2 211 `.kt/.kts` TerrioImporteru (master `b58fa71`) z git objektů; samostatný JVM (JBR 25.0.3, `-Xmx512m`,
+SerialGC), bloby načtené předem (~150 MB z peaku), parse + průchod celým stromem; Windows 11.
+
+| Varianta | Parse vše | Peak RSS | Soubory s chybami | Artefakt |
+|---|---|---|---|---|
+| **(a) Kotlin PSI**, `kotlin-compiler-embeddable` 2.4.20 | **1,8 s** (init 0,3 s) | **362 MB** | **0** | 58,6 MB jar + ~5 MB závislostí; čisté JVM |
+| (b) tree-sitter-ng 0.26.6 + `tree-sitter-kotlin` 0.3.8.1 (JNI) | 3,3 s (init 0,1 s) | 535 MB | 82 | 2,6 MB (nativní knihovny win x64, mac/linux x64+arm64) |
+| (c) jtreesitter 0.26.1 (FFM) | nespuštěno | — | — | 0,3 MB + vlastní build `libtree-sitter` a gramatiky pro každý OS |
+| Node prototyp: web-tree-sitter 0.27 + gramatika 1.1.0 (WASM) | 2,6 s | 558 MB | 21 | — |
+
+- (c) nejde změřit bez nativního buildu: jtreesitter knihovny nepřibaluje, na stroji není C toolchain a JNI jádro
+  z tree-sitter-ng neexportuje C API (`ts_set_allocator`). Právě tahle cena (build jádra i gramatiky pro každý OS
+  v CI) je hlavní nevýhoda varianty.
+- (b) má starší gramatiku (0.3.8, jiné typy uzlů než prototyp) a 4× víc chybných souborů.
+- **Rozhodnutí: (a) PSI** — nejrychlejší, 0 chyb (gramatika samotného kompilátoru, drží krok s jazykem), bez nativních
+  knihoven (stejné na všech OS), nejnižší peak. Java (CL-11) jde stejnou cestou: Java parser IntelliJ je ve stejném
+  jaru. Cena 64 MB v distribuci; parser se načítá jen v build workeru, daemon ho nikdy nenačte.
 
 ## 1. Baseline — co dnes stojí tokeny (2026-09-23 → 10-06, 2 373 běhů)
 
@@ -82,10 +101,10 @@ Technické budgety: daemon ustáleně ≤ 200 MB (JVM), špička ≤ 300 MB; bui
 
 ## 4. Produkt a balení (generický)
 
-- Samostatný projekt a git repozitář (lokálně `C:\Users\tadea\IdeaProjects\codeloupe`), Node ≥ 22.13, čisté
-  JS + WASM, žádná nativní kompilace.
-- Distribuce: npm balíček (`npx codeloupe …`) + Claude Code plugin (MCP konfigurace, skill, SessionStart hook
-  pro autostart). **Publikace na npm/GitHub až na tvé slovo** (navenek viditelné).
+- Samostatný projekt a git repozitář (lokálně `C:\Users\tadea\IdeaProjects\codeloupe`), Kotlin/JVM (JDK 25),
+  Gradle, jen Maven Central, žádná nativní kompilace.
+- Distribuce: zip s jlink runtime (bez nutnosti JDK) + Claude Code plugin (MCP konfigurace, skill, SessionStart hook
+  pro autostart). **Publikace až na tvé slovo** (navenek viditelné).
 - Nulová konfigurace: jakýkoli git repozitář funguje hned; výchozí větev = `origin/HEAD`.
 - Konfigurace (volitelná):
   - uživatel: ``<home>/config.json`` (port, cache dir, budgety, jazyky)
@@ -260,7 +279,7 @@ codeloupe): reviewer a planner. Stejný model a effort. Výstup: tabulka metrik 
 | 3 Vrstvy worktree | delta, vrstvy, líný sync, `changes`, úklid vrstev | změna/nový/smazaný soubor vidět v dalším dotazu; výchozí větev posunutá o 500 souborů → správné odpovědi, sync v P3 |
 | 4 Zápis *(podmíněná, po fázi 7)* | zápisové nástroje + pojistky + `rename_symbol` — jen když detektor mezer ukáže, že coder po `symbol` stejně čte celý soubor kvůli `Edit`, nebo když chybí rename bez IDEA | round-trip bajtově stejný (CRLF i LF); fuzz 200 zápisů + compile zelený; rename na 10 symbolech = compile zelený |
 | 5 Zátěž a platformy | 10 klientů paralelně (dotazy 8 worktree + sync + zápisy); testy na Linuxu (WSL/Docker) | budgety § 2; P0 p95 drží během P3; testy zelené na Windows i Linuxu |
-| 6 Balení + Terrio integrace | npm balíček, plugin (MCP, skill, hook), README; v Terrio: `.mcp.json`, `.codeloupe.json`, allow list, frontmatter agentů, skill `terrio-code` místo IDEA routingu v `terrio-intellij`/`terrio-gitnexus`/`terrio-deliver`, CLAUDE.md § Reading code cheaply, `guardrails.md`, `doctor` (IDEA přestane být povinná), `validate.mjs`, `run-all.sh` | Terrio běží bez IDEA; validace zelené |
+| 6 Balení + Terrio integrace | zip s jlink runtime, plugin (MCP, skill, hook), README; v Terrio: `.mcp.json`, `.codeloupe.json`, allow list, frontmatter agentů, skill `terrio-code` místo IDEA routingu v `terrio-intellij`/`terrio-gitnexus`/`terrio-deliver`, CLAUDE.md § Reading code cheaply, `guardrails.md`, `doctor` (IDEA přestane být povinná), `validate.mjs`, `run-all.sh` | Terrio běží bez IDEA; validace zelené |
 | 7 Měření | benchmark § 8.4, 2 týdny živě, report mezer | cíle § 2; rozhodnutí o vypnutí GitNexus a IDEA MCP |
 
 Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými tasky.
@@ -279,6 +298,26 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 - Home: `%LOCALAPPDATA%codeloupe` / `~/Library/Caches/codeloupe` / `$XDG_CACHE_HOME/codeloupe`
   (`CODELOUPE_HOME`), port 47391 (`CODELOUPE_PORT`), `config.json` v home.
 - Měření: `run/codemetrics.mjs` zatím v Terrio workspace; do balíčku jako `codeloupe metrics` ve fázi 6.
+
+### Výsledek portu na Kotlin/JVM (CL-56, 2026-10-07)
+
+- Build báze Terria (2 211 souborů, podproces `-Xmx512m` SerialGC, nízká priorita): **6,6 s** ve workeru (~7,5 s
+  včetně startu JVM), peak workeru **355 MB** (budget 600), **0** souborů s chybami parseru (prototyp 20).
+- Daemon (SerialGC, `-Xmx96m`, jen C1, AppCDS archiv v home): **112 MB** RSS po prvním dotazu, **138 MB** po 300
+  dotazech (budget 200). Teplý dotaz: p50 **7 ms**, p95 **16 ms** v daemonu, 23 ms u klienta (budget 50). CLI
+  0,65–0,8 s (start JVM; agenti používají MCP).
+- Hot path bez git procesů: HEAD worktree a výchozí větev se čtou přímo z `.git` (fallback na git u reftable a
+  nejednoznačných jmen) — p50 dotazu z 37 ms na 7 ms.
+- Parita: find/outline/symbol identické s prototypem na 53 dotazech nad fixturami a 10 nad Terriem (golden testy).
+  Fakta celého Terria: 99,98 % deklarací shodných (rozdíly = chyby gramatiky prototypu: anotace s `X::class` na
+  samostatném řádku, `by delegate {`), reference 99,3 % (prototyp četl `f<T>(…)` jako porovnání a `!a.b()` se
+  špatnou prioritou). Záměrné odchylky: ukládají se i `$name` v řetězcových šablonách (prototyp je vynechával —
+  `usages` je musí najít), `break`/`continue` už nejsou reference.
+- Řazení cest nezávislé na locale stroje (prototyp řadil podle locale — v cs-CZ „ch“ za „h“); na fixturách ani
+  Terriu žádný rozdíl.
+- MCP přes `kotlin-sdk-server` 0.15 (bezstavový Streamable HTTP), Ktor CIO: odpovědi nesou `Connection: close`,
+  nečinné spojení server zavře po 2 s. Headless Claude Code (haiku): volání → restart daemonu → volání bez chyby.
+- Testy: 28 (17 portovaných z Node + parita, CRLF/BOM, uzavírání spojení, overlay ve View, čtení refů, řazení, fronta).
 
 ## 10. Rizika
 
