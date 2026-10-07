@@ -3,12 +3,15 @@ package codeloupe.query.usages
 import codeloupe.query.DeclRow
 import codeloupe.query.Format
 import codeloupe.query.Members
+import codeloupe.query.PathOrder
 import codeloupe.query.Resolver
 import codeloupe.query.View
 
 /** `hierarchy`: a type's supertypes and subtypes, or the members a member overrides and is overridden by. */
 object HierarchyQuery {
     private const val MAX_LINES = 60
+    private const val MAX_CODE = 100
+    private val FUN_INTERFACE = Regex("""(^|\s)fun interface\s""")
 
     fun run(view: View, name: String?): String {
         val query = name.orEmpty()
@@ -20,6 +23,7 @@ object HierarchyQuery {
         val context = IndexContext(view)
         val lines = arrayListOf(Format.head(target))
         if (target.kind in Kinds.CLASSIFIERS) type(target, context.types, lines) else member(target, context.overrides, lines)
+        if (target.kind == "interface" && FUN_INTERFACE.containsMatchIn(target.sig)) lambdas(view, target, lines)
         return lines.take(MAX_LINES).joinToString("\n") + Format.more(lines.size, MAX_LINES)
     }
 
@@ -45,6 +49,17 @@ object HierarchyQuery {
         }
         down(type, 1, hashSetOf(type))
         lines += if (subtypes.isEmpty()) listOf("subtypes: (none indexed)") else listOf("subtypes:") + subtypes
+    }
+
+    /** `Iface { … }`: a lambda converted to a `fun interface` implements it too. */
+    private fun lambdas(view: View, type: DeclRow, lines: MutableList<String>) {
+        val finder = UsageFinder(view)
+        val conversions = finder.usages(listOf(type)).filter { it.ref.kind == "call" && it.label != Label.OTHER }
+        if (conversions.isEmpty()) return
+        lines += "lambda implementations:"
+        conversions.sortedWith(compareBy<Usage, String>(PathOrder) { it.ref.path }.thenBy { it.ref.line }).forEach {
+            lines += "  ${it.label.mark} ${it.ref.path}:${it.ref.line}  ${finder.cache.line(it.ref.path, it.ref.line).trim().take(MAX_CODE)}"
+        }
     }
 
     private fun member(member: DeclRow, overrides: Overrides, lines: MutableList<String>) {

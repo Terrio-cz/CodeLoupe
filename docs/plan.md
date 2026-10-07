@@ -170,6 +170,8 @@ jeden soubor.
     (`x.apply {}`, `x.run {}`, `with(x) {}`; lambda předaná jiné funkci má spec `&@ř:s#i` = receiver funkčního typu
     jejího parametru `i` — `R.() -> T` dá `R`, `() -> T` žádný, neindexovaná funkce neznámý);
   - `args` — počet argumentů volání (trailing lambda se počítá, spread = −1), pro rozlišení overloadů.
+- object expression (`object : I { … }`) je lokální deklarace `object` se jménem `<anonymous>` a svými nadtypy
+  (formát `2/kotlin-psi-4`, CL-81): je to implementace pro `hierarchy`, její členy jsou její děti.
 - `decls.returns` bez deklarovaného typu = typový spec inicializátoru, `by lazy { … }` nebo těla výrazem;
   parametry nesou příznaky `default` a `vararg`.
 - typový spec (`lang/TypeSpec`): text typu (`Foo`, `List<Foo>`), `@řádek:sloupec` = deklarovaný typ toho, na co
@@ -390,10 +392,11 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 - Daemon (heap 96 MB): běžný dotaz desítky ms, `usages ApiKey.id` (3 446 referencí) 1,0 s poprvé / 0,65 s znovu,
   `calls … depth 3` ~0,1–0,2 s; cache jsou LRU a obsah souborů se drží jen pro vypisované řádky. RSS po velkém dotazu
   ~205 MB (budget 200) — sledovat v CL fáze 5.
-- Index: formát `2/kotlin-psi-3` (sloupce `bind`, `recv_type`, `args` v `refs`) → báze se po upgradu přestaví.
+- Index: formát `2/kotlin-psi-4` (sloupce `bind`, `recv_type`, `args` v `refs`) → báze se po upgradu přestaví.
 - Stejná fixture sada v repu (`fixtures/kotlin/usages`) kryje super, cast, lambdy, alias, companion, enum, extension,
   override/dispatch, overloady, private, `::`, smart cast, DSL receivery, sekundární konstruktor, FQ typ a nadmnožinu.
-- Známé meze: implementace přes `object : I {}` nejsou v `hierarchy` (výraz, ne deklarace); typ výsledku `let {}`,
+- `hierarchy` vidí i implementace přes `object : I {}` a jejich override (CL-81).
+- Známé meze: typ výsledku `let {}`,
   indexace `xs[0]` a generik se neodvozuje (→ `candidate`); povýšení na `exact` u neznámého receiveru je heuristika.
 
 ### Výsledek fáze 3a — vrstvy worktree a líný sync báze (CL-16, 2026-10-07)

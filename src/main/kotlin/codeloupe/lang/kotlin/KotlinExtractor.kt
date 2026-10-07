@@ -49,7 +49,7 @@ internal class KotlinExtractor(private val source: Source) {
     private val refs = ArrayList<RefFact>()
     private var errors = 0
 
-    /** Enclosing declarations, innermost last; [OBJECT_LITERAL] for an anonymous object. */
+    /** Enclosing declarations, innermost last. */
     private val stack = ArrayList<Int>()
 
     /** Plain (non-property) primary constructor parameters of the enclosing classes, visible in their initializers. */
@@ -125,7 +125,7 @@ internal class KotlinExtractor(private val source: Source) {
 
     private fun objectLiteral(element: KtObjectDeclaration) {
         constructorScopes += emptyMap()
-        scopes.inClassBody { nested(OBJECT_LITERAL, element) }
+        scopes.inClassBody { nested(declare(element, shapes.objectLiteral(element)), element) }
         constructorScopes.removeLast()
     }
 
@@ -232,7 +232,7 @@ internal class KotlinExtractor(private val source: Source) {
 
     private fun isWhenSubject(property: KtProperty): Boolean = (property.parent as? KtWhenExpression)?.subjectVariable == property
 
-    private fun ownerName(): String = stack.lastOrNull()?.takeIf { it >= 0 }?.let { decls[it].name } ?: "constructor"
+    private fun ownerName(): String = stack.lastOrNull()?.let { decls[it].name } ?: "constructor"
 
     private fun addImport(directive: KtImportDirective) {
         val reference = directive.importedReference ?: return
@@ -247,7 +247,7 @@ internal class KotlinExtractor(private val source: Source) {
         decls += DeclFact(
             kind = shape.kind,
             name = JsText.bare(shape.name),
-            container = stack.joinToString(".") { if (it >= 0) decls[it].name else "<anonymous>" },
+            container = stack.joinToString(".") { decls[it].name },
             receiver = shape.receiver,
             params = shape.params,
             returns = shape.returns,
@@ -258,7 +258,8 @@ internal class KotlinExtractor(private val source: Source) {
             end = lines.endLine(span.start, span.end),
             sig = shape.sig ?: Signature.of(element, span, shape.modifiers, source),
             hash = Sha1.hex(source.of(span)).take(HASH_LENGTH),
-            local = stack.any { it < 0 || decls[it].kind in CODE_KINDS },
+            // An object expression and all inside it are code, wherever the expression stands.
+            local = shape.name == DeclShapes.ANONYMOUS || stack.any { decls[it].kind in CODE_KINDS || decls[it].name == DeclShapes.ANONYMOUS },
             parent = innermost(),
         )
         return decls.size - 1
@@ -272,10 +273,9 @@ internal class KotlinExtractor(private val source: Source) {
         )
     }
 
-    private fun innermost(): Int = stack.lastOrNull { it >= 0 } ?: -1
+    private fun innermost(): Int = stack.lastOrNull() ?: -1
 
     private companion object {
-        const val OBJECT_LITERAL = -1
         const val HASH_LENGTH = 10
 
         /** Declarations whose members are local: code, not API. */

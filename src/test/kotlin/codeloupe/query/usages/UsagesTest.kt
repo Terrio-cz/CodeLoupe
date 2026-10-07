@@ -138,6 +138,9 @@ class UsagesTest {
         assertContains(HierarchyQuery.run(view, "Account.describe"), "overridden by:\n  src/main/kotlin/com/example/model/Account.kt:21  [SavingsAccount] override fun describe()")
         assertContains(HierarchyQuery.run(view, "AccountStore.find"), "overrides:\n  src/main/kotlin/com/example/model/Account.kt:5  [Store] fun find(…)")
         assertContains(HierarchyQuery.run(view, "Shape"), "subtypes:\n  src/main/kotlin/com/example/model/Shapes.kt:23  class Circle : Shape()")
+        assertContains(HierarchyQuery.run(view, "Named"), "subtypes:\n  src/main/kotlin/com/example/other/Edge.kt:22  [Edge.lit] object : Named", message = "an object expression")
+        assertContains(HierarchyQuery.run(view, "Validator"), "lambda implementations:\n  = src/main/kotlin/com/example/other/Edge.kt:45  val positive = Validator { it > 0 }")
+        assertContains(HierarchyQuery.run(view, "Named.label"), "overridden by:\n  src/main/kotlin/com/example/other/Edge.kt:23  [Edge.lit.<anonymous>] override val label")
     }
 
     private companion object {

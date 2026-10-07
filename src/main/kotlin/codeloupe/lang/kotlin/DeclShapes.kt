@@ -32,6 +32,10 @@ internal class DeclShapes(private val source: Source) {
         return DeclShape(kind, name, modifiers, supertypes = supertypes(element))
     }
 
+    /** `object : I { … }`: a local object named [ANONYMOUS] with its supertypes, so it counts as an implementation. */
+    fun objectLiteral(element: KtObjectDeclaration): DeclShape =
+        DeclShape("object", ANONYMOUS, modifiers(element), supertypes = supertypes(element))
+
     /** A `val`/`var` parameter of a primary constructor: a property whose signature is the whole parameter. */
     fun constructorProperty(parameter: KtParameter): DeclShape =
         DeclShape(
@@ -65,6 +69,11 @@ internal class DeclShapes(private val source: Source) {
     fun enumEntry(element: KtEnumEntry): DeclShape {
         val name = nameOf(element.nameIdentifier)
         return DeclShape("enum_entry", name, modifiers(element), sig = name)
+    }
+
+    companion object {
+        /** Name of an object expression; no declared name can contain `<`. */
+        const val ANONYMOUS = "<anonymous>"
     }
 
     private fun modifiers(element: org.jetbrains.kotlin.psi.KtModifierListOwner) = Modifiers.of(element.modifierList, source)
