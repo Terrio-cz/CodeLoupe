@@ -18,7 +18,10 @@ export interface DaemonState {
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
 
 export interface AppMetrics {
+  /** Sum of working sets (shared pages counted per process: an upper bound). */
   totalMb: number;
+  /** Sum of private bytes (Windows; 0 elsewhere). */
+  privateMb: number;
   processes: { type: string; mb: number }[];
   version: string;
   electron: string;

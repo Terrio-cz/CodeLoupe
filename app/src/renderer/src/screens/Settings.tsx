@@ -103,7 +103,7 @@ export function Settings() {
         {metrics && (
           <dl className="dl">
             <dt>Verze</dt><dd>{metrics.version} · Electron {metrics.electron}</dd>
-            <dt>RSS aplikace</dt><dd>{num(metrics.totalMb)} MB ({metrics.processes.map(p => `${p.type} ${p.mb}`).join(', ')}) · limit 300 MB</dd>
+            <dt>Paměť aplikace</dt><dd>working set {num(metrics.totalMb)} MB ({metrics.processes.map(p => `${p.type} ${p.mb}`).join(', ')}) · private {num(metrics.privateMb)} MB · limit 300 MB</dd>
           </dl>
         )}
       </Card>

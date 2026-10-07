@@ -133,9 +133,11 @@ function isDir(p: string): boolean {
 }
 
 export function metrics(): AppMetrics {
-  const processes = app.getAppMetrics().map(m => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) }));
+  const all = app.getAppMetrics();
+  const processes = all.map(m => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) }));
   return {
     totalMb: processes.reduce((a, p) => a + p.mb, 0),
+    privateMb: Math.round(all.reduce((a, m) => a + (m.memory.privateBytes ?? 0), 0) / 1024),
     processes,
     version: app.getVersion(),
     electron: process.versions.electron,

@@ -17,6 +17,9 @@ const ROUTES: [string, string][] = [
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const go = (win: BrowserWindow, hash: string) => win.webContents.executeJavaScript(`location.hash = ${JSON.stringify(hash)}`);
+// Resolves after the page painted twice, so a capture never returns the previous frame.
+const painted = (win: BrowserWindow) =>
+  win.webContents.executeJavaScript('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))');
 
 /**
  * RAM check (CODELOUPE_APP_TOUR=1): visits every screen in both themes like the screenshot run, without
@@ -40,12 +43,15 @@ export async function tour(win: BrowserWindow): Promise<void> {
  */
 export async function captureScreens(win: BrowserWindow, dir: string): Promise<void> {
   fs.mkdirSync(dir, { recursive: true });
+  win.webContents.setBackgroundThrottling(false);
   const report: Record<string, unknown> = {};
   for (const theme of ['light', 'dark'] as const) {
     nativeTheme.themeSource = theme;
     for (const [name, route] of ROUTES) {
       await go(win, route);
       await sleep(1200);
+      win.webContents.invalidate();
+      await painted(win);
       const img = await win.webContents.capturePage();
       fs.writeFileSync(path.join(dir, `${theme}-${name}.png`), img.toPNG());
     }
