@@ -18,6 +18,9 @@ class RefReaderTest {
         git(repo, "pack-refs", "--all")
         assertEquals(head, RefReader.branch(commonDir, "refs/heads/main"))
         assertEquals(head, RefReader.head(repo.toString()))
+        git(repo, "commit", "-q", "--allow-empty", "-m", "next")
+        git(repo, "pack-refs", "--all")
+        assertEquals(git(repo, "rev-parse", "HEAD"), RefReader.branch(commonDir, "main"), "a rewritten packed-refs is read again")
     }
 
     @Test

@@ -18,7 +18,9 @@ import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.request.httpMethod
 import io.ktor.server.request.receiveChannel
+import io.ktor.server.request.uri
 import io.ktor.server.response.header
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
@@ -27,6 +29,7 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.utils.io.readRemaining
 import io.modelcontextprotocol.kotlin.sdk.server.mcpStatelessStreamableHttp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -114,7 +117,15 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
             call.response.header(HttpHeaders.Connection, "close")
             guard.refusal(call)?.let {
                 call.respondJson(RequestGuard.STATUS, error(it))
-                finish()
+                return@intercept finish()
+            }
+            try {
+                proceed()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("request ${call.request.httpMethod.value} ${call.request.uri} failed: $e")
+                if (!call.response.isCommitted) call.respondJson(HttpStatusCode.InternalServerError, error(e.message ?: e.toString()))
             }
         }
         val mcp = McpTools(runner)

@@ -6,8 +6,7 @@ import codeloupe.repo.BusyException
 import codeloupe.repo.Registry
 import codeloupe.tools.Tool
 import codeloupe.tools.ToolArgs
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -23,9 +22,10 @@ class ToolRunner(private val registry: Registry, private val defaultRoot: String
         val outcome = try {
             val root = args.string("root")?.takeIf { it.isNotEmpty() } ?: defaultRoot
                 ?: throw IllegalArgumentException("pass root: the absolute path of the repository or worktree to answer for")
-            val found = registry.view(root)
-            val text = withContext(Dispatchers.IO) { found.view.use { tool.run(it, args) } }
-            ToolOutcome(true, if (found.note != null) "${found.note}\n$text" else text)
+            val answer = registry.query(root) { tool.run(it, args) }
+            ToolOutcome(true, listOfNotNull(answer.note, answer.value).joinToString("\n"))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: BusyException) {
             wasBusy = true
             ToolOutcome(false, "busy: ${e.message}")

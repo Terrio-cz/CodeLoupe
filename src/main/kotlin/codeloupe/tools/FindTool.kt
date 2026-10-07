@@ -12,7 +12,7 @@ object FindTool : Tool {
         "kind" to Schema.enum(
             listOf("class", "interface", "object", "enum", "companion", "annotation", "fun", "property", "constructor", "enum_entry", "typealias"),
         ),
-        "module" to Schema.string("Module path prefix, e.g. \"public-api\" or \"importers/ruian\""),
+        "module" to Schema.string("Module path prefix, e.g. \"api\" or \"services/billing\""),
         "test" to Schema.boolean("true = only test sources, false = exclude them"),
         "limit" to Schema.integer(1, 200),
     )

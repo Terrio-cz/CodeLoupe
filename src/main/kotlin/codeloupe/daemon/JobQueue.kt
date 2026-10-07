@@ -42,8 +42,6 @@ class JobQueue(private val scope: CoroutineScope) {
         job.result as Deferred<T>
     }
 
-    fun has(key: String): Boolean = synchronized(this) { key in byKey }
-
     fun snapshot(): QueueSnapshot = synchronized(this) {
         fun lane(state: LaneState) = LaneSnapshot(state.running?.key, state.waiting.map { it.key })
         QueueSnapshot(lane(lanes.getValue(Lane.FAST)), lane(lanes.getValue(Lane.HEAVY)), done, failed, coalesced, waitMsMax)

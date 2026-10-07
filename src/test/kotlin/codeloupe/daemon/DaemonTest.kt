@@ -23,8 +23,10 @@ import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
 import java.net.BindException
+import java.net.ServerSocket
 import java.net.Socket
 import java.net.URI
+import java.nio.file.Files
 import java.net.http.HttpClient as JdkHttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -39,7 +41,7 @@ import io.ktor.client.engine.cio.CIO as ClientCIO
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class DaemonTest {
-    private val port = 49152 + (Math.random() * 10000).toInt()
+    private val port = ServerSocket(0).use { it.localPort }
     private val config = Config(TestRepos.tmpDir("home"), port, queryTimeoutMs = 60_000, buildTimeoutMs = 120_000, buildHeapMb = 512, defaultRoot = null)
     private val repo = TestRepos.fixtureRepo("kotlin/sample")
     private var daemon = Daemon.start(config)
@@ -95,6 +97,19 @@ class DaemonTest {
         val response = rawGet("/status", "127.0.0.1:$port")
         assertTrue(response.startsWith("HTTP/1.1 200"), response)
         assertTrue(response.lowercase().contains("connection: close"), response)
+    }
+
+    @Test
+    @Order(4)
+    fun `malformed API calls get a JSON error and a log line`() {
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1")
+            .POST(HttpRequest.BodyPublishers.ofString("{bad")).build()
+        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
+        assertEquals(500, response.statusCode())
+        assertTrue(json(response).containsKey("error"), response.body())
+        assertContains(Files.readString(config.home.resolve("daemon.log")), "request POST /api/find failed")
+        val relative = json(api("find", args("root" to ".", "q" to "x")))
+        assertContains(relative["text"]!!.jsonPrimitive.content, "root must be an absolute path")
     }
 
     @Test

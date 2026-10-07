@@ -19,4 +19,14 @@ class PathOrderTest {
         assertEquals(-1, Integer.signum(PathOrder.compare("app-x/a.kt", "app/x.kt")))
         assertEquals(-1, Integer.signum(PathOrder.compare("a", "a-")))
     }
+
+    @Test
+    fun `stays a total order with non-ASCII paths`() {
+        val paths = listOf("a-b/x.kt", "a/x.kt", "a/ž.kt", "a/Ž.kt", "a/z.kt", "a.b", "a/b", "č/x.kt", "c/x.kt", "Ab", "ab", "ς", "σ")
+        for (a in paths) for (b in paths) for (c in paths) {
+            val ab = PathOrder.compare(a, b)
+            assertEquals(Integer.signum(ab), -Integer.signum(PathOrder.compare(b, a)), "$a $b")
+            if (ab < 0 && PathOrder.compare(b, c) < 0) assertEquals(-1, Integer.signum(PathOrder.compare(a, c)), "$a < $b < $c")
+        }
+    }
 }

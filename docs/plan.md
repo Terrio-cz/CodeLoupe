@@ -301,8 +301,8 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 
 ### Výsledek portu na Kotlin/JVM (CL-56, 2026-10-07)
 
-- Build báze Terria (2 211 souborů, podproces `-Xmx512m` SerialGC, nízká priorita): **6,6 s** ve workeru (~7,5 s
-  včetně startu JVM), peak workeru **355 MB** (budget 600), **0** souborů s chybami parseru (prototyp 20).
+- Build báze Terria (2 211 souborů, podproces `-Xmx512m` SerialGC, nízká priorita): **6,6–7,1 s** ve workeru (~8 s
+  včetně startu JVM), peak workeru **355–382 MB** (budget 600), **0** souborů s chybami parseru (prototyp 20).
 - Daemon (SerialGC, `-Xmx96m`, jen C1, AppCDS archiv v home): **112 MB** RSS po prvním dotazu, **138 MB** po 300
   dotazech (budget 200). Teplý dotaz: p50 **7 ms**, p95 **16 ms** v daemonu, 23 ms u klienta (budget 50). CLI
   0,65–0,8 s (start JVM; agenti používají MCP).
@@ -317,7 +317,11 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
   Terriu žádný rozdíl.
 - MCP přes `kotlin-sdk-server` 0.15 (bezstavový Streamable HTTP), Ktor CIO: odpovědi nesou `Connection: close`,
   nečinné spojení server zavře po 2 s. Headless Claude Code (haiku): volání → restart daemonu → volání bez chyby.
-- Testy: 28 (17 portovaných z Node + parita, CRLF/BOM, uzavírání spojení, overlay ve View, čtení refů, řazení, fronta).
+- Odolnost: extrakce běží na vlákně s velkým zásobníkem (zvládne i výraz s 20 000 členy); soubor, který přesto selže,
+  se uloží s chybou a build nepoloží; neúspěšný commit se 5 min nezkouší znovu (`/status` ukáže `failure`).
+  Báze nese verzi formátu (`format` v `repo.json`) — báze z prototypu nebo starého extraktoru se přestaví.
+- Testy: 33 (17 portovaných z Node + parita, CRLF/BOM, uzavírání spojení, chyby API, overlay ve View, čtení refů,
+  řazení, fronta, hluboký soubor, opakování po selhání buildu, formát indexu).
 
 ## 10. Rizika
 

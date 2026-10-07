@@ -32,10 +32,14 @@ internal class KotlinParser {
     // PSI wants `\n` line ends and no BOM. Spaces in their place keep every offset equal to the original text,
     // so all text the index stores is cut from the original.
     private fun psiSafe(text: String): String {
-        if (text.indexOf('\r') < 0 && !text.startsWith('﻿')) return text
+        if (text.indexOf('\r') < 0 && !text.startsWith(BOM)) return text
         val chars = text.toCharArray()
         for (i in chars.indices) if (chars[i] == '\r') chars[i] = ' '
-        if (chars[0] == '﻿') chars[0] = ' '
+        if (chars[0] == BOM) chars[0] = ' '
         return String(chars)
+    }
+
+    private companion object {
+        val BOM = Char(0xFEFF)
     }
 }

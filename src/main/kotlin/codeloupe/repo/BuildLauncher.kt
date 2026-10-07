@@ -10,9 +10,9 @@ import java.util.concurrent.TimeUnit
 
 /** Runs one base build in a child JVM, so the parser's memory goes away with the process. */
 class BuildLauncher(private val heapMb: Int, private val timeoutMs: Long) {
-    fun build(commonDir: String, commit: String, outFile: Path): BuildResult {
+    fun build(commonDir: String, commit: String, outFile: Path, workDir: Path): BuildResult {
         val command = JavaProcess.command(BuildWorker::class.java.name, jvmArgs(), listOf(commonDir, commit, outFile.toString()))
-        val process = ProcessBuilder(command).start().apply { outputStream.close() }
+        val process = ProcessBuilder(command).directory(workDir.toFile()).start().apply { outputStream.close() }
         val stderr = CompletableFuture.supplyAsync { tail(process.errorStream.readAllBytes().toString(Charsets.UTF_8)) }
         val stdout = CompletableFuture.supplyAsync { process.inputStream.readAllBytes().toString(Charsets.UTF_8) }
         if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) process.destroyForcibly().waitFor()

@@ -11,7 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 class FindCommand : ToolCommand("find") {
     private val q by argument(help = "Name, Type.member, package.Type or glob with * ?")
     private val kind by option(help = "class, interface, object, enum, companion, annotation, fun, property, constructor, enum_entry, typealias")
-    private val module by option(help = "Module path prefix, e.g. public-api")
+    private val module by option(help = "Module path prefix, e.g. services/billing")
     private val test by option(help = "true = only test sources, false = exclude them").boolean()
     private val limit by option(help = "At most this many lines (default 30)").int()
     private val locals by option(help = "Include local declarations").flag()

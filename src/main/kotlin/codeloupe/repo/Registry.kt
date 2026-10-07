@@ -5,6 +5,7 @@ import codeloupe.config.Config
 import codeloupe.daemon.JobQueue
 import codeloupe.git.Git
 import codeloupe.git.RefReader
+import codeloupe.index.Store
 import codeloupe.platform.IsoTime
 import codeloupe.platform.Sha1
 import codeloupe.query.View
@@ -35,6 +36,8 @@ class Registry(
     private val located = ConcurrentHashMap<String, RepoLocation>()
 
     fun locate(root: String): RepoLocation {
+        // The daemon's working directory is its home, so a relative root would name the wrong repository.
+        if (!Path.of(root).isAbsolute) throw IllegalArgumentException("root must be an absolute path: $root")
         val key = normalize(root)
         located[key]?.takeIf { System.currentTimeMillis() - it.at < LOCATE_TTL_MS }?.let { return it }
         if (!Path.of(key).exists()) throw IllegalArgumentException("root does not exist: $root")
@@ -50,8 +53,9 @@ class Registry(
         Files.createDirectories(dir)
         val saved = runCatching { JsonFormat.json.decodeFromString(RepoRecord.serializer(), Files.readString(dir.resolve("repo.json"))) }.getOrNull()
         RepoState(id, dir, commonDir, DefaultRef.of(commonDir)).apply {
+            // A base written by another index format (an older extractor) is rebuilt, not served.
             val file = saved?.baseFile?.let { Path.of(it) }
-            if (file != null && file.exists()) {
+            if (file != null && file.exists() && saved.format == Store.FORMAT) {
                 baseCommit = saved.baseCommit
                 baseFile = file
             }
@@ -61,34 +65,42 @@ class Registry(
 
     /**
      * Base index for the repository's current default-branch commit. A stale base keeps answering while the new
-     * one builds; only a missing base makes the caller wait (bounded by queryTimeoutMs).
+     * one builds; only a missing base makes the caller wait (bounded by queryTimeoutMs). A commit whose build
+     * failed is not retried for [RETRY_FAILED_MS].
      */
     suspend fun base(repo: RepoState): RepoState {
         val head = headOf(repo)
         if (repo.baseCommit == head) return repo
-        val job = queue.run(JobQueue.Lane.HEAVY, "build:${repo.id}:$head") { build(repo, head) }
+        val failed = synchronized(repo) { repo.failure?.takeIf { it.commit == head && System.currentTimeMillis() - repo.failedAt < RETRY_FAILED_MS } }
+        val job = if (failed == null) queue.run(JobQueue.Lane.HEAVY, "build:${repo.id}:$head") { build(repo, head) } else null
         if (repo.baseFile != null) return repo
+        if (job == null) throw IllegalStateException("indexing ${head.take(7)} failed: ${failed!!.error}")
         withTimeoutOrNull(config.queryTimeoutMs) { job.await() }
             ?: throw BusyException("indexing ${repo.commonDir} (first build); retry in a few seconds")
         return repo
     }
 
-    suspend fun view(root: String): RepoView {
+    /** Runs [read] on the base index of [root]'s repository; the answer carries a note when the worktree moved on. */
+    suspend fun <T> query(root: String, read: (View) -> T): Answer<T> {
         val location = locate(root)
         val repo = base(repo(location.commonDir))
-        val (baseFile, baseCommit) = synchronized(repo) { repo.baseFile!! to repo.baseCommit!! }
-        val worktreeHead = RefReader.head(location.worktree) ?: Git.run(location.worktree, "rev-parse", "HEAD", allowFail = true)?.trim()
-        val note = if (worktreeHead != null && worktreeHead != baseCommit) {
-            "(index of ${repo.defaultRef}@${baseCommit.take(7)}; this worktree is at ${worktreeHead.take(7)} — its own changes are not indexed yet)"
-        } else {
-            null
+        return withContext(Dispatchers.IO) {
+            // Opened under the lock that guards the swap, so a new build cannot prune this base in between.
+            val (view, baseCommit) = synchronized(repo) { View(repo.baseFile!!) to repo.baseCommit!! }
+            val value = view.use(read)
+            Answer(value, note(repo, location.worktree, baseCommit))
         }
-        return RepoView(View(baseFile), repo, location.worktree, note)
     }
 
-    fun snapshot(): List<RepoRecord> = repos.values.map(RepoState::record)
+    fun snapshot(): List<RepoSummary> = repos.values.map(RepoState::summary)
 
-    // Reading the ref files is free; only the git fallback is rate-limited.
+    private fun note(repo: RepoState, worktree: String, baseCommit: String): String? {
+        val head = RefReader.head(worktree) ?: Git.run(worktree, "rev-parse", "HEAD", allowFail = true)?.trim()
+        if (head == null || head == baseCommit) return null
+        return "(index of ${repo.defaultRef}@${baseCommit.take(7)}; this worktree is at ${head.take(7)} — its own changes are not indexed yet)"
+    }
+
+    // Reading the ref files costs microseconds; only the git fallback is rate-limited.
     private fun headOf(repo: RepoState): String = RefReader.branch(repo.commonDir, repo.defaultRef) ?: synchronized(repo) {
         if (System.currentTimeMillis() - repo.headAt > HEAD_TTL_MS) {
             repo.head = Git.run(repo.commonDir, "rev-parse", "${repo.defaultRef}^{commit}")!!.trim()
@@ -102,21 +114,26 @@ class Registry(
         val tmp = repo.dir.resolve("$name.tmp.db")
         val out = repo.dir.resolve("$name.db")
         val result = try {
-            launcher.build(repo.commonDir, commit, tmp)
+            launcher.build(repo.commonDir, commit, tmp, workDir = repo.dir)
         } catch (e: Exception) {
+            synchronized(repo) {
+                repo.failure = BuildFailure(commit, IsoTime.now(), e.message ?: e.toString())
+                repo.failedAt = System.currentTimeMillis()
+            }
             log("build ${repo.id} ${commit.take(7)} failed: ${e.message}")
             throw e
         }
-        for (suffix in listOf("", "-wal", "-shm")) Files.deleteIfExists(Path.of("$out$suffix"))
-        Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING)
         synchronized(repo) {
+            for (suffix in listOf("", "-wal", "-shm")) Files.deleteIfExists(Path.of("$out$suffix"))
+            Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING)
             repo.baseCommit = commit
             repo.baseFile = out
             repo.lastBuild = LastBuild(IsoTime.now(), result.ok, result.files, result.errors, result.ms, result.peakRssMb)
+            repo.failure = null
+            prune(repo)
         }
         save(repo)
         log("build ${repo.id} ${commit.take(7)}: ${result.files} files in ${result.ms} ms, peak ${result.peakRssMb} MB")
-        prune(repo)
         result
     }
 
@@ -124,9 +141,10 @@ class Registry(
         Files.writeString(repo.dir.resolve("repo.json"), PRETTY.encodeToString(RepoRecord.serializer(), repo.record()))
     }
 
-    // Old bases may still be open by an in-flight query (Windows refuses to delete open files): best effort.
+    // Called with the repo lock held. Windows refuses to delete a base an in-flight query still has open: best effort,
+    // the next build retries.
     private fun prune(repo: RepoState) {
-        val keep = synchronized(repo) { repo.baseFile }?.name ?: return
+        val keep = repo.baseFile?.name ?: return
         for (file in repo.dir.listDirectoryEntries("base-*")) {
             if (file.name == keep || file.name.startsWith("$keep-")) continue
             runCatching { Files.deleteIfExists(file) }
@@ -138,6 +156,7 @@ class Registry(
     private companion object {
         const val LOCATE_TTL_MS = 60_000
         const val HEAD_TTL_MS = 2_000
+        const val RETRY_FAILED_MS = 5 * 60_000
 
         @OptIn(ExperimentalSerializationApi::class)
         val PRETTY = Json(JsonFormat.json) {

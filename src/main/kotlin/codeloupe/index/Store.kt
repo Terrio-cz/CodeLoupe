@@ -11,6 +11,9 @@ import java.sql.Connection
 object Store {
     const val SCHEMA_VERSION = 1
 
+    /** Schema and extractor of an index; bump the extractor part whenever the facts of a file can change. */
+    const val FORMAT = "$SCHEMA_VERSION/kotlin-psi-1"
+
     private val SCHEMA = listOf(
         "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)",
         """CREATE TABLE IF NOT EXISTS files (

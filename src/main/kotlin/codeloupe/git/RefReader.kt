@@ -2,6 +2,7 @@ package codeloupe.git
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -15,6 +16,9 @@ import kotlin.io.path.readText
 object RefReader {
     private val SHA = Regex("[0-9a-f]{40}([0-9a-f]{24})?")
     private const val MAX_SYMREF_DEPTH = 5
+
+    // Repositories with many tags have megabyte-sized packed-refs; parse each version of the file once.
+    private val packedCache = ConcurrentHashMap<Path, Pair<Pair<Long, Long>, Map<String, String>>>()
 
     /** Commit of HEAD in the worktree at [worktree]. */
     fun head(worktree: String): String? = runCatching {
@@ -52,9 +56,15 @@ object RefReader {
     private fun packed(commonDir: Path, ref: String): String? {
         val file = commonDir.resolve("packed-refs")
         if (!file.exists()) return null
-        return Files.newBufferedReader(file).useLines { lines ->
-            lines.firstOrNull { !it.startsWith("#") && !it.startsWith("^") && it.endsWith(" $ref") }?.substringBefore(' ')
-        }
+        val stamp = Files.getLastModifiedTime(file).toMillis() to Files.size(file)
+        val cached = packedCache[file]?.takeIf { it.first == stamp }
+            ?: (stamp to parsePacked(file)).also { packedCache[file] = it }
+        return cached.second[ref]
+    }
+
+    private fun parsePacked(file: Path): Map<String, String> = Files.newBufferedReader(file).useLines { lines ->
+        lines.filter { !it.startsWith("#") && !it.startsWith("^") && ' ' in it }
+            .associate { it.substringAfter(' ') to it.substringBefore(' ') }
     }
 
     /** `.git` is the git dir itself, or a file `gitdir: <path>` in a linked worktree. */

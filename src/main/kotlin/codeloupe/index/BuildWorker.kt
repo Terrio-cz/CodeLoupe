@@ -17,7 +17,7 @@ object BuildWorker {
         val result = try {
             val (repoDir, commit, outFile) = args
             BaseBuilder.build(repoDir, commit, Path.of(outFile)).copy(peakRssMb = ProcessMemory.peakRssMb())
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             BuildResult(ok = false, error = e.message ?: e.toString())
         }
         println(JsonFormat.json.encodeToString(BuildResult.serializer(), result))

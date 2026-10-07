@@ -9,7 +9,7 @@ import java.nio.file.Path
 
 /** Resident set size of this process in MB (current and peak), or null when the OS does not say. */
 object ProcessMemory {
-    fun rssMb(): Long? = runCatching { if (NativeCalls.isWindows) windowsCounter(WORKING_SET) else procStatus("VmRSS:") }.getOrNull()
+    fun rssMb(): Long? = runCatching { if (NativeCalls.isWindows) windowsCounter(WORKING_SET) else procStatus("VmRSS:") ?: psRssMb() }.getOrNull()
 
     fun peakRssMb(): Long? = runCatching { if (NativeCalls.isWindows) windowsCounter(PEAK_WORKING_SET) else procStatus("VmHWM:") ?: rusageMaxRssMb() }.getOrNull()
 
@@ -31,6 +31,14 @@ object ProcessMemory {
         val status = Path.of("/proc/self/status")
         if (!Files.exists(status)) return null
         return Files.readAllLines(status).firstOrNull { it.startsWith(field) }?.filter(Char::isDigit)?.toLong()?.div(1024)
+    }
+
+    // macOS has no /proc; `/status` is rare enough for one `ps` call.
+    private fun psRssMb(): Long? {
+        val process = ProcessBuilder("ps", "-o", "rss=", "-p", ProcessHandle.current().pid().toString()).start()
+        val kb = process.inputStream.readAllBytes().toString(Charsets.UTF_8).trim().toLongOrNull()
+        process.waitFor()
+        return kb?.div(1024)
     }
 
     // macOS: getrusage(RUSAGE_SELF).ru_maxrss is in bytes and follows two 16-byte timevals.

@@ -104,7 +104,7 @@ class KotlinExtractorTest {
 
     @Test
     fun `CRLF and a BOM change only the hashes`() {
-        val crlf = Languages.extract("Constructs.kt", "﻿" + TEXT.replace("\n", "\r\n"))!!
+        val crlf = Languages.extract("Constructs.kt", Char(0xFEFF) + TEXT.replace("\n", "\r\n"))!!
         assertEquals(0, crlf.errors)
         assertEquals(facts.decls.map { it.copy(hash = "") }, crlf.decls.map { it.copy(hash = "") })
         // The BOM is one column on line 1.
