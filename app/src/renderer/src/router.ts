@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-export type Screen = 'overview' | 'branches' | 'runs' | 'tasks' | 'index' | 'gaps' | 'environment' | 'settings';
-export const SCREENS: Screen[] = ['overview', 'branches', 'runs', 'tasks', 'index', 'gaps', 'environment', 'settings'];
+export type Screen = 'overview' | 'branches' | 'tasks' | 'index' | 'gaps' | 'environment' | 'settings';
+export const SCREENS: Screen[] = ['overview', 'branches', 'tasks', 'index', 'gaps', 'environment', 'settings'];
 
 export interface Route {
   screen: Screen;
@@ -9,7 +9,7 @@ export interface Route {
   params: URLSearchParams;
 }
 
-/** `#/runs/<id>?step=12` → { screen: 'runs', id, params }. Unknown routes fall back to the overview. */
+/** `#/tasks/TER-1?x=1` → { screen: 'tasks', id, params }. Unknown routes fall back to the overview. */
 export function parseHash(hash: string): Route {
   const raw = hash.replace(/^#\/?/, '');
   const [path, qs = ''] = raw.split('?');

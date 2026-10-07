@@ -242,8 +242,6 @@ table.data td.ellipsis { max-width: 360px; overflow: hidden; text-overflow: elli
 .bar-list li > .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-track { height: 14px; position: relative; }
 .bar-track > span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
-.share { display: inline-block; vertical-align: middle; width: 120px; height: 10px; position: relative; }
-.share > span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--series-1); border-radius: 0 3px 3px 0; min-width: 1px; }
 
 /* Chart */
 .chart { position: relative; }

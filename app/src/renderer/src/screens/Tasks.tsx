@@ -4,8 +4,8 @@ import { bridge, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
 import { MarkdownView } from '../components/MarkdownView';
 import { Card, ErrorState, Loading, Search, Section, Select } from '../components/Parts';
-import { LayerBadge, RunBadge, StatusBadge, taskTone } from '../components/StatusBadge';
-import { ago, dateTime, num, tokens } from '../format';
+import { LayerBadge, StatusBadge, taskTone } from '../components/StatusBadge';
+import { ago, dateTime, num } from '../format';
 import { useSettings } from '../hooks';
 import { go, type Route } from '../router';
 
@@ -15,7 +15,6 @@ const columns: Column<TaskSummary>[] = [
   { key: 'state', header: 'Stav', render: t => <StatusBadge tone={taskTone(t.state)}>{t.state}</StatusBadge> },
   { key: 'priority', header: 'Priorita', render: t => t.priority ?? '—' },
   { key: 'branches', header: 'Větve', render: t => num(t.worktreeIds.length), numeric: true },
-  { key: 'runs', header: 'Běhy', render: t => num(t.runs), numeric: true },
   { key: 'reads', header: 'Čtení', render: t => num(t.reads), numeric: true },
   { key: 'updated', header: 'Aktualizováno', render: t => ago(t.updatedAt) },
 ];
@@ -108,17 +107,10 @@ function TaskDetailView({ id }: { id: string }) {
                 ))}
               </ul>
             </Section>
-            <Section title="Běhy" count={t.runList.length}>
-              <ul className="rows">
-                {t.runList.map(r => (
-                  <li key={r.id}><button className="link" onClick={() => go('runs', r.id)}>{r.role}</button><span className="grow muted">{dateTime(r.startedAt)}</span><span className="num">{tokens(r.weighted)}</span><RunBadge status={r.status} /></li>
-                ))}
-              </ul>
-            </Section>
             <Section title="Mirror">
               <dl className="dl">
                 <dt>Synchronizováno</dt><dd>{ago(t.mirror.syncedAt)}</dd>
-                <dt>Čtení agenty</dt><dd>{t.mirror.readsByRole.map(r => `${r.role} ${r.reads}`).join(', ') || '—'}</dd>
+                <dt>Čtení přes mirror</dt><dd>{num(t.reads)} · naposledy {ago(t.mirror.lastReadAt)}</dd>
               </dl>
             </Section>
           </div>

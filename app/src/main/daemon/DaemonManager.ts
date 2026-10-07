@@ -32,6 +32,8 @@ export class DaemonManager extends EventEmitter {
     private readonly home: DaemonHome,
     private readonly settings: () => AppSettings,
     private readonly periodMs: () => number,
+    /** Runs `<cli> start|stop`; injectable for tests. */
+    private readonly runCli: (verb: 'start' | 'stop') => Promise<string> = verb => execCli(settings(), verb, this.port()),
   ) {
     super();
     this.state = { phase: 'unknown', status: null, port: this.port(), message: null, manualStop: home.stoppedByUser(), checkedAt: null };
@@ -193,22 +195,7 @@ export class DaemonManager extends EventEmitter {
   }
 
   private cli(verb: 'start' | 'stop'): Promise<string> {
-    const s = this.settings();
-    return new Promise((resolve, reject) => {
-      // No shell: the command and its arguments go to the OS as an argv array.
-      execFile(s.cliCommand, [...s.cliArgs, verb], {
-        timeout: CLI_TIMEOUT_MS, windowsHide: true, shell: false,
-        env: { ...process.env, CODELOUPE_PORT: String(this.port()) },
-      }, (err, stdout, stderr) => {
-        if (err) {
-          const code = (err as NodeJS.ErrnoException).code;
-          if (code === 'ENOENT') return reject(new Error(`příkaz „${s.cliCommand}“ nebyl nalezen`));
-          if (code === 'EINVAL') return reject(new Error(`„${s.cliCommand}“ nejde spustit bez shellu; zadejte node.exe a cestu k bin/codeloupe.mjs`));
-          return reject(new Error(String(stderr || err.message).trim().split(/\r?\n/).slice(-1)[0]));
-        }
-        resolve(String(stdout));
-      });
-    });
+    return this.runCli(verb);
   }
 
   private serial<T>(fn: () => Promise<T>): Promise<T> {
@@ -224,4 +211,22 @@ export class DaemonManager extends EventEmitter {
     if (prev.phase !== this.state.phase) this.emit('phase', this.state.phase, prev.phase);
     this.emit('state', this.state);
   }
+}
+
+function execCli(s: AppSettings, verb: 'start' | 'stop', port: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // No shell: the command and its arguments go to the OS as an argv array.
+    execFile(s.cliCommand, [...s.cliArgs, verb], {
+      timeout: CLI_TIMEOUT_MS, windowsHide: true, shell: false,
+      env: { ...process.env, CODELOUPE_PORT: String(port) },
+    }, (err, stdout, stderr) => {
+      if (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'ENOENT') return reject(new Error(`příkaz „${s.cliCommand}“ nebyl nalezen`));
+        if (code === 'EINVAL') return reject(new Error(`„${s.cliCommand}“ nejde spustit bez shellu; zadejte node.exe a cestu k bin/codeloupe.mjs`));
+        return reject(new Error(String(stderr || err.message).trim().split(/\r?\n/).slice(-1)[0]));
+      }
+      resolve(String(stdout));
+    });
+  });
 }

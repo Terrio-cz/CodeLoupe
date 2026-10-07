@@ -94,7 +94,7 @@ export function Settings() {
             <dt>Port</dt><dd>{d.port}</dd>
             <dt>Repozitáře</dt><dd>{d.repos.map(r => <div key={r.id} className="mono">{r.path} ({r.baseRef})</div>)}</dd>
             <dt>YouTrack</dt><dd>{d.youtrack.map(y => <div key={y.url}>{y.url} · {y.projects.join(', ')} · token {y.tokenConfigured ? 'nastaven ✓' : 'chybí ✕'} · každých {y.pollSec} s</div>)}</dd>
-            <dt>Rozpočty</dt><dd>denní {tokens(d.budgets.dailyWeighted)} · běh {tokens(d.budgets.runWeighted)} · daemon {d.budgets.daemonRssMb} MB · build {d.budgets.buildPeakRssMb} MB</dd>
+            <dt>Rozpočty</dt><dd>denní {tokens(d.budgets.dailyWeighted)} · daemon {d.budgets.daemonRssMb} MB · build {d.budgets.buildPeakRssMb} MB</dd>
           </dl>
         ) : <span className="t2">{daemonSettings.error?.message ?? 'Načítám…'}</span>}
       </Card>

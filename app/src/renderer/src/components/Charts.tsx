@@ -136,8 +136,3 @@ export function BarList({ label, items }: { label: string; items: { name: string
     </ul>
   );
 }
-
-/** Share bar inside a table cell; the number next to it carries the value. */
-export function ShareBar({ value, max }: { value: number; max: number }) {
-  return <span className="share" aria-hidden="true"><span style={{ width: `${max ? (value / max) * 100 : 0}%` }} /></span>;
-}

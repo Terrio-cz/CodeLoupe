@@ -3,9 +3,8 @@ import type {
   Overview,
   Page,
   Range,
-  RunStep,
-  RunSummary,
   TaskSummary,
+  ToolCalls,
   WorktreeSummary,
 } from '../../shared/contract';
 import type { ApiRequest, Query } from '../../shared/request';
@@ -14,6 +13,16 @@ import type { ApiSource } from './ApiSource';
 import { MockData } from './mockData';
 
 const DAY = 86_400_000;
+
+// Weekly call telemetry per tool, scaled to the requested range.
+const TOOL_CALLS: ToolCalls[] = [
+  { tool: 'find', calls: 1210, p50Ms: 7, p95Ms: 41, avgResultChars: 640, emptyShare: 0.06, busy: 0, errors: 2 },
+  { tool: 'symbol', calls: 812, p50Ms: 9, p95Ms: 58, avgResultChars: 2310, emptyShare: 0.03, busy: 1, errors: 4 },
+  { tool: 'outline', calls: 604, p50Ms: 8, p95Ms: 36, avgResultChars: 1480, emptyShare: 0.01, busy: 0, errors: 0 },
+  { tool: 'issue', calls: 410, p50Ms: 4, p95Ms: 19, avgResultChars: 1720, emptyShare: 0, busy: 0, errors: 1 },
+  { tool: 'usages', calls: 233, p50Ms: 18, p95Ms: 140, avgResultChars: 1960, emptyShare: 0.09, busy: 2, errors: 0 },
+  { tool: 'changes', calls: 96, p50Ms: 120, p95Ms: 910, avgResultChars: 4100, emptyShare: 0.02, busy: 3, errors: 1 },
+];
 
 /** Answers the read-only API from deterministic data, with the daemon's filtering, sorting and paging. */
 export class MockApi implements ApiSource {
@@ -32,9 +41,6 @@ export class MockApi implements ApiSource {
       case 'overview': return this.overview(range(q));
       case 'worktrees': return { items: this.worktrees(q) };
       case 'worktrees/:id': return found(d.worktreeDetail(req.id!));
-      case 'runs': return this.runs(q);
-      case 'runs/:id': return found(d.runDetail(req.id!));
-      case 'runs/:id/steps': return this.steps(req.id!, q);
       case 'tasks': return { ...this.tasks(q), mirrorSyncedAt: new Date(d.now - 120_000).toISOString() };
       case 'tasks/:id': return found(d.taskDetail(req.id!));
       case 'index': return d.index();
@@ -62,22 +68,21 @@ export class MockApi implements ApiSource {
   private overview(r: Range): Overview {
     const d = this.data;
     const span = d.rangeMs(r);
-    const runs = d.runsIn(r);
-    const sum = (xs: RunSummary[]) => xs.reduce((a, x) => a + x.weighted, 0);
+    const sum = (xs: { weighted: number }[]) => xs.reduce((a, x) => a + x.weighted, 0);
     const dayStart = startOfDay(d.now);
-    const today = d.runs.filter(x => Date.parse(x.startedAt) >= dayStart);
-    const yesterday = d.runs.filter(x => {
-      const t = Date.parse(x.startedAt);
+    const today = d.usage.filter(x => Date.parse(x.at) >= dayStart);
+    const yesterday = d.usage.filter(x => {
+      const t = Date.parse(x.at);
       return t >= dayStart - DAY && t < d.now - DAY;
     });
     const bucket = r === '24h' ? 3_600_000 : DAY;
     const from = Math.floor((d.now - span) / bucket) * bucket;
     const series: Overview['costSeries'] = [];
     for (let t = from; t <= d.now; t += bucket) {
-      const w = sum(d.runs.filter(x => { const s = Date.parse(x.startedAt); return s >= t && s < t + bucket; }));
+      const w = sum(d.usage.filter(x => { const s = Date.parse(x.at); return s >= t && s < t + bucket; }));
       series.push({ t: new Date(t).toISOString(), weighted: w, baseline: Math.round(w * 1.17 + (r === '24h' ? 20_000 : 300_000)) });
     }
-    const weightedRange = sum(runs);
+    const weightedRange = sum(d.usageIn(r));
     const baselineRange = series.reduce((a, x) => a + x.baseline, 0);
     const savedTokens = Math.max(0, baselineRange - weightedRange);
     const savings = [
@@ -97,14 +102,14 @@ export class MockApi implements ApiSource {
         weightedToday: sum(today), weightedYesterdaySameTime: sum(yesterday),
         weightedRange, baselineRange, savedTokens,
         savedPct: baselineRange ? Math.round((savedTokens / baselineRange) * 1000) / 10 : 0,
-        runs: runs.length, activeWindows: 6, runningRuns: d.runs.filter(x => x.status === 'running').length,
+        activeWindows: 6, queriedWorktrees: d.worktrees.filter(w => w.queries24h > 0).length,
         codeloupeCalls: Math.round(3412 * scale), callP50Ms: 9,
         gaps: gaps.items.length, newGaps: gaps.items.filter(g => Date.parse(g.at) > d.now - DAY).length,
       },
       budget: { dailyWeighted: 25_000_000, usedToday: sum(today) },
       costSeries: series,
       savingsByTool: savings.map(s => ({ tool: s.tool, calls: Math.round(s.calls * scale), savedTokens: Math.round(savedTokens * s.share) })),
-      recentRuns: d.runs.slice(0, 10),
+      toolCalls: TOOL_CALLS.map(t => ({ ...t, calls: Math.round(t.calls * scale), busy: Math.round(t.busy * scale), errors: Math.round(t.errors * scale) })),
     };
   }
 
@@ -113,48 +118,6 @@ export class MockApi implements ApiSource {
     return this.data.worktrees.filter(w =>
       (!q.repo || w.repoId === q.repo) && (!q.layer || w.layer === q.layer)
       && (!text || `${w.branch} ${w.taskId} ${w.path}`.toLowerCase().includes(text)));
-  }
-
-  private runs(q: Query): Page<RunSummary> {
-    let xs = this.data.runsIn(range(q));
-    if (q.role) xs = xs.filter(x => x.role === q.role);
-    if (q.task) xs = xs.filter(x => x.taskId === q.task);
-    if (q.worktree) xs = xs.filter(x => x.worktreeId === q.worktree);
-    if (q.gapsOnly === true || q.gapsOnly === 'true') xs = xs.filter(x => x.gaps > 0);
-    const key = String(q.sort ?? 'started');
-    const val = (x: RunSummary): number => {
-      switch (key) {
-        case 'duration': return (x.endedAt ? Date.parse(x.endedAt) : this.data.now) - Date.parse(x.startedAt);
-        case 'turns': return x.turns;
-        case 'weighted': return x.weighted;
-        case 'peakContext': return x.peakContext;
-        case 'toolResultShare': return x.toolResultShare;
-        case 'gaps': return x.gaps;
-        default: return Date.parse(x.startedAt);
-      }
-    };
-    return page(sortBy(xs, val, q.order), q);
-  }
-
-  private steps(id: string, q: Query): Page<RunStep> {
-    let xs = found(this.data.runSteps(id));
-    if (typeof q.kind === 'string') xs = xs.filter(s => s.kind === q.kind);
-    if (typeof q.flags === 'string' && q.flags) {
-      const want = q.flags.split(',');
-      xs = xs.filter(s => want.every(f => s.flags.includes(f as RunStep['flags'][number])));
-    }
-    const key = String(q.sort ?? 'seq');
-    const val = (s: RunStep): number =>
-      key === 'weighted' ? s.weighted : key === 'carried' ? s.carriedWeighted : key === 'resultChars' ? s.resultChars
-        : key === 'latency' ? s.latencyMs ?? -1 : s.seq;
-    const sorted = sortBy(xs, val, q.order ?? (key === 'seq' ? 'asc' : 'desc'));
-    if (q.around !== undefined) {
-      // Start the page at the slot that contains the requested step (deep link from Gaps).
-      const limit = pageLimit(q);
-      const at = sorted.findIndex(s => s.seq === Number(q.around));
-      if (at >= 0) return page(sorted, { ...q, cursor: String(Math.floor(at / limit) * limit) });
-    }
-    return page(sorted, q);
   }
 
   private tasks(q: Query): Page<TaskSummary> {
@@ -179,11 +142,6 @@ function startOfDay(ms: number): number {
   const d = new Date(ms);
   d.setHours(0, 0, 0, 0);
   return d.getTime();
-}
-
-function sortBy<T>(xs: T[], val: (x: T) => number, order: Query[string]): T[] {
-  const dir = order === 'asc' ? 1 : -1;
-  return [...xs].sort((a, b) => (val(a) - val(b)) * dir);
 }
 
 function pageLimit(q: Query): number {

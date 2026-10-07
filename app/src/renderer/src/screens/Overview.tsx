@@ -1,24 +1,21 @@
-import type { RunSummary } from '../../../shared/contract';
+import type { ToolCalls } from '../../../shared/contract';
 import { bridge, useApi } from '../api';
 import { BarList, CostChart } from '../components/Charts';
 import { DataTable, type Column } from '../components/DataTable';
 import { Card, Delta, ErrorState, KpiTile, Loading, rangeLabel } from '../components/Parts';
-import { PhaseBadge, RunBadge } from '../components/StatusBadge';
-import { ago, dateTime, duration, ms, num, pct, time, tokens } from '../format';
+import { PhaseBadge } from '../components/StatusBadge';
+import { ago, ms, num, pct, time, tokens } from '../format';
 import { useDaemon, useRange } from '../hooks';
-import { go } from '../router';
 
-export const runColumns: Column<RunSummary>[] = [
-  { key: 'role', header: 'Role', render: r => r.role },
-  { key: 'task', header: 'Úkol', render: r => r.taskId ?? '—' },
-  { key: 'branch', header: 'Větev', render: r => <span className="mono">{r.branch ?? '—'}</span> },
-  { key: 'started', header: 'Začátek', render: r => dateTime(r.startedAt), sortKey: 'started' },
-  { key: 'duration', header: 'Délka', render: r => duration(r.startedAt, r.endedAt), numeric: true, sortKey: 'duration' },
-  { key: 'turns', header: 'Tahy', render: r => num(r.turns), numeric: true, sortKey: 'turns' },
-  { key: 'weighted', header: 'Cena', render: r => <>{tokens(r.weighted)}{r.overBudget && <span className="chip flag-error" style={{ marginLeft: 6 }}>nad rozpočtem</span>}</>, numeric: true, sortKey: 'weighted' },
-  { key: 'peak', header: 'Peak ctx', render: r => tokens(r.peakContext), numeric: true, sortKey: 'peakContext' },
-  { key: 'gaps', header: 'Mezery', render: r => num(r.gaps), numeric: true, sortKey: 'gaps' },
-  { key: 'status', header: 'Stav', render: r => <RunBadge status={r.status} /> },
+const callColumns: Column<ToolCalls>[] = [
+  { key: 'tool', header: 'Nástroj', render: t => <span className="mono">{t.tool}</span> },
+  { key: 'calls', header: 'Volání', render: t => num(t.calls), numeric: true },
+  { key: 'p50', header: 'p50', render: t => ms(t.p50Ms), numeric: true },
+  { key: 'p95', header: 'p95', render: t => ms(t.p95Ms), numeric: true },
+  { key: 'size', header: 'Ø výsledek', render: t => `${tokens(t.avgResultChars)} zn.`, numeric: true },
+  { key: 'empty', header: 'Prázdné', render: t => pct(t.emptyShare * 100), numeric: true },
+  { key: 'busy', header: 'Busy', render: t => num(t.busy), numeric: true },
+  { key: 'errors', header: 'Chyby', render: t => num(t.errors), numeric: true },
 ];
 
 export function Overview() {
@@ -49,7 +46,7 @@ export function Overview() {
           </KpiTile>
           <KpiTile label={`Cena ${r}`} value={tokens(k.weightedRange)} ctx={`baseline ${tokens(k.baselineRange)}`} />
           <KpiTile label={`Úspora ${r}`} value={pct(k.savedPct, 1)} ctx={`${tokens(k.savedTokens)} tokenů`} />
-          <KpiTile label="Aktivní okna" value={num(k.activeWindows)} ctx={`${num(k.runningRuns)} běhy teď`} />
+          <KpiTile label="Aktivní okna" value={num(k.activeWindows)} ctx={`${num(k.queriedWorktrees)} worktree dotazováno`} />
           <KpiTile label={`Volání CodeLoupe ${r}`} value={num(k.codeloupeCalls)} ctx={`${ms(k.callP50Ms)} p50`} />
           <KpiTile label={`Mezery ${r}`} value={num(k.gaps)} ctx={`${num(k.newGaps)} nových za 24 h`} />
         </div>
@@ -88,14 +85,13 @@ export function Overview() {
         <Card title="Rozpočty">
           <dl className="dl">
             <dt>Denní rozpočet</dt><dd>{budget ? `${tokens(data.budget.usedToday)} z ${tokens(budget)}` : 'nenastaven'}</dd>
-            <dt>Běhů nad rozpočtem</dt><dd>{num(data.recentRuns.filter(x => x.overBudget).length)} z posledních {data.recentRuns.length}</dd>
             <dt>Aktualizováno</dt><dd>{ago(data.generatedAt)}</dd>
           </dl>
         </Card>
       </div>
 
-      <Card title="Poslední běhy" actions={<button className="link" onClick={() => go('runs')}>Všechny běhy →</button>} bodyClass="">
-        <DataTable label="Poslední běhy" rows={data.recentRuns} columns={runColumns} rowKey={x => x.id} onOpen={x => go('runs', x.id)} />
+      <Card title={`Volání CodeLoupe podle nástroje (${r})`} bodyClass="">
+        <DataTable label="Volání CodeLoupe podle nástroje" rows={data.toolCalls} columns={callColumns} rowKey={x => x.tool} />
       </Card>
     </>
   );

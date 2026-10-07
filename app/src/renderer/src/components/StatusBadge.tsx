@@ -1,4 +1,4 @@
-import type { DeclChangeKind, LayerState, RepoIndexState, RunStatus, StepFlag } from '../../../shared/contract';
+import type { DeclChangeKind, LayerState, RepoIndexState } from '../../../shared/contract';
 import type { DaemonPhase } from '../../../shared/ipc';
 
 export type Tone = 'ok' | 'warning' | 'serious' | 'critical' | 'neutral' | 'running';
@@ -31,13 +31,6 @@ const REPO: Record<RepoIndexState, [Tone, string]> = {
 };
 export const RepoBadge = ({ state }: { state: RepoIndexState }) => <StatusBadge tone={REPO[state][0]}>{REPO[state][1]}</StatusBadge>;
 
-const RUN: Record<RunStatus, [Tone, string]> = {
-  running: ['running', 'běží'],
-  done: ['ok', 'hotovo'],
-  error: ['critical', 'chyba'],
-};
-export const RunBadge = ({ status }: { status: RunStatus }) => <StatusBadge tone={RUN[status][0]}>{RUN[status][1]}</StatusBadge>;
-
 const PHASE: Record<DaemonPhase, [Tone, string]> = {
   unknown: ['neutral', 'zjišťuji'],
   starting: ['running', 'spouští se'],
@@ -52,7 +45,6 @@ export const PhaseBadge = ({ phase }: { phase: DaemonPhase }) => <StatusBadge to
 export function taskTone(state: string): Tone {
   if (state === 'Done') return 'ok';
   if (state === 'In Progress' || state === 'Review' || state === 'Ready for testing') return 'running';
-  if (state === "Won't do") return 'neutral';
   return 'neutral';
 }
 
@@ -69,11 +61,3 @@ export function ChangeMark({ change }: { change: DeclChangeKind }) {
     </span>
   );
 }
-
-const FLAG: Record<StepFlag, string> = {
-  large_result: '⚠ velký výsledek',
-  gap: '⚑ mezera',
-  error: '✕ chyba',
-  codeloupe: '◆ CodeLoupe',
-};
-export const FlagChip = ({ flag }: { flag: StepFlag }) => <span className={`chip flag-${flag}`}>{FLAG[flag]}</span>;

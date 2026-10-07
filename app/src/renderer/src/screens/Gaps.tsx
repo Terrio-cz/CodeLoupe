@@ -3,7 +3,6 @@ import { useApi } from '../api';
 import { Card, ErrorState, Loading, Select } from '../components/Parts';
 import { ago, dateTime, num } from '../format';
 import { useRange } from '../hooks';
-import { go } from '../router';
 
 const REASONS: Record<string, string> = {
   followup_read: 'agent dočítal ručně',
@@ -60,7 +59,7 @@ export function Gaps() {
                           <td className="t2">{dateTime(g.at)} · {REASONS[g.reason]}</td>
                           <td className="mono">{g.fallback}</td>
                           <td className="mono" colSpan={2}>{g.target}</td>
-                          <td><button className="link" onClick={() => go('runs', g.runId, g.stepSeq ? { step: g.stepSeq } : undefined)}>krok {g.stepSeq ?? '—'} →</button></td>
+                          <td className="mono muted" title="Claude Code session a tah, kde agent sáhl po náhradě">{g.session}{g.turn !== null ? ` · tah ${g.turn}` : ''}</td>
                         </tr>
                       ))}
                     </Fragment>

@@ -28,31 +28,6 @@ export function weighted(t: Tokens): number {
 export type LayerState = 'fresh' | 'stale' | 'building' | 'error' | 'none';
 /** State of a repository's base index. */
 export type RepoIndexState = 'ready' | 'building' | 'stale' | 'error' | 'none';
-export type RunStatus = 'running' | 'done' | 'error';
-
-export interface RunSummary {
-  id: string;
-  sessionId: string;
-  role: string;
-  model: string;
-  taskId: string | null;
-  worktreeId: string | null;
-  branch: string | null;
-  startedAt: Iso;
-  endedAt: Iso | null;
-  status: RunStatus;
-  turns: number;
-  weighted: number;
-  tokens: Tokens;
-  peakContext: number;
-  /** 0..1 share of tool results in the run's cost. */
-  toolResultShare: number;
-  codeloupeCalls: number;
-  gaps: number;
-  /** weighted > budgets.runWeighted */
-  overBudget: boolean;
-}
-
 export interface WorktreeSummary {
   id: string;
   repoId: string;
@@ -68,7 +43,8 @@ export interface WorktreeSummary {
   changedDecls: number;
   layer: LayerState;
   lastActivityAt: Iso | null;
-  activeRuns: number;
+  /** CodeLoupe queries with this worktree as root in the last 24 h (call telemetry, CL-24). */
+  queries24h: number;
 }
 
 export interface TaskSummary {
@@ -80,9 +56,9 @@ export interface TaskSummary {
   type: string | null;
   assignee: string | null;
   updatedAt: Iso;
+  /** Issue reads served by the CodeLoupe mirror. */
   reads: number;
   worktreeIds: string[];
-  runs: number;
 }
 
 // § 9.3 GET /status — exists in the daemon today.
@@ -134,9 +110,9 @@ export interface Overview {
     baselineRange: number;
     savedTokens: number;
     savedPct: number;
-    runs: number;
+    /** Distinct MCP clients that called CodeLoupe in the last 15 minutes. */
     activeWindows: number;
-    runningRuns: number;
+    queriedWorktrees: number;
     codeloupeCalls: number;
     callP50Ms: number;
     gaps: number;
@@ -145,7 +121,19 @@ export interface Overview {
   budget: { dailyWeighted: number | null; usedToday: number };
   costSeries: { t: Iso; weighted: number; baseline: number }[];
   savingsByTool: { tool: string; calls: number; savedTokens: number }[];
-  recentRuns: RunSummary[];
+  /** CodeLoupe's own call telemetry per tool (calls.jsonl, CL-24). */
+  toolCalls: ToolCalls[];
+}
+export interface ToolCalls {
+  tool: string;
+  calls: number;
+  p50Ms: number;
+  p95Ms: number;
+  avgResultChars: number;
+  /** 0..1 */
+  emptyShare: number;
+  busy: number;
+  errors: number;
 }
 
 // § 9.6
@@ -156,34 +144,9 @@ export interface WorktreeDetail extends WorktreeSummary {
   changes: { change: DeclChangeKind; kind: string; fqn: string; path: string; line: number | null; callers: number }[];
   callers: { fqn: string; path: string; line: number; calls: string; exact: boolean }[];
   tests: { path: string; fqn: string | null; reason: 'touched' | 'calls_changed' }[];
-  runs: RunSummary[];
   task: TaskSummary | null;
   index: { layerFiles: number; parsedAt: Iso | null; errorFiles: string[] };
 }
-
-// § 9.8
-export type StepFlag = 'large_result' | 'gap' | 'error' | 'codeloupe';
-export interface RunStep {
-  seq: number;
-  at: Iso;
-  kind: 'prompt' | 'text' | 'tool';
-  tool: string | null;
-  summary: string;
-  resultChars: number;
-  tokens: Tokens;
-  weighted: number;
-  carriedWeighted: number;
-  latencyMs: number | null;
-  flags: StepFlag[];
-}
-export interface RunDetail extends RunSummary {
-  byTool: { tool: string; calls: number; resultChars: number; weighted: number; carriedWeighted: number }[];
-  stepCount: number;
-  /** Shared scale of the share bars across step pages. */
-  maxCarriedWeighted: number;
-}
-export type StepSort = 'seq' | 'weighted' | 'carried' | 'resultChars' | 'latency';
-export type RunSort = 'started' | 'duration' | 'turns' | 'weighted' | 'peakContext' | 'toolResultShare' | 'gaps';
 
 // § 9.10
 export interface TaskDetail extends TaskSummary {
@@ -194,8 +157,7 @@ export interface TaskDetail extends TaskSummary {
   links: { type: string; id: string; summary: string }[];
   activity: { at: Iso; author: string; kind: 'created' | 'comment' | 'field' | 'state'; text: string }[];
   worktrees: WorktreeSummary[];
-  runList: RunSummary[];
-  mirror: { syncedAt: Iso; readsByRole: { role: string; reads: number }[] };
+  mirror: { syncedAt: Iso; lastReadAt: Iso | null };
 }
 
 // § 9.11
@@ -243,8 +205,9 @@ export interface Gaps {
     shape: string;
     fallback: GapFallback;
     reason: GapReason;
-    runId: string;
-    stepSeq: number | null;
+    /** Claude Code session and turn of the fallback, as text (the app does not track agent runs). */
+    session: string;
+    turn: number | null;
     target: string;
   }[];
 }
@@ -271,7 +234,7 @@ export interface DaemonSettings {
   defaultRoot: string | null;
   repos: { id: string; path: string; baseRef: string }[];
   youtrack: { url: string; projects: string[]; tokenConfigured: boolean; pollSec: number }[];
-  budgets: { dailyWeighted: number | null; runWeighted: number | null; daemonRssMb: number; buildPeakRssMb: number };
+  budgets: { dailyWeighted: number | null; daemonRssMb: number; buildPeakRssMb: number };
 }
 
 // § 9.15
@@ -283,7 +246,7 @@ export interface DaemonEvent {
   severity: 'info' | 'warning' | 'critical';
   title: string;
   body: string;
-  ref: { screen: 'overview' | 'runs' | 'index' | 'gaps'; id: string | null };
+  ref: { screen: 'overview' | 'index' | 'gaps'; id: string | null };
 }
 export interface Events {
   /** Changes when the daemon starts numbering anew; the app re-baselines without notifying. */
@@ -298,9 +261,6 @@ export interface ResourceMap {
   overview: Overview;
   worktrees: { items: WorktreeSummary[] };
   'worktrees/:id': WorktreeDetail;
-  runs: Page<RunSummary>;
-  'runs/:id': RunDetail;
-  'runs/:id/steps': Page<RunStep>;
   tasks: Page<TaskSummary> & { mirrorSyncedAt: Iso | null };
   'tasks/:id': TaskDetail;
   index: IndexHealth;

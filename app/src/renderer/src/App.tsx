@@ -9,16 +9,15 @@ import { Environment } from './screens/Environment';
 import { Gaps } from './screens/Gaps';
 import { IndexScreen } from './screens/IndexScreen';
 import { Overview } from './screens/Overview';
-import { Runs } from './screens/Runs';
 import { Settings } from './screens/Settings';
 import { Tasks } from './screens/Tasks';
 
 const TITLES: Record<Screen, string> = {
-  overview: 'Přehled', branches: 'Větve', runs: 'Běhy agentů', tasks: 'Úkoly', index: 'Index', gaps: 'Mezery',
+  overview: 'Přehled', branches: 'Větve', tasks: 'Úkoly', index: 'Index', gaps: 'Mezery',
   environment: 'Prostředí', settings: 'Nastavení',
 };
-const KEYS: Record<string, Screen> = { o: 'overview', b: 'branches', r: 'runs', t: 'tasks', i: 'index', g: 'gaps', e: 'environment', s: 'settings' };
-const WITH_RANGE: Screen[] = ['overview', 'runs', 'gaps'];
+const KEYS: Record<string, Screen> = { o: 'overview', b: 'branches', t: 'tasks', i: 'index', g: 'gaps', e: 'environment', s: 'settings' };
+const WITH_RANGE: Screen[] = ['overview', 'gaps'];
 
 export function App() {
   const route = useRoute();
@@ -95,7 +94,7 @@ export function App() {
         <nav aria-label="Hlavní navigace" style={{ display: 'contents' }}>
           {link('overview')}
           <div className="nav-group">Práce</div>
-          {link('branches')}{link('runs')}{link('tasks')}
+          {link('branches')}{link('tasks')}
           <div className="nav-group">Index</div>
           {link('index')}{link('gaps')}
           <div className="nav-group">Systém</div>
@@ -121,7 +120,6 @@ export function App() {
         <div className="content">
           {route.screen === 'overview' && <Overview />}
           {route.screen === 'branches' && <Branches route={route} />}
-          {route.screen === 'runs' && <Runs route={route} />}
           {route.screen === 'tasks' && <Tasks route={route} />}
           {route.screen === 'index' && <IndexScreen />}
           {route.screen === 'gaps' && <Gaps />}

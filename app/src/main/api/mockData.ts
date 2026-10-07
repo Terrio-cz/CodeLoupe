@@ -8,10 +8,6 @@ import {
   type Events,
   type Gaps,
   type IndexHealth,
-  type RunDetail,
-  type RunStep,
-  type RunSummary,
-  type StepFlag,
   type TaskDetail,
   type TaskSummary,
   type Tokens,
@@ -20,7 +16,6 @@ import {
 } from '../../shared/contract';
 
 const HOUR = 3_600_000;
-const RUN_BUDGET = 2_000_000;
 const DAY = 24 * HOUR;
 
 /** Small seeded PRNG so every launch shows the same data. */
@@ -43,15 +38,15 @@ function hash(s: string): number {
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-interface RoleShape { role: string; model: string; cost: number; turns: number; peak: number; share: number }
-const ROLES: RoleShape[] = [
-  { role: 'reviewer', model: 'fable-5.1', cost: 392_000, turns: 14, peak: 145_000, share: 0.33 },
-  { role: 'planner', model: 'opus-5.5', cost: 1_000_000, turns: 52, peak: 182_000, share: 0.29 },
-  { role: 'coder-high', model: 'opus-5.5', cost: 921_000, turns: 55, peak: 132_000, share: 0.24 },
-  { role: 'coder', model: 'sonnet-5.5', cost: 187_000, turns: 17, peak: 61_000, share: 0.23 },
-  { role: 'tester', model: 'sonnet-5.5', cost: 260_000, turns: 24, peak: 70_000, share: 0.27 },
-  { role: 'deep-reviewer', model: 'opus-5.5', cost: 2_100_000, turns: 74, peak: 324_000, share: 0.4 },
-  { role: 'context', model: 'haiku-4.5', cost: 60_000, turns: 9, peak: 30_000, share: 0.35 },
+// Session cost and length medians by agent role (plan.md § 1); only the token totals are used.
+const SHAPES: { cost: number; turns: number }[] = [
+  { cost: 392_000, turns: 14 },
+  { cost: 1_000_000, turns: 52 },
+  { cost: 921_000, turns: 55 },
+  { cost: 187_000, turns: 17 },
+  { cost: 260_000, turns: 24 },
+  { cost: 2_100_000, turns: 74 },
+  { cost: 60_000, turns: 9 },
 ];
 
 interface WtSeed { id: string; repo: 'terrio' | 'codeloupe'; branch: string | null; task: string | null; isMain?: boolean }
@@ -97,10 +92,18 @@ function tokensFor(cost: number, r: () => number): Tokens {
   return { input: Math.max(200, Math.round(cost - used)), cacheWrite5m, cacheWrite1h, cacheRead, output };
 }
 
+interface Usage {
+  session: string;
+  at: string;
+  weighted: number;
+  turns: number;
+}
+
 export class MockData {
   readonly now: number;
   readonly worktrees: WorktreeSummary[];
-  readonly runs: RunSummary[];
+  /** Token usage samples behind the cost series; the app never shows them as agent runs. */
+  readonly usage: Usage[];
   readonly tasks: TaskSummary[];
   private seqBase = 4100;
 
@@ -118,45 +121,26 @@ export class MockData {
         isMain: !!s.isMain, taskId: s.task,
         ahead: s.isMain ? 0 : 1 + Math.floor(r() * 6), behind: s.isMain ? 0 : Math.floor(r() * 30),
         changedFiles: files, changedDecls: s.isMain ? 0 : Math.round(files * (1.5 + r() * 2)),
-        layer, lastActivityAt: iso(now - Math.floor(r() * 5 * HOUR)), activeRuns: s.isMain ? 0 : Math.floor(r() * 3),
+        layer, lastActivityAt: iso(now - Math.floor(r() * 5 * HOUR)), queries24h: s.isMain ? Math.floor(r() * 40) : 5 + Math.floor(r() * 120),
       };
     });
 
-    const runs: RunSummary[] = [];
-    const taskIds = WT_SEEDS.filter(w => w.task).map(w => w.task as string);
+    const usage: Usage[] = [];
     for (let i = 0; i < 140; i++) {
-      const shape = ROLES[Math.floor(r() ** 1.4 * ROLES.length)];
-      const task = taskIds[Math.floor(r() * taskIds.length)];
-      const wt = this.worktrees.find(w => w.taskId === task) ?? null;
-      const startedAt = now - Math.floor(r() ** 0.8 * 30 * DAY) - 60_000;
-      const cost = Math.round(shape.cost * (0.35 + r() * 1.5));
-      const turns = Math.max(3, Math.round(shape.turns * (0.4 + r() * 1.3)));
-      const running = i < 3;
-      const durationMs = turns * (20_000 + r() * 40_000);
-      const tokens = tokensFor(cost, r);
-      runs.push({
-        id: `run-${(hash(`run${i}`) >>> 0).toString(16).padStart(8, '0')}`,
-        sessionId: `s-${(hash(`s${i}`) >>> 0).toString(36)}`,
-        role: shape.role, model: shape.model, taskId: task, worktreeId: wt?.id ?? null, branch: wt?.branch ?? null,
-        startedAt: iso(running ? now - Math.floor(durationMs / 2) : startedAt),
-        endedAt: running ? null : iso(startedAt + durationMs),
-        status: running ? 'running' : r() < 0.04 ? 'error' : 'done',
-        turns, weighted: weighted(tokens), tokens,
-        peakContext: Math.round(shape.peak * (0.6 + r() * 0.7)),
-        toolResultShare: Math.round((shape.share * (0.7 + r() * 0.6)) * 100) / 100,
-        codeloupeCalls: Math.floor(r() * 30), gaps: r() < 0.25 ? 1 + Math.floor(r() * 3) : 0,
-        overBudget: weighted(tokens) > RUN_BUDGET,
-      });
+      const shape = SHAPES[Math.floor(r() ** 1.4 * SHAPES.length)];
+      // A few sessions today so the day KPI and the budget meter have data.
+      const at = i < 8 ? now - Math.floor(r() * 5 * HOUR) - 60_000 : now - Math.floor(r() ** 0.8 * 30 * DAY) - 60_000;
+      const tokens = tokensFor(Math.round(shape.cost * (0.35 + r() * 1.5)), r);
+      usage.push({ session: `s-${(hash(`s${i}`) >>> 0).toString(36)}`, at: iso(at), weighted: weighted(tokens), turns: Math.max(3, Math.round(shape.turns * (0.4 + r() * 1.3))) });
     }
-    runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-    this.runs = runs;
+    usage.sort((a, b) => b.at.localeCompare(a.at));
+    this.usage = usage;
 
     this.tasks = TASK_SEEDS.map((t, i) => ({
       id: t.id, project: t.id.split('-')[0], summary: t.summary, state: t.state, priority: t.priority, type: t.type,
       assignee: 'Tadeáš G.', updatedAt: iso(now - (i + 1) * 3.7 * HOUR),
       reads: 1 + (hash(t.id) % 9),
       worktreeIds: this.worktrees.filter(w => w.taskId === t.id).map(w => w.id),
-      runs: runs.filter(x => x.taskId === t.id).length,
     }));
   }
 
@@ -164,9 +148,9 @@ export class MockData {
     return range === '24h' ? DAY : range === '30d' ? 30 * DAY : 7 * DAY;
   }
 
-  runsIn(range: string): RunSummary[] {
+  usageIn(range: string): Usage[] {
     const from = this.now - this.rangeMs(range);
-    return this.runs.filter(x => Date.parse(x.startedAt) >= from);
+    return this.usage.filter(x => Date.parse(x.at) >= from);
   }
 
   worktreeDetail(id: string): WorktreeDetail | null {
@@ -202,7 +186,6 @@ export class MockData {
       baseRef: w.repoName === 'CodeLoupe' ? 'origin/main' : 'origin/master',
       mergeBase: (hash(`${id}base`) >>> 0).toString(16).slice(0, 7),
       changes, callers, tests,
-      runs: this.runs.filter(x => x.worktreeId === id).slice(0, 12),
       task,
       index: {
         layerFiles: w.changedFiles, parsedAt: w.layer === 'none' ? null : iso(this.now - 4 * 60_000),
@@ -211,61 +194,9 @@ export class MockData {
     };
   }
 
-  runDetail(id: string): RunDetail | null {
-    const run = this.runs.find(x => x.id === id);
-    const steps = this.runSteps(id);
-    if (!run || !steps) return null;
-    const byToolMap = new Map<string, RunDetail['byTool'][number]>();
-    for (const s of steps) {
-      const key = s.tool ?? (s.kind === 'prompt' ? 'prompt' : 'text');
-      const e = byToolMap.get(key) ?? { tool: key, calls: 0, resultChars: 0, weighted: 0, carriedWeighted: 0 };
-      e.calls++; e.resultChars += s.resultChars; e.weighted += s.weighted; e.carriedWeighted += s.carriedWeighted;
-      byToolMap.set(key, e);
-    }
-    return { ...run, stepCount: steps.length, maxCarriedWeighted: Math.max(0, ...steps.map(s => s.carriedWeighted)), byTool: [...byToolMap.values()].sort((a, b) => b.carriedWeighted - a.carriedWeighted) };
-  }
-
-  runSteps(id: string): RunStep[] | null {
-    const run = this.runs.find(x => x.id === id);
-    if (!run) return null;
-    const r = rng(hash(id));
-    const tools = ['Read', 'Bash rg', 'Bash sed -n', 'Grep', 'Edit', 'mcp__codeloupe__symbol', 'mcp__codeloupe__outline', 'mcp__codeloupe__find', 'mcp__youtrack__yt_get_issue', 'Bash git diff', 'Agent'];
-    const targets = ['OrderStatistics.kt', 'RevisionRepository.find', '"anti-join"', 'StatisticsRoutes.kt', 'TER-671', 'docs/api.md', 'ParcelRoutes.handle', 'build.gradle.kts'];
-    const steps: RunStep[] = [];
-    let t = Date.parse(run.startedAt);
-    const perTurn = run.weighted / run.turns;
-    for (let i = 0; i < run.turns; i++) {
-      const kind: RunStep['kind'] = i === 0 ? 'prompt' : r() < 0.15 ? 'text' : 'tool';
-      const tool = kind === 'tool' ? tools[Math.floor(r() * tools.length)] : null;
-      const resultChars = kind === 'prompt' ? 4_000 + Math.floor(r() * 4_000) : kind === 'text' ? 200 + Math.floor(r() * 1_500) : Math.floor(200 + r() ** 3 * 42_000);
-      const flags: StepFlag[] = [];
-      if (resultChars > 10_000) flags.push('large_result');
-      if (tool?.startsWith('mcp__codeloupe')) flags.push('codeloupe');
-      if (tool && /rg|sed|Read|Grep/.test(tool) && r() < 0.18 && run.gaps > 0) flags.push('gap');
-      if (r() < 0.02) flags.push('error');
-      const tokens = tokensFor(Math.round(perTurn * (0.5 + r())), r);
-      const latencyMs = kind === 'tool' ? Math.round(20 + r() ** 2 * 6_000) : null;
-      const target = targets[Math.floor(r() * targets.length)];
-      const summary = kind === 'prompt' ? `Task packet for ${run.taskId ?? 'session'} (${run.role})`
-        : kind === 'text' ? 'Assistant reasoning and plan update'
-        : `${tool} ${target}`;
-      steps.push({
-        seq: i + 1, at: iso(t), kind, tool, summary, resultChars, tokens, weighted: weighted(tokens),
-        // A result is cached once and re-read by every later turn (analysis.md § 1).
-        carriedWeighted: Math.round((resultChars / 4) * (1.25 + 0.1 * (run.turns - i - 1))),
-        latencyMs, flags,
-      });
-      t += 4_000 + Math.floor(r() * 50_000);
-    }
-    return steps;
-  }
-
   taskDetail(id: string): TaskDetail | null {
     const t = this.tasks.find(x => x.id === id);
     if (!t) return null;
-    const runList = this.runs.filter(x => x.taskId === id);
-    const roles = new Map<string, number>();
-    for (const x of runList) roles.set(x.role, (roles.get(x.role) ?? 0) + 1);
     const base = this.now - 3 * DAY;
     const instance = t.project === 'CL' ? 'CL' : 'TER';
     return {
@@ -290,8 +221,7 @@ export class MockData {
         { at: iso(base + 50 * HOUR), author: 'orchestrator', kind: 'field', text: 'Test Evidence: attached' },
       ],
       worktrees: this.worktrees.filter(w => w.taskId === id),
-      runList: runList.slice(0, 20),
-      mirror: { syncedAt: iso(this.now - 2 * 60_000), readsByRole: [...roles.entries()].map(([role, reads]) => ({ role, reads })) },
+      mirror: { syncedAt: iso(this.now - 2 * 60_000), lastReadAt: iso(this.now - 47 * 60_000) },
     };
   }
 
@@ -337,15 +267,15 @@ export class MockData {
       { tool: 'symbol', shape: 'extension fun', fallback: 'grep' as const },
       { tool: 'find', shape: 'kind=property', fallback: 'rg' as const },
     ];
-    const withGaps = this.runs.filter(x => x.gaps > 0);
+    const sessions = this.usage;
     const items: Gaps['items'] = [];
     for (let i = 0; i < 40; i++) {
       const s = shapes[Math.floor(r() ** 1.3 * shapes.length)];
-      const run = withGaps[Math.floor(r() * withGaps.length)];
+      const u = sessions[Math.floor(r() * sessions.length)];
       items.push({
-        id: `g-${i}`, at: iso(Date.parse(run.startedAt) + Math.floor(r() * HOUR)), tool: s.tool, shape: s.shape, fallback: s.fallback,
+        id: `g-${i}`, at: iso(Date.parse(u.at) + Math.floor(r() * HOUR)), tool: s.tool, shape: s.shape, fallback: s.fallback,
         reason: (['followup_read', 'followup_read', 'empty', 'candidate_manual'] as const)[Math.floor(r() * 4)],
-        runId: run.id, stepSeq: 2 + Math.floor(r() * Math.max(1, run.turns - 2)),
+        session: u.session, turn: 2 + Math.floor(r() * Math.max(1, u.turns - 2)),
         target: ['OrderStatistics.handle', 'RevisionRepository', 'ParcelRoutes.kt', 'String.toSlug', 'TokenMeter.limit'][i % 5],
       });
     }
@@ -384,7 +314,7 @@ export class MockData {
         { id: REPOS.codeloupe.id, path: REPOS.codeloupe.main, baseRef: 'origin/main' },
       ],
       youtrack: [{ url: 'https://terrio.youtrack.cloud', projects: ['TER', 'CL'], tokenConfigured: true, pollSec: 180 }],
-      budgets: { dailyWeighted: 25_000_000, runWeighted: RUN_BUDGET, daemonRssMb: 200, buildPeakRssMb: 600 },
+      budgets: { dailyWeighted: 25_000_000, daemonRssMb: 200, buildPeakRssMb: 600 },
     };
   }
 

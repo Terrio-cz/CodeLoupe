@@ -4,8 +4,8 @@ import { bridge, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
 import { Drawer } from '../components/Drawer';
 import { Card, ErrorState, Loading, Search, Section, Select } from '../components/Parts';
-import { ChangeMark, LayerBadge, RunBadge, StatusBadge, taskTone } from '../components/StatusBadge';
-import { ago, num, time, tokens } from '../format';
+import { ChangeMark, LayerBadge, StatusBadge, taskTone } from '../components/StatusBadge';
+import { ago, num } from '../format';
 import { useSettings } from '../hooks';
 import { go, type Route } from '../router';
 
@@ -18,7 +18,7 @@ const columns: Column<WorktreeSummary>[] = [
   { key: 'decls', header: 'Deklarace', render: w => num(w.changedDecls), numeric: true },
   { key: 'layer', header: 'Vrstva', render: w => <LayerBadge state={w.layer} /> },
   { key: 'activity', header: 'Aktivita', render: w => ago(w.lastActivityAt) },
-  { key: 'agents', header: 'Agenti', render: w => num(w.activeRuns), numeric: true },
+  { key: 'queries', header: 'Dotazy 24 h', render: w => num(w.queries24h), numeric: true },
 ];
 
 const LAYERS: { value: LayerState | ''; label: string }[] = [
@@ -118,19 +118,6 @@ function BranchDrawer({ id, onClose }: { id: string; onClose(): void }) {
                 <li key={i}>
                   <span className="grow mono">{t.path}</span>
                   <span className="muted">{t.reason === 'touched' ? 'změněný' : 'volá změněné'}</span>
-                </li>
-              ))}
-            </ul>
-          </Section>
-
-          <Section title="Běhy agentů" count={w.runs.length}>
-            <ul className="rows">
-              {w.runs.map(r => (
-                <li key={r.id}>
-                  <button className="link" onClick={() => go('runs', r.id)}>{r.role}</button>
-                  <span className="grow muted">{time(r.startedAt)} · {num(r.turns)} tahů</span>
-                  <span className="num">{tokens(r.weighted)}</span>
-                  <RunBadge status={r.status} />
                 </li>
               ))}
             </ul>

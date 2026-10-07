@@ -40,7 +40,7 @@ export class Notifier {
     this.lastSeq = Math.max(this.lastSeq, res.lastSeq);
     for (const e of res.items) {
       if (!this.enabled(e.kind)) continue;
-      const hash = `#/${e.ref.screen}${e.ref.id && e.ref.screen === 'runs' ? `/${encodeURIComponent(e.ref.id)}` : ''}`;
+      const hash = `#/${e.ref.screen}`;
       this.show(e.kind, e.title, e.body, hash);
     }
   }

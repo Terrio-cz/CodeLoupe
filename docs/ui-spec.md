@@ -1,13 +1,16 @@
 # CodeLoupe Desktop — UI spec
 
 Stav 2026-10-07 · karta CL-38 (epic CL-7) · zdroj dat: `docs/analysis.md` § 1–3 a § 6, `docs/plan.md` § 5, § 8.
-Implementace: CL-43 (Electron), CL-40 (obrazovky), CL-41 (detail větve), CL-42 (časová osa běhu),
+Implementace: CL-43 (Electron), CL-40 (obrazovky), CL-41 (detail větve),
 CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 
 ## 1. Zásady
 
 - **Samostatná desktopová aplikace** (Electron, TypeScript, React). Primární UI; tray, notifikace, správa daemonu.
 - **Nepřidává práci agentům**: čte jen to, co daemon už ví (read-only API, § 9). Nic v UI nevolá MCP nástroje.
+- **Nemonitoruje agenty** (uživatel 2026-10-07): běhy agentů, jejich kroky a stav sleduje launcher. Aplikace
+  ukazuje jen to, co CodeLoupe měří o sobě — spotřebu a úsporu tokenů proti baseline, telemetrii vlastních
+  volání, mezery, čtení issue přes mirror, index. Obrazovka „Běhy agentů“ a časová osa běhu (CL-42) proto nejsou.
 - **Hustý developer-tool styl** (Browserbase, Mintlify, Vercel, Linear): levý sidebar, tabulky s 32px řádky,
   postranní detail panely, žádné dekorace, ilustrace ani gradienty. Čísla tabulková (`tabular-nums`).
 - **Světlý i tmavý režim** ze stejných tokenů (§ 6), výchozí = systém.
@@ -24,7 +27,7 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 │ Přehled                    │ │                                                             │
 │ PRÁCE                      │ │ Obsah obrazovky                                             │
 │   Větve           8        │ │                                       ┌ Drawer (detail) ──┐ │
-│   Běhy agentů              │ │                                       │ z pravé strany,   │ │
+│                            │ │                                       │ z pravé strany,   │ │
 │   Úkoly           12       │ │                                       │ nad obsahem       │ │
 │ INDEX                      │ │                                       └───────────────────┘ │
 │   Index           ●        │ │                                                             │
@@ -44,23 +47,20 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 |---|---|---|---|
 | `#/overview` | Přehled | — | `overview`, `/status` |
 | `#/branches` · `#/branches/:id` | Větve | drawer (520 px) | `worktrees`, `worktrees/{id}` |
-| `#/runs` · `#/runs/:id` | Běhy agentů | široký drawer (min(1040 px, 76 vw)) s časovou osou | `runs`, `runs/{id}` |
 | `#/tasks` · `#/tasks/:id` | Úkoly | celá stránka s panelem vlastností vpravo | `tasks`, `tasks/{id}` |
 | `#/index` | Index | — | `index` |
 | `#/gaps` | Mezery | řádek se rozbalí | `gaps` |
 | `#/environment` | Prostředí (CL-54) | — | `environment` |
 | `#/settings` | Nastavení | — | `settings` + lokální nastavení aplikace (IPC) |
 
-- **Proklik**: větev → běh, úkol · běh → větev, úkol · úkol → běhy, větve · Přehled (tabulka běhů) → běh ·
-  notifikace → obrazovka z `event.ref`. Deep link = hash route, drawer se otevře nad seznamem.
+- **Proklik**: větev → úkol · úkol → větve · notifikace → obrazovka z `event.ref`. Deep link = hash route, drawer se otevře nad seznamem.
 - Sidebar ukazuje počty (aktivní worktree, otevřené úkoly v mirroru, nové mezery od posledního otevření)
   a stav indexu — jedním voláním `nav` (§ 9.4a) při startu, po obnovení (`Ctrl+R`) a s každým `/status` tickem okna
   (ne víc než 1× za 15 s).
-- Rozsah času (`24h | 7d | 30d`, výchozí `7d`) platí pro Přehled, Běhy, Mezery a pamatuje se. Popisky KPI
+- Rozsah času (`24h | 7d | 30d`, výchozí `7d`) platí pro Přehled a Mezery a pamatuje se. Popisky KPI
   nesou zvolený rozsah („Cena 7 d“ / „Cena 30 d“).
-- Deep link na krok běhu: `#/runs/:id?step=<seq>` (z Mezer) — drawer vybere krok a odscrolluje na něj.
-- Klávesy (vypínatelné v Nastavení → „Klávesové zkratky“, WCAG 2.1.4): `g o / g b / g r / g t / g i / g g /
-  g e / g s` navigace, `/` fokus hledání, `Esc` zavře drawer; `j/k` a `Enter` jen když má fokus tabulka;
+- Klávesy (vypínatelné v Nastavení → „Klávesové zkratky“, WCAG 2.1.4): `g o / g b / g t / g i / g g / g e /
+  g s` navigace, `/` fokus hledání, `Esc` zavře drawer; `j/k` a `Enter` jen když má fokus tabulka;
   obnovení `Ctrl+R` (žádná samostatná písmena mimo tabulku). Aplikace nemá výchozí menu Electronu:
   na Windows a Linuxu `Menu.setApplicationMenu(null)`, na macOS minimální menu jen s rolemi `appMenu` a
   `editMenu` (Cmd+C/V/X/A/Z v polích), bez `reload`, `forceReload` a `toggleDevTools` — `Ctrl/Cmd+R` tak
@@ -98,16 +98,19 @@ Přehled                                             [24h|7d|30d]  ⟳
 │ outline  █████████        0,7M   604×              │
 │ find     ████             0,3M   1 210×            │
 └────────────────────────────────────────────────────┘
-┌ Poslední běhy ───────────────────────────────────────────────────────── Všechny běhy → ┐
-│ Role      Úkol    Větev     Začátek  Tahy  Cena     Peak ctx  Mezery  Stav           │
-│ reviewer  TER-671 TER-671   12:41    14    392k     145k      0       ● hotovo        │
+┌ Volání CodeLoupe podle nástroje (7 d) ───────────────────────────────────────────────┐
+│ Nástroj  Volání  p50    p95    Ø výsledek  Prázdné  Busy  Chyby                       │
+│ find     1 210   7 ms   41 ms  640 zn.     6 %      0     2                           │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - KPI dlaždice: hodnota + jedna řádka kontextu (delta vůči předchozímu období nebo baseline). Delta s
   šipkou a slovem, nikdy jen barvou. „Cena dnes“ se srovnává se včerejškem **do stejné hodiny**
-  (`weightedYesterdaySameTime`) a ukazuje čerpání denního rozpočtu (`budget`); rozpočet běhu
-  (`runWeighted`) zvýrazní v Bězích řádky nad limitem (`RunSummary.overBudget`).
+  (`weightedYesterdaySameTime`) a ukazuje čerpání denního rozpočtu (`budget`).
+- „Aktivní okna“ = počet MCP klientů, kteří CodeLoupe volali za posledních 15 min (telemetrie volání, ne
+  sledování agentů).
+- Tabulka volání = vlastní telemetrie CodeLoupe (`calls.jsonl`, CL-24): latence, velikost výsledků, prázdné
+  výsledky, `busy`, chyby po nástrojích.
 - Graf: 2 série (skutečnost, baseline přerušovaně) → legenda nad grafem + přímé popisky; tabulkový pohled
   (přepínač „Tabulka“). Jedna osa Y.
 - Úspora podle nástroje: vodorovné pruhy, jedna série, seřazeno sestupně, hodnota přímo u pruhu.
@@ -124,7 +127,7 @@ Inspirace: [Mintlify Previews](https://mobbin.com/screens/31bc9279-f1e6-449c-914
 ```
 Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hledat větev, úkol]  ⟳
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-│ Větev        Repo           Úkol     Báze      Soubory  Deklarace  Vrstva     Aktivita  Agenti│
+│ Větev        Repo           Úkol     Báze      Soubory  Deklarace  Vrstva     Aktivita  Dotazy│
 │ TER-671      TerrioImporter TER-671  ↑3 ↓12    14       37         ● čerstvá  před 2 min  2  │
 │ TER-672      TerrioImporter TER-672  ↑1 ↓0     3        5          ◐ zastaralá před 1 h   0  │
 │ main (hlavní)CodeLoupe      —        ↑0 ↓0     0        0          ● čerstvá  před 5 min  0  │
@@ -140,7 +143,6 @@ Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hle
                                                      │ - fun legacyMap                 │
                                                      │ ─ Dotčení volající (21) ─────── │
                                                      │ ─ Testy (6) ────────────────── │
-                                                     │ ─ Běhy agentů (4) ───── → běh  │
                                                      │ ─ Index vrstvy ─────────────── │
                                                      │ 14 souborů · parse 12:40 · 0 chyb│
                                                      └─────────────────────────────────┘
@@ -151,45 +153,11 @@ Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hle
 - Sekce draweru jsou sbalitelné; dlouhé seznamy po 20 + „zobrazit dalších N“.
 - „Otevřít složku“ = IPC `open.worktree(id)`: main vezme cestu z daemonu a otevře ji jen jako adresář s `.git` (§ 10).
 
-### 3.3 Běhy agentů + detail s časovou osou
+### 3.3 (zrušeno) Běhy agentů
 
-Inspirace: [Browserbase Run](https://mobbin.com/screens/073d8baf-023d-40ef-8d91-98c05d12354a),
-[Browserbase run steps](https://mobbin.com/screens/6fd2d728-88b8-4276-a09c-9670afb19bb7),
-[StackAI Run details](https://mobbin.com/screens/bb0174f4-60aa-4e30-ac5f-73679b160f38) (waterfall + panel vlastností),
-[LangSmith trace](https://mobbin.com/screens/02770c1c-ae1c-4b56-af2d-a0a3bdd438e9),
-[Adaline traces](https://mobbin.com/screens/2207d89d-a8ef-43af-abe9-172896657854) (tabulka + waterfall vedle sebe),
-[Sentry trace preview](https://mobbin.com/screens/16987d18-5642-44bf-a645-4b326df775a6).
-
-```
-Běhy agentů     [Role ▾] [Úkol ▾] [Větev ▾] [Jen s mezerami ☐] [24h|7d|30d]   Řadit: Cena ▾  ⟳
-┌──────────────────────────────────────────────────────────────────────────────────────────┐
-│ Role         Model     Úkol    Větev    Začátek     Délka  Tahy  Cena ▼  Peak ctx  Nástroje% Mezery│
-│ planner      opus-5.5  TER-664 TER-664  10-06 22:10 41 min 52    1,0M    182k      29 %      2 │
-│ reviewer     fable-5.1 TER-671 TER-671  10-07 00:41 9 min  14    392k    145k      33 %      0 │
-└──────────────────────────────────────────────────────────────────────────────────────────┘
-┌ Drawer (široký): planner · TER-664 ───────────────────────────────────────────────── ✕ ┐
-│ 1,0M vážených · 52 tahů · peak 182k · 41 min · opus-5.5 · [Větev →] [Úkol →]           │
-│ Cena podle nástroje: Read 31 % · Bash(rg) 22 % · yt_get_issue 9 % · symbol 4 % …       │
-│ Filtr: [Vše|Nástroje|Text] [Jen velké výsledky ☐] [Jen mezery ☐]  Řadit: [Čas|Cena]    │
-│ ┌ # ┬ Čas ──┬ Krok ─────────────────────┬ Znaky ─┬ Latence ┬ Cena tahu ┬ Nesená ┬ podíl ──┐ │
-│ │ 1 │ 0:00  │ prompt                     │ 4,1k   │ —       │ 61k       │ —      │ █       │ │
-│ │ 2 │ 0:04  │ Read Order.kt (celý)  ⚠ velký│ 38k  │ 40 ms   │ 22k       │ 410k   │ ███████ │ │
-│ │ 3 │ 0:09  │ symbol OrderService.handle │ 1,2k   │ 12 ms   │ 14k       │ 12k    │ ▏       │ │
-│ │ 4 │ 0:11  │ Bash rg -n "handle"  ⚑ mezera│ 6,0k │ 310 ms  │ 15k       │ 70k    │ ██      │ │
-│ └───┴───────┴────────────────────────────┴────────┴─────────┴───────────┴────────┴─────────┘ │
-│ Vybraný krok: vstup (zkrácený, redigovaný), tokeny input/cache write/cache read/output, │
-│ latence, příznaky.                                                                     │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-- **Časová osa** = tabulka kroků s pruhem „nesené ceny“ (výsledek × další tahy, plan.md § 8.1) — to je
-  podstatné číslo; časový waterfall je sekundární (sloupec Čas).
-- Příznaky: `⚠ velký výsledek` (> 10k znaků), `⚑ mezera` (gap detector CL-22), `✕ chyba`, `◆ CodeLoupe`
-  volání — ikona + text.
-- Řazení podle ceny i nesené ceny, filtr velkých výsledků a mezer (CL-42 kritéria) — na serveru
-  (`runs/{id}/steps`, § 9.8a), po stránkách 200 kroků; dlouhé session (tisíce kroků) se tak nikdy nenačítají celé.
-- Seznam běhů řadí server podle všech číselných sloupců (§ 9.7); sloupec bez serverového řazení nemá
-  `aria-sort` ani šipku.
+Obrazovka běhů a detail s časovou osou kroků (původně CL-42) byly vyřazeny rozhodnutím uživatele 2026-10-07:
+monitorování agentů patří launcheru, ne CodeLoupe. Data z transcriptů daemon dál používá jen agregovaně —
+pro spotřebu a úsporu na Přehledu a pro detektor mezer.
 
 ### 3.4 Úkoly (YouTrack mirror) + detail
 
@@ -202,8 +170,8 @@ Inspirace: [Canny Idea detail](https://mobbin.com/screens/e6f63663-c551-4177-bd5
 ```
 Úkoly           [Projekt ▾] [Stav ▾] [🔍 hledat]                            mirror 12:40 ⟳
 ┌───────────────────────────────────────────────────────────────────────────────────────┐
-│ ID       Název                                   Stav         Priorita  Větve Běhy Čtení │
-│ TER-671  Scope statistics anti-join …            In Progress  Major     1     6    4     │
+│ ID       Název                                   Stav         Priorita  Větve Čtení      │
+│ TER-671  Scope statistics anti-join …            In Progress  Major     1     4          │
 └───────────────────────────────────────────────────────────────────────────────────────┘
 
 Detail (#/tasks/TER-671):
@@ -214,10 +182,10 @@ Detail (#/tasks/TER-671):
 │ ─ Akceptační kritéria  3/5 ───────────────────────────  │ Řešitel     …               │
 │ ☑ …  ☐ …                                                │ Aktualizováno 12:31         │
 │ ─ Odkazy ─────────────────────────────────────────────  │ ─ Větve ─── TER-671 →       │
-│ ─ Aktivita ───────────────────────────────────────────  │ ─ Běhy (6) ─ planner →      │
+│ ─ Aktivita ───────────────────────────────────────────  │                             │
 │ ● 12:31 stav → In Progress                              │ ─ Mirror ──────────────────  │
 │ ● 12:10 komentář: …                                     │ synchronizováno 12:40       │
-│                                                         │ čtení agenty: planner 2, …  │
+│                                                         │ čtení přes mirror: 4        │
 └─────────────────────────────────────────────────────────┴─────────────────────────────┘
 ```
 
@@ -257,12 +225,12 @@ Výstup gap detectoru (CL-22): agent po volání CodeLoupe sáhl po `rg`/`sed`/`
 Mezery                                      [Nástroj ▾] [Důvod ▾] [24h|7d|30d]         ⟳
 ┌ Podle nástroje a tvaru dotazu ───────────────────────────────────────────────────────┐
 │ Nástroj  Tvar dotazu            Náhrada  Počet  Poslední   ▸                           │
-│ symbol   Type.member (overload) Read     9      12:31      ▸ rozbalit výskyty → běh   │
+│ symbol   Type.member (overload) Read     9      12:31      ▸ rozbalit výskyty         │
 │ find     glob *Repository       rg       4      11:02      ▸                          │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Rozbalený řádek: jednotlivé výskyty (čas, běh → `#/runs/:id?step=<seq>`, cíl).
+- Rozbalený řádek: jednotlivé výskyty (čas, důvod, náhrada, cíl, session a tah jako text — bez prokliku do běhu).
 
 ### 3.7 Prostředí (CL-54)
 
@@ -318,7 +286,7 @@ Nastavení
 │                                                                    [Uložit]           │
 ├ Daemon (jen čtení, z GET settings) ─────────────────────────────────────────────────┤
 │ Home %LOCALAPPDATA%\codeloupe · config.json [Otevřít]                                 │
-│ Repozitáře, YouTrack instance (token: nastaven ✓), rozpočty (denní 25M, běh 2M)       │
+│ Repozitáře, YouTrack instance (token: nastaven ✓), rozpočty (denní 25M)               │
 ├ O aplikaci ─────────────────────────────────────────────────────────────────────────┤
 │ Verze 0.4.0 · Electron 3x · RSS aplikace 182 MB (main 61, renderer 88, GPU 21, síť 12)│
 └──────────────────────────────────────────────────────────────────────────────────────┘
@@ -352,7 +320,7 @@ Ukončit
 
 | Událost | Zdroj | Text notifikace | Klik |
 |---|---|---|---|
-| Překročený rozpočet (den / běh) | `events` `budget_breach` | „Rozpočet překročen: dnes 26,1M / 25M“ | Přehled / běh |
+| Překročený denní rozpočet | `events` `budget_breach` | „Rozpočet překročen: dnes 26,1M / 25M“ | Přehled |
 | Build dokončen / selhal | `events` `build_finished` / `build_failed` | „Index TerrioImporter: hotovo za 5,4 s“ | Index |
 | Nové mezery | `events` `gap_new` | „3 nové mezery (symbol)“ | Mezery |
 | Daemon spadl / znovu běží | lokálně (`/status` přestal odpovídat) | „Daemon neodpovídá — spouštím znovu“ | — |
@@ -368,12 +336,11 @@ Notifikace se slučují (max 1 za typ za minutu), každá se dá vypnout v Nasta
 | `KpiTile` | Přehled | label (12 px muted), hodnota (22 px), kontext (12 px), volitelně delta ▲▼ se slovem |
 | `DataTable` | všechny seznamy | 32 px řádky, sticky hlavička, řazení (`aria-sort`), výběr řádku klávesnicí, prázdný stav, skeleton, „… +N“; čísla vpravo `tabular-nums` |
 | `FilterBar` | nad tabulkou | jeden řádek: select, toggle, hledání; reset |
-| `Drawer` | detail větve, běhu | z pravé strany, `role="dialog"` `aria-modal`, focus trap, `Esc`, návrat fokusu, šířka `md` 520 / `xl` 76 vw |
+| `Drawer` | detail větve | z pravé strany, `role="dialog"` `aria-modal`, focus trap, `Esc`, návrat fokusu, šířka 520 px |
 | `Section` | drawer, detail | sbalitelná hlavička s počtem |
-| `Timeline` | detail běhu | tabulka kroků + pruh nesené ceny, výběr kroku → detail kroku, řazení a filtry |
 | `AreaChart` | cena v čase | SVG, 2 série max, jedna osa, crosshair + tooltip, tabulkový pohled |
 | `BarList` | úspora podle nástroje, cena podle nástroje | vodorovné pruhy, hodnota u pruhu, jedna série |
-| `StatusBadge` | vrstvy, buildy, běhy, úkoly | tečka/ikona + text; stavy `ok`, `warning`, `serious`, `critical`, `neutral`, `running` |
+| `StatusBadge` | vrstvy, buildy, úkoly, daemon | tečka/ikona + text; stavy `ok`, `warning`, `serious`, `critical`, `neutral`, `running` |
 | `ChangeMark` | změněné deklarace | `+ ~ ^ -` + `aria-label` |
 | `PropertyList` | panel vlastností úkolu | dvojice label/hodnota, 28 px řádky |
 | `ActivityFeed` | úkol | tečka, čas, autor, text |
@@ -436,7 +403,7 @@ s ikonou a textem.
   draweru odscrolluje mimo jeho plochu.
 - Reflow (1.4.10): pod ~900 CSS px (200 % zoom) je drawer přes celou šířku a sidebar sbalený.
 - Grafy: `role="img"` + `aria-label` se shrnutím, tabulkový pohled, legenda pro ≥ 2 série.
-- Stav nikdy jen barvou (StatusBadge, ChangeMark, příznaky kroků).
+- Stav nikdy jen barvou (StatusBadge, ChangeMark).
 - `prefers-reduced-motion`: bez animací draweru; jinak max 150 ms.
 - Měřítko textu: layout snese 200 % zoom (`Ctrl +`), tabulky se horizontálně posouvají uvnitř karty.
 
@@ -480,9 +447,8 @@ s ikonou a textem.
   400 / 404 / 503. `busy` = data se právě počítají (fronta), klient zkusí znovu.
 - ID: worktree = prvních 12 hex SHA-1 normalizované cesty (absolutní `path.resolve`, lomítka `/`, na Windows
   malými písmeny, bez koncového lomítka — stejně pro `git worktree list` i cesty z transcriptů); worktree,
-  který už neexistuje, má v běhu `worktreeId: null` a jen textové `branch`. Repo = repo-id daemonu; běh = id
-  agenta / session z transcriptu; úkol = `idReadable`.
-- **Žádná tajemství**: žádné hodnoty proměnných; `summary` kroků max 200 znaků, redigované (vzory klíčů,
+  který už neexistuje, se v telemetrii volání neukáže. Repo = repo-id daemonu; úkol = `idReadable`.
+- **Žádná tajemství**: žádné hodnoty proměnných; `target` mezer max 200 znaků, redigovaný (vzory klíčů,
   `Authorization`, `*_TOKEN=…`).
 - Kanonická kopie typů: `app/src/shared/contract.ts` (aplikace) — změna kontraktu mění obojí.
 
@@ -495,27 +461,18 @@ interface Page<T> { items: T[]; total: number; nextCursor: string | null }
 interface Tokens { input: number; cacheWrite5m: number; cacheWrite1h: number; cacheRead: number; output: number }
 type LayerState = 'fresh' | 'stale' | 'building' | 'error' | 'none';           // vrstva worktree (plan.md § 5.3)
 type RepoIndexState = 'ready' | 'building' | 'stale' | 'error' | 'none';      // báze repozitáře
-type RunStatus = 'running' | 'done' | 'error';
-
-interface RunSummary {
-  id: string; sessionId: string; role: string; model: string;
-  taskId: string | null; worktreeId: string | null; branch: string | null;
-  startedAt: Iso; endedAt: Iso | null; status: RunStatus;
-  turns: number; weighted: number; tokens: Tokens; peakContext: number;
-  toolResultShare: number;      // 0..1 podíl výsledků nástrojů z ceny
-  codeloupeCalls: number; gaps: number;
-  overBudget: boolean;          // weighted > budgets.runWeighted (zvýraznění v Bězích)
-}
 interface WorktreeSummary {
   id: string; repoId: string; repoName: string; path: string;
   branch: string | null; head: string; isMain: boolean; taskId: string | null;
   ahead: number; behind: number; changedFiles: number; changedDecls: number;
-  layer: LayerState; lastActivityAt: Iso | null; activeRuns: number;
+  layer: LayerState; lastActivityAt: Iso | null;
+  queries24h: number;           // dotazy CodeLoupe s tímto worktree jako root za 24 h (CL-24)
 }
 interface TaskSummary {
   id: string; project: string; summary: string; state: string;
   priority: string | null; type: string | null; assignee: string | null;
-  updatedAt: Iso; reads: number; worktreeIds: string[]; runs: number;
+  updatedAt: Iso; reads: number;  // čtení issue obsloužená mirrorem
+  worktreeIds: string[];
 }
 ```
 
@@ -547,16 +504,18 @@ interface Overview {
   range: Range; generatedAt: Iso;
   kpis: {
     weightedToday: number; weightedYesterdaySameTime: number;   // včera do stejné hodiny
-    weightedRange: number; baselineRange: number;   // baseline = medián role z baseline × počet běhů role
+    weightedRange: number; baselineRange: number;   // baseline = medián role z baseline × počet sessions role
     savedTokens: number; savedPct: number;          // odhad úspory nástrojů CodeLoupe (CL-21/CL-24)
-    runs: number; activeWindows: number; runningRuns: number;
+    activeWindows: number;        // MCP klienti, kteří volali CodeLoupe za posledních 15 min
+    queriedWorktrees: number;
     codeloupeCalls: number; callP50Ms: number;
     gaps: number; newGaps: number;
   };
   budget: { dailyWeighted: number | null; usedToday: number };
   costSeries: { t: Iso; weighted: number; baseline: number }[];  // 24h: hodinové, jinak denní buckety
   savingsByTool: { tool: string; calls: number; savedTokens: number }[];
-  recentRuns: RunSummary[];                                       // 10 nejnovějších
+  toolCalls: { tool: string; calls: number; p50Ms: number; p95Ms: number; avgResultChars: number;
+               emptyShare: number; busy: number; errors: number }[];   // telemetrie volání (CL-24)
 }
 ```
 
@@ -570,40 +529,14 @@ interface WorktreeDetail extends WorktreeSummary {
              path: string; line: number | null; callers: number }[];
   callers: { fqn: string; path: string; line: number; calls: string; exact: boolean }[];
   tests: { path: string; fqn: string | null; reason: 'touched' | 'calls_changed' }[];
-  runs: RunSummary[];
   task: TaskSummary | null;
   index: { layerFiles: number; parsedAt: Iso | null; errorFiles: string[] };
 }
 ```
 
-### 9.7 `GET /ui-api/v1/runs?range=&role=&task=&worktree=&gapsOnly=&sort=&order=asc|desc&limit=&cursor=` → `Page<RunSummary>`
+### 9.7–9.8 (zrušeno)
 
-`sort` = `started | duration | turns | weighted | peakContext | toolResultShare | gaps` (výchozí `started`).
-Agregace běhů jsou předpočítané při ingestu (§ 9.17), dotaz je indexovaný select — cíl < 200 ms i pro `30d`.
-
-### 9.8 `GET /ui-api/v1/runs/{id}`
-```ts
-interface RunDetail extends RunSummary {
-  byTool: { tool: string; calls: number; resultChars: number; weighted: number; carriedWeighted: number }[];
-  stepCount: number;                  // kroky po stránkách: § 9.8a
-  maxCarriedWeighted: number;         // společné měřítko pruhů „podíl“ napříč stránkami
-}
-```
-
-### 9.8a `GET /ui-api/v1/runs/{id}/steps?sort=seq|weighted|carried|resultChars|latency&order=&flags=&kind=&around=&limit=&cursor=` → `Page<RunStep>`
-```ts
-interface RunStep {
-  seq: number; at: Iso; kind: 'prompt' | 'text' | 'tool';
-  tool: string | null;              // 'Read', 'Bash', 'mcp__codeloupe__symbol', …
-  summary: string;                  // ≤ 200 znaků, redigováno
-  resultChars: number; tokens: Tokens; weighted: number;
-  carriedWeighted: number;          // výsledek × následující tahy (plan.md § 8.1)
-  latencyMs: number | null;
-  flags: ('large_result' | 'gap' | 'error' | 'codeloupe')[];
-}
-```
-`flags` = čárkou oddělený seznam (krok musí mít všechny), `kind` = `prompt|text|tool`; `limit` max 200;
-`around=<seq>` vrátí stránku, která daný krok obsahuje (deep link `#/runs/:id?step=<seq>`).
+API běhů agentů a jejich kroků (`runs`, `runs/{id}`, `runs/{id}/steps`) vypadlo s obrazovkou Běhy (§ 3.3).
 
 ### 9.9 `GET /ui-api/v1/tasks?project=&state=&q=&limit=&cursor=` → `Page<TaskSummary> & { mirrorSyncedAt: Iso | null }`
 
@@ -615,8 +548,8 @@ interface TaskDetail extends TaskSummary {
   criteria: { text: string; checked: boolean }[];
   links: { type: string; id: string; summary: string }[];
   activity: { at: Iso; author: string; kind: 'created' | 'comment' | 'field' | 'state'; text: string }[];
-  worktrees: WorktreeSummary[]; runList: RunSummary[];
-  mirror: { syncedAt: Iso; readsByRole: { role: string; reads: number }[] };
+  worktrees: WorktreeSummary[];
+  mirror: { syncedAt: Iso; lastReadAt: Iso | null };
 }
 ```
 
@@ -640,7 +573,7 @@ interface Gaps {
   items: { id: string; at: Iso; tool: string; shape: string;
            fallback: 'rg' | 'grep' | 'sed' | 'cat' | 'Read' | 'other';
            reason: 'followup_read' | 'empty' | 'candidate_manual' | 'rollback';
-           runId: string; stepSeq: number | null; target: string }[];
+           session: string; turn: number | null; target: string }[];   // session a tah jen jako text
 }
 ```
 
@@ -659,7 +592,7 @@ interface DaemonSettings {
   port: number; home: string; configFile: string; defaultRoot: string | null;
   repos: { id: string; path: string; baseRef: string }[];
   youtrack: { url: string; projects: string[]; tokenConfigured: boolean; pollSec: number }[];
-  budgets: { dailyWeighted: number | null; runWeighted: number | null; daemonRssMb: number; buildPeakRssMb: number };
+  budgets: { dailyWeighted: number | null; daemonRssMb: number; buildPeakRssMb: number };
 }
 ```
 
@@ -670,7 +603,7 @@ interface Events {
   lastSeq: number;
   items: { seq: number; at: Iso; kind: 'budget_breach' | 'build_finished' | 'build_failed' | 'gap_new';
            severity: 'info' | 'warning' | 'critical'; title: string; body: string;
-           ref: { screen: 'overview' | 'runs' | 'index' | 'gaps'; id: string | null } }[];
+           ref: { screen: 'overview' | 'index' | 'gaps'; id: string | null } }[];
 }
 ```
 `since` chybí → jen `epoch`, `lastSeq` a prázdné `items` (aplikace po startu nenotifikuje historii). Události
@@ -685,7 +618,6 @@ nim nemá časovač (plan.md § 5.1).
 | Sidebar | `nav` |
 | Přehled | `overview`, `/status` |
 | Větve, detail | `worktrees`, `worktrees/{id}` |
-| Běhy, detail | `runs`, `runs/{id}`, `runs/{id}/steps` |
 | Úkoly, detail | `tasks`, `tasks/{id}` |
 | Index | `index` |
 | Mezery | `gaps` |
@@ -696,11 +628,12 @@ nim nemá časovač (plan.md § 5.1).
 ### 9.17 Zdroje dat a implementace
 
 - CL-39 se staví v **Kotlin portu** (závisí na CL-56); Node prototyp ho nedostane.
-- Běhy, kroky, mezery, rozpočty a události: **inkrementální ingest transcriptů do SQLite daemonu** (CL-62;
+- Spotřeba a baseline, mezery, rozpočty a události: **inkrementální ingest transcriptů do SQLite daemonu** (CL-62;
   metodika `codeloupe metrics` CL-21, detektor mezer CL-22), spouštěný líně voláním UI API — bez časovače.
 - Telemetrie volání CodeLoupe (CL-24), úkoly z mirroru (CL-26), změny z `changes()` (CL-17) a vrstev (CL-16).
 - Dokud zdroj chybí, endpoint vrací prázdná data (ne 404), aby obrazovky fungovaly.
-- Rozpočet < 1 s na obrazovku (CL-40) se měří na ingestovaném baseline (2 651 běhů).
+- Rozpočet < 1 s na obrazovku (CL-40) se měří na ingestovaném baseline (2 651 sessions). Daemon neposkytuje
+  žádné API běhů ani kroků agentů.
 
 ## 10. Bezpečnost aplikace
 
@@ -743,7 +676,7 @@ nim nemá časovač (plan.md § 5.1).
 
 - Metrika: součet `workingSetSize` všech procesů z `app.getAppMetrics()` (sdílené stránky se započítají
   vícekrát — konzervativní horní mez), ověřeno i součtem `WorkingSet64` procesů z OS. Měří se po startu a s
-  otevřeným největším během; hodnota je v Nastavení → O aplikaci.
+  otevřeným detailem větve po průchodu všemi obrazovkami; hodnota je v Nastavení → O aplikaci.
 - `app.disableHardwareAcceleration()` — tabulky a SVG GPU nepotřebují, GPU proces zmenší (software compositing ho ponechá).
 - Žádná grafová knihovna (vlastní SVG), žádný router ani state manager, vlastní převodník markdownu —
   React + React DOM jsou jediné runtime závislosti.
@@ -755,7 +688,6 @@ nim nemá časovač (plan.md § 5.1).
 |---|---|
 | Dashboard s KPI | [Browserbase](https://mobbin.com/screens/654392d0-9063-4db4-8987-6b7fc6742537) · [AirOps](https://mobbin.com/screens/0246600f-6040-447b-88f9-0f52ed10c159) · [Mintlify](https://mobbin.com/screens/d895f4b2-6d7b-4e4b-abab-638e1c18debd) · [fal](https://mobbin.com/screens/3786699a-7b92-4f81-9545-737fd5edfcff) · [Adaline](https://mobbin.com/screens/7483692e-1571-40a7-829d-468a0686e2d9) · [OpenAI Usage](https://mobbin.com/screens/2bf4f941-a9a7-4308-aa0c-864135823830) · [Neon](https://mobbin.com/screens/1662d1cc-c43f-4227-91f1-bf6652b2146e) · [Railway](https://mobbin.com/screens/3af70f9f-c560-4a42-a15c-cbd12db09c73) |
 | Tabulka + drawer | [Navattic](https://mobbin.com/screens/79a31934-4ca2-4700-86a5-c180fa735404) · [Dovetail](https://mobbin.com/screens/aac9827e-b12f-4fe5-908a-2efd0acfcc11) · [Typeform](https://mobbin.com/screens/ff36a25d-3112-4aa7-92fc-91a091dafd5c) · [Airwallex](https://mobbin.com/screens/e2030715-1ee4-48ad-9dc1-e96346351e12) · [fal Request detail](https://mobbin.com/screens/5485a50c-1791-4b0c-a147-ee4c478c04ab) |
-| Běh / trace | [Browserbase Run](https://mobbin.com/screens/073d8baf-023d-40ef-8d91-98c05d12354a) · [Browserbase steps](https://mobbin.com/screens/6fd2d728-88b8-4276-a09c-9670afb19bb7) · [StackAI](https://mobbin.com/screens/bb0174f4-60aa-4e30-ac5f-73679b160f38) · [LangSmith](https://mobbin.com/screens/02770c1c-ae1c-4b56-af2d-a0a3bdd438e9) · [Adaline traces](https://mobbin.com/screens/2207d89d-a8ef-43af-abe9-172896657854) · [Sentry](https://mobbin.com/screens/16987d18-5642-44bf-a645-4b326df775a6) · [Databricks](https://mobbin.com/screens/7444dd7f-2985-442d-a68d-27566d343c01) |
 | Větve / deploymenty | [Mintlify Previews](https://mobbin.com/screens/31bc9279-f1e6-449c-9143-583e558609b4) · [Vercel](https://mobbin.com/screens/b9d9cc23-34a1-434c-a4ed-52a2a4f49bb7) · [Cloudflare](https://mobbin.com/screens/2dfb1cd3-26ac-4e63-9866-f293a0306177) · [Cofounder](https://mobbin.com/screens/3f704e54-eb37-425e-b3a2-096ba3e894c0) · [Railway](https://mobbin.com/screens/cf56574a-01d3-4efe-b841-e091c9ecc39d) |
 | Issue detail | [Canny](https://mobbin.com/screens/e6f63663-c551-4177-bd55-b2799aa5fad9) · [Shopify](https://mobbin.com/screens/a51ae731-6a37-494f-ba48-a1577c165650) · [Linear](https://mobbin.com/screens/cef36326-d8ec-4c6f-acd4-a9f1e1060d33) · [Plane](https://mobbin.com/screens/acb49906-5e78-45fc-b820-75354c74c2e0) · [Jira](https://mobbin.com/screens/8c2f9e48-a551-48a9-b793-18ddc2c8b239) · [GitLab](https://mobbin.com/screens/cc8104d3-0331-479d-9465-015134f6739e) |
 | Nastavení, tajemství | [Modal Secrets](https://mobbin.com/screens/e11ade6b-7c86-4534-b83a-471f6f64263a) · [Devin](https://mobbin.com/screens/9b6d3a6e-f980-4502-988e-fa3e31a72ae8) · [StackAI Env](https://mobbin.com/screens/085dc01f-65c9-409b-9e46-55a0a161d956) · [Supabase](https://mobbin.com/screens/8d3f5333-785a-4908-87cd-d3c20fdcdd39) · [Attio](https://mobbin.com/screens/04bc7a2a-d006-4bb5-b200-77681dd899d9) · [Vapi](https://mobbin.com/screens/96cc6786-d268-4b44-be65-3e8b97280d3c) · tok [Replit](https://mobbin.com/flows/4ecfe9d3-cb0a-42a1-9516-238bc237a077) · tok [Manus](https://mobbin.com/flows/fce9976f-bf4c-4187-b691-8e909c142afc) |
