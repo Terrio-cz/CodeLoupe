@@ -121,6 +121,7 @@ Obrazovky:
 
 Vizuální směr: hustý „developer tool“ styl (Browserbase, Mintlify): levý sidebar, tabulky, postranní detail
 panely, tmavý i světlý režim, žádné dekorace.
+Detailní spec (IA, wireframy, komponenty, tokeny, API kontrakt pro CL-39): [ui-spec.md](ui-spec.md).
 
 ## 7. Pořadí
 
