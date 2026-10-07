@@ -2,6 +2,7 @@ package codeloupe.daemon
 
 import codeloupe.jobs.JobsSnapshot
 import codeloupe.repo.RepoSummary
+import codeloupe.tracker.TrackerSummary
 import kotlinx.serialization.Serializable
 
 /** `GET /status`: what the daemon is, what it costs and what it is doing. */
@@ -20,4 +21,5 @@ data class DaemonStatus(
     val queue: QueueSnapshot,
     val repos: List<RepoSummary>,
     val jobs: JobsSnapshot,
+    val trackers: List<TrackerSummary> = emptyList(),
 )

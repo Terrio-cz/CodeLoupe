@@ -1,0 +1,3295 @@
+{
+ "recorded": "2026-10-07",
+ "source": "terrio.youtrack.cloud project CL, fields as YouTrackJson.ISSUE_FIELDS / ACTIVITY_FIELDS",
+ "issues": [
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 2,
+      "name": "Major",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "Epic",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "In Progress",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Index",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 1,
+       "name": "0.1 Core",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Core index & daemon",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791372157548,
+   "created": 1791329713901,
+   "idReadable": "CL-1",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-10",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-11",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-64",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-77",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-78",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-79",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-80",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-9",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-12",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-56",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "Per-file fact index, one daemon per machine with a priority queue, MCP over stateless Streamable HTTP, CLI — in **Kotlin/JVM** (user decision 2026-10-07; CL-56). Base index of the default branch built from git objects in a short-lived child JVM. The Node.js prototype (CL-9) measured: Terrio 2,211 files in 5.4 s, worker peak 567 MB, DB 57 MB, daemon 80 MB, query 9–31 ms — the Kotlin port must match or beat it within the JVM budgets in CL-56. Analysis: docs/analysis.md, plan: docs/plan.md (repo Terrio-cz/CodeLoupe; KB articles in this project).",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Critical",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "Epic",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "YouTrack task index & mirror",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376346641,
+   "created": 1791329714277,
+   "idReadable": "CL-4",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-26",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-27",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-28",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-29",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-30",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-90",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-91",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-92",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-93",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-94",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-95",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "Index the tracker like code: issues, epics, links and dependencies, fields, acceptance criteria, comments, and the code each task touched — kept fresh by a cheap watcher, queried by agents in one compact call. Serves reading (brief/sections/delta), the dispatcher (ready tasks, collisions with active worktrees), the planner (one context pack) and issue creation (duplicate check). Measured 2026-09-23 → 10-06: YouTrack tool results = 1.97 % of all agent cost; the dispatcher (terrio-suggester) spends 20 % of its cost on YouTrack (1,441 calls in 117 runs, ~12 per run) and predicts code collisions by hand with GitNexus/rg; issues are read 6.5× on average; yt_search 944 calls, yt_create_issue 204. Generic: a tracker adapter interface with YouTrack first (GitHub Issues/Jira possible later); Terrio workflow rules stay in the Terrio layer. Analysis: docs/analysis.md § 5.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [
+    {
+     "author": {
+      "login": "dev1",
+      "$type": "User"
+     },
+     "deleted": false,
+     "text": "Pozor při merge s CL-13: tabulka refs má nové sloupce bind, recv_type, args a parametry v decls.params nesou default/vararg (formát 2/kotlin-psi-3). StoreCopier je musí kopírovat, jinak overlay ztratí typy a usages zhorší přesnost.",
+     "updated": null,
+     "created": 1791371588652,
+     "id": "7-1356",
+     "$type": "IssueComment"
+    },
+    {
+     "author": {
+      "login": "dev1",
+      "$type": "User"
+     },
+     "deleted": false,
+     "text": "**Hotovo:** vrstvy worktree + líný sync báze na main 1420880; testy 58/0, review 3 kola bez otevřených nálezů. Terrio: první dotaz ve worktree 0,6–1,6 s, teplý p95 24–27 ms, RSS 174 MB, v klidu 0 CPU; posun báze o 644 souborů v HEAVY lane 2,5 s. Mimo rozsah: CL-79, CL-80.",
+     "updated": null,
+     "created": 1791372729014,
+     "id": "7-1360",
+     "$type": "IssueComment"
+    }
+   ],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Critical",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 3,
+      "name": "Done",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 2,
+      "name": "Query tools",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 2,
+       "name": "0.2 Navigation",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [
+    {
+     "author": {
+      "login": "dev1",
+      "$type": "User"
+     },
+     "mimeType": "text/plain",
+     "created": 1791372723307,
+     "name": "CL-16.md",
+     "size": 4013,
+     "id": "12-258",
+     "$type": "IssueAttachment"
+    }
+   ],
+   "resolved": 1791372729373,
+   "summary": "Worktree overlays and lazy base sync",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791372729383,
+   "created": 1791329717247,
+   "idReadable": "CL-16",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-44",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-56",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-2",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nAnswers must reflect the worktree being worked on, not only the default branch.\n\n## Scope\nOverlay DB per worktree = files differing from base commit B (git diff --name-status B + untracked, tombstones); check on query (git status + mtime/size), no watchers; lazy base sync when the default branch moves (inline ≤ 200 files, else heavy lane); GC of overlays whose worktree is gone.\n\n## Acceptance criteria\n- [x] Changed/new/deleted file visible in the next query\n- [x] Default branch moved by 500 files → correct answers, sync in the heavy lane\n- [x] Zero CPU when idle\n- [x] Overlay removed when its worktree disappears\n\n## Verification\nIntegration tests with a temp repo and two worktrees.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [
+    {
+     "author": {
+      "login": "dev1",
+      "$type": "User"
+     },
+     "deleted": false,
+     "text": "**Hotovo:** nástroj `changes` na main 0f9c3ed; testy 68/0, review 3 kola bez otevřených nálezů. Terrio (3 TER worktree): výstup 13–26 % `git diff` (6,9k / 10,2k / 15k znaků), 0,4–1,0 s, 1 volání místo ~15–80 tahů.",
+     "updated": null,
+     "created": 1791374808917,
+     "id": "7-1361",
+     "$type": "IssueComment"
+    }
+   ],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Critical",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 3,
+      "name": "Done",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 2,
+      "name": "Query tools",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 2,
+       "name": "0.2 Navigation",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [
+    {
+     "author": {
+      "login": "dev1",
+      "$type": "User"
+     },
+     "mimeType": "text/plain",
+     "created": 1791374808530,
+     "name": "CL-17.md",
+     "size": 6451,
+     "id": "12-259",
+     "$type": "IssueAttachment"
+    }
+   ],
+   "resolved": 1791374809294,
+   "summary": "changes(root): semantic diff for review",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376346840,
+   "created": 1791329717561,
+   "idReadable": "CL-17",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-91",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-44",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-56",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-2",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nReviewers spend 4.4 % of their cost on git diff plus re-reading changed files.\n\n## Scope\nChanged declarations against the merge-base: + added, ~ body changed, ^ signature changed, - removed; callers (count + top 10) and tests touching each; optional before/after body.\n\n## Acceptance criteria\n- [x] One call gives the reviewer the changed surface of a TER worktree\n- [x] Output scales with changed declarations, not file sizes\n- [x] Signature changes list affected callers\n\n## Verification\nRun on 3 landed TER branches; compare against git diff.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 2,
+      "name": "Major",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "In Progress",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Local YouTrack mirror with incremental watcher",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376762670,
+   "created": 1791329720487,
+   "idReadable": "CL-26",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-90",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-91",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-92",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-93",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-94",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-95",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-56",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nIssues are re-read 6.5× on average.\n\n## Scope\nSQLite mirror behind a tracker adapter interface (YouTrack first): issues, epics, fields, links, parsed acceptance criteria, comments, attachment metadata, history of state changes; full-text index (SQLite FTS5) over summary, description and comments; watcher polls `updated` per configured project every 2–5 min only while clients are active; freshness check by `updated` on read.\n\n## Acceptance criteria\n- [ ] Mirror stays within 5 min of YouTrack while windows run\n- [ ] No polling when idle\n- [ ] Credentials never logged or returned\n\n## Verification\nIntegration test against a test project; status shows last sync.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 2,
+      "name": "Major",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "issue(id): brief / sections / delta since last read",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791330819702,
+   "created": 1791329720831,
+   "idReadable": "CL-27",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-56",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nAgents need the acceptance criteria and a few fields, rarely the whole issue again.\n\n## Scope\nview=brief|full, sections=[...], since=<last read> → \"unchanged since …\" or only the diff; per-session read memory.\n\n## Acceptance criteria\n- [ ] Second read of an unchanged issue costs < 100 tokens\n- [ ] Criteria checklist rendered compactly\n\n## Verification\nMeasure yt reads per issue per task before/after (target ≤ 1 full read).",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 3,
+      "name": "Normal",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 3,
+      "name": "Optimization",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Slim write proxy: field updates and comments return only what changed",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791330819802,
+   "created": 1791329721147,
+   "idReadable": "CL-28",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-56",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nyt_update_fields responses are 2.9 % of tool-result cost.\n\n## Scope\nWrites go to YouTrack, response = changed fields + new state; mirror updated immediately.\n\n## Acceptance criteria\n- [ ] Update response ≤ 300 chars\n- [ ] Mirror reflects the write without a re-fetch\n\n## Verification\nCompare response sizes with the current youtrack MCP.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 3,
+      "name": "Normal",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "In Progress",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Generic YouTrack configuration (instances, projects, credentials)",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376763046,
+   "created": 1791329721466,
+   "idReadable": "CL-29",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-56",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nOther users have other instances and projects.\n\n## Scope\nConfig: instance URL, project short names, token from env/OS keychain; per-project workflow rules stay outside CodeLoupe (Terrio layer).\n\n## Acceptance criteria\n- [ ] Two projects (TER, CL) mirrored from one config\n- [ ] Token never in logs, results or the UI\n\n## Verification\nTest with TER + CL.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 3,
+      "name": "Normal",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 6,
+      "name": "Chore",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Terrio: route issue reads through CodeLoupe, keep TER write rules in the youtrack MCP",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791329722052,
+   "created": 1791329721787,
+   "idReadable": "CL-30",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nTerrio has lifecycle/completion rules in mcp/youtrack-mcp.mjs; reads are the expensive part.\n\n## Scope\nSkills and agents read via CodeLoupe issue(); writes keep using the youtrack MCP until the slim proxy carries the TER rules.\n\n## Acceptance criteria\n- [ ] terrio-youtrack skill updated\n- [ ] Measured drop in yt_get_issue calls\n\n## Verification\ncodeloupe metrics compare after one week.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [
+    {
+     "author": {
+      "login": "dev1",
+      "$type": "User"
+     },
+     "deleted": false,
+     "text": "Hotovo: CodeLoupe běží na Kotlin/JVM s parserem Kotlin PSI (spike: 1,8 s / 362 MB / 0 chybných souborů vs. tree-sitter-ng 3,3 s / 535 MB / 82), výstupy shodné s prototypem (53 + 10 dotazů), build Terria 7,1 s / 382 MB, daemon ~120–135 MB, p95 15 ms, testy 34/0, headless restart OK; Node prototyp odstraněn, main 3e7d3fe.",
+     "updated": null,
+     "created": 1791365860416,
+     "id": "7-1342",
+     "$type": "IssueComment"
+    }
+   ],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Critical",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 3,
+      "name": "Done",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Index",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 1,
+       "name": "0.1 Core",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [
+    {
+     "author": {
+      "login": "dev1",
+      "$type": "User"
+     },
+     "mimeType": "text/plain",
+     "created": 1791365853275,
+     "name": "CL-56-evidence.md",
+     "size": 5935,
+     "id": "12-249",
+     "$type": "IssueAttachment"
+    }
+   ],
+   "resolved": 1791365860795,
+   "summary": "Port CodeLoupe to Kotlin/JVM with parity to phase 1",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791365860808,
+   "created": 1791330817717,
+   "idReadable": "CL-56",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-10",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-11",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-15",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-18",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-19",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-21",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-22",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-24",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-25",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-26",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-27",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-28",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-29",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-32",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-33",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-34",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-37",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-39",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-45",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-46",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-48",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-50",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-51",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-52",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-53",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-66",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-67",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-68",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-69",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-70",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-71",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-74",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-12",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-13",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-14",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-16",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-17",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-20",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-1",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nThe user chose Kotlin (2026-10-07): it is the language they know and want to read. Phase 1 exists as a Node.js prototype (commit b7d0166, CL-9): it is the behavioural reference and is removed once the Kotlin version reaches parity. Performance expectation: queries equal (SQLite-bound), base build faster with a native parser, daemon RAM higher than Node (80 MB) — budgets below.\n\n## Scope\n1. **Parser spike first** — on all 2,211 Terrio Kotlin files measure parse-all time, peak RSS, files with syntax errors and artifact size for: (a) Kotlin compiler PSI, parse only (org.jetbrains.kotlin:kotlin-compiler-embeddable, stable 2.4.x line); (b) tree-sitter-ng (io.github.bonede:tree-sitter 0.26.x + tree-sitter-kotlin 0.3.8.1, JNI natives bundled); (c) jtreesitter 0.26.1 (FFM, Java 22+, grammar native lib must be built per OS). Record the decision and numbers in docs/plan.md. Java support (CL-11) must stay possible with the chosen route.\n2. **Gradle Kotlin DSL project** in the same repo, Maven Central only, non-interactive Gradle, toolchain JDK 25 (JetBrains Runtime 25 is in ~/.gradle/jdks; system JAVA_HOME is JDK 17 — never rely on it). One top-level type per file, package = folder, small single-purpose classes (the user's Kotlin rules).\n3. **Port**: extractor (decls, imports, refs with kinds/receivers/enclosing decl), SQLite store via org.xerial:sqlite-jdbc (same schema), base build from git objects in a child JVM (-Xmx512m, low priority, one at a time), registry (git common dir → repo, default branch, .codeloupe.json), priority queue with coalescing (coroutines), View with overlay masking, find/outline/symbol with identical output format, daemon (Ktor, 127.0.0.1, Host/Origin/x-codeloupe checks, Connection: close, /status, /api/<tool>, /shutdown, calls.jsonl), MCP over stateless Streamable HTTP via io.modelcontextprotocol:kotlin-sdk-server 0.15.x (or a minimal own JSON-RPC handler if the SDK cannot do stateless), CLI (clikt) with daemon autostart and mcp-config.\n4. **Tests**: port the 17 Node tests to kotlin.test/JUnit 5 with the same fixtures; repeat the headless Claude Code restart check.\n5. **Remove the Node prototype** (src/, bin/, package.json, node tests) in the last commit; README and docs updated.\n\n## Acceptance criteria\n- [x] Parser decision recorded with measured numbers for all three options\n- [x] Kotlin output of find/outline/symbol identical to the Node prototype on the fixtures and on 10 Terrio queries\n- [x] Terrio base build ≤ 10 s, build worker peak ≤ 600 MB\n- [x] Daemon steady RSS ≤ 200 MB (JVM flags tuned: SerialGC, small heap, CDS), query p95 ≤ 50 ms warm\n- [x] MCP works from Claude Code and survives a daemon restart (headless check)\n- [x] All ported tests green; Node prototype removed\n\n## Verification\ngradlew test; Terrio measurements attached; headless claude -p restart check attached.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Critical",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Task graph queries: tasks, task_graph, ready, epic_progress",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376344344,
+   "created": 1791376343822,
+   "idReadable": "CL-90",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-26",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nMeasured 2026-09-23 → 10-06: YouTrack tool results = 1.97 % of all agent cost; the dispatcher (terrio-suggester) spends 20 % of its cost on YouTrack (1,441 calls in 117 runs, ~12 per run) and predicts code collisions by hand with GitNexus/rg; issues are read 6.5× on average; yt_search 944 calls, yt_create_issue 204.\n\n## Scope\n`tasks(query)` — YouTrack-like filters + full-text, one line per task (id, state, type, priority, epic, title, blockers); `task_graph(id, depth)` — epic, subtasks, depends-on / required-for, relates, duplicates with states; `ready(scope)` — open tasks whose dependencies are resolved and that no active workspace holds (CL-66); `epic_progress(epic)` — counts by state, open criteria, blockers. All from the local index, compact text.\n\n## Acceptance criteria\n- [ ] Each query answers from the index in < 100 ms\n- [ ] ready() matches a manual check on 3 Terrio epics\n- [ ] Output ≤ 1 line per task\n\n## Verification\nTests on a fixture tracker dump + Terrio TER.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 2,
+      "name": "Major",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Task ↔ code links from git history and descriptions",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376346841,
+   "created": 1791376344422,
+   "idReadable": "CL-91",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-26",
+       "$type": "Issue"
+      },
+      {
+       "idReadable": "CL-17",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nWhich tasks touched this code, and which code will this task touch, are answered today by reading commits and grepping.\n\n## Scope\nLanded tasks: commits/merges with `TER-<n>` (configurable pattern) → changed files and declarations via the code index (changes() of CL-17). Open tasks: predicted touch set from paths, modules, symbols and API routes mentioned in the description and acceptance criteria, resolved against the code index (confidence labels). Queries: `task_code(id)`, `code_tasks(symbol|path)`.\n\n## Acceptance criteria\n- [ ] Landed TER tasks map to their declarations\n- [ ] Predicted touch sets carry confidence and evidence\n- [ ] code_tasks lists prior tasks for a symbol with merge SHAs\n\n## Verification\nSpot check on 10 landed and 10 open TER tasks.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Critical",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Dispatcher support: collision prediction and window grouping",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376345368,
+   "created": 1791376344923,
+   "idReadable": "CL-92",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-26",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nThe dispatcher must never put two windows on the same code; today it predicts this manually.\n\n## Scope\n`dispatch_plan(candidates | epic | query, slots)` — ready tasks, predicted touch sets vs. active worktrees and each other, groups colliding tasks into one window (batch ≤ 3 small or a chain), keeps windows clear of live ones; explains every grouping in one line. The Terrio suggester keeps the final judgment and `run/terrio.mjs suggest check`.\n\n## Acceptance criteria\n- [ ] Plans for 3 recent Terrio dispatches match or beat the manual ones\n- [ ] Each grouping cites the shared code\n- [ ] Suggester cost per run drops (metrics)\n\n## Verification\nReplay 3 recorded dispatcher sessions; codeloupe metrics compare.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 2,
+      "name": "Major",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Planner context pack: task_context(id)",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376345863,
+   "created": 1791376345452,
+   "idReadable": "CL-93",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-26",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nPlanners read the issue, linked issues, prior tasks and code in many calls.\n\n## Scope\nOne call: brief issue with acceptance criteria, linked and dependency issues (brief), prior tasks touching the same code (summary, merge SHA), the relevant declarations (outline lines, not bodies) and open criteria from related tasks; sections selectable; delta mode when called again.\n\n## Acceptance criteria\n- [ ] One call replaces the planner's issue/related/search round trips\n- [ ] Second call on an unchanged task < 100 tokens\n\n## Verification\nPlanner benchmark (CL-23) with and without the pack.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 3,
+      "name": "Normal",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 1,
+      "name": "Feature",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Duplicate and related check before creating an issue",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376346359,
+   "created": 1791376345956,
+   "idReadable": "CL-94",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-26",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\n204 issues were created in two weeks by agents; duplicates and missed links cost later reads.\n\n## Scope\n`similar(summary, description)` — FTS ranking over open and recent issues with the shared terms; agents call it before creating; creation helpers suggest `relates to` links.\n\n## Acceptance criteria\n- [ ] Top 5 similar issues returned in < 100 ms\n- [ ] Terrio creation flow (orchestrator, steward) calls it\n\n## Verification\nReplay of 20 recent creations: how many had a likely duplicate.",
+   "$type": "Issue"
+  },
+  {
+   "comments": [],
+   "customFields": [
+    {
+     "value": {
+      "ordinal": 2,
+      "name": "Major",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Priority",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 6,
+      "name": "Chore",
+      "$type": "EnumBundleElement"
+     },
+     "name": "Type",
+     "$type": "SingleEnumIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 0,
+      "name": "To do",
+      "$type": "StateBundleElement"
+     },
+     "name": "State",
+     "$type": "StateIssueCustomField"
+    },
+    {
+     "value": {
+      "login": "dev1",
+      "name": "Dev One",
+      "$type": "User"
+     },
+     "name": "Assignee",
+     "$type": "SingleUserIssueCustomField"
+    },
+    {
+     "value": {
+      "ordinal": 5,
+      "name": "YouTrack mirror",
+      "$type": "OwnedBundleElement"
+     },
+     "name": "Subsystem",
+     "$type": "SingleOwnedIssueCustomField"
+    },
+    {
+     "value": [
+      {
+       "ordinal": 3,
+       "name": "0.3 Context & YouTrack",
+       "$type": "VersionBundleElement"
+      }
+     ],
+     "name": "Fix versions",
+     "$type": "MultiVersionIssueCustomField"
+    }
+   ],
+   "attachments": [],
+   "resolved": null,
+   "summary": "Terrio: dispatcher and planner use the task index",
+   "reporter": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "updated": 1791376346740,
+   "created": 1791376346432,
+   "idReadable": "CL-95",
+   "project": {
+    "shortName": "CL",
+    "$type": "Project"
+   },
+   "links": [
+    {
+     "direction": "BOTH",
+     "linkType": {
+      "sourceToTarget": "relates to",
+      "targetToSource": "",
+      "name": "Relates",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is required for",
+      "targetToSource": "depends on",
+      "name": "Depend",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-26",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "is duplicated by",
+      "targetToSource": "duplicates",
+      "name": "Duplicate",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "OUTWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [],
+     "$type": "IssueLink"
+    },
+    {
+     "direction": "INWARD",
+     "linkType": {
+      "sourceToTarget": "parent for",
+      "targetToSource": "subtask of",
+      "name": "Subtask",
+      "$type": "IssueLinkType"
+     },
+     "issues": [
+      {
+       "idReadable": "CL-4",
+       "$type": "Issue"
+      }
+     ],
+     "$type": "IssueLink"
+    }
+   ],
+   "description": "## Context\nMeasured 2026-09-23 → 10-06: YouTrack tool results = 1.97 % of all agent cost; the dispatcher (terrio-suggester) spends 20 % of its cost on YouTrack (1,441 calls in 117 runs, ~12 per run) and predicts code collisions by hand with GitNexus/rg; issues are read 6.5× on average; yt_search 944 calls, yt_create_issue 204.\n\n## Scope\nterrio-suggester and terrio-planner get the task index tools; skills terrio-suggest, terrio-youtrack and terrio-deliver route reads, ready lists, collisions and context packs through it; youtrack MCP keeps TER writes and workflow rules.\n\n## Acceptance criteria\n- [ ] Suggester and planner flows documented with the new tools\n- [ ] validate.mjs and self-tests green\n- [ ] YouTrack share of suggester cost ≤ 5 % (from 20 %) over 7+ days\n\n## Verification\ncodeloupe metrics compare.",
+   "$type": "Issue"
+  }
+ ],
+ "activities": [
+  {
+   "removed": [
+    {
+     "name": "To do",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "In Progress",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "State",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22100",
+   "target": {
+    "idReadable": "CL-1",
+    "$type": "Issue"
+   },
+   "timestamp": 1791329753716,
+   "$type": "CustomFieldActivityItem"
+  },
+  {
+   "removed": [
+    {
+     "name": "To do",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "In Progress",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "State",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22254",
+   "target": {
+    "idReadable": "CL-56",
+    "$type": "Issue"
+   },
+   "timestamp": 1791331100051,
+   "$type": "CustomFieldActivityItem"
+  },
+  {
+   "removed": [
+    {
+     "name": "In Progress",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "Done",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "State",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22558",
+   "target": {
+    "idReadable": "CL-56",
+    "$type": "Issue"
+   },
+   "timestamp": 1791365860808,
+   "$type": "CustomFieldActivityItem"
+  },
+  {
+   "removed": [
+    {
+     "name": "To do",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "In Progress",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "State",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22563",
+   "target": {
+    "idReadable": "CL-16",
+    "$type": "Issue"
+   },
+   "timestamp": 1791366237541,
+   "$type": "CustomFieldActivityItem"
+  },
+  {
+   "removed": [
+    {
+     "name": "In Progress",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "Done",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "State",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22736",
+   "target": {
+    "idReadable": "CL-16",
+    "$type": "Issue"
+   },
+   "timestamp": 1791372729383,
+   "$type": "CustomFieldActivityItem"
+  },
+  {
+   "removed": [
+    {
+     "name": "To do",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "In Progress",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "State",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22737",
+   "target": {
+    "idReadable": "CL-17",
+    "$type": "Issue"
+   },
+   "timestamp": 1791372752247,
+   "$type": "CustomFieldActivityItem"
+  },
+  {
+   "removed": [
+    {
+     "name": "In Progress",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "Done",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "State",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22750",
+   "target": {
+    "idReadable": "CL-17",
+    "$type": "Issue"
+   },
+   "timestamp": 1791374809327,
+   "$type": "CustomFieldActivityItem"
+  },
+  {
+   "removed": [
+    {
+     "name": "Major",
+     "$type": "EnumBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "Critical",
+     "$type": "EnumBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "Priority",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22800",
+   "target": {
+    "idReadable": "CL-4",
+    "$type": "Issue"
+   },
+   "timestamp": 1791376343530,
+   "$type": "CustomFieldActivityItem"
+  },
+  {
+   "removed": [
+    {
+     "name": "To do",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "In Progress",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "State",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22847",
+   "target": {
+    "idReadable": "CL-26",
+    "$type": "Issue"
+   },
+   "timestamp": 1791376762671,
+   "$type": "CustomFieldActivityItem"
+  },
+  {
+   "removed": [
+    {
+     "name": "To do",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "added": [
+    {
+     "name": "In Progress",
+     "$type": "StateBundleElement"
+    }
+   ],
+   "author": {
+    "login": "dev1",
+    "$type": "User"
+   },
+   "field": {
+    "name": "State",
+    "$type": "CustomFilterField"
+   },
+   "id": "0-0.14-22848",
+   "target": {
+    "idReadable": "CL-29",
+    "$type": "Issue"
+   },
+   "timestamp": 1791376763047,
+   "$type": "CustomFieldActivityItem"
+  }
+ ]
+}

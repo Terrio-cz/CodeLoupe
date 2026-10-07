@@ -11,7 +11,13 @@ import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Runs a tool against the index of its `root` and records the call. */
-class ToolRunner(private val registry: Registry, private val defaultRoot: String?, private val calls: AppendLog) {
+class ToolRunner(
+    private val registry: Registry,
+    private val defaultRoot: String?,
+    private val calls: AppendLog,
+    /** Every call, before it runs: the tracker watcher keeps syncing only while calls arrive. */
+    private val onCall: () -> Unit = {},
+) {
     private val total = AtomicInteger()
     private val errors = AtomicInteger()
     private val busy = AtomicInteger()
@@ -19,8 +25,10 @@ class ToolRunner(private val registry: Registry, private val defaultRoot: String
     suspend fun run(tool: Tool, args: ToolArgs, via: String): ToolOutcome {
         val started = Instant.now()
         var wasBusy = false
+        onCall()
         val outcome = try {
-            val root = args.string("root")?.takeIf { it.isNotEmpty() } ?: defaultRoot
+            // A tool without a repository keys per-caller state on root: only the caller's own, never the shared default.
+            val root = args.string("root")?.takeIf { it.isNotEmpty() } ?: (if (tool.needsRoot) defaultRoot else "")
                 ?: throw IllegalArgumentException("pass root: the absolute path of the repository or worktree to answer for")
             ToolOutcome(true, tool.answer(registry, root, args))
         } catch (e: CancellationException) {
@@ -45,6 +53,6 @@ class ToolRunner(private val registry: Registry, private val defaultRoot: String
     fun stats() = CallStats(total.get(), errors.get(), busy.get())
 
     private companion object {
-        val EMPTY = Regex("^no (declaration|type|indexed file)")
+        val EMPTY = Regex("^no (declaration|type|indexed file|issue|tasks|ready tasks)")
     }
 }
