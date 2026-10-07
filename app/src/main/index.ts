@@ -38,7 +38,9 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 async function main(): Promise<void> {
-  app.setAppUserModelId('cz.terrio.codeloupe');
+  // Windows shows toasts only for an AppUserModelId that a Start-menu shortcut carries: the installer (CL-45)
+  // creates one for the packaged app; a development run uses the Electron binary's own id.
+  app.setAppUserModelId(app.isPackaged ? 'cz.terrio.codeloupe' : process.execPath);
   await app.whenReady();
 
   const store = new SettingsStore(app.getPath('userData'));
