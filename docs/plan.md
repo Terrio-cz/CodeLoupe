@@ -514,8 +514,9 @@ view, SQL, zbytek nástroje (resolver + formát), HTTP (klient − nástroj). Te
   (pool bez `shrink_memory` 208–234 MB). Teplé dotazy 132–138 MB.
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
-  Globální `core.excludesFile` a `git add -f` / `git rm --cached` za běhu daemonu se projeví až při nové bázi nebo
-  hromadné změně (jako dosud).
+  Globální `core.excludesFile` se neprojeví až do nové báze nebo hromadné změny — za běhu jako dosud, nově i po
+  restartu (snapshot ho nehlídá); `git add -f` / `git rm --cached` za běhu daemonu stejně. Snapshot se přepisuje celý i
+  po každé obnově indexu (IDE), synchronně pod zámkem worktree.
 - Opraveno cestou: `MergeBases` otevíral DB merge-base zapisovatelně jen kvůli čtení — souběžný zápis dával
   `SQLITE_BUSY`, čerstvě založený soubor bez schématu „no such table“ (`ChangesTest` souběh dvou worktree).
 - Testy: 74 (nově `GitLayoutTest`, `GitObjectsTest` — refy, merge-base, bloby jako git, žádný proces, chybějící blob a

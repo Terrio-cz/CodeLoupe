@@ -28,6 +28,7 @@ internal object OverlayPlanner {
      */
     fun reconcile(state: OverlayState, baseCommit: String, baseFile: Path, previous: Path? = null): OverlayChange {
         val worktree = state.worktree
+        val started = System.currentTimeMillis() * 1_000
         val (differing, prune, walk) = Executors.newVirtualThreadPerTaskExecutor().use { executor ->
             val changed = CompletableFuture.supplyAsync({ WorktreeGit.changedSince(worktree, baseCommit) }, executor)
             val untracked = CompletableFuture.supplyAsync({ WorktreeGit.untracked(worktree) }, executor)
@@ -49,7 +50,11 @@ internal object OverlayPlanner {
         // Seen by the walk, neither tracked nor reported untracked: git ignores them.
         val ignored = scan.keys.filterTo(HashSet()) { it !in differing && it !in basePaths }
         val unchanged = if (previous == null) emptySet() else target.keys.filterTo(HashSet()) { it !in state.entries && state.scan[it] == target[it] }
-        return change(state, target, scan, prune, ignored, walk.ignoreFiles, baseCommit, previous, unchanged)
+        // Saved while git was answering, a .gitignore may not be what git read: its next check asks git again. (A
+        // future mtime, from a skewed clock or an archive, is left alone: it would ask git on every check.)
+        val during = started..System.currentTimeMillis() * 1_000
+        val ignoreFiles = walk.ignoreFiles.mapValues { (_, stamp) -> if (stamp.mtime in during) Stamp.MISSING else stamp }
+        return change(state, target, scan, prune, ignored, ignoreFiles, baseCommit, previous, unchanged)
     }
 
     /** Null when no stamp moved since the last check. [state] must be relative to [baseCommit]. */
