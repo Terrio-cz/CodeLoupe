@@ -13,7 +13,7 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 - **Světlý i tmavý režim** ze stejných tokenů (§ 6), výchozí = systém.
 - **Bezpečnost**: renderer nemá Node ani síť; data jdou jen přes preload IPC do main procesu, který volá
   výhradně `127.0.0.1:<port>` (§ 10).
-- **RAM**: aplikace ≤ 300 MB RSS (všechny procesy), cíl ~200 MB s otevřeným oknem, ~100 MB jen v trayi (§ 11).
+- **RAM**: aplikace ≤ 300 MB RSS (všechny procesy), cíl ~200 MB s otevřeným oknem, ≤ 150 MB jen v trayi (§ 11).
 
 ## 2. Informační architektura
 
@@ -61,7 +61,8 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 - Deep link na krok běhu: `#/runs/:id?step=<seq>` (z Mezer) — drawer vybere krok a odscrolluje na něj.
 - Klávesy (vypínatelné v Nastavení → „Klávesové zkratky“, WCAG 2.1.4): `g o / g b / g r / g t / g i / g g /
   g e / g s` navigace, `/` fokus hledání, `Esc` zavře drawer; `j/k` a `Enter` jen když má fokus tabulka;
-  obnovení `Ctrl+R` (žádná samostatná písmena mimo tabulku).
+  obnovení `Ctrl+R` (žádná samostatná písmena mimo tabulku). Aplikace nemá výchozí menu Electronu
+  (`Menu.setApplicationMenu(null)`), takže `Ctrl+R` nepřenačte renderer — obsluhuje ho aplikace sama.
 
 ## 3. Obrazovky (wireframy)
 
@@ -295,7 +296,7 @@ validaci (jméno `^[A-Z][A-Z0-9_]{0,63}$`, hodnota ≤ 16 KB).
 | Přidat / upravit | Drawer „Přidat klíč“: jméno, rozsah, hodnota (`type=password`, bez autocomplete a spellchecku). Odeslání pošle hodnotu jediným voláním `env.set` do main procesu, renderer ihned vymaže stav pole a hodnotu nikdy nedostane zpět. Main ji uloží do storu (CL-50, klíč storu chráněný `safeStorage` / OS keychainem) a vrátí jen metadata. |
 | Rotovat | Stejný drawer s předvyplněným jménem; stará hodnota se nezobrazí, po uložení audit „rotated“. |
 | Import (wizard) | 1) Inventář: main projde Claude složky (CL-52) a vrátí jen jména, zdroj a počet výskytů. 2) Potvrzení: uživatel zaškrtne, co importovat. 3) Import: main přesune hodnoty do storu, renderer vidí jen průběh. 4) Volitelně nahrazení zdroje odkazem na store (CL-53) s náhledem změn (jen cesty a jména). |
-| Odhalit | Jen po OS re-auth: Windows Hello přes nativní helper (Electron nemá API), macOS `systemPreferences.promptTouchID`, Linux heslo přes polkit. Hodnota se ukáže v modálním okně vlastněném main procesem (ne v rendereru aplikace), zkopírovat jde jedním tlačítkem, okno se samo zavře po 30 s a schránka se vyčistí po 60 s. |
+| Odhalit | Jen po OS re-auth: Windows Hello přes nativní helper (Electron nemá API), macOS `systemPreferences.promptTouchID`, Linux heslo přes polkit. Hodnota se ukáže v modálním okně vlastněném main procesem (ne v rendereru aplikace), zkopírovat jde jedním tlačítkem, okno se samo zavře po 30 s; po 60 s se schránka vyčistí, jen pokud stále obsahuje odhalenou hodnotu (porovnání hashe). |
 | Smazat | Potvrzovací dialog main procesu se jménem klíče a jeho spotřebiteli. |
 
 ### 3.8 Nastavení
@@ -317,7 +318,7 @@ Nastavení
 │ Home %LOCALAPPDATA%\codeloupe · config.json [Otevřít]                                 │
 │ Repozitáře, YouTrack instance (token: nastaven ✓), rozpočty (denní 25M, běh 2M)       │
 ├ O aplikaci ─────────────────────────────────────────────────────────────────────────┤
-│ Verze 0.4.0 · Electron 3x · RSS aplikace 182 MB (main 61, renderer 88, GPU 33)        │
+│ Verze 0.4.0 · Electron 3x · RSS aplikace 182 MB (main 61, renderer 88, GPU 21, síť 12)│
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -392,7 +393,7 @@ Radius 6 (prvky), 8 (karty). Řádek tabulky 32 px, topbar 48 px, sidebar 216 px
 | `--surface-2` | `#f3f3f0` | `#1f1f1d` | hlavička tabulky, hover |
 | `--sidebar` | `#f3f3f0` | `#121211` | sidebar |
 | `--border` | `#e4e3dd` | `#2c2c2a` | hairline mezi oblastmi (dekorativní) |
-| `--border-control` | `#8a8984` | `#6b6a66` | okraj inputů, selectů, checkboxů (≥ 3:1, WCAG 1.4.11) |
+| `--border-control` | `#82817c` | `#787772` | okraj inputů, selectů, checkboxů (≥ 3:1 na všech pozadích, WCAG 1.4.11) |
 | `--text` | `#0b0b0b` | `#f5f5f3` | primární text |
 | `--text-2` | `#52514e` | `#c3c2b7` | sekundární |
 | `--text-muted` | `#65645f` | `#9a9993` | popisky, osy |
@@ -406,14 +407,15 @@ Radius 6 (prvky), 8 (karty). Řádek tabulky 32 px, topbar 48 px, sidebar 216 px
 | `--serious` | `#ec835a` (text `#a8431a`) | `#ec835a` | vážné |
 | `--critical` | `#d03b3b` (text `#b83232`) | `#e66767` | chyba |
 
-Kontrast textových tokenů (`--text*`, `--accent-text`, stavové `text`) je ≥ 4,5:1 proti **všem čtyřem**
-pozadím (`--bg`, `--surface`, `--surface-2`, `--accent-weak`) v obou režimech; kontroluje to test
-`app/test/tokens.test.ts`. Stavové tečky v světlém režimu (warning, serious) jsou pod 3:1, proto vždy
-s ikonou a textem.
 | `--series-1` | `#2a78d6` | `#3987e5` | graf: skutečnost |
 | `--series-baseline` | `#898781` | `#898781` | graf: baseline (přerušovaná) |
 | `--grid` | `#e1e0d9` | `#2c2c2a` | mřížka grafu |
 | `--axis` | `#c3c2b7` | `#383835` | osa |
+
+Kontrast textových tokenů (`--text*`, `--accent-text`, stavové `text`) je ≥ 4,5:1 a `--border-control` ≥ 3:1 proti **všem čtyřem**
+pozadím (`--bg`, `--surface`, `--surface-2`, `--accent-weak`) v obou režimech; kontroluje to test
+`app/test/tokens.test.ts`. Stavové tečky v světlém režimu (warning, serious) jsou pod 3:1, proto vždy
+s ikonou a textem.
 
 - Grafové barvy podle validované referenční palety (dataviz skill); stavové barvy se nikdy nepoužijí pro
   sérii a vždy jdou s ikonou + textem. Text nikdy nemá barvu série.
@@ -441,7 +443,9 @@ s ikonou a textem.
 - **Stav**: `GET /status` každých 5 s při viditelném okně, 15 s v trayi. Tři neúspěchy = `down`.
 - **Port a identita**: port z `<home>/daemon.json` (`pid`, `port`, `version`, `startedAt` — zapisuje daemon),
   jinak `CODELOUPE_PORT` / `config.json` / 47391, nebo explicitní přepsání v Nastavení. `/status.pid` se
-  porovná s `daemon.json`; nesouhlasí-li (cizí proces na portu), stav `error`, žádná data ani otevírání cest.
+  porovná s `daemon.json`. Daemon zapisuje `daemon.json` až po startu a maže ho při stopu, takže krátký
+  nesoulad (soubor chybí nebo je starý) je stav `starting`; teprve nesoulad trvající 3 ticky je `error`
+  (cizí proces na portu) — pak žádná data ani otevírání cest.
 - **Start**: když je `down` a `autoStartDaemon` je zapnuto a daemon nebyl zastaven ručně → spustí
   `<cli.command> <cli.args…> start` (konfigurovatelné; dnes `node bin/codeloupe.mjs`, po CL-56 Kotlin CLI)
   s `CODELOUPE_PORT` = port, který aplikace sleduje. Backoff 5 s → 60 s, max 5 pokusů za 10 min, pak
@@ -498,6 +502,7 @@ interface RunSummary {
   turns: number; weighted: number; tokens: Tokens; peakContext: number;
   toolResultShare: number;      // 0..1 podíl výsledků nástrojů z ceny
   codeloupeCalls: number; gaps: number;
+  overBudget: boolean;          // weighted > budgets.runWeighted (zvýraznění v Bězích)
 }
 interface WorktreeSummary {
   id: string; repoId: string; repoName: string; path: string;
@@ -524,7 +529,9 @@ interface DaemonStatus {
   repos: { id: string; commonDir: string; defaultRef: string; baseCommit: string | null; lastBuild: LastBuild | null }[];
 }
 interface Lane { running: string | null; waiting: string[] }
-interface LastBuild { at: Iso; ok: boolean; files: number; errors: number; ms: number; peakRssMb?: number }
+// Poslední *úspěšný* build (daemon ho dnes zapisuje jen po úspěchu, src/repo/registry.mjs); neúspěchy
+// eviduje CL-62 (`builds` v § 9.11, událost `build_failed`).
+interface LastBuild { at: Iso; ok: true; files: number; errors: number; ms: number; peakRssMb?: number }
 ```
 
 ### 9.4a `GET /ui-api/v1/nav?gapsSince=<Iso>` (počty sidebaru)
@@ -577,10 +584,11 @@ Agregace běhů jsou předpočítané při ingestu (§ 9.17), dotaz je indexovan
 interface RunDetail extends RunSummary {
   byTool: { tool: string; calls: number; resultChars: number; weighted: number; carriedWeighted: number }[];
   stepCount: number;                  // kroky po stránkách: § 9.8a
+  maxCarriedWeighted: number;         // společné měřítko pruhů „podíl“ napříč stránkami
 }
 ```
 
-### 9.8a `GET /ui-api/v1/runs/{id}/steps?sort=seq|weighted|carried|resultChars|latency&order=&flags=&kind=&limit=&cursor=` → `Page<RunStep>`
+### 9.8a `GET /ui-api/v1/runs/{id}/steps?sort=seq|weighted|carried|resultChars|latency&order=&flags=&kind=&around=&limit=&cursor=` → `Page<RunStep>`
 ```ts
 interface RunStep {
   seq: number; at: Iso; kind: 'prompt' | 'text' | 'tool';
@@ -592,7 +600,8 @@ interface RunStep {
   flags: ('large_result' | 'gap' | 'error' | 'codeloupe')[];
 }
 ```
-`flags` = čárkou oddělený seznam (krok musí mít všechny), `kind` = `prompt|text|tool`; `limit` max 200.
+`flags` = čárkou oddělený seznam (krok musí mít všechny), `kind` = `prompt|text|tool`; `limit` max 200;
+`around=<seq>` vrátí stránku, která daný krok obsahuje (deep link `#/runs/:id?step=<seq>`).
 
 ### 9.9 `GET /ui-api/v1/tasks?project=&state=&q=&limit=&cursor=` → `Page<TaskSummary> & { mirrorSyncedAt: Iso | null }`
 
@@ -695,8 +704,9 @@ nim nemá časovač (plan.md § 5.1).
 
 - `BrowserWindow`: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`,
   `webSecurity: true`, `spellcheck: false`; preload vystaví jen `window.codeloupe` (§ níže).
-- Bundle se načítá přes vlastní schéma `app://codeloupe/` (`protocol.handle`, jen soubory z adresáře
-  bundlu) — CSP `'self'` i kontrola odesílatele IPC tak mají pevný origin místo `file://`.
+- Bundle se načítá přes vlastní schéma `app://codeloupe/` (`protocol.registerSchemesAsPrivileged([{ scheme:
+  'app', privileges: { standard: true, secure: true } }])` před `ready`, pak `protocol.handle`, jen soubory z
+  adresáře bundlu) — CSP `'self'` i kontrola odesílatele IPC tak mají pevný origin místo `file://`.
 - **Renderer nemá síť**: CSP `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
   connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`.
   Všechna data přes IPC; main volá jen `http://127.0.0.1:<port>` (Node `http`, bez `Origin`).
@@ -708,8 +718,10 @@ nim nemá časovač (plan.md § 5.1).
   - `open.worktree(id)` — main vezme cestu z `worktrees` daemonu, ověří, že je to **adresář** obsahující
     `.git`, a otevře ho (`shell.openPath`); soubory se nikdy nespouští. `open.config()` — `showItemInFolder`
     na `<home>/config.json` složené v main.
-  - `open.youtrack(taskId)` — URL `<instance>/issue/<id>`; povolí se jen `https:` a origin přesně shodný s
-    instancí z nastavení daemonu (`new URL().origin`, žádné porovnání prefixu).
+  - `open.external(url)` — pro „Otevřít v YouTracku“ (`TaskDetail.url`) i odkazy z markdownu; povolí se jen
+    `https:` a origin přesně shodný s některou instancí z nastavení daemonu (`new URL().origin`, žádné
+    porovnání prefixu); jiné odkazy se zobrazí jen jako text.
+  - `env.*` (§ 3.7.1) — přibudou až s CL-54, se stejnou kontrolou odesílatele a vlastní validací.
   - Obojí `open.*` jen když `/status.pid` odpovídá `daemon.json` (§ 8) — cizí proces na portu nic neotevře.
 - `setPermissionRequestHandler` a `setPermissionCheckHandler` → vše zamítnout; `will-attach-webview` → zamítnout;
   navigace a nová okna zakázané (`will-navigate`, `setWindowOpenHandler` → deny); žádný `remote`.
@@ -723,14 +735,14 @@ nim nemá časovač (plan.md § 5.1).
 | Cíl | Hodnota |
 |---|---|
 | RSS aplikace s oknem | ≤ 300 MB (cíl ~200 MB) |
-| RSS jen v trayi | ≤ 150 MB (okno zničeno; zůstává main, network service, crashpad) |
+| RSS jen v trayi | ≤ 150 MB (okno zničeno; zůstává main, GPU, network service, crashpad) |
 | Načtení obrazovky | < 1 s (CL-40); seznamy max 200 řádků na stránku |
-| Polling | `/status` 5 s / 15 s; data obrazovky jen při otevření a `Ctrl+R`; `events` 15 s |
+| Polling | `/status` 5 s / 15 s; data obrazovky jen při otevření a `Ctrl+R`; `events` a `nav` 15 s |
 
 - Metrika: součet `workingSetSize` všech procesů z `app.getAppMetrics()` (sdílené stránky se započítají
   vícekrát — konzervativní horní mez), ověřeno i součtem `WorkingSet64` procesů z OS. Měří se po startu a s
   otevřeným největším během; hodnota je v Nastavení → O aplikaci.
-- `app.disableHardwareAcceleration()` — tabulky a SVG GPU nepotřebují, ušetří GPU proces.
+- `app.disableHardwareAcceleration()` — tabulky a SVG GPU nepotřebují, GPU proces zmenší (software compositing ho ponechá).
 - Žádná grafová knihovna (vlastní SVG), žádný router ani state manager, vlastní převodník markdownu —
   React + React DOM jsou jediné runtime závislosti.
 - Jeden renderer; `backgroundThrottling` zapnutý; okno se po zavření ničí.
