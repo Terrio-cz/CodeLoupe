@@ -8,12 +8,13 @@ import codeloupe.query.RefRow
  * ([overriding]) and the classes of target constructors ([constructed]): a call that reaches one of those may
  * dispatch to, or construct through, a target. A named argument counts when passed to a call in [namedBy].
  */
-internal data class Targets(
+internal class Targets(
     val decls: Set<DeclRow>,
     val overridden: Set<DeclRow>,
     val overriding: Set<DeclRow>,
     val constructed: Set<DeclRow>,
     val namedBy: Set<String>,
+    private val arguments: Arguments,
 ) {
     fun label(r: Resolution, ref: RefRow): Label {
         val kind = ref.kind
@@ -23,10 +24,14 @@ internal data class Targets(
             hit && r.complete && r.decls.all { it in decls } -> Label.EXACT
             hit -> Label.CANDIDATE
             r.further.any { it in decls } || r.decls.any { it in overridden || it in overriding } -> Label.CANDIDATE
-            kind == "call" && r.decls.any { it in constructed } -> Label.CANDIDATE
+            kind == "call" && r.decls.any { it in constructed } && constructorFits(ref.args) -> Label.CANDIDATE
             else -> Label.OTHER
         }
     }
+
+    // A call of the class reaches a target constructor only when its arguments fit that constructor.
+    private fun constructorFits(args: Int?) =
+        args == null || args < 0 || decls.any { it.kind == "constructor" && arguments.fits(it, args) }
 
     companion object {
         fun of(decls: Collection<DeclRow>, context: IndexContext): Targets = Targets(
@@ -35,12 +40,15 @@ internal data class Targets(
             decls.flatMap(context.overrides::overriding).toSet(),
             decls.filter { it.kind == "constructor" }.mapNotNull(context.cache::parent).toSet(),
             namedArgumentCallees(decls, context),
+            context.arguments,
         )
 
-        // A property declared in a constructor is passed by name to that constructor or to a data class's `copy`.
+        // A property declared in a constructor is passed by name to that constructor (by its name, an import alias,
+        // `this(…)` or `super(…)`) or to a data class's `copy`.
         private fun namedArgumentCallees(decls: Collection<DeclRow>, context: IndexContext): Set<String> {
             val owners = decls.filter { it.kind == "property" }.mapNotNull(context.cache::parent)
-            return if (owners.isEmpty()) emptySet() else owners.map { it.name }.toSet() + "copy"
+            if (owners.isEmpty()) return emptySet()
+            return owners.flatMap { listOf(it.name) + context.visibility.aliases(it) }.toSet() + setOf("copy", "this", "super")
         }
 
         /**

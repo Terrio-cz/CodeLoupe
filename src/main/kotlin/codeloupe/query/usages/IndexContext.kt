@@ -9,4 +9,5 @@ internal class IndexContext(view: View) {
     val types = Types(cache, visibility)
     val lookup = MemberLookup(cache, types, visibility)
     val overrides = Overrides(cache, types)
+    val arguments = Arguments(cache)
 }

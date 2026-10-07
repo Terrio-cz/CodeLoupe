@@ -1,20 +1,18 @@
 package codeloupe.query.usages
 
-import codeloupe.query.Like
-
 /**
  * Names something outside the index declares: members of the Kotlin and JDK core types, and every name a file
  * imports from a library. A call of one of them on a receiver of unknown type may be the library's, even when the
  * index declares the name only once.
  */
 internal class LibraryNames(private val cache: IndexCache) {
-    private val imported = HashMap<String, Boolean>()
+    /** Simple (or alias) name -> fully qualified names files import under it, read in one pass when first needed. */
+    private val imported: Map<String, List<String>> by lazy {
+        cache.view.imports("i.star = 0").groupBy({ it.alias ?: it.fqn.substringAfterLast('.') }, { it.fqn })
+    }
 
-    fun contains(name: String): Boolean = name in CORE || imported.getOrPut(name) { importedFromLibrary(name) }
-
-    private fun importedFromLibrary(name: String): Boolean =
-        cache.view.imports("i.star = 0 AND (i.fqn LIKE :suffix ESCAPE '\\' OR i.alias = :name)", mapOf("suffix" to "%." + Like.escape(name), "name" to name))
-            .any { imp -> cache.named(imp.fqn.substringAfterLast('.')).none { it.fqn == imp.fqn } }
+    fun contains(name: String): Boolean =
+        name in CORE || imported[name].orEmpty().any { fqn -> cache.named(fqn.substringAfterLast('.')).none { it.fqn == fqn } }
 
     private companion object {
         val CORE = setOf(

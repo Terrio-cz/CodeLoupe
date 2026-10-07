@@ -18,7 +18,7 @@ class UsageFinder(view: View) {
     private val outsideIndex = HashMap<String, Boolean>()
     private val resolved = HashMap<Triple<String, Int, Int>, Resolution>()
     private val specs = TypeSpecs(context.cache, settled = { deciding.isEmpty() }) { resolve(it) }
-    private val resolver = RefResolver(context.cache, context.types, context.lookup, implicit, Receivers(context.cache, context.types, implicit, specs))
+    private val resolver = RefResolver(context, implicit, Receivers(context.cache, context.types, implicit, specs, ::promoted))
 
     fun usages(targets: Collection<DeclRow>): List<Usage> {
         val set = Targets.of(targets, context)
@@ -32,7 +32,7 @@ class UsageFinder(view: View) {
     internal fun resolve(ref: RefRow): Resolution {
         val key = Triple(ref.path, ref.line, ref.col)
         resolved[key]?.let { return it }
-        val r = promoted(ref, resolver.resolve(ref))
+        val r = promoted(ref.name, resolver.resolve(ref))
         if (deciding.isEmpty()) resolved[key] = r
         return r
     }
@@ -42,18 +42,19 @@ class UsageFinder(view: View) {
      * meant — unless the name is one libraries declare too, or a reference elsewhere surely resolves outside the index.
      * A heuristic: the golden test measures it.
      */
-    private fun promoted(ref: RefRow, r: Resolution): Resolution {
-        if (r.complete || !r.byName || r.decls.size != 1 || libraryNames.contains(ref.name) || declaredOutside(ref.name)) return r
+    private fun promoted(name: String, r: Resolution): Resolution {
+        if (r.complete || !r.byName || r.decls.size != 1 || libraryNames.contains(name) || declaredOutside(name)) return r
         return r.copy(complete = true)
     }
 
     private fun declaredOutside(name: String): Boolean {
         outsideIndex[name]?.let { return it }
-        // While deciding, assume it is: a type spec that leads back to this name gets no promotion from itself.
-        if (!deciding.add(name)) return true
+        // While one name is being decided, no other gets promoted: the answer stays linear and never depends on order.
+        if (deciding.isNotEmpty()) return true
+        deciding.add(name)
         try {
             return cache.refsNamed(name).any { it.kind in CALLS && resolver.resolve(it).let { r -> r.complete && r.decls.isEmpty() } }
-                .also { if (deciding.size == 1) outsideIndex[name] = it }
+                .also { outsideIndex[name] = it }
         } finally {
             deciding.remove(name)
         }

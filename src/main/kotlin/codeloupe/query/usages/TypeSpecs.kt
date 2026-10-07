@@ -65,7 +65,27 @@ internal class TypeSpecs(
         return resolution.decls.mapNotNull(::declaredType).distinctBy { it.text }.singleOrNull()
     }
 
+    /**
+     * The receiver of the function type a lambda is passed as (`&@line:col#i`): its text when the parameter declares
+     * one (`R.() -> T`), "" when it declares none (`() -> T`), null when that is not known (an unindexed callee, a
+     * `fun interface` or alias parameter, an argument the index cannot place).
+     */
+    fun lambdaReceiver(spec: String, file: FileScope): TypeText? {
+        val position = spec.substring(1).substringBefore(TypeSpec.ARGUMENT)
+        val index = spec.substringAfter(TypeSpec.ARGUMENT).toIntOrNull() ?: return null
+        val (line, col) = position.substring(1).split(':').map(String::toInt)
+        val callee = cache.refAt(file.path, line, col)?.let(resolveRef)?.takeIf { it.complete }?.decls?.singleOrNull { it.kind == "fun" } ?: return null
+        val params = cache.params(callee)
+        val type = (if (index < 0) params.lastOrNull() else params.getOrNull(index))?.type ?: return null
+        if ("->" !in type) return null
+        val receiver = FUNCTION_RECEIVER.find(type)?.groupValues?.get(1).orEmpty()
+        return TypeText(receiver, cache.file(callee.path) ?: return null, cache.parent(callee))
+    }
+
     private companion object {
+        /** `R.() -> T`, `suspend R.(X) -> T`, `(R.() -> T)?` -> `R`. */
+        val FUNCTION_RECEIVER = Regex("""^\(?\s*(?:suspend\s+)?([\w.<>?, *]+?)\.\(""")
+
         const val MAX_DEPTH = 6
     }
 }

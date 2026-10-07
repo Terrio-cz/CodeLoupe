@@ -19,13 +19,16 @@ internal object HitLines {
         for (hit in hits) {
             val newFile = hit.ref.path != path
             if (newFile) appendLine(hit.ref.path)
-            if ((newFile || hit.owner != owner) && hit.ref.line != hit.owner?.declLine) appendLine("  " + ownerLine(hit.owner))
+            val code = cache.line(hit.ref.path, hit.ref.line)
+            if ((newFile || hit.owner != owner) && !showsOwner(hit, code)) appendLine("  " + ownerLine(hit.owner))
             path = hit.ref.path
             owner = hit.owner
-            val code = cache.line(hit.ref.path, hit.ref.line)
             appendLine("  ${hit.ref.line} ${hit.label.mark} ${snippet(code, hit.ref.col)}")
         }
     }.trimEnd()
+
+    // The hit's own line is the owner's declaration, shown whole: it names the owner already.
+    private fun showsOwner(hit: Usage, code: String) = hit.ref.line == hit.owner?.declLine && code.trim().length <= MAX_CODE
 
     fun ownerLine(d: DeclRow?): String = if (d == null) "(file level)" else ShortSignature.of(d)
 

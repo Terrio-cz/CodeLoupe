@@ -558,6 +558,42 @@
     "public-api/src/test/kotlin/cz/terrio/api/provenance/HeritageTourismProvenanceCoverageTest.kt:495",
     "public-api/src/test/kotlin/cz/terrio/api/query/LocationResolverPlanTest.kt:195"
    ]
+  },
+  {
+   "query": "InvitationService",
+   "kind": "class",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/AccountModule.kt:56",
+    "accounts/src/main/kotlin/cz/terrio/accounts/AccountModule.kt:166",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountInputRefusalTest.kt:199",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountInputRefusalTest.kt:201",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1013",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/AccountServicePasswordHashingTest.kt:1282",
+    "accounts/src/test/kotlin/cz/terrio/accounts/service/StaffOrganizationAccessTest.kt:54"
+   ]
+  },
+  {
+   "query": "ApiUsageStore.addDailyUsage",
+   "kind": "repository method",
+   "usages": [
+    "public-api/src/main/kotlin/cz/terrio/api/usage/ApiUsageService.kt:93",
+    "public-api/src/main/kotlin/cz/terrio/api/usage/ApiUsageService.kt:398"
+   ]
+  },
+  {
+   "query": "TourismDatabaseImporter.logRepublication",
+   "kind": "private fun, same name elsewhere",
+   "usages": [
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/TourismDatabaseImporter.kt:219",
+    "app/src/main/kotlin/cz/terrio/importer/database/imports/TourismDatabaseImporter.kt:391"
+   ]
+  },
+  {
+   "query": "BoundedPasswordHasher.admit",
+   "kind": "private suspend fun, same name elsewhere",
+   "usages": [
+    "accounts/src/main/kotlin/cz/terrio/accounts/security/BoundedPasswordHasher.kt:66"
+   ]
   }
  ]
 }

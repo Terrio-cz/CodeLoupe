@@ -29,3 +29,15 @@ class Edge {
 }
 
 fun build(block: Point.() -> Unit) = Point(0, 0).block()
+
+fun interface Validator {
+    fun check(x: Int): Boolean
+}
+
+fun validate(x: Int) = x > 0
+
+class MyEx : RuntimeException()
+
+fun Enum<*>.lower() = name.lowercase()
+
+fun probes(validate: Validator, e: MyEx, level: Level) = listOf(validate(1), e.report(), level.lower())

@@ -1,5 +1,6 @@
 package codeloupe.query.usages
 
+import codeloupe.lang.TypeSpec
 import codeloupe.query.DeclMatch
 import codeloupe.query.DeclRow
 import codeloupe.query.RefRow
@@ -13,13 +14,13 @@ internal class Receivers(
     private val types: Types,
     private val implicit: ImplicitScope,
     private val specs: TypeSpecs,
+    private val promote: (String, Resolution) -> Resolution,
 ) {
     fun of(ref: RefRow, file: FileScope, chain: List<DeclRow>): ReceiverType {
         val recv = ref.recv ?: return ReceiverType.Unknown
         val at = chain.firstOrNull()
         return when {
-            recv == "this" && ref.recvType != null -> fromSpec(ref.recvType, file, at)
-            recv == "this" -> thisType(chain, file, null)
+            recv == "this" -> ref.recvType?.let { lambdaReceiver(it, file, at) } ?: thisType(chain, file, null)
             recv.startsWith("this@") -> thisType(chain, file, recv.removePrefix("this@"))
             recv == "super" || recv.startsWith("super<") -> superType(chain)
             else -> qualifier(recv, file, at)
@@ -28,9 +29,15 @@ internal class Receivers(
         }
     }
 
-    /** The innermost implicit receiver a lambda brought (`x.apply { m() }`), from its recorded spec. */
     fun fromSpec(spec: String, file: FileScope, at: DeclRow?): ReceiverType =
         specs.text(spec, file, at)?.let { instance(it) } ?: ReceiverType.Unknown
+
+    /** The implicit receiver a lambda brought (`x.apply { m() }`, a DSL builder), null when it brings none. */
+    fun lambdaReceiver(spec: String, file: FileScope, at: DeclRow?): ReceiverType? {
+        if (spec.isEmpty() || spec[0] != TypeSpec.LAMBDA_RECEIVER) return fromSpec(spec, file, at)
+        val receiver = specs.lambdaReceiver(spec, file) ?: return ReceiverType.Unknown
+        return if (receiver.text.isEmpty()) null else instance(receiver)
+    }
 
     // `Type`, `Outer.Inner`, `pkg.Type`, `pkg` before a top-level name.
     private fun qualifier(recv: String, file: FileScope, at: DeclRow?): ReceiverType? {
@@ -50,12 +57,11 @@ internal class Receivers(
     // A capitalised name nothing in reach declares, and no indexed type bears, is a library type or object:
     // `ByteBuffer.allocate(8)`.
     private fun property(name: String, file: FileScope, chain: List<DeclRow>): ReceiverType {
-        val properties = implicit.find(name, file, chain, accept = { it.kind == "property" || it.kind == "object" || it.kind == "enum_entry" })
+        val properties = promote(name, implicit.find(name, file, chain, accept = { it.kind == "property" || it.kind == "object" || it.kind == "enum_entry" }))
         if (properties.decls.isEmpty() && name.first().isUpperCase() && cache.named(name).none { it.kind in Kinds.CLASSIFIERS }) {
             return ReceiverType.Static(emptyList())
         }
-        val sure = properties.complete || (properties.byName && properties.decls.size == 1)
-        if (!sure || properties.decls.isEmpty()) return ReceiverType.Unknown
+        if (!properties.complete || properties.decls.isEmpty()) return ReceiverType.Unknown
         if (properties.decls.all { it.kind == "object" }) return ReceiverType.Static(properties.decls)
         if (properties.decls.all { it.kind == "enum_entry" }) return implicit.instanceOf(properties.decls, emptySet())
         val typed = properties.decls.map { p -> specs.declaredType(p)?.let(::instance) as? ReceiverType.Instance ?: return ReceiverType.Unknown }

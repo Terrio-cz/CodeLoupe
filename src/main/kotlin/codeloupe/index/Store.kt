@@ -12,7 +12,7 @@ object Store {
     const val SCHEMA_VERSION = 2
 
     /** Schema and extractor of an index; bump the extractor part whenever the facts of a file can change. */
-    const val FORMAT = "$SCHEMA_VERSION/kotlin-psi-2"
+    const val FORMAT = "$SCHEMA_VERSION/kotlin-psi-3"
 
     private val SCHEMA = listOf(
         "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)",

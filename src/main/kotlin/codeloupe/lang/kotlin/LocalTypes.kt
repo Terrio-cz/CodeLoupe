@@ -77,7 +77,8 @@ internal class LocalTypes(private val source: Source, private val scopes: LocalS
         return at(callee) + (if (fallback.isEmpty()) "" else "${TypeSpec.OR}$fallback")
     }
 
-    private fun at(expression: KtExpression): String {
+    /** `@line:col` of a name reference, "" for anything else. */
+    fun at(expression: KtExpression): String {
         if (expression !is KtNameReferenceExpression) return ""
         val offset = expression.textRange.startOffset
         return TypeSpec.position(source.lines.line(offset), source.lines.column(offset) + 1)

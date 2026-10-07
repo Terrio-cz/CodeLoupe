@@ -67,7 +67,9 @@ class UsagesTest {
     fun `callable references, smart casts, this in apply, DSL receivers, library supertypes`() {
         assertEquals(mapOf("Edge.kt:6" to Label.EXACT, "Edge.kt:10" to Label.EXACT, "Edge.kt:28" to Label.EXACT), labels("Point.area"))
         assertEquals(mapOf("Edge.kt:8" to Label.CANDIDATE), labels("Circle.radius"), "reached through a smart cast")
-        assertEquals(mapOf("Edge.kt:12" to Label.CANDIDATE), labels("report"), "IllegalStateException is a Throwable the index cannot see")
+        assertEquals(mapOf("Edge.kt:12" to Label.CANDIDATE, "Edge.kt:43" to Label.CANDIDATE), labels("report"), "a Throwable the index cannot see, a class with a library supertype")
+        assertEquals(Label.CANDIDATE, labels("com.example.other.validate")["Edge.kt:43"], "a fun interface binding may be invoked")
+        assertEquals(mapOf("Edge.kt:43" to Label.EXACT), labels("lower"), "an enum is an Enum")
         assertEquals(Label.CANDIDATE, labels("Named.label")["Edge.kt:25"], "a local across an object body may be the object's member")
     }
 

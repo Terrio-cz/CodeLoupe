@@ -11,6 +11,7 @@ internal class IndexCache(val view: View) {
     private val files = Lru<String, FileScope?>(FILES)
     private val refsByLine = Lru<Pair<String, Int>, List<RefRow>>(LINES)
     private val texts = Lru<String, List<String>>(TEXTS)
+    private val params = Lru<String, List<Param>>(NAMES)
 
     /** Declarations with this name, local ones included. */
     fun named(name: String): List<DeclRow> = byName.getOrPut(name) { view.decls("d.name = :name", mapOf("name" to name)) }
@@ -31,6 +32,9 @@ internal class IndexCache(val view: View) {
     /** Source line [n] (1-based) of a file, without its line end. */
     fun line(path: String, n: Int): String =
         texts.getOrPut(path) { view.file(path)?.content.orEmpty().split('\n') }.getOrNull(n - 1)?.removeSuffix("\r").orEmpty()
+
+    /** Value parameters of a function or constructor. */
+    fun params(d: DeclRow): List<Param> = params.getOrPut(d.params.orEmpty()) { Param.of(d) }
 
     fun children(d: DeclRow): List<DeclRow> = file(d.path)?.children(d).orEmpty()
 

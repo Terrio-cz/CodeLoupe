@@ -160,13 +160,14 @@ jeden soubor.
   anotace, supertypy, řádky deklarace/těla/KDocu, hash textu
 - `refs`: jméno, řádek, sloupec, druh (`call`, `nav`, `type`, `callable_ref`, `named_arg`, `name`), text
   receiveru (u `type` kvalifikátor `pkg` z `pkg.Type`, u `Type::m` typ, u `named_arg` jméno volané funkce či
-  konstruktoru), id obklopující deklarace; od formátu `2/kotlin-psi-2` navíc (CL-13):
+  konstruktoru), id obklopující deklarace; od formátu `2/kotlin-psi-3` navíc (CL-13):
   - `bind` — jméno je vázané v kódu (parametr, parametr lambdy včetně `it`, proměnná `for`/`catch`, lokální
     `val`/`fun`, subjekt `when`); hodnota = typový spec vazby, `""` = typ neznámý, prefix `^` = mezi vazbou a
     použitím leží tělo třídy (jméno může být i jejím členem);
   - `recv_type` — typový spec receiveru `x.m()`, je-li receiver lokální vazba nebo výraz (volání, řetěz, `as`,
     `!!`, `?:`, `this` v lambdě s receiverem); u nekvalifikovaného jména spec implicitního receiveru lambdy
-    (`x.apply {}`, `x.run {}`, `with(x) {}`; lambda předaná jiné než známé knihovní funkci má receiver neznámý `""`);
+    (`x.apply {}`, `x.run {}`, `with(x) {}`; lambda předaná jiné funkci má spec `&@ř:s#i` = receiver funkčního typu
+    jejího parametru `i` — `R.() -> T` dá `R`, `() -> T` žádný, neindexovaná funkce neznámý);
   - `args` — počet argumentů volání (trailing lambda se počítá, spread = −1), pro rozlišení overloadů.
 - `decls.returns` bez deklarovaného typu = typový spec inicializátoru, `by lazy { … }` nebo těla výrazem;
   parametry nesou příznaky `default` a `vararg`.
@@ -367,17 +368,17 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 
 ### Výsledek navigace: usages, calls, hierarchy (CL-13, CL-14, CL-20, 2026-10-07)
 
-- Golden test (`UsagesGoldenTest`, oracle `src/test/resources/golden/terrio-usages.json`): 40 symbolů Terria na
+- Golden test (`UsagesGoldenTest`, oracle `src/test/resources/golden/terrio-usages.json`): 44 symbolů Terria na
   commitu 22d02d3f (třídy, rozhraní, object, enum a entry, companion členy, extension funkce včetně 10 stejnojmenných
   podle receiveru, routy, repository, override, overloady podle počtu parametrů, private, `Type::member`, smart
-  cast, extension na knihovním typu, `this.x` v `apply`). Oracle ručně ověřený čtením kódu (316 řádků), bez IDE.
-  Výsledek: nadmnožina `rg -w` **100 %** (1 591/1 591 pozic), přesnost `exact` **100 %** (307/307), každé skutečné
-  použití je `exact` nebo `candidate` (316/316), `exact` samo pokryje 97,2 %, podíl `candidate` **13,8 %**. Dotaz
-  v testu p50 **16 ms**, max 164 ms.
+  cast, extension na knihovním typu, `this.x` v `apply`). Oracle ručně ověřený čtením kódu (328 řádků), bez IDE.
+  Výsledek: nadmnožina `rg -w` **100 %** (1 608/1 608 pozic), přesnost `exact` **100 %** (319/319), každé skutečné
+  použití je `exact` nebo `candidate` (328/328), `exact` samo pokryje 97,3 %, podíl `candidate` **11,9 %**. Dotaz
+  v testu p50 **16 ms**, max 145 ms.
 - Daemon (heap 96 MB): běžný dotaz desítky ms, `usages ApiKey.id` (3 446 referencí) 1,0 s poprvé / 0,65 s znovu,
   `calls … depth 3` ~0,1–0,2 s; cache jsou LRU a obsah souborů se drží jen pro vypisované řádky. RSS po velkém dotazu
   ~205 MB (budget 200) — sledovat v CL fáze 5.
-- Index: formát `2/kotlin-psi-2` (sloupce `bind`, `recv_type`, `args` v `refs`) → báze se po upgradu přestaví.
+- Index: formát `2/kotlin-psi-3` (sloupce `bind`, `recv_type`, `args` v `refs`) → báze se po upgradu přestaví.
 - Stejná fixture sada v repu (`fixtures/kotlin/usages`) kryje super, cast, lambdy, alias, companion, enum, extension,
   override/dispatch, overloady, private, `::`, smart cast, DSL receivery, sekundární konstruktor, FQ typ a nadmnožinu.
 - Známé meze: implementace přes `object : I {}` nejsou v `hierarchy` (výraz, ne deklarace); typ výsledku `let {}`,
@@ -388,7 +389,7 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 | Riziko | Uzavřeno |
 |---|---|
 | RAM/CPU při 8–10 oknech | jedna instance, fronta, build jen v podprocesu max 1, budget test fáze 5 |
-| Bez IDE horší přesnost | značky exact/candidate, nadmnožina `rg -w`, golden test s ručně ověřeným oracle (40 symbolů, exact 100 %, CL-20) běží při každé změně extraktoru i resolveru; typy dál ověřuje build |
+| Bez IDE horší přesnost | značky exact/candidate, nadmnožina `rg -w`, golden test s ručně ověřeným oracle (44 symbolů, exact 100 %, CL-20) běží při každé změně extraktoru i resolveru; typy dál ověřuje build |
 | Daemon neběží při startu okna | autostart hook, CLI, doctor; volitelně služba OS |
 | Pád daemonu | bezstavové HTTP, autostart, ověření fáze 1, záložní shim |
 | Zastaralá data | kontrola změn při každém dotazu; vrstva vůči `B` |

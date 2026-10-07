@@ -16,8 +16,16 @@ internal class LocalScopes {
     /** Implicit receivers lambdas brought (their specs, "" = unknown type), [CLASS_BODY] where a class body begins. */
     private val receivers = ArrayList<String>()
 
-    /** Spec of the innermost implicit receiver a lambda brought (`x.apply { }`), "" when its type is unknown. */
-    val implicitReceiver: String? get() = receivers.lastOrNull { it != CLASS_BODY }
+    /**
+     * Spec of the innermost implicit receiver a lambda brought (`x.apply { }`), "" when its type is unknown — also when
+     * a class body lies between, whose own members come first and are not all known.
+     */
+    val implicitReceiver: String?
+        get() {
+            val last = receivers.lastOrNull() ?: return null
+            if (last != CLASS_BODY) return last
+            return if (receivers.any { it != CLASS_BODY }) "" else null
+        }
 
     /** What a plain `this` means when it is a lambda's receiver rather than a class. */
     val thisReceiver: String? get() = receivers.lastOrNull()?.takeIf { it != CLASS_BODY }

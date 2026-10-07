@@ -1,17 +1,20 @@
 package codeloupe.query.usages
 
 import codeloupe.lang.RefFact
+import codeloupe.query.DeclMatch
 import codeloupe.query.DeclRow
 import codeloupe.query.RefRow
 
 /** One reference -> the declarations it may denote, from the file's scopes and the receiver's type. */
 internal class RefResolver(
-    private val cache: IndexCache,
-    private val types: Types,
-    private val lookup: MemberLookup,
+    private val context: IndexContext,
     private val implicit: ImplicitScope,
     private val receivers: Receivers,
 ) {
+    private val cache = context.cache
+    private val types = context.types
+    private val lookup = context.lookup
+
     fun resolve(ref: RefRow): Resolution {
         val file = cache.file(ref.path) ?: return Resolution(emptyList(), complete = false)
         val chain = file.chain(file.decl(ref.declId))
@@ -24,15 +27,16 @@ internal class RefResolver(
             ref.recv == null -> lexical(ref, file, chain, accept)
             else -> qualified(ref, file, chain, accept)
         }
-        return if (ref.kind == "call") Arguments.narrow(resolution, ref.args) else resolution
+        return if (ref.kind == "call") context.arguments.narrow(resolution, ref.args) else resolution
     }
 
     private fun lexical(ref: RefRow, file: FileScope, chain: List<DeclRow>, accept: (DeclRow) -> Boolean): Resolution =
-        implicit.find(ref.name, file, chain, accept, ref.recvType?.let { receivers.fromSpec(it, file, chain.firstOrNull()) })
+        implicit.find(ref.name, file, chain, accept, ref.recvType?.let { receivers.lambdaReceiver(it, file, chain.firstOrNull()) })
 
     /**
      * A name bound in code: its local declarations. A call goes past a binding that cannot be invoked (`flag()` with
-     * `flag: Boolean` calls a function), and a binding across a class body may also be that class's member.
+     * `flag: Boolean` calls a function); one of a type that may have `invoke` (a `fun interface`, an alias) leaves
+     * both open. A binding across a class body may also be that class's member.
      */
     private fun bound(ref: RefRow, file: FileScope, chain: List<DeclRow>, accept: (DeclRow) -> Boolean): Resolution {
         val bind = ref.bind.orEmpty()
@@ -41,13 +45,13 @@ internal class RefResolver(
         val ids = chain.map { it.id }.toSet()
         val locals = cache.named(ref.name).filter { it.local && it.path == ref.path && it.parentId in ids }
         val localFunctions = locals.filter { it.kind == "fun" }
-        val invocable = type.isEmpty() || "->" in type
         return when {
             ref.kind == "call" || ref.kind == "callable_ref" -> when {
                 localFunctions.isNotEmpty() -> Resolution(localFunctions, complete = !beyondClass)
-                ref.kind == "call" && invocable && type.isNotEmpty() -> Resolution(locals, complete = !beyondClass)
-                ref.kind == "call" && invocable -> lexical(ref, file, chain, accept).let { it.copy(decls = (it.decls + locals).distinct(), complete = false, byName = false) }
-                else -> lexical(ref, file, chain, accept)
+                ref.kind == "callable_ref" -> lexical(ref, file, chain, accept)
+                "->" in type -> Resolution(locals, complete = !beyondClass)
+                DeclMatch.baseType(type) in NOT_INVOCABLE -> lexical(ref, file, chain, accept)
+                else -> lexical(ref, file, chain, accept).let { it.copy(decls = (it.decls + locals).distinct(), complete = false, byName = false) }
             }
             beyondClass -> Resolution((locals + cache.named(ref.name).filter { Kinds.isMember(it) && accept(it) }).distinct(), complete = false)
             else -> Resolution(locals, complete = true)
@@ -71,17 +75,19 @@ internal class RefResolver(
     }
 
     /**
-     * Members and extensions of an instance. Nothing found on an indexed type may still be a subtype's member reached
-     * through a smart cast (`if (e is Sub) e.f()`); on a library type, an extension declared on a library supertype.
+     * Members and extensions of an instance. Past them, a type with supertypes outside the index may meet an extension
+     * declared on a library type (`fun Throwable.f()` on an `IOException` or a `MyEx : RuntimeException`), and an
+     * indexed type a subtype's member through a smart cast (`if (e is Sub) e.f()`) — both only candidates.
      */
     private fun instance(name: String, type: ReceiverType.Instance, file: FileScope, accept: (DeclRow) -> Boolean): Resolution {
         val members = type.types.distinct().map { lookup.instance(types.closure(it), name, accept) }
         val decls = members.flatMap { it.decls }
         if (decls.isNotEmpty()) return Resolution(decls, complete = true, further = members.flatMap { it.further })
         lookup.extensions(name, type.names, file, accept).let { if (it.isNotEmpty()) return Resolution(it, complete = true) }
-        if (type.types.isEmpty()) return lookup.onLibraryTypes(name, file, accept).let { Resolution(it, complete = it.isEmpty()) }
-        val cast = type.types.flatMap(types::allSubtypes).flatMap { sub -> lookup.instance(types.closure(sub), name, accept).decls }.distinct()
-        return Resolution(cast, complete = cast.isEmpty())
+        val library = if (implicit.opensToLibrary(type)) lookup.onLibraryTypes(name, file, accept) else emptyList()
+        val cast = type.types.flatMap(types::allSubtypes).flatMap { sub -> lookup.instance(types.closure(sub), name, accept).decls }
+        val guesses = (library + cast).distinct()
+        return Resolution(guesses, complete = guesses.isEmpty())
     }
 
     private fun accepts(kind: String): ((DeclRow) -> Boolean)? = when (kind) {
@@ -90,5 +96,10 @@ internal class RefResolver(
         "name" -> { d -> d.kind == "property" || d.kind in Kinds.CLASSIFIERS }
         "nav", "callable_ref" -> { d -> d.kind == "fun" || d.kind == "property" || d.kind in Kinds.CLASSIFIERS }
         else -> null
+    }
+
+    private companion object {
+        /** Built-in value types without `invoke`: calling a binding of one of them calls a function of that name. */
+        val NOT_INVOCABLE = setOf("Boolean", "Int", "Long", "Short", "Byte", "Double", "Float", "Char", "String", "Unit")
     }
 }

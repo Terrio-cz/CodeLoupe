@@ -4,6 +4,7 @@ import codeloupe.lang.TypeSpec
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFunctionLiteral
+import org.jetbrains.kotlin.psi.KtLambdaArgument
 import org.jetbrains.kotlin.psi.KtLambdaExpression
 import org.jetbrains.kotlin.psi.KtQualifiedExpression
 import org.jetbrains.kotlin.psi.KtValueArgument
@@ -12,7 +13,7 @@ import org.jetbrains.kotlin.psi.KtValueArgumentList
 /**
  * Types the standard library gives a lambda by the call it is passed to: `it` of `x.let {}` is `x`, of
  * `xs.filter {}` an element of `xs`; `x.apply {}`, `x.run {}`, `with(x) {}` make `x` the implicit receiver. A lambda
- * passed to any other call may have a receiver of its own (DSL builders): its type is unknown.
+ * passed to any other call has the receiver its parameter type declares, which only the query side can read.
  */
 internal class LambdaTypes(private val types: LocalTypes) {
     /** Spec of the lambda's single (or, for `…Indexed`, second) parameter; "" when the call is not a known one. */
@@ -40,8 +41,16 @@ internal class LambdaTypes(private val types: LocalTypes) {
             name in RECEIVER && receiver != null -> types.ofExpression(receiver)
             name == "with" -> (callee.parent as KtCallExpression).valueArguments.firstOrNull()?.getArgumentExpression()?.let(types::ofExpression) ?: ""
             name in RECEIVER || name in RECEIVERLESS || name in SELF || name in ELEMENT || name in INDEXED -> null
-            else -> ""
+            // Any other callee: its parameter's function type says (`R.() -> T`); unindexed ones stay unknown.
+            else -> types.at(callee).let { if (it.isEmpty()) "" else TypeSpec.lambdaReceiver(it, argumentIndex(literal)) }
         }
+    }
+
+    // A trailing lambda is the last parameter.
+    private fun argumentIndex(literal: KtFunctionLiteral): Int {
+        val argument = (literal.parent as KtLambdaExpression).parent as KtValueArgument
+        if (argument is KtLambdaArgument) return -1
+        return (argument.parent as? KtValueArgumentList)?.arguments?.indexOf(argument) ?: -1
     }
 
     /** Callee of the call the lambda is an argument of, and that call's receiver. */

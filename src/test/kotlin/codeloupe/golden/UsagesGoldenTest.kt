@@ -22,13 +22,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * `usages` against a manually verified oracle: 40 TerrioImporter symbols at a pinned commit. Checks that every
+ * `usages` against a manually verified oracle: 44 TerrioImporter symbols at a pinned commit. Checks that every
  * `rg -w` code position is in the result, that `exact` hits are right and that no true usage is hidden as other.
  * Writes build/reports/codeloupe/golden-usages.md. Runs where TerrioImporter is checked out (CODELOUPE_TERRIO).
  */
 class UsagesGoldenTest {
     @Test
-    fun `usages of 40 Terrio symbols match the oracle`() {
+    fun `usages of the golden Terrio symbols match the oracle`() {
         val oracle = Json.parseToJsonElement(UsagesGoldenTest::class.java.getResource("/golden/terrio-usages.json")!!.readText()).jsonObject
         val terrio = System.getenv("CODELOUPE_TERRIO") ?: "C:/Users/tadea/IdeaProjects/TerrioImporter"
         val commit = oracle.getValue("commit").jsonPrimitive.content

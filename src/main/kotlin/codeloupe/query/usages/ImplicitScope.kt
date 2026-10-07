@@ -35,8 +35,15 @@ internal class ImplicitScope(
         else -> null
     }
 
+    // Enums extend `Enum` and `Comparable` without saying so.
     fun instanceOf(resolved: List<DeclRow>, names: Set<String>): ReceiverType.Instance =
-        ReceiverType.Instance(resolved, names + resolved.flatMap { types.closure(it).names })
+        ReceiverType.Instance(resolved, names + resolved.flatMap { types.closure(it).names + if (isEnum(it)) ENUM_SUPERTYPES else emptySet() })
+
+    /** A receiver typed outside the index, or with supertypes outside it, has members nobody knows. */
+    fun opensToLibrary(receiver: ReceiverType.Instance) =
+        receiver.types.isEmpty() || receiver.types.any { isEnum(it) || types.closure(it).external.isNotEmpty() }
+
+    private fun isEnum(d: DeclRow) = d.kind == "enum" || d.kind == "enum_entry"
 
     private fun onInstance(receiver: ReceiverType.Instance, name: String, file: FileScope, accept: (DeclRow) -> Boolean): Resolution? {
         val members = receiver.types.map { lookup.instance(types.closure(it), name, accept) }
@@ -64,9 +71,9 @@ internal class ImplicitScope(
         return Resolution.byName(cache.named(name).filter { Kinds.isMember(it) && accept(it) })
     }
 
-    // A receiver typed outside the index, or with supertypes outside it, has members nobody knows.
-    private fun opensToLibrary(receiver: ReceiverType.Instance) =
-        receiver.types.isEmpty() || receiver.types.any { types.closure(it).external.isNotEmpty() }
-
     private fun Resolution.openToLibrary() = copy(complete = false, byName = true)
+
+    private companion object {
+        val ENUM_SUPERTYPES = setOf("Enum", "Comparable")
+    }
 }

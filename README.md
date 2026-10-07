@@ -95,5 +95,5 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 
 `ParityTest` compares every tool answer with golden output of the Node.js prototype (phase 1); the
 TerrioImporter part runs where that repository is checked out (`CODELOUPE_TERRIO`). `UsagesGoldenTest` checks
-`usages` on 40 TerrioImporter symbols against a manually verified oracle (`src/test/resources/golden`) and writes
+`usages` on 44 TerrioImporter symbols against a manually verified oracle (`src/test/resources/golden`) and writes
 `build/reports/codeloupe/golden-usages.md`: superset of `rg -w`, precision of `exact` (≥ 95 %), candidate share.

@@ -3,16 +3,21 @@ package codeloupe.lang
 /**
  * Type specs the extractor records and the query side resolves: plain type text (`Foo`, `List<Foo>`), `@line:col`
  * (the declared type of what the reference at that position denotes), `*spec` (an element of `spec`), `a|b` (`a`,
- * else `b`); "" is unknown.
+ * else `b`); "" is unknown. A lambda's implicit receiver may also be `&@line:col#i`: the receiver of the function type
+ * of parameter `i` (-1 = the last) of what the call at that position denotes.
  */
 object TypeSpec {
     const val ELEMENT = '*'
     const val POSITION = '@'
     const val OR = '|'
+    const val LAMBDA_RECEIVER = '&'
+    const val ARGUMENT = '#'
 
     private val ITERABLE = Regex("""(?:Mutable)?(?:List|Set|Collection|Iterable|Sequence|Array)<\s*([^,<>]+?)\s*>\??""")
 
     fun position(line: Int, col: Int) = "$POSITION$line:$col"
+
+    fun lambdaReceiver(callee: String, argument: Int) = "$LAMBDA_RECEIVER$callee$ARGUMENT$argument"
 
     /** `List<Foo>` -> `Foo`; null for text that is not a known collection type. */
     fun elementType(text: String): String? = ITERABLE.matchEntire(text.trim())?.groupValues?.get(1)
