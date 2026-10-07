@@ -33,23 +33,30 @@ class MirrorStore(file: Path) : AutoCloseable {
     /** The mirror is a cache: a file of another schema version is dropped and loaded again from the tracker. */
     private fun open(file: Path, config: SQLiteConfig): Connection {
         val existing = config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
-        val (version, tables) = try {
-            existing.createStatement().use { s -> s.executeQuery("PRAGMA user_version").use { it.next(); it.getInt(1) } } to
-                existing.query("SELECT count(*) FROM sqlite_master") { it.getInt(1) }.first()
-        } catch (e: Exception) {
-            existing.close()
-            throw e
+        val (version, tables) = closingOnFailure(existing) {
+            it.createStatement().use { s -> s.executeQuery("PRAGMA user_version").use { r -> r.next(); r.getInt(1) } } to
+                it.query("SELECT count(*) FROM sqlite_master") { r -> r.getInt(1) }.first()
         }
         val connection = if (version == SCHEMA_VERSION || tables == 0) existing else {
             existing.close()
             listOf("", "-wal", "-shm").forEach { Files.deleteIfExists(Path.of("$file$it")) }
             config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
         }
-        connection.createStatement().use { s ->
-            SCHEMA.forEach(s::execute)
-            s.execute("PRAGMA user_version = $SCHEMA_VERSION")
+        closingOnFailure(connection) {
+            it.createStatement().use { s ->
+                SCHEMA.forEach(s::execute)
+                s.execute("PRAGMA user_version = $SCHEMA_VERSION")
+            }
         }
         return connection
+    }
+
+    /** On Windows an open handle keeps the file locked: a connection that fails to set up is closed at once. */
+    private fun <T> closingOnFailure(connection: Connection, block: (Connection) -> T): T = try {
+        block(connection)
+    } catch (e: Exception) {
+        connection.close()
+        throw e
     }
 
     fun <T> read(block: (Connection) -> T): T = synchronized(db) { block(db) }
