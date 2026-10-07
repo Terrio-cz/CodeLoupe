@@ -3,7 +3,7 @@ package codeloupe.tools
 import codeloupe.query.SymbolQuery
 import codeloupe.query.View
 
-object SymbolTool : Tool {
+object SymbolTool : ViewTool {
     override val name = "symbol"
     override val description = "Source of one declaration — KDoc, annotations and body — by name: Type.member, member(ParamType, …) " +
         "for an overload, pkg.Type, or path/File.kt:line. Types over 120 lines return their header and member list unless full=true. " +

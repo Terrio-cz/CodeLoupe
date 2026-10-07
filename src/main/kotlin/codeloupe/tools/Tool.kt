@@ -1,6 +1,6 @@
 package codeloupe.tools
 
-import codeloupe.query.View
+import codeloupe.repo.Registry
 import kotlinx.serialization.json.JsonObject
 
 /** One tool, shared by MCP and the HTTP API/CLI: one definition, one implementation. */
@@ -12,5 +12,6 @@ interface Tool {
     val properties: JsonObject
     val required: List<String>
 
-    fun run(view: View, args: ToolArgs): String
+    /** The answer for the repository or worktree at [root]. */
+    suspend fun answer(registry: Registry, root: String, args: ToolArgs): String
 }

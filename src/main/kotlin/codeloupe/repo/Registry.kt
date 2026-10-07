@@ -1,6 +1,7 @@
 package codeloupe.repo
 
 import codeloupe.JsonFormat
+import codeloupe.changes.ChangeSet
 import codeloupe.config.Config
 import codeloupe.daemon.JobQueue
 import codeloupe.git.Git
@@ -34,6 +35,7 @@ class Registry(
     private val located = ConcurrentHashMap<String, RepoLocation>()
     private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, log)
     private val builds = BaseBuilds(queue, launcher, log, swapped = ::collectOverlays)
+    private val mergeBases = MergeBases(queue, launcher, config.queryTimeoutMs)
 
     fun locate(root: String): RepoLocation {
         // The daemon's working directory is its home, so a relative root would name the wrong repository.
@@ -89,6 +91,16 @@ class Registry(
         // A failed sync is recorded in repo.failure; the old base answers meanwhile.
         if (sync.inline) withTimeoutOrNull(config.queryTimeoutMs) { runCatching { sync.job.await() } }
         return repo
+    }
+
+    /**
+     * Runs [read] on what [root]'s worktree changed against the merge-base with the default branch: the change set, the
+     * worktree as it is now and the merge-base versions of the changed files (null when there are none).
+     */
+    suspend fun <T> changes(root: String, read: (ChangeSet, View, View?) -> T): T {
+        val location = locate(root)
+        val set = mergeBases.changes(repo(location.commonDir), location.worktree)
+        return query(root) { after -> set.beforeFile?.let(::View).use { before -> read(set, after, before) } }
     }
 
     /** Runs [read] on the base index of [root]'s repository with [root]'s worktree overlay on top. */

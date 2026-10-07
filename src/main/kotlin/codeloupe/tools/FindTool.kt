@@ -3,7 +3,7 @@ package codeloupe.tools
 import codeloupe.query.FindQuery
 import codeloupe.query.View
 
-object FindTool : Tool {
+object FindTool : ViewTool {
     override val name = "find"
     override val description = "Find declarations (classes, functions, properties, …) by name, qualified name (Type.member) or glob " +
         "(*Routes). One line per hit: path:lines [container] signature. Use instead of grep/rg to locate code."

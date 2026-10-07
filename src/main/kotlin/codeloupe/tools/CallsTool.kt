@@ -3,7 +3,7 @@ package codeloupe.tools
 import codeloupe.query.View
 import codeloupe.query.usages.CallsQuery
 
-object CallsTool : Tool {
+object CallsTool : ViewTool {
     override val name = "calls"
     override val description = "Call tree of a declaration: its callers (default) or callees, up to depth 3, " +
         "each node path:line [Container] signature @call lines, marked = exact or ? candidate."

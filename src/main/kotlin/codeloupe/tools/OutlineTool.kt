@@ -3,7 +3,7 @@ package codeloupe.tools
 import codeloupe.query.OutlineQuery
 import codeloupe.query.View
 
-object OutlineTool : Tool {
+object OutlineTool : ViewTool {
     override val name = "outline"
     override val description = "Members of a file or a type with line ranges and signatures, no bodies. Read this before reading a file; " +
         "then fetch only the members you need with `symbol`."

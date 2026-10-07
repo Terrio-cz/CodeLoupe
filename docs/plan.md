@@ -1,6 +1,6 @@
 # CodeLoupe — plán (code index pro AI agenty)
 
-Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56), vrstvy worktree (CL-16) · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
+Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56), vrstvy worktree (CL-16), `changes` (CL-17) · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
 
 ## 0. Zadání
 
@@ -257,7 +257,7 @@ v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`
 | `calls(name, direction=callers\|callees, depth≤3)` ✅ | strom volání; pod první úrovní jen exact vazby, kandidáti jako počet (jeden nástroj místo dvou — strop 12 nástrojů) |
 | `hierarchy(type \| member)` ✅ | supertypy (i mimo index jménem), podtypy včetně enum entry, override nahoru i dolů |
 | `grep(pattern)` | `rg` nad rootem, zásahy označené obklopující deklarací |
-| `changes(root)` | změněné deklarace proti merge-base: `+ ~ ^ -`, volající, testy, volitelně tělo před/po |
+| `changes(root)` | změněné deklarace proti merge-base: `+ ~ ^ -`, volající a testy (počet + 10, kandidáti jen počtem), volitelně diff těla |
 | `context(name)` | `symbol` + volající + volané jedním voláním |
 | `modules()` | moduly a jejich závislosti |
 | `check(file)` | syntaktické chyby (ERROR uzly) — rychlá náhrada IDEA `get_file_problems`; typy dál ověřuje build |
@@ -421,6 +421,29 @@ celou dobu vytížený jinými okny (CPU 40–97 %), `main` měřený souběžn�
   na pomalou obnovu, GC vrstvy smazaného worktree, znovupoužití vrstvy po restartu; `StoreCopierTest`).
 - Mimo rozsah založeno: CL-79 (kontrola worktree pro repozitáře se 100k+ soubory), CL-80 (worker s nízkou prioritou
   na vytíženém stroji: build Terria 61 s místo 7 s).
+
+### Výsledek fáze 3b — `changes` pro review (CL-17, 2026-10-07)
+
+- Merge-base `HEAD` × výchozí větev, změněné soubory z `git diff --raw <merge-base>` + untracked (commitnuté i
+  rozpracované). Fakta „po" = báze + vrstva worktree; fakta „před" = index merge-base verzí změněných souborů
+  (`merge-bases/<commit>.db`, bloby se nemění → jen přibývá, 8 posledních, parse v daemonu ≤ 200 souborů, jinak worker).
+- Párování deklarací podle druhu, kontejneru a jména: stejná signatura → `~` při změně textu (konce řádků se
+  nepočítají; typ jen když se změnil text mimo jeho členy), zbytek skupiny `^` (se starou signaturou), zbylé `+`/`-`.
+  Členy přidaného/odebraného typu se slučují do řádku typu („with N members").
+- Volající přes resolver usages (CL-13): přesní jmenovitě (10 nejčastějších), kandidáti jen počtem (běžná jména typu
+  `id` jich mají stovky); testy po testovacích třídách; u odebrané deklarace odkazy jménem, které jistě nevedou jinam.
+- Terrio (3 TER worktree, výstup vs. `git diff <merge-base>`):
+
+| Worktree | Souborů (.kt) | Deklarací | `git diff` | + změněné soubory celé | `changes` | `bodies=true` | Čas (první / znovu) |
+|---|---|---|---|---|---|---|---|
+| TER-591 | 15 (13) | 52 (+29 ~14 ^9) | 35 084 zn. | 59 198 zn. | **8 284 zn.** (24 %) | 26 383 | 0,72 / 0,30 s |
+| TER-656 | 21 (20) | 53 (+14 ~37 ^2) | 38 689 zn. | 171 317 zn. | **10 367 zn.** (27 %) | 36 067 | 0,79 / 0,51 s |
+| TER-477 | 81 (72) | 516 (+431 ~70 ^3 -12) | 254 337 zn. | 730 951 zn. | **17 742 zn.** limit 60 / 34 403 vše (14 %) | 75 562 | 0,85 / 0,67 s |
+
+- Tahy: reviewer dnes `git diff --stat` + `git diff` + čtení změněných souborů (13–72) + `rg` na volající každé
+  změny signatury (2–9) → ~15–80 tahů; `changes` 1 tah (+ `symbol`/`usages` jen pro to, co chce vidět celé).
+- Testy: 61 (nově `ChangesTest`: větev s `+ ~ ^ -`, novým a smazaným souborem, CRLF bez falešného `~`, posunutý
+  main mimo výstup, `bodies`, soubory bez změny deklarací a nekódové soubory).
 
 ## 10. Rizika
 

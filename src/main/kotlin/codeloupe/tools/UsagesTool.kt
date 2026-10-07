@@ -3,7 +3,7 @@ package codeloupe.tools
 import codeloupe.query.View
 import codeloupe.query.usages.UsagesQuery
 
-object UsagesTool : Tool {
+object UsagesTool : ViewTool {
     override val name = "usages"
     override val description = "Every reference to a declaration (Type.member, member(ParamType), pkg.Type), grouped by file and " +
         "enclosing declaration, one code line each, marked = exact or ? candidate. Covers what rg -w would find in code; " +

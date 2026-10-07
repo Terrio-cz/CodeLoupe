@@ -3,7 +3,7 @@ package codeloupe.tools
 import codeloupe.query.View
 import codeloupe.query.usages.HierarchyQuery
 
-object HierarchyTool : Tool {
+object HierarchyTool : ViewTool {
     override val name = "hierarchy"
     override val description = "Supertypes and subtypes (implementations) of a type, or what a member overrides and what overrides it."
     override val properties = Schema.properties("name" to Schema.string("Type, pkg.Type or Type.member"))
