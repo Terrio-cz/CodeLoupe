@@ -1,6 +1,6 @@
 package codeloupe.repo
 
-import codeloupe.git.Git
+import codeloupe.git.GitObjects
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -13,8 +13,8 @@ internal object DefaultRef {
     fun of(commonDir: String): String {
         val mainWorktree = if (commonDir.endsWith("/.git")) commonDir.removeSuffix("/.git") else commonDir
         configured(Path.of(mainWorktree, ".codeloupe.json"))?.let { return it }
-        Git.run(commonDir, "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD", allowFail = true)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        return CANDIDATES.firstOrNull { Git.run(commonDir, "rev-parse", "-q", "--verify", "$it^{commit}", allowFail = true) != null } ?: "HEAD"
+        GitObjects.symbolic(commonDir, "refs/remotes/origin/HEAD")?.let { return it.removePrefix("refs/remotes/") }
+        return CANDIDATES.firstOrNull { GitObjects.resolve(commonDir, it) != null } ?: "HEAD"
     }
 
     private fun configured(file: Path): String? = runCatching {

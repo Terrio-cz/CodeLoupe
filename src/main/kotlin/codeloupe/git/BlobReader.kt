@@ -1,12 +1,16 @@
 package codeloupe.git
 
+import codeloupe.platform.TimedPart
+import codeloupe.platform.Timings
 import java.io.BufferedInputStream
 import java.io.InputStream
 
 /** Streams blob contents through one `git cat-file --batch`, one blob in memory at a time. */
 object BlobReader {
+    fun of(cwd: String) = BlobSource { shas, onBlob -> read(cwd, shas, onBlob) }
+
     /** Calls [onBlob] with each blob's UTF-8 text in request order; returns how many blobs were read. */
-    fun read(cwd: String, shas: Collection<String>, onBlob: (sha: String, text: String) -> Unit): Int {
+    fun read(cwd: String, shas: Collection<String>, onBlob: (sha: String, text: String) -> Unit): Int = Timings.measure(TimedPart.GIT) {
         val process = Git.start(cwd, "cat-file", "--batch")
         // A separate writer keeps the request pipe from filling up while we read answers.
         val writer = Thread.ofVirtual().start {
@@ -32,7 +36,7 @@ object BlobReader {
         }
         val code = process.waitFor()
         if (code != 0) throw GitException("git cat-file exit $code")
-        return count
+        count
     }
 
     private fun readLine(input: InputStream): String? {

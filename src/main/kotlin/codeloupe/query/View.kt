@@ -1,6 +1,8 @@
 package codeloupe.query
 
 import codeloupe.index.Store
+import codeloupe.platform.TimedPart
+import codeloupe.platform.Timings
 import java.nio.file.Path
 import java.sql.PreparedStatement
 
@@ -8,10 +10,15 @@ import java.sql.PreparedStatement
  * Read view over a base index, optionally with a worktree overlay attached as `ov`. Every query goes through
  * here so overlay masking (a worktree's copy of a file hides the base copy) lives in one place.
  */
-class View(baseFile: Path, overlayFile: Path? = null) : AutoCloseable {
+class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
+    private val openedAt = System.nanoTime()
     private val db = Store.open(baseFile, readOnly = true)
     private val overlay = overlayFile != null
-    private val statements = HashMap<String, Pair<PreparedStatement, NamedSql>>()
+    // A pooled view serves many queries: only the statements used most recently stay compiled.
+    private val statements = object : LinkedHashMap<String, Pair<PreparedStatement, NamedSql>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, Pair<PreparedStatement, NamedSql>>): Boolean =
+            (size > MAX_STATEMENTS).also { if (it) eldest.value.first.close() }
+    }
 
     init {
         if (overlayFile != null) {
@@ -19,17 +26,34 @@ class View(baseFile: Path, overlayFile: Path? = null) : AutoCloseable {
             // One read transaction: every statement sees the same version of an overlay that a refresh may be rewriting.
             db.autoCommit = false
         }
+        Timings.add(TimedPart.OPEN, System.nanoTime() - openedAt)
     }
+
+    /**
+     * Readies a pooled view for its next query: ends the read transaction, so that query sees the overlay as it is
+     * then and a refresh's write-ahead log is not held back, and frees the page cache (an idle view holds ~4 MB
+     * otherwise; its next query reads the pages back from the OS cache). False when the connection is unusable.
+     */
+    fun reset(): Boolean = runCatching {
+        if (overlay) db.rollback()
+        db.createStatement().use { it.execute("PRAGMA shrink_memory") }
+    }.isSuccess
+
+    /** True when the view reads [file], as its base or its overlay. */
+    fun reads(file: Path): Boolean = file == baseFile || file == overlayFile
 
     /** The base commit the attached overlay was made against; null without an overlay. */
     fun overlayBase(): String? =
         if (overlay) query("SELECT value FROM ov.meta WHERE key = 'base'", emptyMap()) { it.getString(1) }.firstOrNull() else null
 
-    /** Declarations matching [where] (written against aliases `d`/`f`, with `:params`) over base and overlay. */
+    /**
+     * Declarations matching [where] (written against aliases `d`/`f`, with `:params`; `{db}` names the database of the
+     * row, for a subquery) over base and overlay.
+     */
     fun decls(where: String, params: Map<String, Any?> = emptyMap(), tail: String = ""): List<DeclRow> {
-        val base = "SELECT ${DeclRow.COLUMNS}, 'base' AS src FROM main.decls d JOIN main.files f ON f.id = d.file_id WHERE ($where)"
+        val base = "SELECT ${DeclRow.COLUMNS}, 'base' AS src FROM main.decls d JOIN main.files f ON f.id = d.file_id WHERE (${where.replace("{db}", "main")})"
         val sql = if (overlay) {
-            """SELECT * FROM (SELECT ${DeclRow.COLUMNS}, 'ov' AS src FROM ov.decls d JOIN ov.files f ON f.id = d.file_id WHERE ($where)
+            """SELECT * FROM (SELECT ${DeclRow.COLUMNS}, 'ov' AS src FROM ov.decls d JOIN ov.files f ON f.id = d.file_id WHERE (${where.replace("{db}", "ov")})
            UNION ALL $base AND f.path NOT IN (SELECT path FROM ov.files)) $tail"""
         } else {
             "SELECT * FROM ($base) $tail"
@@ -86,17 +110,21 @@ class View(baseFile: Path, overlayFile: Path? = null) : AutoCloseable {
         return LinkedHashSet(rows.filter { it !in gone } + ov.filter { !it.second }.map { it.first }).toList()
     }
 
-    override fun close() {
+    override fun close() = Timings.measure(TimedPart.OPEN) {
         statements.values.forEach { it.first.close() }
         db.close()
     }
 
-    private fun <T> query(sql: String, params: Map<String, Any?>, map: (java.sql.ResultSet) -> T): List<T> {
+    private fun <T> query(sql: String, params: Map<String, Any?>, map: (java.sql.ResultSet) -> T): List<T> = Timings.measure(TimedPart.SQL) {
         val (statement, named) = statements.getOrPut(sql) {
             val named = NamedSql.parse(sql)
             db.prepareStatement(named.sql) to named
         }
         named.bind(statement, params)
-        return statement.executeQuery().use { rs -> buildList { while (rs.next()) add(map(rs)) } }
+        statement.executeQuery().use { rs -> buildList { while (rs.next()) add(map(rs)) } }
+    }
+
+    private companion object {
+        const val MAX_STATEMENTS = 24
     }
 }

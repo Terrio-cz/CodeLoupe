@@ -5,6 +5,7 @@ import codeloupe.JsonFormat
 import codeloupe.config.Config
 import codeloupe.platform.IsoTime
 import codeloupe.platform.ProcessMemory
+import codeloupe.platform.Timings
 import codeloupe.repo.Registry
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
@@ -72,12 +73,14 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
             uptimeSec = Instant.now().epochSecond - started.epochSecond, rssMb = ProcessMemory.rssMb(),
             heapMb = (runtime.totalMemory() - runtime.freeMemory()) / MB, cpuSec = cpu,
             calls = runner.stats(), queue = queue.snapshot(), repos = registry.snapshot(),
+            gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(),
         )
     }
 
     fun stop() {
         server.stop(gracePeriodMillis = 100, timeoutMillis = 2_000)
         scope.cancel()
+        registry.close()
         runCatching {
             val info = JsonFormat.json.decodeFromString(DaemonInfo.serializer(), Files.readString(infoFile))
             if (info.pid == pid) Files.deleteIfExists(infoFile)

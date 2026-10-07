@@ -2,6 +2,8 @@ package codeloupe.daemon
 
 import codeloupe.JsonFormat
 import codeloupe.platform.IsoTime
+import codeloupe.platform.TimedPart
+import codeloupe.platform.Timings
 import codeloupe.repo.BusyException
 import codeloupe.repo.Registry
 import codeloupe.tools.Tool
@@ -22,7 +24,7 @@ class ToolRunner(private val registry: Registry, private val defaultRoot: String
         val outcome = try {
             val root = args.string("root")?.takeIf { it.isNotEmpty() } ?: defaultRoot
                 ?: throw IllegalArgumentException("pass root: the absolute path of the repository or worktree to answer for")
-            ToolOutcome(true, tool.answer(registry, root, args))
+            ToolOutcome(true, Timings.measure(TimedPart.TOOL) { tool.answer(registry, root, args) })
         } catch (e: CancellationException) {
             throw e
         } catch (e: BusyException) {

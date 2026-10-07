@@ -1,6 +1,7 @@
 package codeloupe.index
 
 import codeloupe.JsonFormat
+import codeloupe.git.BlobReader
 import codeloupe.platform.ProcessMemory
 import codeloupe.platform.ProcessPriority
 import java.nio.file.Files
@@ -36,8 +37,8 @@ object BuildWorker {
         }
         val (_, repoDir, commit, dbFile, updateFile) = args
         val update = JsonFormat.json.decodeFromString(StoreUpdate.serializer(), Files.readString(Path.of(updateFile)))
-        if (commit != NO_COMMIT) return BaseBuilder.update(repoDir, commit, Path.of(dbFile), update)
-        return Store.open(Path.of(dbFile)).use { StoreUpdater.apply(it, update, repoDir) }
+        if (commit != NO_COMMIT) return BaseBuilder.update(BlobReader.of(repoDir), commit, Path.of(dbFile), update)
+        return Store.open(Path.of(dbFile)).use { StoreUpdater.apply(it, update, BlobReader.of(repoDir)) }
     }
 
     const val UPDATE = "update"

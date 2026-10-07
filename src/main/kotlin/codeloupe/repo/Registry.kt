@@ -5,11 +5,14 @@ import codeloupe.changes.ChangeSet
 import codeloupe.config.Config
 import codeloupe.daemon.JobQueue
 import codeloupe.git.Git
-import codeloupe.git.RefReader
+import codeloupe.git.GitLayout
+import codeloupe.git.GitObjects
 import codeloupe.index.Store
 import codeloupe.overlay.Overlays
 import codeloupe.platform.Sha1
+import codeloupe.git.JGitRepos
 import codeloupe.query.View
+import codeloupe.query.ViewPool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -32,21 +35,22 @@ class Registry(
     private val log: (String) -> Unit = {},
 ) {
     private val repos = ConcurrentHashMap<String, RepoState>()
-    private val located = ConcurrentHashMap<String, RepoLocation>()
-    private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, log)
-    private val builds = BaseBuilds(queue, launcher, log, swapped = ::collectOverlays)
+    private val views = ViewPool()
+    private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, views::release, log)
+    private val builds = BaseBuilds(queue, launcher, log, release = views::release, swapped = ::collectOverlays)
     private val mergeBases = MergeBases(queue, launcher, config.queryTimeoutMs)
 
+    /** Read from the `.git` files on every call (well under a millisecond), so a moved or removed worktree is never served from a cache. */
     fun locate(root: String): RepoLocation {
         // The daemon's working directory is its home, so a relative root would name the wrong repository.
         if (!Path.of(root).isAbsolute) throw IllegalArgumentException("root must be an absolute path: $root")
-        val key = normalize(root)
-        located[key]?.takeIf { System.currentTimeMillis() - it.at < LOCATE_TTL_MS }?.let { return it }
-        if (!Path.of(key).exists()) throw IllegalArgumentException("root does not exist: $root")
-        val out = Git.run(key, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir", allowFail = true)
+        val path = Path.of(normalize(root))
+        if (!path.exists()) throw IllegalArgumentException("root does not exist: $root")
+        GitLayout.locate(path)?.let { return RepoLocation(it.worktree, it.commonDir) }
+        val out = Git.run(path.toString(), "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir", allowFail = true)
             ?: throw IllegalArgumentException("not inside a git repository: $root")
         val (worktree, commonDir) = out.trim().lines().map(::normalize)
-        return RepoLocation(worktree, commonDir, System.currentTimeMillis()).also { located[key] = it }
+        return RepoLocation(worktree, commonDir)
     }
 
     fun repo(commonDir: String): RepoState = repos.computeIfAbsent(commonDir) {
@@ -132,10 +136,23 @@ class Registry(
 
     /** Null when the base or the overlay moved on since [baseCommit]: the caller tries again. */
     private fun <T> read(repo: RepoState, baseFile: Path, baseCommit: String, overlay: Path?, read: (View) -> T): Read<T>? {
-        // Opened under the lock that guards the swap, so a new build cannot prune this base in between.
-        val view = synchronized(repo) { if (repo.baseCommit == baseCommit) View(baseFile, overlay) else null } ?: return null
-        // An overlay refreshed against a newer base in the meantime does not fit this one.
-        return view.use { if (overlay == null || it.overlayBase() == baseCommit) Read(read(it)) else null }
+        // Taken under the lock that guards the swap, so a new build cannot prune this base in between.
+        val lease = synchronized(repo) { if (repo.baseCommit == baseCommit) views.take(baseFile, overlay) else null } ?: return null
+        var healthy = false
+        try {
+            // An overlay refreshed against a newer base in the meantime does not fit this one.
+            val answer = if (overlay == null || lease.view.overlayBase() == baseCommit) Read(read(lease.view)) else null
+            healthy = true
+            return answer
+        } finally {
+            views.give(lease, healthy)
+        }
+    }
+
+    /** Closes the open read views and git repositories; the next query opens them again. */
+    fun close() {
+        views.closeAll()
+        JGitRepos.closeIdle()
     }
 
     fun snapshot(): List<RepoSummary> = repos.values.map { it.summary(overlays.count(it.id)) }
@@ -146,14 +163,9 @@ class Registry(
         }
     }
 
-    // Reading the ref files costs microseconds; only the git fallback is rate-limited.
-    private fun headOf(repo: RepoState): String = RefReader.branch(repo.commonDir, repo.defaultRef) ?: synchronized(repo) {
-        if (System.currentTimeMillis() - repo.headAt > HEAD_TTL_MS) {
-            repo.head = Git.run(repo.commonDir, "rev-parse", "${repo.defaultRef}^{commit}")!!.trim()
-            repo.headAt = System.currentTimeMillis()
-        }
-        repo.head!!
-    }
+    // Read on every query from the ref files (microseconds) or JGit, which re-reads them when their stamps move.
+    private fun headOf(repo: RepoState): String = GitObjects.resolve(repo.commonDir, repo.defaultRef)
+        ?: throw IllegalStateException("${repo.defaultRef} does not name a commit in ${repo.commonDir}")
 
     private fun normalize(path: String): String = Path.of(path).toAbsolutePath().normalize().toString().replace('\\', '/')
 
@@ -161,8 +173,6 @@ class Registry(
     private class Read<T>(val value: T)
 
     private companion object {
-        const val LOCATE_TTL_MS = 60_000
-        const val HEAD_TTL_MS = 2_000
         const val RETRY_FAILED_MS = 5 * 60_000
         const val ATTEMPTS = 3
     }

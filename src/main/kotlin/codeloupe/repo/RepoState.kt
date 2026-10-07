@@ -14,8 +14,6 @@ class RepoState(val id: String, val dir: Path, val commonDir: String, val defaul
     var lastBuild: LastBuild? = null
     var failure: BuildFailure? = null
     var failedAt: Long = 0
-    var head: String? = null
-    var headAt: Long = 0
 
     /** The latest sync of the base to a newer commit of the default branch, and the commit it was started for. */
     var sync: BaseSync? = null

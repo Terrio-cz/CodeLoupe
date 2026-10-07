@@ -1,5 +1,7 @@
 package codeloupe.git
 
+import codeloupe.platform.TimedPart
+import codeloupe.platform.Timings
 import java.io.IOException
 import java.util.concurrent.CompletableFuture
 
@@ -9,7 +11,7 @@ import java.util.concurrent.CompletableFuture
  */
 object Git {
     /** stdout of `git -C cwd args` (with [input] on stdin); null when git fails and [allowFail] is set. */
-    fun run(cwd: String, vararg args: String, allowFail: Boolean = false, input: String? = null): String? {
+    fun run(cwd: String, vararg args: String, allowFail: Boolean = false, input: String? = null): String? = Timings.measure(TimedPart.GIT) {
         val process = start(cwd, *args)
         val writer = Thread.ofVirtual().start { runCatching { process.outputStream.use { out -> input?.let { out.write(it.toByteArray()) } } } }
         val stderr = CompletableFuture.supplyAsync { process.errorStream.readAllBytes().toString(Charsets.UTF_8) }
@@ -26,7 +28,7 @@ object Git {
     // A repository's own config must not make a query run a command: core.fsmonitor can name one.
     fun start(cwd: String, vararg args: String): Process =
         try {
-            ProcessBuilder(listOf("git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", cwd) + args).start()
+            ProcessBuilder(listOf("git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", cwd) + args).start().also { Timings.spawned() }
         } catch (e: IOException) {
             throw GitException("git is not available: ${e.message}")
         }

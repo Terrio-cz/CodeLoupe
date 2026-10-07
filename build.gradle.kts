@@ -14,6 +14,7 @@ repositories {
 dependencies {
     implementation(libs.kotlin.compiler)
     implementation(libs.sqlite.jdbc)
+    implementation(libs.jgit)
     implementation(libs.ktor.server.cio)
     implementation(libs.mcp.server)
     implementation(libs.coroutines.core)

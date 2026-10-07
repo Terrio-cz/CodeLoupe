@@ -1,6 +1,8 @@
 package codeloupe.overlay
 
 import codeloupe.lang.Languages
+import codeloupe.platform.TimedPart
+import codeloupe.platform.Timings
 import java.io.IOException
 import java.nio.file.AccessDeniedException
 import java.nio.file.FileVisitResult
@@ -33,7 +35,7 @@ object WorktreeScan {
      * Relative path -> stamp; [prune] holds relative directories to skip (what git ignores as a whole). An unexpected
      * listing error fails the whole walk: a partial walk would read as deleted files.
      */
-    fun scan(root: Path, prune: Set<String>): Map<String, Stamp> = Walk(prune).run(root)
+    fun scan(root: Path, prune: Set<String>): Map<String, Stamp> = Timings.measure(TimedPart.SCAN) { Walk(prune).run(root) }
 
     private class Walk(private val prune: Set<String>) {
         val stamps = ConcurrentHashMap<String, Stamp>()

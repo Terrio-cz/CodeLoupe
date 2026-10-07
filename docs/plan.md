@@ -1,6 +1,6 @@
 # CodeLoupe — plán (code index pro AI agenty)
 
-Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56), vrstvy worktree (CL-16), `changes` (CL-17) · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
+Stav: fáze 1 hotová, port na Kotlin/JVM hotový (CL-56), vrstvy worktree (CL-16), `changes` (CL-17), dotaz bez git procesů (CL-96) · 2026-10-07 · repo `Terrio-cz/CodeLoupe` (private) · YouTrack projekt CL · analýza `docs/analysis.md`
 
 ## 0. Zadání
 
@@ -191,12 +191,18 @@ Pozice jen řádek/sloupec (CRLF vs LF nevadí).
 - Vrstva worktree = soubory, které se liší od `B` (`git diff --name-only B` + untracked; smazané jako
   tombstone), vlastní SQLite `overlays/<hash cesty>.db`. Klíč = cesta worktree, ne název větve → funguje pro
   jakýkoli workflow, i pro hlavní checkout.
-- Kontrola při dotazu (žádný watcher, v klidu 0 CPU): první dotaz a nová báze → git (`diff B`, untracked,
-  ignorované adresáře); každý další dotaz → paralelní výpis adresářů worktree (mtime/velikost z výpisu, bez
-  git procesu; Terrio ~30 ms) → přeparsovat jen soubory se změněným razítkem, obsah porovnaný s bází (CRLF/BOM
+- Kontrola při dotazu (žádný watcher, v klidu 0 CPU): první dotaz nového worktree a nová báze → git (`diff B`,
+  untracked, ignorované adresáře); každý další dotaz → paralelní výpis adresářů worktree (mtime/velikost z výpisu,
+  bez git procesu; Terrio ~30 ms) → přeparsovat jen soubory se změněným razítkem, obsah porovnaný s bází (CRLF/BOM
   = beze změny). Kontrola mladší než `overlayCheckMs` (1 s) platí i pro další dotaz: dávky dotazů platí jeden
   výpis; agent mezi editací a dotazem vždy čeká na tah modelu. Dotaz čte souběžně s kontrolou; když kontrola
   nic nezměnila, odpověď platí.
+- Stav poslední kontroly (razítka, ignorované soubory a adresáře, báze) leží vedle vrstvy v `overlays/<hash>.scan`
+  (CL-96): první dotaz po restartu daemonu nebo po vyřazení stavu z paměti worktree jen projde, bez gitu. Snapshot
+  platí, jen když jeho položky přesně odpovídají souboru vrstvy (zapisuje se až po něm); jinak git.
+- Lokace worktree (`.git`, `gitdir:`, `commondir`), výchozí větev, seznam worktree a refy se čtou ze souborů
+  v procesu, merge-base a git objekty přes JGit; git proces jen pro stav pracovního stromu (diff, untracked,
+  ignorované) a jako záloha, když JGit repozitář neotevře (CL-96).
 - Obnova vrstvy ve FAST lane, parse v daemonu (≤ 200 souborů do 512 KB), jinak build worker v HEAVY lane.
 - Správnost vrstvy nezávisí na čerstvosti báze; zastaralá báze jen zvětší vrstvu.
 - Sync báze líně (výchozí větev ≠ `B`): předchozí báze + změněné bloby; ≤ 200 souborů inline (dotaz počká),
@@ -452,6 +458,59 @@ celou dobu vytížený jinými okny (CPU 40–97 %), `main` měřený souběžn�
   main mimo výstup, `bodies`, soubory bez změny deklarací, přidaný člen bez `~` třídy, `(KDoc only)`, limit,
   přesměrovaný overload a stejnojmenná funkce jiného balíčku, dva worktree na jedné merge-base souběžně, `git rm --cached`,
   chybějící git objekt = chyba, ne špatná odpověď).
+
+### Výsledek CL-96 — méně git procesů, profil dotazu (2026-10-07)
+
+Profil `node tools/profile.mjs` (daemon v dočasném home, port 47471): latence u klienta (Node `fetch`) a rozpad podle
+časů daemonu (`/status` → `timings`, `gitSpawns`): git, JGit, výpis worktree, kontrola vrstvy, obnova, otevření
+view, SQL, zbytek nástroje (resolver + formát), HTTP (klient − nástroj). Terrio canonical `32f82d9` + worktree TER-591
+(jen čtení), obnova vrstvy na scratch klonu. Windows 11, stroj sdílený s dalšími okny. Časy v ms, p50 / p95.
+
+| Scénář | Před | Po | git procesů před → po | Hlavní položka před → po |
+|---|---|---|---|---|
+| Teplý dotaz za sebou, canonical | 12,8 / 36,9 | **4,2 / 8,6** | 0 → 0 | SQL 10,0 → 1,7 |
+| Teplý dotaz za sebou, worktree | 16,4 / 32,4 | **3,9 / 8,3** | 0 → 0 | otevření view + ATTACH 11,3 → 0 |
+| Teplý dotaz po pauze 1,1 s (výpis worktree) | 59,3 / 88,0 | 38,9 / 60,8 | 0 → 0 | výpis 50 → 35 (zátěž stroje) |
+| První dotaz po startu daemonu | 552 / 587 | 219 / 228 | 6 → **0** | git 530 → 0; zbývá první otevření SQLite 105 |
+| První dotaz v nezměněném worktree | 275 / 300 | **57 / 91** | 4 → **0** | git 430 → 0 (snapshot + výpis 33) |
+| Obnova vrstvy: editace souboru | 125 / 593 | 79 / 394 | 0 → 0 | parse (první parse startuje parser) |
+| Obnova vrstvy: návrat editace | 91 / 158 | 55 / 82 | 0 → 0 | výpis |
+| `changes` | — | — | 4–5 → 2 | merge-base, velikosti blobů v JGit; diff + untracked dál git |
+
+- Teplý dotaz bez změny worktree nespustí git proces (test `OverlayTest`, počítadlo `gitSpawns`); první dotaz po
+  restartu v nezměněném worktree také ne. Git zbývá jen pro stav pracovního stromu nového worktree, nové báze a
+  `changes` (diff a untracked).
+- **Lokace bez gitu** (`GitLayout`): `.git`, `gitdir:`, `commondir`, real path (sjednotí i různý zápis velikosti
+  písmen); `core.worktree`, bare, `GIT_DIR` a spol. nebo cesta uvnitř git dir → git. Bez TTL: čte se při každém
+  dotazu (pod 1 ms). Výchozí větev (`refs/remotes/origin/HEAD`) a seznam worktree (`worktrees/*/gitdir`) taky ze
+  souborů. HEAD výchozí větve: soubory refů → JGit (re-read podle razítek souborů) → git; TTL 2 s zrušeno.
+- **JGit 7.8** (Maven Central) pro refy mimo soubory (reftable, tagy), merge-base, velikosti a obsah blobů. Spike na
+  Terriu: otevření repozitáře 210 ms poprvé (načtení tříd, jednou za běh daemonu), znovu 22 ms; merge-base 55 ms
+  poprvé / 6–10 ms vs `git merge-base` 37–42 ms; velikosti 50 blobů 1–1,5 ms vs `cat-file --batch-check` 34 ms;
+  obsah 50 blobů 0,6 ms vs spawn 35 ms. Repozitář se zavře po 10 s nečinnosti (otevřené packy by Windows nedovolily
+  smazat uživatelovu `git gc`). JGit nečte systémový ani uživatelský config (hledání systémového spouští git) a
+  neměří rozlišení časových razítek (zapisoval by sondy do `.git` a výsledek do `~/.config/jgit`); WindowCache 4 MB,
+  delta cache 2 MB. Repozitář, který JGit neotevře (např. SHA-256), čte git (test).
+- **Dlouhodobý `git cat-file --batch` nezaveden**: změřený 2 ms / 50 blobů + 28 ms start a proces, který by se musel
+  hlídat, restartovat a zavírat; JGit 0,6 ms bez procesu. Build worker dál čte jedním `cat-file --batch` na build.
+- **fsmonitor zůstává vypnutý** (`-c core.fsmonitor=false`). Důvod z CL-16 (54f7c76, review): `core.fsmonitor`
+  v configu repozitáře může jmenovat příkaz (hook) → dotaz na cizí repozitář by spustil libovolný program; builtin
+  fsmonitor navíc startuje `git fsmonitor--daemon`, který běží dál. Čísla (klon Terria, Git 2.51, vytížený stroj):
+  samotný spawn 54–63 ms, `diff --name-only B` 75–103, `ls-files --others` 116–168, ignorované adresáře 114–142,
+  `status` 79–91 ms. fsmonitor zrychlí jen kontrolu indexu, tj. nejvýš rozdíl `diff` − spawn ≈ 30 ms na reconcile,
+  a reconcile je teď vzácný (nový worktree, nová báze). `core.untrackedCache`: untracked 112–136 ms (−~10 ms), ale
+  jen s rozšířením UNTR zapsaným v indexu — daemon index nezapisuje (`--no-optional-locks`, žádné zámky proti
+  uživatelovu gitu). Zapnutý fsmonitor jsem neměřil: guard workspace blokuje `-c core.fsmonitor` v shellu.
+- **SQLite**: otevřená view se drží v poolu (≤ 4 nečinná, zavřou se po 60 s nebo před smazáním souboru; po dotazu
+  `rollback` read transakce a `PRAGMA shrink_memory`), LRU 24 připravených statementů na view. Glob a podřetězec ve
+  `find` čtou úzký index `decls_name` jako covering poddotaz (sqlite3: 8–9 → 2–3 ms). `mmap_size` 256 MB: RSS +30 MB
+  (224 MB) bez měřitelného zrychlení → ne; `cache_size` 8 MB a `soft_heap_limit` v šumu → výchozí.
+- **RSS** (zátěž: 4 TER worktree poprvé + 8× `changes` + 4× `usages ApiKey.id`): main 190–194 MB, CL-96 **195–198 MB**
+  (pool bez `shrink_memory` 208–234 MB). Teplé dotazy 132–138 MB.
+- Opraveno cestou: `MergeBases` otevíral DB merge-base zapisovatelně jen kvůli čtení — souběžný zápis dával
+  `SQLITE_BUSY`, čerstvě založený soubor bez schématu „no such table“ (`ChangesTest` souběh dvou worktree).
+- Testy: 73 (nově `GitLayoutTest`, `GitObjectsTest` — refy, merge-base, bloby jako git, žádný proces, fallback na git
+  u SHA-256; `OverlayTest`: teplé dotazy a první dotaz po restartu bez git procesu, nesedící snapshot → git).
 
 ## 10. Rizika
 

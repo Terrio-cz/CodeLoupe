@@ -3,6 +3,7 @@ package codeloupe.repo
 import codeloupe.JsonFormat
 import codeloupe.daemon.JobQueue
 import codeloupe.git.Git
+import codeloupe.git.GitObjects
 import codeloupe.index.BaseBuilder
 import codeloupe.index.BuildResult
 import codeloupe.index.FilePut
@@ -30,6 +31,8 @@ internal class BaseBuilds(
     private val queue: JobQueue,
     private val launcher: BuildLauncher,
     private val log: (String) -> Unit,
+    /** Called before a base file is deleted or replaced, so nothing keeps it open. */
+    private val release: (Path) -> Unit,
     private val swapped: (RepoState) -> Unit,
 ) {
     fun full(repo: RepoState, commit: String): Deferred<BuildResult> =
@@ -56,7 +59,7 @@ internal class BaseBuilds(
                 }
                 val update = if (source == from) planned else changes(repo, source, commit)
                 if (inline) {
-                    BaseBuilder.update(repo.commonDir, commit, tmp, update)
+                    BaseBuilder.update(GitObjects.blobs(repo.commonDir), commit, tmp, update)
                 } else {
                     launcher.update(repo.commonDir, commit, tmp, update, repo.dir)
                 }
@@ -67,7 +70,7 @@ internal class BaseBuilds(
 
     private fun changes(repo: RepoState, from: String, to: String): StoreUpdate {
         val changed = Git.diff(repo.commonDir, from, to).filter { Languages.languageOf(it.path) != null }
-        val sizes = Git.blobSizes(repo.commonDir, changed.mapNotNull { it.blob })
+        val sizes = GitObjects.blobSizes(repo.commonDir, changed.mapNotNull { it.blob })
         return StoreUpdate(
             puts = changed.mapNotNull { entry -> entry.blob?.let { FilePut(entry.path, blob = it, size = sizes[it] ?: 0) } },
             removes = changed.filter { it.blob == null }.map { it.path },
@@ -104,6 +107,7 @@ internal class BaseBuilds(
         }
         val swappedIn = synchronized(repo) {
             if (!current()) return@synchronized false
+            release(out)
             for (suffix in listOf("", "-wal", "-shm")) Files.deleteIfExists(Path.of("$out$suffix"))
             Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING)
             if (repo.baseCommit != commit) {
@@ -139,6 +143,7 @@ internal class BaseBuilds(
         for (file in repo.dir.listDirectoryEntries("base-*")) {
             // A .tmp file is a build still in progress in the other lane; clean() removes those a killed daemon left.
             if (".tmp." in file.name || keep.any { file.name == it || file.name.startsWith("$it-") }) continue
+            release(file)
             runCatching { Files.deleteIfExists(file) }
         }
     }

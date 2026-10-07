@@ -1,12 +1,16 @@
 package codeloupe.overlay
 
 import codeloupe.daemon.JobQueue
+import codeloupe.git.GitLayout
+import codeloupe.git.GitObjects
 import codeloupe.git.WorktreeGit
 import codeloupe.index.InlineParse
 import codeloupe.index.Store
 import codeloupe.index.StoreUpdater
 import codeloupe.platform.NativeCalls
 import codeloupe.platform.Sha1
+import codeloupe.platform.TimedPart
+import codeloupe.platform.Timings
 import codeloupe.repo.BuildLauncher
 import codeloupe.repo.BusyException
 import codeloupe.repo.RepoState
@@ -31,6 +35,8 @@ class Overlays(
     private val launcher: BuildLauncher,
     private val waitMs: Long,
     checkMs: Long,
+    /** Called before an overlay file is deleted, so nothing keeps it open. */
+    private val release: (Path) -> Unit,
     private val log: (String) -> Unit,
 ) {
     private val states = ConcurrentHashMap<String, OverlayState>()
@@ -56,7 +62,7 @@ class Overlays(
                 state.checkedAt = System.nanoTime()
                 state.mustCheck = false
                 val reconcile = state.base != baseCommit
-                val change = withContext(Dispatchers.IO) { plan(repo, state, baseCommit, baseFile) }
+                val change = withContext(Dispatchers.IO) { Timings.measure(TimedPart.CHECK) { plan(repo, state, baseCommit, baseFile) } }
                 if (reconcile) log("overlay $worktree: checked against ${baseCommit.take(7)} in ${(System.nanoTime() - state.checkedAt) / 1_000_000} ms")
                 change?.let { start(repo, state, it) } ?: return state.view!!
             } ?: continue
@@ -78,14 +84,18 @@ class Overlays(
      * are matched by name, never opened: one a refresh is still writing belongs to a live worktree.
      */
     fun collect(repo: RepoState) {
-        val live = WorktreeGit.list(repo.commonDir).filter { Path.of(it).exists() }.mapTo(HashSet(), ::key)
+        val worktrees = GitLayout.worktrees(repo.commonDir) ?: WorktreeGit.list(repo.commonDir)
+        val live = worktrees.filter { Path.of(it).exists() }.mapTo(HashSet(), ::key)
         states.entries.removeIf { (key, state) -> state.repoId == repo.id && key !in live }
         val dir = repo.dir.resolve(DIR)
         if (!dir.exists()) return
         val keep = live.mapTo(HashSet(), ::nameOf)
         val gone = dir.listDirectoryEntries().filter { it.name.substringBefore('.') !in keep }
         // Windows refuses to delete a file a reader still has open: best effort, the next collection retries.
-        for (file in gone) runCatching { Files.deleteIfExists(file) }
+        for (file in gone) {
+            release(file)
+            runCatching { Files.deleteIfExists(file) }
+        }
         if (gone.isNotEmpty()) log("overlays of removed worktrees deleted: ${gone.map { it.name.substringBefore('.') }.distinct().joinToString()}")
     }
 
@@ -108,7 +118,10 @@ class Overlays(
     }
 
     private fun plan(repo: RepoState, state: OverlayState, baseCommit: String, baseFile: Path): OverlayChange? {
-        if (state.base == null) load(state)
+        if (state.base == null) {
+            load(state)
+            restore(state)
+        }
         if (state.base == baseCommit) return OverlayPlanner.incremental(state, baseCommit, baseFile)
         val previous = synchronized(repo) { repo.previousFile?.takeIf { state.base != null && repo.previousCommit == state.base } }
         return OverlayPlanner.reconcile(state, baseCommit, baseFile, previous?.takeIf { it.exists() })
@@ -130,6 +143,18 @@ class Overlays(
         if (!usable) deleteFile(state)
     }
 
+    /** The worktree as the last check of an earlier daemon run saw it, when its snapshot matches the overlay file. */
+    private fun restore(state: OverlayState) {
+        val snapshot = ScanSnapshot.read(ScanSnapshot.fileOf(state.file)) ?: return
+        if (snapshot.format != Store.FORMAT || snapshot.entries != state.entries) return
+        if (state.entries.isNotEmpty() && snapshot.base != state.fileBase) return
+        state.base = snapshot.base
+        state.scan = snapshot.scan
+        state.prune = snapshot.prune
+        state.ignored = snapshot.ignored
+        state.view = OverlayVersion(state.file.takeIf { state.entries.isNotEmpty() }, snapshot.base, 1)
+    }
+
     /** The refresh job that writes [change], or null when nothing needs writing and [change] is already committed. */
     private fun start(repo: RepoState, state: OverlayState, change: OverlayChange): Deferred<*>? {
         val update = change.update
@@ -141,11 +166,12 @@ class Overlays(
         val heavy = !InlineParse.fits(update.puts)
         val job = queue.run(if (heavy) JobQueue.Lane.HEAVY else JobQueue.Lane.FAST, "overlay:${state.worktree}") {
             withContext(Dispatchers.IO) {
+                val started = System.nanoTime()
                 val result = try {
                     if (heavy) {
                         launcher.update(repo.commonDir, null, state.file, update, repo.dir)
                     } else {
-                        Store.open(state.file).use { StoreUpdater.apply(it, update, repo.commonDir) }
+                        Store.open(state.file).use { StoreUpdater.apply(it, update, GitObjects.blobs(repo.commonDir)) }
                     }
                 } catch (e: Exception) {
                     state.mustCheck = true
@@ -154,6 +180,7 @@ class Overlays(
                 }
                 state.fileBase = base
                 commit(state, change, result.unread)
+                Timings.add(TimedPart.REFRESH, System.nanoTime() - started)
                 log(
                     "overlay ${state.worktree}: ${update.puts.size} parsed, ${update.copies.size} copied, " +
                         "${update.removes.size + update.tombstones.size} removed in ${result.ms} ms${if (heavy) " (build worker)" else ""}",
@@ -183,11 +210,15 @@ class Overlays(
         if (previous == null || previous.base != base || change.update.size > 0) {
             state.view = OverlayVersion(state.file.takeIf { entries.isNotEmpty() }, base, (previous?.version ?: 0) + 1)
         }
+        // Written after the overlay file: a snapshot never runs ahead of the entries the file holds.
+        ScanSnapshot.write(ScanSnapshot.fileOf(state.file), ScanSnapshot(Store.FORMAT, base, entries, scan, state.prune, state.ignored))
     }
 
     private fun busy(state: OverlayState) = BusyException("indexing the changes of ${state.worktree}; retry in a few seconds")
 
     private fun deleteFile(state: OverlayState) {
+        release(state.file)
+        ScanSnapshot.delete(ScanSnapshot.fileOf(state.file))
         for (suffix in listOf("", "-wal", "-shm")) Files.deleteIfExists(Path.of("${state.file}$suffix"))
         state.fileBase = null
         state.entries = emptyMap()

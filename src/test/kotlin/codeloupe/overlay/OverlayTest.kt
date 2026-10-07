@@ -6,6 +6,7 @@ import codeloupe.config.Config
 import codeloupe.daemon.JobQueue
 import codeloupe.index.BuildResult
 import codeloupe.index.StoreUpdate
+import codeloupe.platform.Timings
 import codeloupe.query.FindQuery
 import codeloupe.repo.BuildLauncher
 import codeloupe.repo.Registry
@@ -182,11 +183,37 @@ class OverlayTest {
         assertEquals(2, overlayFiles().size)
 
         git(repo, "worktree", "remove", "--force", feature.toString())
+        first.close()
         val restartQueue = JobQueue(CoroutineScope(Dispatchers.Default))
         val restarted = Registry(config, restartQueue)
         assertContains(find(restarted, other, "Other"), "class Other")
         waitFor("overlay collected") { overlayFiles().size == 1 }
         assertEquals(1, restartQueue.snapshot().fast.done, "the collection only: the live overlay was reused, not rebuilt")
+    }
+
+    @Test
+    fun `warm queries and the first query after a restart in an unchanged worktree start no git process`() {
+        write(feature, BETA, "package demo\n\nclass Beta\n")
+        val first = Registry(config, queue)
+        assertContains(find(first, feature, "Beta"), "class Beta")
+        val warm = Timings.gitSpawns()
+        repeat(3) { assertContains(find(first, feature, "Beta"), "class Beta") }
+        assertEquals(warm, Timings.gitSpawns(), "warm queries")
+        first.close()
+
+        val restarted = Registry(config, JobQueue(CoroutineScope(Dispatchers.Default)))
+        assertContains(find(restarted, feature, "Beta"), "class Beta")
+        write(feature, BETA, "package demo\n\nclass Gamma\n")
+        assertContains(find(restarted, feature, "Gamma"), "class Gamma")
+        assertNone(find(restarted, feature, "Beta"), "replaced class")
+        assertEquals(warm, Timings.gitSpawns(), "first query after the restart, then an edit")
+        restarted.close()
+
+        // A snapshot that does not fit the overlay file is not trusted: git settles the worktree again.
+        overlayFiles().forEach(Files::delete)
+        val again = Registry(config, JobQueue(CoroutineScope(Dispatchers.Default)))
+        assertContains(find(again, feature, "Gamma"), "class Gamma")
+        assertTrue(Timings.gitSpawns() > warm, "reconciled with git")
     }
 
     private fun overlayFiles(): List<Path> = Files.walk(config.home).use { paths ->

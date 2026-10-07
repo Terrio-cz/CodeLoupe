@@ -85,6 +85,10 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 ./gradlew test
 ```
 
+`node tools/profile.mjs --cli build/install/codeloupe/bin/codeloupe --home <tmp> --root <repo> --worktree <worktree>`
+profiles a warm query, the first query in a worktree and (with `--clone`) an overlay refresh: client latency split
+by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktree walk, SQL, the rest of the tool and HTTP.
+
 | Package | Role |
 |---|---|
 | `lang`, `lang.kotlin` | file → facts (declarations, imports, references) via Kotlin PSI |

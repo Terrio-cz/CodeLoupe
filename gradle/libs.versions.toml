@@ -8,6 +8,7 @@ sqlite = "3.53.4.0"
 clikt = "5.1.0"
 slf4j = "2.0.18"
 junit = "5.14.4"
+jgit = "7.8.0.202609011348-r"
 
 [libraries]
 kotlin-compiler = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
@@ -17,6 +18,7 @@ mcp-server = { module = "io.modelcontextprotocol:kotlin-sdk-server", version.ref
 mcp-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcp" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "jgit" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
 clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
 slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }

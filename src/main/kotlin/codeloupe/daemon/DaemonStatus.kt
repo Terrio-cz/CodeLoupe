@@ -1,5 +1,6 @@
 package codeloupe.daemon
 
+import codeloupe.platform.PartTime
 import codeloupe.repo.RepoSummary
 import kotlinx.serialization.Serializable
 
@@ -18,4 +19,8 @@ data class DaemonStatus(
     val calls: CallStats,
     val queue: QueueSnapshot,
     val repos: List<RepoSummary>,
+    /** git processes started since the daemon started. */
+    val gitSpawns: Long = 0,
+    /** Time spent per [codeloupe.platform.TimedPart], lower-case names. */
+    val timings: Map<String, PartTime> = emptyMap(),
 )

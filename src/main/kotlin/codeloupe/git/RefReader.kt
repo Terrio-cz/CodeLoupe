@@ -4,7 +4,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
-import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 
@@ -24,8 +23,9 @@ object RefReader {
 
     /** Commit of HEAD in the worktree at [worktree]. */
     fun head(worktree: String): String? = runCatching {
-        val gitDir = gitDir(Path.of(worktree)) ?: return null
-        resolveSymbolic(gitDir, commonDir(gitDir) ?: return null, "HEAD", 0)
+        val gitDir = GitLayout.gitDir(Path.of(worktree)) ?: return null
+        val commonDir = GitLayout.commonDir(gitDir).takeUnless(::isReftable) ?: return null
+        resolveSymbolic(gitDir, commonDir, "HEAD", 0)
     }.getOrNull()
 
     /** Commit a branch name points to, in git's own lookup order (`main`, `origin/main`, `refs/heads/main`, `HEAD`). */
@@ -37,6 +37,16 @@ object RefReader {
         if (!name.startsWith("refs/") && listOf("refs/$name", "refs/tags/$name").any { exists(common, it) }) return null
         candidates(name).firstNotNullOfOrNull { resolveSymbolic(common, common, it, 0) }
     }.getOrNull()
+
+    /** Where the symbolic ref [ref] points (`refs/remotes/origin/main`); null when it is not one. Files backend only. */
+    fun symbolic(commonDir: String, ref: String): String? = runCatching {
+        val file = Path.of(commonDir).resolve(ref)
+        if (!file.isRegularFile()) return null
+        file.readText().trim().takeIf { it.startsWith("ref: ") }?.removePrefix("ref: ")?.trim()
+    }.getOrNull()
+
+    /** True when [commonDir] keeps refs as files (and packed-refs), the layout this reader understands. */
+    fun filesBackend(commonDir: String): Boolean = !isReftable(Path.of(commonDir))
 
     private fun candidates(name: String): List<String> =
         if (name.startsWith("refs/")) listOf(name) else listOf("refs/heads/$name", "refs/remotes/$name", "refs/remotes/$name/HEAD")
@@ -70,21 +80,6 @@ object RefReader {
     /** Answers already read from one version of a packed-refs file, misses included. */
     private class PackedLookups(val stamp: Pair<Long, Long>) {
         val answers = ConcurrentHashMap<String, String>()
-    }
-
-    /** `.git` is the git dir itself, or a file `gitdir: <path>` in a linked worktree. */
-    private fun gitDir(worktree: Path): Path? {
-        val dotGit = worktree.resolve(".git")
-        if (dotGit.isDirectory()) return dotGit
-        if (!dotGit.isRegularFile()) return null
-        val target = dotGit.readText().trim().removePrefix("gitdir: ").trim()
-        return worktree.resolve(target).normalize()
-    }
-
-    private fun commonDir(gitDir: Path): Path? {
-        val pointer = gitDir.resolve("commondir")
-        val common = if (pointer.isRegularFile()) gitDir.resolve(pointer.readText().trim()).normalize() else gitDir
-        return common.takeUnless(::isReftable)
     }
 
     private fun isReftable(commonDir: Path) = commonDir.resolve("reftable").exists()

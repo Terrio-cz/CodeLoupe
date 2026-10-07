@@ -1,6 +1,7 @@
 package codeloupe.index
 
 import codeloupe.git.BlobReader
+import codeloupe.git.BlobSource
 import codeloupe.git.Git
 import codeloupe.lang.Languages
 import codeloupe.platform.IsoTime
@@ -44,8 +45,8 @@ object BaseBuilder {
     }
 
     /** Turns [outFile], a copy of an earlier base, into the base of [commit] by applying [update]: the files that differ. */
-    fun update(repoDir: String, commit: String, outFile: Path, update: StoreUpdate): BuildResult = Store.open(outFile).use { db ->
-        val result = StoreUpdater.apply(db, update.copy(meta = update.meta + mapOf("commit" to commit, "built_at" to IsoTime.now())), repoDir)
+    fun update(blobs: BlobSource, commit: String, outFile: Path, update: StoreUpdate): BuildResult = Store.open(outFile).use { db ->
+        val result = StoreUpdater.apply(db, update.copy(meta = update.meta + mapOf("commit" to commit, "built_at" to IsoTime.now())), blobs)
         Store.setMeta(db, "files", Store.count(db, "SELECT count(*) FROM files"))
         Store.setMeta(db, "files_with_errors", Store.count(db, "SELECT count(*) FROM files WHERE errors > 0"))
         Store.checkpoint(db)

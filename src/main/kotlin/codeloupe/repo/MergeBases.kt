@@ -5,6 +5,8 @@ import codeloupe.changes.ChangedFile
 import codeloupe.daemon.JobQueue
 import codeloupe.git.DiffEntry
 import codeloupe.git.Git
+import codeloupe.git.GitObjects
+import codeloupe.git.RefReader
 import codeloupe.git.WorktreeGit
 import codeloupe.index.FilePut
 import codeloupe.index.InlineParse
@@ -19,6 +21,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.nio.file.Files
 import java.nio.file.Path
+import java.sql.SQLException
 import kotlin.io.path.exists
 import kotlin.io.path.getLastModifiedTime
 import kotlin.io.path.listDirectoryEntries
@@ -43,8 +46,15 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
     }
 
     private fun mergeBase(repo: RepoState, worktree: String): String {
-        Git.run(worktree, "merge-base", "HEAD", repo.defaultRef, allowFail = true)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        val shallow = Git.run(worktree, "rev-parse", "--is-shallow-repository", allowFail = true)?.trim() == "true"
+        val head = RefReader.head(worktree)
+        val target = GitObjects.resolve(repo.commonDir, repo.defaultRef)
+        val base = if (head != null && target != null) {
+            GitObjects.mergeBase(repo.commonDir, head, target)
+        } else {
+            Git.run(worktree, "merge-base", "HEAD", repo.defaultRef, allowFail = true)?.trim()?.ifEmpty { null }
+        }
+        if (base != null) return base
+        val shallow = Path.of(repo.commonDir, "shallow").exists()
         throw IllegalArgumentException(
             if (shallow) "$worktree is a shallow clone without the history back to ${repo.defaultRef}; fetch more of it (git fetch --unshallow)"
             else "$worktree has no commit in common with ${repo.defaultRef}",
@@ -77,12 +87,21 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
         }
     }
 
-    private fun present(file: Path): Set<String> = Store.open(file).use { db ->
-        db.createStatement().use { s -> s.executeQuery("SELECT path FROM files").use { rs -> buildSet { while (rs.next()) add(rs.getString(1)) } } }
+    // Read-only: a writable open sets the journal mode, which fails with SQLITE_BUSY while another call is writing.
+    private fun present(file: Path): Set<String> {
+        if (!file.exists()) return emptySet()
+        return try {
+            Store.open(file, readOnly = true).use { db ->
+                db.createStatement().use { s -> s.executeQuery("SELECT path FROM files").use { rs -> buildSet { while (rs.next()) add(rs.getString(1)) } } }
+            }
+        } catch (e: SQLException) {
+            // Just created by a concurrent call that has not written its schema yet: nothing is in it.
+            if (e.message?.contains("no such table") == true) emptySet() else throw e
+        }
     }
 
     private fun start(repo: RepoState, mergeBase: String, file: Path, missing: List<DiffEntry>): Deferred<*> {
-        val sizes = Git.blobSizes(repo.commonDir, missing.map { it.oldBlob!! })
+        val sizes = GitObjects.blobSizes(repo.commonDir, missing.map { it.oldBlob!! })
         // A blob git does not have (a partial or shallow clone) would be asked for again on every call.
         val absent = missing.count { it.oldBlob !in sizes }
         if (absent > 0) throw IllegalStateException("git objects of $absent files at merge-base ${mergeBase.take(7)} are not in this clone (partial or shallow?)")
@@ -93,7 +112,7 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
         val inline = InlineParse.fits(update.puts)
         return queue.run(if (inline) JobQueue.Lane.FAST else JobQueue.Lane.HEAVY, "merge-base:${repo.id}:$mergeBase") {
             withContext(Dispatchers.IO) {
-                if (inline) Store.open(file).use { StoreUpdater.apply(it, update, repo.commonDir) } else launcher.update(repo.commonDir, null, file, update, repo.dir)
+                if (inline) Store.open(file).use { StoreUpdater.apply(it, update, GitObjects.blobs(repo.commonDir)) } else launcher.update(repo.commonDir, null, file, update, repo.dir)
             }
         }
     }

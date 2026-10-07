@@ -1,6 +1,6 @@
 package codeloupe.index
 
-import codeloupe.git.BlobReader
+import codeloupe.git.BlobSource
 import codeloupe.lang.Languages
 import codeloupe.platform.Sha1
 import java.io.IOException
@@ -10,8 +10,8 @@ import java.sql.Connection
 
 /** Applies a [StoreUpdate] to a store in one transaction, so readers see all of it or none. */
 object StoreUpdater {
-    /** [gitDir] reads the blobs of the update; files are read from disk. */
-    fun apply(db: Connection, update: StoreUpdate, gitDir: String?): BuildResult {
+    /** [blobs] reads the blobs of the update; files are read from disk. */
+    fun apply(db: Connection, update: StoreUpdate, blobs: BlobSource?): BuildResult {
         val started = System.currentTimeMillis()
         db.autoCommit = false
         val batch = try {
@@ -21,7 +21,7 @@ object StoreUpdater {
                     update.tombstones.forEach(writer::tombstone)
                     copy(db, update)
                     update.puts.filter { it.blob == null }.forEach(::putFile)
-                    putBlobs(gitDir, update.puts.filter { it.blob != null })
+                    putBlobs(blobs, update.puts.filter { it.blob != null })
                 }
             }.also {
                 for ((key, value) in update.meta) Store.setMeta(db, key, value)
@@ -60,10 +60,10 @@ object StoreUpdater {
             if (text == null) unread += entry.path else put(entry, text, entry.size)
         }
 
-        fun putBlobs(gitDir: String?, entries: List<FilePut>) {
+        fun putBlobs(blobs: BlobSource?, entries: List<FilePut>) {
             if (entries.isEmpty()) return
             val bySha = entries.groupBy { it.blob!! }
-            BlobReader.read(gitDir!!, bySha.keys) { sha, text ->
+            blobs!!.read(bySha.keys) { sha, text ->
                 for (entry in bySha.getValue(sha)) put(entry, text, text.toByteArray(Charsets.UTF_8).size.toLong())
             }
         }
