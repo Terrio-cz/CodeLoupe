@@ -105,7 +105,7 @@ Přehled                                             [24h|7d|30d]  ⟳
 - KPI dlaždice: hodnota + jedna řádka kontextu (delta vůči předchozímu období nebo baseline). Delta s
   šipkou a slovem, nikdy jen barvou. „Cena dnes“ se srovnává se včerejškem **do stejné hodiny**
   (`weightedYesterdaySameTime`) a ukazuje čerpání denního rozpočtu (`budget`); rozpočet běhu
-  (`runWeighted`) zvýrazní v Bězích řádky nad limitem.
+  (`runWeighted`) zvýrazní v Bězích řádky nad limitem (`RunSummary.overBudget`).
 - Graf: 2 série (skutečnost, baseline přerušovaně) → legenda nad grafem + přímé popisky; tabulkový pohled
   (přepínač „Tabulka“). Jedna osa Y.
 - Úspora podle nástroje: vodorovné pruhy, jedna série, seřazeno sestupně, hodnota přímo u pruhu.
