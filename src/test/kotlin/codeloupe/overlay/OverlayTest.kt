@@ -160,6 +160,13 @@ class OverlayTest {
     fun `queries waiting for a slow refresh share the wait instead of queueing behind each other`() {
         val gate = CompletableDeferred<Unit>()
         val launcher = CountingLauncher(overlayGate = gate)
+        // The first base build is not under test and can outlast the short timeout when the machine is busy.
+        val warm = Registry(config, queue)
+        try {
+            assertContains(find(warm, feature, "Alpha.one"), "fun one")
+        } finally {
+            warm.close()
+        }
         val registry = Registry(config.copy(queryTimeoutMs = 1_500), queue, launcher)
         assertContains(find(registry, feature, "Alpha.one"), "fun one")
         for (i in 0 until 250) write(feature, "src/main/kotlin/many/Many$i.kt", "package many\n\nclass Many$i\n")
