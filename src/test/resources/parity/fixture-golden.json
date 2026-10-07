@@ -1,0 +1,388 @@
+{
+ "commit": "3c3939e3fa3d02da08863632e44a02957e669e37",
+ "files": 2,
+ "results": [
+  {
+   "tool": "find",
+   "args": {
+    "q": "OrderService",
+    "kind": "class"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:52-94  class OrderService( repo: Repository<Order>, private val clock: () -> Long = { 0L }, ) : BaseService(repo), AutoCloseable"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "OrderService.handle"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:68-75  [OrderService] override fun handle(id: OrderId): Result\nsrc/main/kotlin/com/example/shop/Constructs.kt:77-77  [OrderService] fun handle(id: OrderId, force: Boolean): Result"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "Order*",
+    "kind": "class"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:52-94  class OrderService( repo: Repository<Order>, private val clock: () -> Long = { 0L }, ) : BaseService(repo), AutoCloseable"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "m1",
+    "module": "big"
+   },
+   "text": "big/src/main/kotlin/com/example/big/Big.kt:9-11  [Big] fun m1(x: Int): Int"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "nothing_like_this"
+   },
+   "text": "no declaration matches \"nothing_like_this\""
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "local"
+   },
+   "text": "no declaration matches \"local\""
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "local",
+    "locals": true
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:71-71  [OrderService.handle] fun local(x: Int)"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "handle",
+    "test": false
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:49-49  [BaseService] abstract fun handle(id: OrderId): Result\nsrc/main/kotlin/com/example/shop/Constructs.kt:68-75  [OrderService] override fun handle(id: OrderId): Result\nsrc/main/kotlin/com/example/shop/Constructs.kt:77-77  [OrderService] fun handle(id: OrderId, force: Boolean): Result"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "handle",
+    "test": true
+   },
+   "text": "no declaration matches \"handle\""
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "m?",
+    "limit": 3
+   },
+   "text": "big/src/main/kotlin/com/example/big/Big.kt:5-7  [Big] fun m0(x: Int): Int\nbig/src/main/kotlin/com/example/big/Big.kt:9-11  [Big] fun m1(x: Int): Int\nbig/src/main/kotlin/com/example/big/Big.kt:13-15  [Big] fun m2(x: Int): Int\n… +7 more (narrow with kind/module or a qualified name)"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "Status.PAID"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:40-42  [Status] PAID"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "Result.Ok.value"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:31-31  [Result.Ok] val value: Order"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "Order.isBig"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:22-23  val Order.isBig: Boolean"
+  },
+  {
+   "tool": "find",
+   "args": {
+    "q": "ord"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:10-10  typealias OrderId\nsrc/main/kotlin/com/example/shop/Constructs.kt:52-94  class OrderService( repo: Repository<Order>, private val clock: () -> Long = { 0L }, ) : BaseService(repo), AutoCloseable\nsrc/main/kotlin/com/example/shop/Constructs.kt:66-66  [OrderService] constructor(repo: Repository<Order>, seed: Long) : this(repo, { seed })\nsrc/main/kotlin/com/example/shop/Constructs.kt:90-90  [OrderService.Audit] fun record()"
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "shop/Constructs.kt"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt  (117 lines, package com.example.shop)\n10-10  typealias OrderId\n12-13  const val MAX_ITEMS\n15-18  fun total(orders: List<Order>): Cash\n20-20  fun String.shout(): String\n22-23  val Order.isBig: Boolean\n25-28  interface Repository<T>\n  26-26  fun find(id: OrderId): T?\n  27-27  fun save(item: T)\n30-33  sealed interface Result\n  31-31  data class Ok(val value: Order) : Result\n    31-31  val value: Order\n  32-32  data object Missing : Result\n35-36  value class Sku(val raw: String)\n  36-36  val raw: String\n38-46  enum class Status(val label: String)\n  38-38  val label: String\n  39-39  NEW\n  40-42  PAID\n    41-41  override fun next(): Status\n  43-43  SHIPPED\n  45-45  open fun next(): Status\n48-50  abstract class BaseService(protected val repo: Repository<Order>)\n  48-48  protected val repo: Repository<Order>\n  49-49  abstract fun handle(id: OrderId): Result\n52-94  class OrderService( repo: Repository<Order>, private val clock: () -> Long = { 0L }, ) : BaseService(repo), AutoCloseable\n  54-54  private val clock: () -> Long = { 0L }\n  57-57  private val cache\n  59-60  var lastId: OrderId?\n  62-64  init\n  66-66  constructor(repo: Repository<Order>, seed: Long) : this(repo, { seed })\n  68-75  override fun handle(id: OrderId): Result\n  77-77  fun handle(id: OrderId, force: Boolean): Result\n  79-79  infix fun merge(other: OrderService): OrderService\n  81-81  operator fun plus(other: OrderService): OrderService\n  83-83  override fun close()\n  85-87  companion object Factory\n    86-86  fun create(repo: Repository<Order>): OrderService\n  89-91  inner class Audit\n    90-90  fun record()\n  93-93  private fun log(message: String)\n96-99  object Registry\n  97-97  val services\n  98-98  fun register(s: OrderService)\n101-110  fun main()\n112-112  private infix fun OrderService.handle2(id: String)\n114-116  class `weird name`\n  115-115  fun `does something with spaces`()"
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "Constructs.kt"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt  (117 lines, package com.example.shop)\n10-10  typealias OrderId\n12-13  const val MAX_ITEMS\n15-18  fun total(orders: List<Order>): Cash\n20-20  fun String.shout(): String\n22-23  val Order.isBig: Boolean\n25-28  interface Repository<T>\n  26-26  fun find(id: OrderId): T?\n  27-27  fun save(item: T)\n30-33  sealed interface Result\n  31-31  data class Ok(val value: Order) : Result\n    31-31  val value: Order\n  32-32  data object Missing : Result\n35-36  value class Sku(val raw: String)\n  36-36  val raw: String\n38-46  enum class Status(val label: String)\n  38-38  val label: String\n  39-39  NEW\n  40-42  PAID\n    41-41  override fun next(): Status\n  43-43  SHIPPED\n  45-45  open fun next(): Status\n48-50  abstract class BaseService(protected val repo: Repository<Order>)\n  48-48  protected val repo: Repository<Order>\n  49-49  abstract fun handle(id: OrderId): Result\n52-94  class OrderService( repo: Repository<Order>, private val clock: () -> Long = { 0L }, ) : BaseService(repo), AutoCloseable\n  54-54  private val clock: () -> Long = { 0L }\n  57-57  private val cache\n  59-60  var lastId: OrderId?\n  62-64  init\n  66-66  constructor(repo: Repository<Order>, seed: Long) : this(repo, { seed })\n  68-75  override fun handle(id: OrderId): Result\n  77-77  fun handle(id: OrderId, force: Boolean): Result\n  79-79  infix fun merge(other: OrderService): OrderService\n  81-81  operator fun plus(other: OrderService): OrderService\n  83-83  override fun close()\n  85-87  companion object Factory\n    86-86  fun create(repo: Repository<Order>): OrderService\n  89-91  inner class Audit\n    90-90  fun record()\n  93-93  private fun log(message: String)\n96-99  object Registry\n  97-97  val services\n  98-98  fun register(s: OrderService)\n101-110  fun main()\n112-112  private infix fun OrderService.handle2(id: String)\n114-116  class `weird name`\n  115-115  fun `does something with spaces`()"
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "OrderService"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:52-94  class OrderService( repo: Repository<Order>, private val clock: () -> Long = { 0L }, ) : BaseService(repo), AutoCloseable\n  54-54  private val clock: () -> Long = { 0L }\n  57-57  private val cache\n  59-60  var lastId: OrderId?\n  62-64  init\n  66-66  constructor(repo: Repository<Order>, seed: Long) : this(repo, { seed })\n  68-75  override fun handle(id: OrderId): Result\n  77-77  fun handle(id: OrderId, force: Boolean): Result\n  79-79  infix fun merge(other: OrderService): OrderService\n  81-81  operator fun plus(other: OrderService): OrderService\n  83-83  override fun close()\n  85-87  companion object Factory\n    86-86  fun create(repo: Repository<Order>): OrderService\n  89-91  inner class Audit\n    90-90  fun record()\n  93-93  private fun log(message: String)"
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "Status"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:38-46  enum class Status(val label: String)\n  38-38  val label: String\n  39-39  NEW\n  40-42  PAID\n    41-41  override fun next(): Status\n  43-43  SHIPPED\n  45-45  open fun next(): Status"
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "Result"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:30-33  sealed interface Result\n  31-31  data class Ok(val value: Order) : Result\n    31-31  val value: Order\n  32-32  data object Missing : Result"
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "Registry"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:96-99  object Registry\n  97-97  val services\n  98-98  fun register(s: OrderService)"
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "Big"
+   },
+   "text": "big/src/main/kotlin/com/example/big/Big.kt:3-164  class Big\n  5-7  fun m0(x: Int): Int\n  9-11  fun m1(x: Int): Int\n  13-15  fun m2(x: Int): Int\n  17-19  fun m3(x: Int): Int\n  21-23  fun m4(x: Int): Int\n  25-27  fun m5(x: Int): Int\n  29-31  fun m6(x: Int): Int\n  33-35  fun m7(x: Int): Int\n  37-39  fun m8(x: Int): Int\n  41-43  fun m9(x: Int): Int\n  45-47  fun m10(x: Int): Int\n  49-51  fun m11(x: Int): Int\n  53-55  fun m12(x: Int): Int\n  57-59  fun m13(x: Int): Int\n  61-63  fun m14(x: Int): Int\n  65-67  fun m15(x: Int): Int\n  69-71  fun m16(x: Int): Int\n  73-75  fun m17(x: Int): Int\n  77-79  fun m18(x: Int): Int\n  81-83  fun m19(x: Int): Int\n  85-87  fun m20(x: Int): Int\n  89-91  fun m21(x: Int): Int\n  93-95  fun m22(x: Int): Int\n  97-99  fun m23(x: Int): Int\n  101-103  fun m24(x: Int): Int\n  105-107  fun m25(x: Int): Int\n  109-111  fun m26(x: Int): Int\n  113-115  fun m27(x: Int): Int\n  117-119  fun m28(x: Int): Int\n  121-123  fun m29(x: Int): Int\n  125-127  fun m30(x: Int): Int\n  129-131  fun m31(x: Int): Int\n  133-135  fun m32(x: Int): Int\n  137-139  fun m33(x: Int): Int\n  141-143  fun m34(x: Int): Int\n  145-147  fun m35(x: Int): Int\n  149-151  fun m36(x: Int): Int\n  153-155  fun m37(x: Int): Int\n  157-159  fun m38(x: Int): Int\n  161-163  fun m39(x: Int): Int"
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "Nope.kt"
+   },
+   "text": "no indexed file \"Nope.kt\""
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "Servic"
+   },
+   "text": "no type named \"Servic\"\nsimilar:\nsrc/main/kotlin/com/example/shop/Constructs.kt:48-50  abstract class BaseService(protected val repo: Repository<Order>)\nsrc/main/kotlin/com/example/shop/Constructs.kt:52-94  class OrderService( repo: Repository<Order>, private val clock: () -> Long = { 0L }, ) : BaseService(repo), AutoCloseable\nsrc/main/kotlin/com/example/shop/Constructs.kt:66-66  [OrderService] constructor(repo: Repository<Order>, seed: Long) : this(repo, { seed })\nsrc/main/kotlin/com/example/shop/Constructs.kt:97-97  [Registry] val services"
+  },
+  {
+   "tool": "outline",
+   "args": {
+    "target": "Factory"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:85-87  [OrderService] companion object Factory\n  86-86  fun create(repo: Repository<Order>): OrderService"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "total"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:15-18  com.example.shop.total  hash=290501779f\n/**\n * Computes the total.\n */\nfun total(orders: List<Order>): Cash = orders.fold(Cash.ZERO) { acc, o -> acc + o.price }"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "OrderService.handle"
+   },
+   "text": "2 declarations match \"OrderService.handle\" — qualify it (Type.member, member(ParamType, …)) or pass all=true:\nsrc/main/kotlin/com/example/shop/Constructs.kt:68-75  [OrderService] override fun handle(id: OrderId): Result\nsrc/main/kotlin/com/example/shop/Constructs.kt:77-77  [OrderService] fun handle(id: OrderId, force: Boolean): Result"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "OrderService.handle",
+    "all": true
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:68-75  com.example.shop.OrderService.handle  hash=7882037dc5\n    override fun handle(id: OrderId): Result {\n        val order = repo.find(id) ?: return Result.Missing\n        lastId = id\n        fun local(x: Int) = max(x, 1)\n        val ref = ::total\n        val other = Order::price\n        return Result.Ok(order).also { log(\"handled ${order.id} ${local(2)}\") }\n    }\n\nsrc/main/kotlin/com/example/shop/Constructs.kt:77-77  com.example.shop.OrderService.handle  hash=eb59ded8e7\n    fun handle(id: OrderId, force: Boolean): Result = if (force) handle(id) else Result.Missing"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "OrderService.handle(OrderId, Boolean)"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:77-77  com.example.shop.OrderService.handle  hash=eb59ded8e7\n    fun handle(id: OrderId, force: Boolean): Result = if (force) handle(id) else Result.Missing"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "OrderService.handle(_)"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:68-75  com.example.shop.OrderService.handle  hash=7882037dc5\n    override fun handle(id: OrderId): Result {\n        val order = repo.find(id) ?: return Result.Missing\n        lastId = id\n        fun local(x: Int) = max(x, 1)\n        val ref = ::total\n        val other = Order::price\n        return Result.Ok(order).also { log(\"handled ${order.id} ${local(2)}\") }\n    }"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "shop/Constructs.kt:70"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:68-75  com.example.shop.OrderService.handle  hash=7882037dc5\n    override fun handle(id: OrderId): Result {\n        val order = repo.find(id) ?: return Result.Missing\n        lastId = id\n        fun local(x: Int) = max(x, 1)\n        val ref = ::total\n        val other = Order::price\n        return Result.Ok(order).also { log(\"handled ${order.id} ${local(2)}\") }\n    }"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "Constructs.kt:1"
+   },
+   "text": "no declaration \"Constructs.kt:1\""
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "Constructs.kt:58"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:52-94  com.example.shop.OrderService  hash=8162c3a8bb\nclass OrderService(\n    repo: Repository<Order>,\n    private val clock: () -> Long = { 0L },\n) : BaseService(repo), AutoCloseable {\n\n    private val cache by lazy { mutableMapOf<OrderId, Order>() }\n\n    var lastId: OrderId? = null\n        private set\n\n    init {\n        require(MAX_ITEMS > 0)\n    }\n\n    constructor(repo: Repository<Order>, seed: Long) : this(repo, { seed })\n\n    override fun handle(id: OrderId): Result {\n        val order = repo.find(id) ?: return Result.Missing\n        lastId = id\n        fun local(x: Int) = max(x, 1)\n        val ref = ::total\n        val other = Order::price\n        return Result.Ok(order).also { log(\"handled ${order.id} ${local(2)}\") }\n    }\n\n    fun handle(id: OrderId, force: Boolean): Result = if (force) handle(id) else Result.Missing\n\n    infix fun merge(other: OrderService): OrderService = this\n\n    operator fun plus(other: OrderService): OrderService = merge(other)\n\n    override fun close() {}\n\n    companion object Factory {\n        fun create(repo: Repository<Order>): OrderService = OrderService(repo)\n    }\n\n    inner class Audit {\n        fun record() = log(\"audit\")\n    }\n\n    private fun log(message: String) = println(message)\n}"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "String.shout"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:20-20  com.example.shop.shout  hash=b6e9ce3cd7\nfun String.shout(): String = uppercase() + \"!\""
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "com.example.shop.Registry"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:96-99  com.example.shop.Registry  hash=3906072eb9\nobject Registry {\n    val services = mutableListOf<OrderService>()\n    fun register(s: OrderService) { services += s }\n}"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "`weird name`.`does something with spaces`"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:115-115  com.example.shop.weird name.does something with spaces  hash=66a6395316\n    fun `does something with spaces`() = Unit"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "Missing"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:32-32  com.example.shop.Result.Missing  hash=640ff42e3f\n    data object Missing : Result"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "Big"
+   },
+   "text": "big/src/main/kotlin/com/example/big/Big.kt:3-164  com.example.big.Big  hash=e5f4db9cc8\n/** A big class. */\nclass Big {\n  // 162 lines; members (symbol \"Big.<member>\" for one, full=true for all):\n  5-7  fun m0(x: Int): Int\n  9-11  fun m1(x: Int): Int\n  13-15  fun m2(x: Int): Int\n  17-19  fun m3(x: Int): Int\n  21-23  fun m4(x: Int): Int\n  25-27  fun m5(x: Int): Int\n  29-31  fun m6(x: Int): Int\n  33-35  fun m7(x: Int): Int\n  37-39  fun m8(x: Int): Int\n  41-43  fun m9(x: Int): Int\n  45-47  fun m10(x: Int): Int\n  49-51  fun m11(x: Int): Int\n  53-55  fun m12(x: Int): Int\n  57-59  fun m13(x: Int): Int\n  61-63  fun m14(x: Int): Int\n  65-67  fun m15(x: Int): Int\n  69-71  fun m16(x: Int): Int\n  73-75  fun m17(x: Int): Int\n  77-79  fun m18(x: Int): Int\n  81-83  fun m19(x: Int): Int\n  85-87  fun m20(x: Int): Int\n  89-91  fun m21(x: Int): Int\n  93-95  fun m22(x: Int): Int\n  97-99  fun m23(x: Int): Int\n  101-103  fun m24(x: Int): Int\n  105-107  fun m25(x: Int): Int\n  109-111  fun m26(x: Int): Int\n  113-115  fun m27(x: Int): Int\n  117-119  fun m28(x: Int): Int\n  121-123  fun m29(x: Int): Int\n  125-127  fun m30(x: Int): Int\n  129-131  fun m31(x: Int): Int\n  133-135  fun m32(x: Int): Int\n  137-139  fun m33(x: Int): Int\n  141-143  fun m34(x: Int): Int\n  145-147  fun m35(x: Int): Int\n  149-151  fun m36(x: Int): Int\n  153-155  fun m37(x: Int): Int\n  157-159  fun m38(x: Int): Int\n  161-163  fun m39(x: Int): Int\n}"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "Big",
+    "full": true
+   },
+   "text": "big/src/main/kotlin/com/example/big/Big.kt:3-164  com.example.big.Big  hash=e5f4db9cc8\n/** A big class. */\nclass Big {\n    fun m0(x: Int): Int {\n        return x + 0\n    }\n\n    fun m1(x: Int): Int {\n        return x + 1\n    }\n\n    fun m2(x: Int): Int {\n        return x + 2\n    }\n\n    fun m3(x: Int): Int {\n        return x + 3\n    }\n\n    fun m4(x: Int): Int {\n        return x + 4\n    }\n\n    fun m5(x: Int): Int {\n        return x + 5\n    }\n\n    fun m6(x: Int): Int {\n        return x + 6\n    }\n\n    fun m7(x: Int): Int {\n        return x + 7\n    }\n\n    fun m8(x: Int): Int {\n        return x + 8\n    }\n\n    fun m9(x: Int): Int {\n        return x + 9\n    }\n\n    fun m10(x: Int): Int {\n        return x + 10\n    }\n\n    fun m11(x: Int): Int {\n        return x + 11\n    }\n\n    fun m12(x: Int): Int {\n        return x + 12\n    }\n\n    fun m13(x: Int): Int {\n        return x + 13\n    }\n\n    fun m14(x: Int): Int {\n        return x + 14\n    }\n\n    fun m15(x: Int): Int {\n        return x + 15\n    }\n\n    fun m16(x: Int): Int {\n        return x + 16\n    }\n\n    fun m17(x: Int): Int {\n        return x + 17\n    }\n\n    fun m18(x: Int): Int {\n        return x + 18\n    }\n\n    fun m19(x: Int): Int {\n        return x + 19\n    }\n\n    fun m20(x: Int): Int {\n        return x + 20\n    }\n\n    fun m21(x: Int): Int {\n        return x + 21\n    }\n\n    fun m22(x: Int): Int {\n        return x + 22\n    }\n\n    fun m23(x: Int): Int {\n        return x + 23\n    }\n\n    fun m24(x: Int): Int {\n        return x + 24\n    }\n\n    fun m25(x: Int): Int {\n        return x + 25\n    }\n\n    fun m26(x: Int): Int {\n        return x + 26\n    }\n\n    fun m27(x: Int): Int {\n        return x + 27\n    }\n\n    fun m28(x: Int): Int {\n        return x + 28\n    }\n\n    fun m29(x: Int): Int {\n        return x + 29\n    }\n\n    fun m30(x: Int): Int {\n        return x + 30\n    }\n\n    fun m31(x: Int): Int {\n        return x + 31\n    }\n\n    fun m32(x: Int): Int {\n        return x + 32\n    }\n\n    fun m33(x: Int): Int {\n        return x + 33\n    }\n\n    fun m34(x: Int): Int {\n        return x + 34\n    }\n\n    fun m35(x: Int): Int {\n        return x + 35\n    }\n\n    fun m36(x: Int): Int {\n        return x + 36\n    }\n\n    fun m37(x: Int): Int {\n        return x + 37\n    }\n\n    fun m38(x: Int): Int {\n        return x + 38\n    }\n\n    fun m39(x: Int): Int {\n        return x + 39\n    }\n}"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "OrderService"
+   },
+   "text": "2 declarations match \"OrderService\" — qualify it (Type.member, member(ParamType, …)) or pass all=true:\nsrc/main/kotlin/com/example/shop/Constructs.kt:52-94  class OrderService( repo: Repository<Order>, private val clock: () -> Long = { 0L }, ) : BaseService(repo), AutoCloseable\nsrc/main/kotlin/com/example/shop/Constructs.kt:66-66  [OrderService] constructor(repo: Repository<Order>, seed: Long) : this(repo, { seed })"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "OrderService.OrderService"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:66-66  com.example.shop.OrderService.OrderService  hash=2734e464b6\n    constructor(repo: Repository<Order>, seed: Long) : this(repo, { seed })"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "OrderService.init"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:62-64  com.example.shop.OrderService.init  hash=3b43608e9d\n    init {\n        require(MAX_ITEMS > 0)\n    }"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "Status.PAID"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:40-42  com.example.shop.Status.PAID  hash=dc121ed257\n    PAID(\"paid\") {\n        override fun next(): Status = SHIPPED\n    },"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "Status.PAID.next"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:41-41  com.example.shop.Status.PAID.next  hash=2c00733f51\n        override fun next(): Status = SHIPPED"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "OrderService.Factory.create"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:86-86  com.example.shop.OrderService.Factory.create  hash=e9fb0ea167\n        fun create(repo: Repository<Order>): OrderService = OrderService(repo)"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "OrderId"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:10-10  com.example.shop.OrderId  hash=e68e6eb3c0\ntypealias OrderId = String"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "MAX_ITEMS"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:12-13  com.example.shop.MAX_ITEMS  hash=6b3bbce30b\n/** Top-level constant. */\nconst val MAX_ITEMS = 10"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "clock"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:54-54  com.example.shop.OrderService.clock  hash=d4bd290e5f\n    private val clock: () -> Long = { 0L },"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "cache"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:57-57  com.example.shop.OrderService.cache  hash=06b2a2b6fb\n    private val cache by lazy { mutableMapOf<OrderId, Order>() }"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "local"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:71-71  com.example.shop.OrderService.handle.local  hash=92bc1fb24c\n        fun local(x: Int) = max(x, 1)"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "m1",
+    "limit": 1,
+    "all": true
+   },
+   "text": "big/src/main/kotlin/com/example/big/Big.kt:9-11  com.example.big.Big.m1  hash=e6e16bed29\n    fun m1(x: Int): Int {\n        return x + 1\n    }"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "Ordr"
+   },
+   "text": "no declaration \"Ordr\""
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "Repository.find(OrderId)"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:26-26  com.example.shop.Repository.find  hash=9dbf7426fe\n    fun find(id: OrderId): T?"
+  },
+  {
+   "tool": "symbol",
+   "args": {
+    "name": "find"
+   },
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:26-26  com.example.shop.Repository.find  hash=9dbf7426fe\n    fun find(id: OrderId): T?"
+  }
+ ]
+}

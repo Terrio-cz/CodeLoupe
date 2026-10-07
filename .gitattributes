@@ -1,0 +1,6 @@
+* text=auto
+gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+# Golden outputs carry hashes of fixture text: keep the fixtures byte-identical on every OS.
+src/test/resources/fixtures/** text eol=lf
