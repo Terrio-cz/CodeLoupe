@@ -1,9 +1,11 @@
 package codeloupe.lang.kotlin
 
 import codeloupe.lang.JsText
+import codeloupe.lang.RefFact
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBinaryExpression
+import org.jetbrains.kotlin.psi.KtCallElement
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtCallableReferenceExpression
 import org.jetbrains.kotlin.psi.KtClassLiteralExpression
@@ -15,13 +17,16 @@ import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtOperationReferenceExpression
 import org.jetbrains.kotlin.psi.KtQualifiedExpression
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
+import org.jetbrains.kotlin.psi.KtThisExpression
 import org.jetbrains.kotlin.psi.KtUserType
 import org.jetbrains.kotlin.psi.KtValueArgumentName
 
 /**
- * Classifies a name use: `call` (callee of a call or an infix call), `nav` (selector after `.`, `?.` or `Recv::`),
- * `type`, `callable_ref` (`::name`), `named_arg`, otherwise `name`. Calls and navigations keep their receiver text;
- * names bound inside code carry their local type (see [LocalScopes]).
+ * Classifies a name use: `call` (callee of a call or an infix call), `nav` (selector after `.` or `?.`), `type`
+ * (with its qualifier as receiver), `callable_ref` (`::name`, `Recv::name`), `named_arg` (with the callee's name as
+ * receiver), otherwise `name`. Calls,
+ * navigations and callable references keep their receiver text; names bound inside code carry their local type
+ * (see [LocalScopes]), prefixed with [RefFact.BEYOND_CLASS] when a class body lies between.
  */
 internal class References(private val source: Source, private val scopes: LocalScopes, private val types: LocalTypes) {
     fun of(expression: KtSimpleNameExpression): Reference? = when (expression) {
@@ -41,9 +46,9 @@ internal class References(private val source: Source, private val scopes: LocalS
         val name = JsText.bare(source.of(expression))
         val offset = expression.textRange.startOffset
         return when {
-            parent is KtUserType -> Reference(name, offset, TYPE, null)
+            parent is KtUserType -> Reference(name, offset, TYPE, parent.qualifier?.let { JsText.squash(source.of(it)) })
             parent is KtCallableReferenceExpression && parent.callableReference == expression ->
-                parent.receiverExpression?.let { qualified(name, offset, NAV, it, null) }
+                parent.receiverExpression?.let { qualified(name, offset, CALLABLE_REF, it, null) }
                     ?: unqualified(name, offset, CALLABLE_REF, null)
             parent is KtCallExpression && parent.calleeExpression == expression -> {
                 val args = argumentCount(parent)
@@ -52,21 +57,30 @@ internal class References(private val source: Source, private val scopes: LocalS
                 else unqualified(name, offset, CALL, args)
             }
             parent is KtQualifiedExpression && parent.selectorExpression == expression -> qualified(name, offset, NAV, parent.receiverExpression, null)
-            parent is KtValueArgumentName -> Reference(name, offset, NAMED_ARG, null)
+            parent is KtValueArgumentName -> Reference(name, offset, NAMED_ARG, calleeOf(parent))
             else -> unqualified(name, offset, NAME, null)
         }
     }
 
     // A name bound in code is that binding; any other may be a member of a lambda's implicit receiver.
     private fun unqualified(name: String, offset: Int, kind: String, args: Int?): Reference {
-        val bind = scopes.typeOf(name)
+        val binding = scopes.lookup(name)
+        val bind = binding?.let { if (it.beyondClass) RefFact.BEYOND_CLASS + it.type else it.type }
         return Reference(name, offset, kind, null, bind = bind, recvType = if (bind == null) scopes.implicitReceiver else null, args = args)
     }
 
     private fun qualified(name: String, offset: Int, kind: String, receiver: KtExpression, args: Int?): Reference =
         Reference(name, offset, kind, receiver(receiver), recvType = localType(receiver), args = args)
 
-    private fun localType(receiver: KtExpression): String? = types.ofReceiver(receiver)
+    // A plain `this` inside `x.apply { }` is `x`, not the enclosing class.
+    private fun localType(receiver: KtExpression): String? =
+        if (receiver is KtThisExpression) scopes.thisReceiver.takeIf { receiver.getLabelName() == null } else types.ofReceiver(receiver)
+
+    /** The simple name of the call a named argument belongs to: `Account` in `Account(id = 1)`, `copy`. */
+    private fun calleeOf(argumentName: KtValueArgumentName): String? {
+        val call = argumentName.parent?.parent?.parent as? KtCallElement ?: return null
+        return call.calleeExpression?.let { JsText.bare(JsText.squash(source.of(it)).substringBefore('<').substringAfterLast('.')) }
+    }
 
     // `valueArguments` includes trailing lambdas.
     private fun argumentCount(call: KtCallExpression): Int =

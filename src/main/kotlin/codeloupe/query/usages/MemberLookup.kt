@@ -11,7 +11,7 @@ internal class MemberLookup(private val cache: IndexCache, private val types: Ty
             level.flatMap { t -> cache.children(t).filter { it.name == name && !it.local && it.kind !in Kinds.CLASSIFIERS && accept(it) } }
         }
         val nearest = levels.indexOfFirst { it.isNotEmpty() }
-        if (nearest < 0) return Resolution(emptyList(), complete = true)
+        if (nearest < 0) return Resolution.NOTHING
         return Resolution(levels[nearest], complete = true, further = levels.drop(nearest + 1).flatten())
     }
 
@@ -25,15 +25,24 @@ internal class MemberLookup(private val cache: IndexCache, private val types: Ty
     }
 
     /** Visible extensions named [name] whose receiver is one of [receiverNames] (simple names), `Any` or a type parameter. */
-    fun extensions(name: String, receiverNames: Set<String>, file: FileScope, accept: (DeclRow) -> Boolean): List<DeclRow> {
-        val all = cache.named(name).filter { it.receiver != null && !it.local && accept(it) && fits(it.receiver, receiverNames) }
+    fun extensions(name: String, receiverNames: Set<String>, file: FileScope, accept: (DeclRow) -> Boolean): List<DeclRow> =
+        visibleExtensions(name, file, accept).filter { receiverName(it) in receiverNames || generic(it) }
+
+    /**
+     * Visible extensions on types outside the index: a library type's supertypes are unknown, so `fun Throwable.f()`
+     * may be meant on an `IOException`.
+     */
+    fun onLibraryTypes(name: String, file: FileScope, accept: (DeclRow) -> Boolean): List<DeclRow> =
+        visibleExtensions(name, file, accept).filter { d -> cache.named(receiverName(d)).none { it.kind in Kinds.CLASSIFIERS } }
+
+    private fun visibleExtensions(name: String, file: FileScope, accept: (DeclRow) -> Boolean): List<DeclRow> {
+        val all = cache.named(name).filter { it.receiver != null && !it.local && accept(it) }
         if (all.isEmpty()) return all
-        val visible = visibility.topLevel(name, file).toSet()
+        val visible = visibility.topLevel(name, file, accept).toSet()
         return all.filter { it in visible || it.container.isNotEmpty() || it.path == file.path }
     }
 
-    private fun fits(receiver: String, names: Set<String>): Boolean {
-        val base = DeclMatch.baseType(receiver).substringAfterLast(' ').substringAfterLast('.')
-        return base in names || base == "Any" || Kinds.isTypeParameter(base)
-    }
+    private fun receiverName(d: DeclRow) = DeclMatch.baseType(d.receiver).substringAfterLast(' ').substringAfterLast('.')
+
+    private fun generic(d: DeclRow) = receiverName(d).let { it == "Any" || Kinds.isTypeParameter(it) }
 }

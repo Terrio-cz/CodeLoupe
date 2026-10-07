@@ -1,5 +1,6 @@
 package codeloupe.query.usages
 
+import codeloupe.lang.RefFact
 import codeloupe.query.DeclRow
 import codeloupe.query.RefRow
 
@@ -14,42 +15,73 @@ internal class RefResolver(
     fun resolve(ref: RefRow): Resolution {
         val file = cache.file(ref.path) ?: return Resolution(emptyList(), complete = false)
         val chain = file.chain(file.decl(ref.declId))
-        val accept = accepts(ref.kind) ?: return Resolution(emptyList(), complete = false)
+        val kind = accepts(ref.kind) ?: return Resolution(emptyList(), complete = false)
+        val accept = { d: DeclRow -> kind(d) && Kinds.accessible(d, ref.path) }
         val resolution = when {
-            ref.recv == null && ref.bind != null -> local(ref, chain)
-            ref.recv == null -> implicit.find(ref.name, file, chain, accept, ref.recvType?.let { receivers.fromSpec(it, file, chain.firstOrNull()) })
+            ref.kind == "type" && ref.recv != null ->
+                Resolution(types.resolve("${ref.recv}.${ref.name}", file, chain.firstOrNull(), keepAliases = true), complete = true)
+            ref.recv == null && ref.bind != null -> bound(ref, file, chain, accept)
+            ref.recv == null -> lexical(ref, file, chain, accept)
             else -> qualified(ref, file, chain, accept)
         }
-        return Arguments.narrow(preferCallables(resolution, ref.kind), ref.args).filter { accessible(it, ref.path) }
+        return if (ref.kind == "call") Arguments.narrow(resolution, ref.args) else resolution
     }
 
-    // A private declaration is out of reach outside its own file.
-    private fun accessible(d: DeclRow, path: String) = d.path == path || "private" !in d.modifiers.split(' ')
+    private fun lexical(ref: RefRow, file: FileScope, chain: List<DeclRow>, accept: (DeclRow) -> Boolean): Resolution =
+        implicit.find(ref.name, file, chain, accept, ref.recvType?.let { receivers.fromSpec(it, file, chain.firstOrNull()) })
 
-    // Names bound inside code shadow everything else; only local declarations can be meant.
-    private fun local(ref: RefRow, chain: List<DeclRow>): Resolution {
+    /**
+     * A name bound in code: its local declarations. A call goes past a binding that cannot be invoked (`flag()` with
+     * `flag: Boolean` calls a function), and a binding across a class body may also be that class's member.
+     */
+    private fun bound(ref: RefRow, file: FileScope, chain: List<DeclRow>, accept: (DeclRow) -> Boolean): Resolution {
+        val bind = ref.bind.orEmpty()
+        val beyondClass = bind.startsWith(RefFact.BEYOND_CLASS)
+        val type = bind.removePrefix(RefFact.BEYOND_CLASS)
         val ids = chain.map { it.id }.toSet()
-        return Resolution(cache.named(ref.name).filter { it.local && it.path == ref.path && it.parentId in ids }, complete = true)
+        val locals = cache.named(ref.name).filter { it.local && it.path == ref.path && it.parentId in ids }
+        val localFunctions = locals.filter { it.kind == "fun" }
+        val invocable = type.isEmpty() || "->" in type
+        return when {
+            ref.kind == "call" || ref.kind == "callable_ref" -> when {
+                localFunctions.isNotEmpty() -> Resolution(localFunctions, complete = !beyondClass)
+                ref.kind == "call" && invocable && type.isNotEmpty() -> Resolution(locals, complete = !beyondClass)
+                ref.kind == "call" && invocable -> lexical(ref, file, chain, accept).let { it.copy(decls = (it.decls + locals).distinct(), complete = false, byName = false) }
+                else -> lexical(ref, file, chain, accept)
+            }
+            beyondClass -> Resolution((locals + cache.named(ref.name).filter { Kinds.isMember(it) && accept(it) }).distinct(), complete = false)
+            else -> Resolution(locals, complete = true)
+        }
     }
 
     private fun qualified(ref: RefRow, file: FileScope, chain: List<DeclRow>, accept: (DeclRow) -> Boolean): Resolution =
         when (val type = receivers.of(ref, file, chain)) {
-            is ReceiverType.Static -> type.types.map { lookup.static(it, ref.name, accept) }
-                .let { r -> Resolution(r.flatMap { it.decls }, complete = true, further = r.flatMap { it.further }) }
-            is ReceiverType.Instance -> {
-                val members = type.types.distinct().map { lookup.instance(types.closure(it), ref.name, accept) }
-                val decls = members.flatMap { it.decls }
-                if (decls.isNotEmpty()) Resolution(decls, complete = true, further = members.flatMap { it.further })
-                else Resolution(lookup.extensions(ref.name, type.names, file, accept), complete = true)
-            }
+            is ReceiverType.Static -> static(ref, type, file, accept)
+            is ReceiverType.Instance -> instance(ref.name, type, file, accept)
             is ReceiverType.Package -> Resolution(cache.named(ref.name).filter { !it.local && it.fqn == "${type.name}.${ref.name}" && accept(it) }, complete = true)
-            ReceiverType.Unknown -> Resolution(cache.named(ref.name).filter { Kinds.isMember(it) && accept(it) }, complete = false)
+            ReceiverType.Unknown -> Resolution.byName(cache.named(ref.name).filter { Kinds.isMember(it) && accept(it) })
         }
 
-    // `x()` on a property means `invoke`: only when no function or class of that name is in reach.
-    private fun preferCallables(r: Resolution, kind: String): Resolution {
-        if (kind != "call" || r.decls.none { it.kind != "property" }) return r
-        return r.filter { it.kind != "property" }
+    // `Type::member` names an instance member (or extension) too.
+    private fun static(ref: RefRow, type: ReceiverType.Static, file: FileScope, accept: (DeclRow) -> Boolean): Resolution {
+        val found = type.types.map { lookup.static(it, ref.name, accept) }
+        val statics = Resolution(found.flatMap { it.decls }, complete = true, further = found.flatMap { it.further })
+        if (ref.kind != "callable_ref" || statics.decls.isNotEmpty()) return statics
+        return instance(ref.name, implicit.instanceOf(type.types, type.types.map { it.name }.toSet()), file, accept)
+    }
+
+    /**
+     * Members and extensions of an instance. Nothing found on an indexed type may still be a subtype's member reached
+     * through a smart cast (`if (e is Sub) e.f()`); on a library type, an extension declared on a library supertype.
+     */
+    private fun instance(name: String, type: ReceiverType.Instance, file: FileScope, accept: (DeclRow) -> Boolean): Resolution {
+        val members = type.types.distinct().map { lookup.instance(types.closure(it), name, accept) }
+        val decls = members.flatMap { it.decls }
+        if (decls.isNotEmpty()) return Resolution(decls, complete = true, further = members.flatMap { it.further })
+        lookup.extensions(name, type.names, file, accept).let { if (it.isNotEmpty()) return Resolution(it, complete = true) }
+        if (type.types.isEmpty()) return lookup.onLibraryTypes(name, file, accept).let { Resolution(it, complete = it.isEmpty()) }
+        val cast = type.types.flatMap(types::allSubtypes).flatMap { sub -> lookup.instance(types.closure(sub), name, accept).decls }.distinct()
+        return Resolution(cast, complete = cast.isEmpty())
     }
 
     private fun accepts(kind: String): ((DeclRow) -> Boolean)? = when (kind) {

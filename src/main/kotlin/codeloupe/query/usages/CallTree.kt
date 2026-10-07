@@ -11,7 +11,7 @@ internal class CallTree(private val finder: UsageFinder, private val direction: 
     /** A caller or callee; [decl] is null for code outside any declaration. [lines] are where the call is. */
     data class Node(val decl: DeclRow?, val path: String, val label: Label, val lines: List<Int>) {
         fun text(): String {
-            val where = if (decl == null) "$path:${lines.joinToString(",")}  (file level)" else "${decl.path}:${decl.declLine}  ${ShortSignature.of(decl)}"
+            val where = if (decl == null) "$path:${lines.joinToString(",")}  (file level)" else ShortSignature.located(decl)
             return "${label.mark} $where" + if (decl != null) "  @${lines.joinToString(",")}" else ""
         }
     }

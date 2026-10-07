@@ -16,11 +16,12 @@ object CallsQuery {
         val name = args.name.orEmpty()
         val targets = Resolver.resolve(view, name)
         if (targets.isEmpty()) return "no declaration \"$name\"" + Members.suggest(view, name)
+        TargetLines.ambiguity(name, targets)?.let { return it }
         val finder = UsageFinder(view)
         val tree = CallTree(finder, if (args.callees) CallTree.Direction.CALLEES else CallTree.Direction.CALLERS)
         val depth = args.depth.coerceIn(1, MAX_DEPTH)
         val out = Rendering(args.limit)
-        out.line(TargetLines.header(if (args.callees) "callees" else "callers", targets) + "\n(= exact, ? candidate)")
+        out.line(TargetLines.header(if (args.callees) "callees" else "callers", targets))
         val seen = HashSet<DeclRow>(targets)
         // Below the first level only exact links are drawn; guesses about guesses are counted, not listed.
         fun expand(all: List<CallTree.Node>, level: Int) {

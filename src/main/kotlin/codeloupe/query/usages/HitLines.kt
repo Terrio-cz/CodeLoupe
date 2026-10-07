@@ -12,21 +12,18 @@ internal object HitLines {
         usages.groupBy { it.ref.path to it.ref.line }.values.map { same -> same.minBy { it.label.ordinal } }
             .sortedWith(compareBy<Usage, String>(PathOrder) { it.ref.path }.thenBy { it.ref.line })
 
+    /** `path`, then per enclosing declaration its short signature — left out when the first hit is its own line. */
     fun render(hits: List<Usage>, cache: IndexCache): String = buildString {
         var path: String? = null
         var owner: DeclRow? = null
         for (hit in hits) {
-            if (hit.ref.path != path) {
-                path = hit.ref.path
-                owner = null
-                appendLine(path)
-                appendLine("  " + ownerLine(hit.owner))
-            } else if (hit.owner != owner) {
-                appendLine("  " + ownerLine(hit.owner))
-            }
+            val newFile = hit.ref.path != path
+            if (newFile) appendLine(hit.ref.path)
+            if ((newFile || hit.owner != owner) && hit.ref.line != hit.owner?.declLine) appendLine("  " + ownerLine(hit.owner))
+            path = hit.ref.path
             owner = hit.owner
-            val code = cache.file(hit.ref.path)?.line(hit.ref.line).orEmpty()
-            appendLine("    ${hit.ref.line} ${hit.label.mark} ${snippet(code, hit.ref.col)}")
+            val code = cache.line(hit.ref.path, hit.ref.line)
+            appendLine("  ${hit.ref.line} ${hit.label.mark} ${snippet(code, hit.ref.col)}")
         }
     }.trimEnd()
 

@@ -1,36 +1,32 @@
 package codeloupe.query.usages
 
 import codeloupe.query.DeclRow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
-/** Overload narrowing by argument count; parameters with defaults and varargs make a range. */
+/**
+ * A call's candidates narrowed by argument count: functions whose parameters fit (defaults and `vararg` make a
+ * range); `x()` on a property (`invoke`) only when no function of that name fits.
+ */
 internal object Arguments {
     fun narrow(r: Resolution, args: Int?): Resolution {
-        if (args == null || args < 0 || r.decls.none { it.kind == "fun" }) return r
-        val fitting = r.filter { it.kind != "fun" || fits(it, args) }
-        return if (fitting.decls.isEmpty()) r else fitting
+        val functions = r.decls.filter { it.kind == "fun" }
+        if (functions.isEmpty()) return r
+        val fitting = if (args == null || args < 0) functions else functions.filter { fits(it, args) }
+        return when {
+            fitting.isNotEmpty() -> r.filter { it.kind != "property" && (it.kind != "fun" || it in fitting) }
+            r.decls.any { it.kind != "fun" } -> r.filter { it.kind != "fun" }
+            else -> r
+        }
     }
 
     fun fits(d: DeclRow, args: Int): Boolean {
-        if ("vararg" in d.sig) return args >= d.paramCount - 1 - defaults(d.sig)
-        return args <= d.paramCount && args >= d.paramCount - defaults(d.sig)
+        val params = Json.parseToJsonElement(d.params?.takeIf { it.isNotEmpty() } ?: "[]").jsonArray.map { it.jsonObject }
+        val required = params.count { p -> p["default"]?.jsonPrimitive?.booleanOrNull != true && p["vararg"]?.jsonPrimitive?.booleanOrNull != true }
+        val vararg = params.any { it["vararg"]?.jsonPrimitive?.booleanOrNull == true }
+        return args >= required && (vararg || args <= params.size)
     }
-
-    /** `=` at the top level of the parameter list: a default value (not `==`, `!=`, `<=`, `>=`, `->`). */
-    private fun defaults(sig: String): Int {
-        val open = sig.indexOf('(')
-        if (open < 0) return 0
-        var depth = 0
-        var count = 0
-        for (i in open until sig.length) {
-            val c = sig[i]
-            when (c) {
-                '(', '<', '[', '{' -> depth++
-                ')', '>', ']', '}' -> if (c == '>' && sig.getOrNull(i - 1) == '-') Unit else if (--depth == 0) return count
-                '=' -> if (depth == 1 && sig.getOrNull(i - 1) !in NOT_DEFAULT && sig.getOrNull(i + 1) != '=' && sig.getOrNull(i + 1) != '>') count++
-            }
-        }
-        return count
-    }
-
-    private val NOT_DEFAULT = setOf('=', '!', '<', '>')
 }

@@ -6,6 +6,9 @@ import codeloupe.query.DeclRow
 internal object ShortSignature {
     private const val MAX = 100
 
+    /** `path:line  [Container] fun name(…)` */
+    fun located(d: DeclRow): String = "${d.path}:${d.declLine}  ${of(d)}"
+
     fun of(d: DeclRow): String {
         val sig = d.sig
         val at = sig.indexOf(d.name)

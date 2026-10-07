@@ -12,12 +12,13 @@ object UsagesQuery {
         val name = args.name.orEmpty()
         val targets = Resolver.resolve(view, name)
         if (targets.isEmpty()) return "no declaration \"$name\"" + Members.suggest(view, name)
+        TargetLines.ambiguity(name, targets)?.let { return it }
         val finder = UsageFinder(view)
         val lines = HitLines.lines(finder.usages(targets))
         val counts = Label.entries.associateWith { label -> lines.count { it.label == label } }
         val shown = if (args.all) lines else lines.filter { it.label != Label.OTHER }
-        val header = TargetLines.header("usages", targets) + "\n${counts[Label.EXACT]} exact (=), ${counts[Label.CANDIDATE]} candidate (?)" +
-            if (args.all) ", ${counts[Label.OTHER]} other (-)" else ""
+        val header = TargetLines.header("usages", targets) + "\n${counts[Label.EXACT]} exact, ${counts[Label.CANDIDATE]} candidate" +
+            if (args.all) ", ${counts[Label.OTHER]} other" else ""
         val body = HitLines.render(shown.take(args.limit), finder.cache)
         val rest = shown.size - minOf(shown.size, args.limit)
         val footer = buildList {

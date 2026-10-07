@@ -53,7 +53,7 @@ class UsagesTest {
         assertEquals(Label.EXACT, account["Account.kt:20"], "supertype")
         assertEquals(mapOf("AccountService.kt:23" to Label.EXACT), labels("Account.create"))
         assertEquals(Label.EXACT, labels("Level.atLeast")["AccountService.kt:37"])
-        assertEquals(mapOf("AccountService.kt:35" to Label.EXACT), labels("Account.label"))
+        assertEquals(mapOf("AccountService.kt:35" to Label.EXACT, "Edge.kt:25" to Label.OTHER), labels("Account.label"))
         assertEquals(mapOf("AccountService.kt:24" to Label.CANDIDATE), labels("Store.save"), "the call reaches the override")
         assertEquals(mapOf("AccountService.kt:24" to Label.EXACT), labels("AccountStore.save"))
     }
@@ -64,8 +64,33 @@ class UsagesTest {
     }
 
     @Test
+    fun `callable references, smart casts, this in apply, DSL receivers, library supertypes`() {
+        assertEquals(mapOf("Edge.kt:6" to Label.EXACT, "Edge.kt:10" to Label.EXACT, "Edge.kt:28" to Label.EXACT), labels("Point.area"))
+        assertEquals(mapOf("Edge.kt:8" to Label.CANDIDATE), labels("Circle.radius"), "reached through a smart cast")
+        assertEquals(mapOf("Edge.kt:12" to Label.CANDIDATE), labels("report"), "IllegalStateException is a Throwable the index cannot see")
+        assertEquals(Label.CANDIDATE, labels("Named.label")["Edge.kt:25"], "a local across an object body may be the object's member")
+    }
+
+    @Test
+    fun `scopes - shadowing bindings, private declarations elsewhere, nested types of supertypes, qualified types`() {
+        assertEquals(mapOf("Edge.kt:14" to Label.EXACT), labels("com.example.model.helper"), "a Boolean binding cannot be called")
+        assertEquals(mapOf("Edge.kt:16" to Label.EXACT), labels("com.example.model.shared"), "a private shared() in another file hides nothing")
+        assertEquals(mapOf("Shapes.kt:12" to Label.EXACT), labels("Nested.make"))
+        assertEquals(Label.EXACT, labels("com.example.model.Point")["Edge.kt:20"], "a package-qualified type")
+        assertEquals(Label.CANDIDATE, labels("Point(Int)")["Edge.kt:18"], "a secondary constructor call")
+    }
+
+    @Test
+    fun `ambiguous names must be qualified`() {
+        assertContains(UsagesQuery.run(view, UsagesQuery.Args("label")), "declarations match \"label\" — qualify it")
+    }
+
+    @Test
     fun `every rg -w code position is in the result`() {
-        val queries = listOf("Account.describe", "Account.rename", "Account", "Store.save", "Level.atLeast", "Account.label")
+        val queries = listOf(
+            "Account.describe", "Account.rename", "Account", "Store.save", "Level.atLeast", "Account.label", "Point.area", "Circle.radius",
+            "report", "Nested.make", "Named.label", "com.example.model.shared", "com.example.model.helper",
+        )
         val targets = queries.associateWith { Resolver.resolve(view, it) }
         val baseline = IdentifierScan.positions(view, targets.values.flatten().map { it.name }.toSet())
         for ((query, decls) in targets) {
@@ -78,8 +103,8 @@ class UsagesTest {
     @Test
     fun `usages output - grouped by file and declaration, one line per hit, others counted`() {
         val text = UsagesQuery.run(view, UsagesQuery.Args("Account.describe"))
-        assertTrue(text.startsWith("usages of src/main/kotlin/com/example/model/Account.kt:9-9  [Account] open fun describe(): String\n4 exact (=), 1 candidate (?)\n"), text)
-        assertContains(text, "\nsrc/main/kotlin/com/example/other/Report.kt\n  [Report] fun run(…)\n    10 = account.describe()\n    11 ? savings.describe()")
+        assertTrue(text.startsWith("usages of src/main/kotlin/com/example/model/Account.kt:9-9  [Account] open fun describe(): String\n4 exact, 1 candidate\n"), text)
+        assertContains(text, "\nsrc/main/kotlin/com/example/other/Report.kt\n  [Report] fun run(…)\n  10 = account.describe()\n  11 ? savings.describe()")
         assertTrue(text.endsWith("2 more lines with the name resolve to other declarations (all=true lists them)"))
         val limited = UsagesQuery.run(view, UsagesQuery.Args("Account.describe", limit = 2, all = true))
         assertContains(limited, "… +5 more in 2 files (raise limit)")
@@ -98,10 +123,11 @@ class UsagesTest {
 
     @Test
     fun `hierarchy - subtypes, supertypes and overrides`() {
-        assertContains(HierarchyQuery.run(view, "com.example.model.Account"), "subtypes:\n  src/main/kotlin/com/example/model/Account.kt:20-22  class SavingsAccount(id: String) : Account(id, \"bank\")")
-        assertContains(HierarchyQuery.run(view, "AccountStore"), "supertypes:\n  src/main/kotlin/com/example/model/Account.kt:3-6  interface Store<T>")
-        assertContains(HierarchyQuery.run(view, "Account.describe"), "overridden by:\n  src/main/kotlin/com/example/model/Account.kt:21-21  [SavingsAccount] override fun describe(): String")
-        assertContains(HierarchyQuery.run(view, "AccountStore.find"), "overrides:\n  src/main/kotlin/com/example/model/Account.kt:5-5  [Store] fun find(id: String): T?")
+        assertContains(HierarchyQuery.run(view, "com.example.model.Account"), "subtypes:\n  src/main/kotlin/com/example/model/Account.kt:20  class SavingsAccount(…)")
+        assertContains(HierarchyQuery.run(view, "AccountStore"), "supertypes:\n  src/main/kotlin/com/example/model/Account.kt:3  interface Store<T>")
+        assertContains(HierarchyQuery.run(view, "Account.describe"), "overridden by:\n  src/main/kotlin/com/example/model/Account.kt:21  [SavingsAccount] override fun describe()")
+        assertContains(HierarchyQuery.run(view, "AccountStore.find"), "overrides:\n  src/main/kotlin/com/example/model/Account.kt:5  [Store] fun find(…)")
+        assertContains(HierarchyQuery.run(view, "Shape"), "subtypes:\n  src/main/kotlin/com/example/model/Shapes.kt:23  class Circle : Shape()")
     }
 
     private companion object {

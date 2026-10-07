@@ -66,7 +66,7 @@ internal class KotlinExtractor(private val source: Source) {
             is KtPackageDirective -> packageName = element.packageNameExpression?.let { JsText.squash(source.of(it)) } ?: ""
             is KtImportDirective -> addImport(element)
             is KtEnumEntry -> nested(declare(element, shapes.enumEntry(element)), element)
-            is KtObjectDeclaration -> if (element.isObjectLiteral()) nested(OBJECT_LITERAL, element) else classLike(element)
+            is KtObjectDeclaration -> if (element.isObjectLiteral()) objectLiteral(element) else classLike(element)
             is KtClassOrObject -> classLike(element)
             // A function without a name is an anonymous function: an expression, not a declaration.
             is KtNamedFunction -> function(element)
@@ -117,9 +117,15 @@ internal class KotlinExtractor(private val source: Source) {
             if (parameter.hasValOrVar()) declare(parameter, shapes.constructorProperty(parameter))
         }
         constructorScopes += parameters(element.primaryConstructorParameters.filter { !it.hasValOrVar() })
-        walkChildren(element)
+        scopes.inClassBody { walkChildren(element) }
         constructorScopes.removeLast()
         stack.removeLast()
+    }
+
+    private fun objectLiteral(element: KtObjectDeclaration) {
+        constructorScopes += emptyMap()
+        scopes.inClassBody { nested(OBJECT_LITERAL, element) }
+        constructorScopes.removeLast()
     }
 
     private fun function(element: KtNamedFunction) {
@@ -129,8 +135,11 @@ internal class KotlinExtractor(private val source: Source) {
         }
         // Bound before its body: a local function may call itself.
         if (element.isLocal) scopes.bind(JsText.bare(source.of(element.nameIdentifier!!)), "")
-        val index = declare(element, shapes.function(element))
-        scopes.within(parameters(element.valueParameters)) { nested(index, element) }
+        scopes.within(parameters(element.valueParameters)) {
+            val shape = shapes.function(element)
+            val body = element.bodyExpression?.takeIf { shape.returns == null && !element.hasBlockBody() }
+            nested(declare(element, shape.copy(returns = shape.returns ?: body?.let(localTypes::ofExpression)?.ifEmpty { null })), element)
+        }
     }
 
     private fun property(element: KtProperty) {
@@ -140,12 +149,18 @@ internal class KotlinExtractor(private val source: Source) {
                 walkChildren(element)
                 bindName(element.nameIdentifier, type())
             }
-            element.parent is KtClassBody -> inConstructorScope { nested(declare(element, shapes.property(element)), element) }
+            element.parent is KtClassBody -> inConstructorScope { nested(declare(element, propertyShape(element)), element) }
             else -> {
-                nested(declare(element, shapes.property(element)), element)
+                nested(declare(element, propertyShape(element)), element)
                 if (element.isLocal) bindName(element.nameIdentifier, type())
             }
         }
+    }
+
+    // An undeclared type is recorded as the spec of its initializer.
+    private fun propertyShape(element: KtProperty): DeclShape {
+        val shape = shapes.property(element)
+        return if (shape.returns != null) shape else shape.copy(returns = localTypes.ofProperty(element))
     }
 
     private fun destructuring(element: KtDestructuringDeclaration) {
@@ -179,7 +194,7 @@ internal class KotlinExtractor(private val source: Source) {
 
     private fun lambdaParameters(literal: KtFunctionLiteral): Map<String, String> {
         val implied = lambdaTypes.parameter(literal)
-        if (literal.valueParameterList == null) return mapOf("it" to implied)
+        if (literal.valueParameterList == null) return if (lambdaTypes.hasNoParameter(literal)) emptyMap() else mapOf("it" to implied)
         val bindings = HashMap(parameters(literal.valueParameters))
         val typed = literal.valueParameters.getOrNull(if (lambdaTypes.isIndexed(literal)) 1 else 0)
         if (typed != null && typed.typeReference == null && literal.valueParameters.size == (if (lambdaTypes.isIndexed(literal)) 2 else 1)) {

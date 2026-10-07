@@ -18,6 +18,7 @@ internal class Receivers(
         val recv = ref.recv ?: return ReceiverType.Unknown
         val at = chain.firstOrNull()
         return when {
+            recv == "this" && ref.recvType != null -> fromSpec(ref.recvType, file, at)
             recv == "this" -> thisType(chain, file, null)
             recv.startsWith("this@") -> thisType(chain, file, recv.removePrefix("this@"))
             recv == "super" || recv.startsWith("super<") -> superType(chain)
@@ -46,11 +47,15 @@ internal class Receivers(
     private fun packageRoots(file: FileScope): Set<String> =
         (file.imports.map { it.fqn } + file.packageName).map { it.substringBefore('.') }.toSet() + PLATFORM_ROOTS
 
-    // A capitalised name nothing in reach declares is a library type or object: `ByteBuffer.allocate(8)`.
+    // A capitalised name nothing in reach declares, and no indexed type bears, is a library type or object:
+    // `ByteBuffer.allocate(8)`.
     private fun property(name: String, file: FileScope, chain: List<DeclRow>): ReceiverType {
         val properties = implicit.find(name, file, chain, accept = { it.kind == "property" || it.kind == "object" || it.kind == "enum_entry" })
-        if (!properties.complete && name.first().isUpperCase()) return ReceiverType.Static(emptyList())
-        if (!properties.complete || properties.decls.isEmpty()) return ReceiverType.Unknown
+        if (properties.decls.isEmpty() && name.first().isUpperCase() && cache.named(name).none { it.kind in Kinds.CLASSIFIERS }) {
+            return ReceiverType.Static(emptyList())
+        }
+        val sure = properties.complete || (properties.byName && properties.decls.size == 1)
+        if (!sure || properties.decls.isEmpty()) return ReceiverType.Unknown
         if (properties.decls.all { it.kind == "object" }) return ReceiverType.Static(properties.decls)
         if (properties.decls.all { it.kind == "enum_entry" }) return implicit.instanceOf(properties.decls, emptySet())
         val typed = properties.decls.map { p -> specs.declaredType(p)?.let(::instance) as? ReceiverType.Instance ?: return ReceiverType.Unknown }

@@ -12,49 +12,45 @@ object HierarchyQuery {
 
     fun run(view: View, name: String?): String {
         val query = name.orEmpty()
-        val targets = Resolver.resolve(view, query)
-        if (targets.isEmpty()) return "no declaration \"$query\"" + Members.suggest(view, query)
-        if (targets.size > 1) return "${targets.size} declarations match \"$query\" — qualify it:\n" + targets.take(20).joinToString("\n", transform = Format::head)
+        val found = Resolver.resolve(view, query)
+        if (found.isEmpty()) return "no declaration \"$query\"" + Members.suggest(view, query)
+        val targets = found.filter { it.kind != "constructor" }.ifEmpty { found }
+        if (targets.size > 1) return TargetLines.ambiguity(query, targets) ?: "${targets.size} overloads of \"$query\" — give the parameters: member(ParamType)"
         val target = targets.single()
-        val finder = UsageFinder(view)
-        val lines = ArrayList<String>()
-        lines += Format.head(target)
-        if (target.kind in Kinds.CLASSIFIERS) type(target, finder.types, lines) else member(target, finder.overrides, lines)
+        val context = IndexContext(view)
+        val lines = arrayListOf(Format.head(target))
+        if (target.kind in Kinds.CLASSIFIERS) type(target, context.types, lines) else member(target, context.overrides, lines)
         return lines.take(MAX_LINES).joinToString("\n") + Format.more(lines.size, MAX_LINES)
     }
 
     private fun type(type: DeclRow, types: Types, lines: MutableList<String>) {
-        lines += "supertypes:"
-        val before = lines.size
+        val supertypes = ArrayList<String>()
         fun up(t: DeclRow, depth: Int, seen: MutableSet<DeclRow>) {
             for ((name, resolved) in types.direct(t)) {
-                if (resolved.isEmpty()) lines += "  ".repeat(depth) + "$name  (not indexed)"
+                if (resolved.isEmpty()) supertypes += "  ".repeat(depth) + "$name  (not indexed)"
                 for (s in resolved) {
-                    lines += "  ".repeat(depth) + Format.head(s)
+                    supertypes += "  ".repeat(depth) + ShortSignature.located(s)
                     if (seen.add(s)) up(s, depth + 1, seen)
                 }
             }
         }
         up(type, 1, hashSetOf(type))
-        if (lines.size == before) lines.removeLast()
-        lines += "subtypes:"
-        val mark = lines.size
+        if (supertypes.isNotEmpty()) lines += listOf("supertypes:") + supertypes
+        val subtypes = ArrayList<String>()
         fun down(t: DeclRow, depth: Int, seen: MutableSet<DeclRow>) {
             for (s in types.directSubtypes(t)) {
-                lines += "  ".repeat(depth) + Format.head(s)
+                subtypes += "  ".repeat(depth) + ShortSignature.located(s)
                 if (seen.add(s)) down(s, depth + 1, seen)
             }
         }
         down(type, 1, hashSetOf(type))
-        if (lines.size == mark) lines += "  (none indexed)"
+        lines += if (subtypes.isEmpty()) listOf("subtypes: (none indexed)") else listOf("subtypes:") + subtypes
     }
 
     private fun member(member: DeclRow, overrides: Overrides, lines: MutableList<String>) {
         val up = overrides.overridden(member)
         val down = overrides.overriding(member)
-        if (up.isNotEmpty()) lines += "overrides:"
-        up.forEach { lines += "  " + Format.head(it) }
-        lines += if (down.isEmpty()) "overridden by: (none indexed)" else "overridden by:"
-        down.forEach { lines += "  " + Format.head(it) }
+        if (up.isNotEmpty()) lines += listOf("overrides:") + up.map { "  " + ShortSignature.located(it) }
+        lines += if (down.isEmpty()) listOf("overridden by: (none indexed)") else listOf("overridden by:") + down.map { "  " + ShortSignature.located(it) }
     }
 }
