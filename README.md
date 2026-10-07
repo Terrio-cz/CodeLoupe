@@ -23,6 +23,9 @@ JDK 25 (Gradle finds or downloads it as a toolchain; a bundled runtime is planne
 build/install/codeloupe/bin/codeloupe outline OrderService          # from inside a repository
 build/install/codeloupe/bin/codeloupe symbol "OrderService.handle(_)"
 build/install/codeloupe/bin/codeloupe find "*Repository" --kind interface
+build/install/codeloupe/bin/codeloupe usages OrderService.handle
+build/install/codeloupe/bin/codeloupe calls OrderService.handle --depth 2      # --callees for what it calls
+build/install/codeloupe/bin/codeloupe hierarchy Repository
 build/install/codeloupe/bin/codeloupe status
 ```
 
@@ -44,6 +47,13 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature` |
 | `outline` | members of a file or type with line ranges, no bodies |
 | `symbol` | one declaration's source (KDoc, annotations, body) by `Type.member`, `member(ParamType)`, `pkg.Type` or `File.kt:line`; large types collapse to header + members |
+| `usages` | every reference to a declaration, grouped by file and enclosing declaration, one code line each, `=` exact or `?` candidate; a superset of what `rg -w` finds in code, references that resolve elsewhere only counted (`all=true` lists them) |
+| `calls` | callers (default) or callees as a tree, depth ≤ 3; below the first level only exact links |
+| `hierarchy` | supertypes and subtypes of a type, or what a member overrides and what overrides it |
+
+Usages are resolved without an IDE or compiler: the scopes, imports and aliases a file sees, the receiver's
+type where syntax tells it (declared types, `Type(…)`, what a call returns, collection elements in lambdas), and
+overloads by argument count. Unsure hits are marked, never dropped.
 
 ## Desktop app
 

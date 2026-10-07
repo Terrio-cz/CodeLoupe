@@ -228,9 +228,9 @@ v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`
 | `find(q, kind?, module?, test?)` | `path:start-end kind FQN signatura` |
 | `outline(file \| type)` | signatury členů s rozsahy, bez těl |
 | `symbol(name, body=true)` | text deklarace (anotace, KDoc, tělo) + `hash`; overloady podle parametrů |
-| `usages(name)` | výskyty seskupené podle obklopující deklarace, 1 řádek každý, exact/candidate |
-| `callers` / `callees(name, depth≤3)` | strom volání |
-| `hierarchy(type \| member)` | supertypy, implementace, override |
+| `usages(name, all?, limit?)` ✅ | výskyty seskupené podle souboru a obklopující deklarace, 1 řádek každý, `=` exact / `?` candidate; počet výskytů vedoucích jinam |
+| `calls(name, direction=callers\|callees, depth≤3)` ✅ | strom volání; pod první úrovní jen exact vazby, kandidáti jako počet (jeden nástroj místo dvou — strop 12 nástrojů) |
+| `hierarchy(type \| member)` ✅ | supertypy (i mimo index jménem), podtypy včetně enum entry, override nahoru i dolů |
 | `grep(pattern)` | `rg` nad rootem, zásahy označené obklopující deklarací |
 | `changes(root)` | změněné deklarace proti merge-base: `+ ~ ^ -`, volající, testy, volitelně tělo před/po |
 | `context(name)` | `symbol` + volající + volané jedním voláním |
@@ -305,7 +305,7 @@ codeloupe): reviewer a planner. Stejný model a effort. Výstup: tabulka metrik 
 |---|---|---|
 | 0 Spike + baseline | parser, RAM, chybovost; `codemetrics` + baseline | ✅ hotovo (§ 1, § 3) |
 | 1 Core + daemon ✅ | repo, daemon (single instance, HTTP MCP, fronta, `/status`), registry repozitářů, Kotlin adaptér, store, plný build v podprocesu, CLI `find/outline/symbol` | fixtury § 7 (Kotlin) zelené; build Terrio ≤ 10 s, DB ≤ 100 MB; restart daemonu okno přežije (jinak shim) |
-| 2 Čtení + resolver | `usages`, `callers/callees`, `hierarchy`, `grep`, `context`, `modules`, `check`; Java adaptér | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
+| 2 Čtení + resolver | ✅ `usages`, `calls` (callers/callees), `hierarchy` (CL-13/14/20); zbývá `grep`, `context`, `modules`, `check`; Java adaptér | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
 | 3 Vrstvy worktree | delta, vrstvy, líný sync, `changes`, úklid vrstev | změna/nový/smazaný soubor vidět v dalším dotazu; výchozí větev posunutá o 500 souborů → správné odpovědi, sync v P3 |
 | 4 Zápis *(podmíněná, po fázi 7)* | zápisové nástroje + pojistky + `rename_symbol` — jen když detektor mezer ukáže, že coder po `symbol` stejně čte celý soubor kvůli `Edit`, nebo když chybí rename bez IDEA | round-trip bajtově stejný (CRLF i LF); fuzz 200 zápisů + compile zelený; rename na 10 symbolech = compile zelený |
 | 5 Zátěž a platformy | 10 klientů paralelně (dotazy 8 worktree + sync + zápisy); testy na Linuxu (WSL/Docker) | budgety § 2; P0 p95 drží během P3; testy zelené na Windows i Linuxu |

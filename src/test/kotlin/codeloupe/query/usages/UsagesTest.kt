@@ -86,6 +86,24 @@ class UsagesTest {
         assertContains(UsagesQuery.run(view, UsagesQuery.Args("Nope")), "no declaration \"Nope\"")
     }
 
+    @Test
+    fun `calls - callers and callees trees`() {
+        val callers = CallsQuery.run(view, CallsQuery.Args("Account.rename(_)", depth = 2))
+        assertContains(callers, "\n  = src/main/kotlin/com/example/service/AccountService.kt:28  [AccountService] fun rename(…)  @30")
+        assertContains(callers, "\n    = src/main/kotlin/com/example/other/Report.kt:9  [Report] fun run(…)  @15")
+        val callees = CallsQuery.run(view, CallsQuery.Args("AccountService.rename", callees = true))
+        assertContains(callees, "= src/main/kotlin/com/example/service/AccountService.kt:16  [AccountStore] override fun find(…)  @29")
+        assertContains(callees, "= src/main/kotlin/com/example/model/Account.kt:11  [Account] fun rename(…)  @30")
+    }
+
+    @Test
+    fun `hierarchy - subtypes, supertypes and overrides`() {
+        assertContains(HierarchyQuery.run(view, "com.example.model.Account"), "subtypes:\n  src/main/kotlin/com/example/model/Account.kt:20-22  class SavingsAccount(id: String) : Account(id, \"bank\")")
+        assertContains(HierarchyQuery.run(view, "AccountStore"), "supertypes:\n  src/main/kotlin/com/example/model/Account.kt:3-6  interface Store<T>")
+        assertContains(HierarchyQuery.run(view, "Account.describe"), "overridden by:\n  src/main/kotlin/com/example/model/Account.kt:21-21  [SavingsAccount] override fun describe(): String")
+        assertContains(HierarchyQuery.run(view, "AccountStore.find"), "overrides:\n  src/main/kotlin/com/example/model/Account.kt:5-5  [Store] fun find(id: String): T?")
+    }
+
     private companion object {
         val REPO = TestRepos.fixtureRepo("kotlin/usages")
         val DB = TestRepos.tmpDir("usages").resolve("base.db").also { BaseBuilder.build(REPO.toString(), TestRepos.git(REPO, "rev-parse", "HEAD"), it) }
