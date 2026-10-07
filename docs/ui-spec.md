@@ -51,6 +51,7 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 | `#/index` | Index | — | `index` |
 | `#/gaps` | Mezery | řádek se rozbalí | `gaps` |
 | `#/environment` | Prostředí (CL-54) | — | `environment` |
+| `#/accounts` | Účty (CL-63, plán) | — | `accounts` |
 | `#/settings` | Nastavení | — | `settings` + lokální nastavení aplikace (IPC) |
 
 - **Proklik**: větev → úkol · úkol → větve · notifikace → obrazovka z `event.ref`. Deep link = hash route, drawer se otevře nad seznamem.
@@ -288,7 +289,7 @@ Nastavení
 │ Home %LOCALAPPDATA%\codeloupe · config.json [Otevřít]                                 │
 │ Repozitáře, YouTrack instance (token: nastaven ✓), rozpočty (denní 25M)               │
 ├ O aplikaci ─────────────────────────────────────────────────────────────────────────┤
-│ Verze 0.4.0 · Electron 3x · RSS aplikace 182 MB (main 61, renderer 88, GPU 21, síť 12)│
+│ Verze 0.4.0 · Electron 3x · RSS aplikace 249 MB (main 147, renderer 102)              │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -299,6 +300,33 @@ Nastavení
   uživatelem; přepsání také proměnnou `CODELOUPE_APP_CLI` (JSON pole) při spuštění aplikace.
 - Port: výchozí z `<home>/daemon.json` (zapisuje daemon), jinak `CODELOUPE_PORT` / `config.json` / 47391;
   ruční přepsání je explicitní a předá se spouštěnému daemonu jako `CODELOUPE_PORT`.
+
+### 3.9 Účty (CL-63, plán)
+
+Správa víc Claude účtů a YouTrack účtů na jednom PC (uživatel 2026-10-07). Sidebar: skupina Systém,
+mezi Prostředím a Nastavením; route `#/accounts`. Tokeny jen v šifrovaném storu (CL-50), zápisy přes IPC
+main procesu jako v § 3.7.1 — nikdy přes daemon HTTP.
+
+```
+Účty
+┌ Claude účty ──────────────────────────────────────────────────────── [+ Přidat účet] ┐
+│ Účet                 Config dir                 Výchozí  Okna  Cena 7 d  Úspora  Naposledy│
+│ účet A (e-mail)      ~/.claude                  ●        4     12,1M     14 %    před 2 min│
+│ účet B (e-mail)      ~/.claude-b                         2     6,8M      11 %    před 1 h  │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+┌ YouTrack účty ───────────────────────────────────────────────────── [+ Přidat účet] ┐
+│ Instance                      Projekty   Token        Mirror          [Test] [Rotovat]│
+│ https://terrio.youtrack.cloud TER, CL    nastaven ✓   ● synchronní 2 min              │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- Claude účet = config dir Claude Code (`CLAUDE_CONFIG_DIR`); spotřeba a úspora se přiřazují podle adresáře,
+  ve kterém transcript leží (ingest CL-62). Přehled půjde filtrovat podle účtu.
+- YouTrack účet nahrazuje jedinou instanci z CL-29: URL, projekty, token (jen „nastaven ✓“), stav mirroru,
+  test spojení.
+- API: `GET /ui-api/v1/accounts` → `{ claude: { id, label, configDir, isDefault, windows, weighted7d,
+  savedPct7d, lastUsedAt }[], youtrack: { id, url, projects, tokenConfigured, mirror: { state, syncedAt } }[] }`
+  — jen metadata, nikdy tokeny.
 
 ## 4. Tray a notifikace
 
@@ -417,7 +445,8 @@ s ikonou a textem.
   (cizí proces na portu) — pak žádná data ani otevírání cest.
 - **Start**: když je `down` a `autoStartDaemon` je zapnuto a daemon nebyl zastaven ručně → spustí
   `<cli.command> <cli.args…> start` (konfigurovatelné; dnes `node bin/codeloupe.mjs`, po CL-56 Kotlin CLI)
-  s `CODELOUPE_PORT` = port, který aplikace sleduje. Backoff 5 s → 60 s, max 5 pokusů za 10 min, pak
+  s `CODELOUPE_PORT` = port, který aplikace sleduje. Spouští se bez shellu, takže CLI musí být `.exe`, nebo
+  `node`/`java` + cesta ke skriptu; `.cmd`/`.bat` (npm shim, Gradle launcher) aplikace odmítne s vysvětlením. Backoff 5 s → 60 s, max 5 pokusů za 10 min, pak
   notifikace a stav `error`.
 - **Stop / restart**: `… stop` (CLI posílá `POST /shutdown`), restart = stop + start. Ruční stop — z aplikace
   **i z CLI** — vypne autostart do dalšího ručního startu: `codeloupe stop` zapíše `<home>/stopped`,
@@ -458,7 +487,6 @@ s ikonou a textem.
 type Iso = string;
 type Range = '24h' | '7d' | '30d';
 interface Page<T> { items: T[]; total: number; nextCursor: string | null }
-interface Tokens { input: number; cacheWrite5m: number; cacheWrite1h: number; cacheRead: number; output: number }
 type LayerState = 'fresh' | 'stale' | 'building' | 'error' | 'none';           // vrstva worktree (plan.md § 5.3)
 type RepoIndexState = 'ready' | 'building' | 'stale' | 'error' | 'none';      // báze repozitáře
 interface WorktreeSummary {
@@ -657,7 +685,8 @@ nim nemá časovač (plan.md § 5.1).
     `https:` a origin přesně shodný s některou instancí z nastavení daemonu (`new URL().origin`, žádné
     porovnání prefixu); jiné odkazy se zobrazí jen jako text.
   - `env.*` (§ 3.7.1) — přibudou až s CL-54, se stejnou kontrolou odesílatele a vlastní validací.
-  - Obojí `open.*` jen když `/status.pid` odpovídá `daemon.json` (§ 8) — cizí proces na portu nic neotevře.
+  - `open.worktree` a `open.external` jen když `/status.pid` odpovídá `daemon.json` (§ 8) — cizí proces na
+    portu nic neotevře; `open.config` skládá cestu lokálně a kontrolu nepotřebuje.
 - `setPermissionRequestHandler` a `setPermissionCheckHandler` → vše zamítnout; `will-attach-webview` → zamítnout;
   navigace a nová okna zakázané (`will-navigate`, `setWindowOpenHandler` → deny); žádný `remote`.
 - Příkaz daemonu se spouští přes `execFile` bez shellu, s argumenty jako polem.
@@ -670,14 +699,17 @@ nim nemá časovač (plan.md § 5.1).
 | Cíl | Hodnota |
 |---|---|
 | RSS aplikace s oknem | ≤ 300 MB (cíl ~200 MB) |
-| RSS jen v trayi | ≤ 150 MB (okno zničeno; zůstává main, GPU, network service, crashpad) |
+| RSS jen v trayi | ≤ 150 MB (okno zničeno; zůstává jen main proces s GPU a síťovou službou) |
 | Načtení obrazovky | < 1 s (CL-40); seznamy max 200 řádků na stránku |
 | Polling | `/status` 5 s / 15 s; data obrazovky jen při otevření a `Ctrl+R`; `events` a `nav` 15 s |
 
 - Metrika: součet `workingSetSize` všech procesů z `app.getAppMetrics()` (sdílené stránky se započítají
   vícekrát — konzervativní horní mez), ověřeno i součtem `WorkingSet64` procesů z OS. Měří se po startu a s
   otevřeným detailem větve po průchodu všemi obrazovkami; hodnota je v Nastavení → O aplikaci.
-- `app.disableHardwareAcceleration()` — tabulky a SVG GPU nepotřebují, GPU proces zmenší (software compositing ho ponechá).
+- `app.disableHardwareAcceleration()`, `in-process-gpu` a `NetworkServiceInProcess` — tabulky a SVG GPU nepotřebují;
+  GPU a síťová služba běží v main procesu, takže aplikace má 2 procesy místo 4 (−~110 MB working set).
+  Daň: pád GPU nebo síťové služby shodí i main a tray; u aplikace bez GPU práce a jen s 127.0.0.1 voláními
+  je to přijatelné.
 - Žádná grafová knihovna (vlastní SVG), žádný router ani state manager, vlastní převodník markdownu —
   React + React DOM jsou jediné runtime závislosti.
 - Jeden renderer; `backgroundThrottling` zapnutý; okno se po zavření ničí.

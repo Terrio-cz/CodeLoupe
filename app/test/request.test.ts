@@ -36,3 +36,9 @@ describe('validateRequest', () => {
     expect(r).toMatchObject({ ok: true, path: '/ui-api/v1/worktrees?q=a%26layer%3Dx%23%2F..%2F' });
   });
 });
+
+it('refuses dot-only ids that the daemon would normalise into another path', () => {
+  expect(validateRequest({ resource: 'worktrees/:id', id: '..' }).ok).toBe(false);
+  expect(validateRequest({ resource: 'worktrees/:id', id: '.' }).ok).toBe(false);
+  expect(validateRequest({ resource: 'worktrees/:id', id: 'a..b' }).ok).toBe(true);
+});

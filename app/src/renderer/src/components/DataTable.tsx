@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 
 export interface Column<T> {
   key: string;
@@ -29,30 +29,39 @@ interface Props<T> {
   shortcuts?: boolean;
 }
 
-/** Dense table: sticky header, server-side sorting, keyboard row navigation, row → detail. */
+/**
+ * Dense table: sticky header, server-side sorting, row → detail. Rows use a roving tabindex: one Tab stop
+ * for the whole table, arrows (or j/k) move between rows, Enter opens.
+ */
 export function DataTable<T>({ label, rows, columns, rowKey, onOpen, selected, sort, onSort, empty, shortcuts = true }: Props<T>) {
-  const body = useRef<HTMLTableSectionElement>(null);
+  const [active, setActive] = useState<string | null>(null);
+  const keys = rows.map(rowKey);
+  const current = active && keys.includes(active) ? active : selected && keys.includes(selected) ? selected : keys[0];
 
   const onKey = (e: KeyboardEvent<HTMLTableRowElement>, row: T) => {
     const tr = e.currentTarget;
-    const move = (el: Element | null) => (el as HTMLElement | null)?.focus();
+    const move = (el: Element | null) => {
+      if (!el) return;
+      setActive((el as HTMLElement).dataset.key ?? null);
+      (el as HTMLElement).focus();
+    };
     if (e.key === 'Enter' && onOpen) { e.preventDefault(); onOpen(row); }
     else if (e.key === 'ArrowDown' || (shortcuts && e.key === 'j')) { e.preventDefault(); move(tr.nextElementSibling); }
     else if (e.key === 'ArrowUp' || (shortcuts && e.key === 'k')) { e.preventDefault(); move(tr.previousElementSibling); }
   };
 
   const header = (c: Column<T>) => {
-    const active = sort && c.sortKey && sort.key === c.sortKey;
-    const ariaSort = active ? (sort.order === 'asc' ? 'ascending' : 'descending') : c.sortKey && onSort ? 'none' : undefined;
+    const sorted = sort && c.sortKey && sort.key === c.sortKey;
+    const ariaSort = sorted ? (sort.order === 'asc' ? 'ascending' : 'descending') : c.sortKey && onSort ? 'none' : undefined;
     return (
       <th key={c.key} scope="col" className={c.numeric ? 'num' : undefined} aria-sort={ariaSort}>
         {c.sortKey && onSort ? (
           <button
             className="sort"
-            onClick={() => onSort({ key: c.sortKey!, order: active && sort.order === 'desc' ? 'asc' : 'desc' })}
+            onClick={() => onSort({ key: c.sortKey!, order: sorted && sort.order === 'desc' ? 'asc' : 'desc' })}
           >
             {c.header}
-            <span aria-hidden="true">{active ? (sort.order === 'desc' ? '▼' : '▲') : ''}</span>
+            <span aria-hidden="true">{sorted ? (sort.order === 'desc' ? '▼' : '▲') : ''}</span>
           </button>
         ) : (
           c.header
@@ -67,7 +76,7 @@ export function DataTable<T>({ label, rows, columns, rowKey, onOpen, selected, s
         <thead>
           <tr>{columns.map(header)}</tr>
         </thead>
-        <tbody ref={body}>
+        <tbody>
           {rows.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="muted">{empty ?? 'Žádná data.'}</td>
@@ -78,9 +87,11 @@ export function DataTable<T>({ label, rows, columns, rowKey, onOpen, selected, s
               return (
                 <tr
                   key={k}
+                  data-key={k}
                   className={onOpen ? 'clickable' : undefined}
-                  tabIndex={onOpen ? 0 : undefined}
-                  aria-selected={selected !== undefined ? selected === k : undefined}
+                  tabIndex={onOpen ? (k === current ? 0 : -1) : undefined}
+                  aria-current={selected === k ? 'true' : undefined}
+                  onFocus={onOpen ? () => setActive(k) : undefined}
                   onClick={onOpen ? () => onOpen(row) : undefined}
                   onKeyDown={onOpen ? e => onKey(e, row) : undefined}
                 >

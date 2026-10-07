@@ -26,7 +26,8 @@ const QUERY_KEYS: Record<Resource, readonly string[]> = {
   events: ['since', 'limit'],
 };
 
-const ID = /^[A-Za-z0-9._:-]{1,100}$/;
+// No `.` or `..` alone: the daemon would normalise them into another path.
+const ID = /^(?!\.{1,2}$)[A-Za-z0-9._:-]{1,100}$/;
 const MAX_VALUE = 200;
 
 export type Validated = { ok: true; path: string; request: ApiRequest } | { ok: false; error: string };

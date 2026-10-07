@@ -11,19 +11,6 @@ export interface Page<T> {
   nextCursor: string | null;
 }
 
-export interface Tokens {
-  input: number;
-  cacheWrite5m: number;
-  cacheWrite1h: number;
-  cacheRead: number;
-  output: number;
-}
-
-/** Weighted cost of a token breakdown (analysis.md, plan.md § 1). */
-export function weighted(t: Tokens): number {
-  return Math.round(t.input + 1.25 * t.cacheWrite5m + 2 * t.cacheWrite1h + 0.1 * t.cacheRead + 5 * t.output);
-}
-
 /** State of a worktree layer (plan.md § 5.3). */
 export type LayerState = 'fresh' | 'stale' | 'building' | 'error' | 'none';
 /** State of a repository's base index. */

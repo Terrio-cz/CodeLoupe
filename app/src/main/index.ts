@@ -19,7 +19,9 @@ import { SettingsStore } from './settingsStore';
 import { AppTray } from './tray';
 
 const DEV_URL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
-const SCREENSHOTS = process.env.CODELOUPE_APP_SCREENSHOTS;
+// Verification modes write files and switch themes: development builds only.
+const SCREENSHOTS = !app.isPackaged ? process.env.CODELOUPE_APP_SCREENSHOTS : undefined;
+const TOUR = !app.isPackaged ? process.env.CODELOUPE_APP_TOUR : undefined;
 const EVENTS_MS = 15_000;
 
 // RAM budget ≤ 300 MB (docs/ui-spec.md § 11): tables and SVG need no GPU, and the GPU and network
@@ -50,12 +52,9 @@ async function main(): Promise<void> {
   let mock: MockApi | null = null;
   const source = (): ApiSource => (store.get().apiSource === 'mock' ? (mock ??= new MockApi()) : daemonApi);
 
-  const showScreen = (hash: string) => {
-    const w = openWindow();
-    w.webContents.send(CH.navigate, hash);
-  };
-  const notifier = new Notifier(async since => {
-    const req = validateRequest({ resource: 'events', query: since === null ? {} : { since } });
+  const showScreen = (hash: string) => { openWindow(hash); };
+  const notifier = new Notifier(async (since, limit) => {
+    const req = validateRequest({ resource: 'events', query: since === null ? { limit } : { since, limit } });
     if (!req.ok) throw new Error(req.error);
     return (await source().get(req.request, req.path)) as Events;
   }, () => store.get(), showScreen);
@@ -87,9 +86,11 @@ async function main(): Promise<void> {
 
   manager.on('state', s => {
     tray.update(s);
-    win?.webContents.send(CH.daemonPush, s);
+    if (win && !win.isDestroyed()) win.webContents.send(CH.daemonPush, s);
   });
   manager.on('phase', phase => notifier.daemonPhase(phase));
+  manager.on('failed', message => notifier.startFailed(message));
+  manager.on('gaveUp', message => notifier.gaveUp(message));
   manager.run();
 
   const pollEvents = async () => {
@@ -105,9 +106,9 @@ async function main(): Promise<void> {
   app.on('before-quit', () => { quitting = true; manager.dispose(); tray.destroy(); });
 
   const w = openWindow();
-  if (process.env.CODELOUPE_APP_TOUR) {
+  if (TOUR) {
     // `close` ends in the tray with the window destroyed: the tray-only memory case.
-    const thenClose = process.env.CODELOUPE_APP_TOUR === 'close';
+    const thenClose = TOUR === 'close';
     w.webContents.once('did-finish-load', () => setTimeout(() => void tour(w).then(() => { if (thenClose) w.close(); }), 1500));
   }
   if (SCREENSHOTS) {
@@ -116,11 +117,13 @@ async function main(): Promise<void> {
     });
   }
 
-  function openWindow(): BrowserWindow {
+  /** Shows the window, creating it when only the tray is left; `hash` selects the screen (notification click). */
+  function openWindow(hash?: string): BrowserWindow {
     if (win && !win.isDestroyed()) {
       if (win.isMinimized()) win.restore();
       win.show();
       win.focus();
+      if (hash) win.webContents.send(CH.navigate, hash);
       return win;
     }
     win = new BrowserWindow({
@@ -146,8 +149,10 @@ async function main(): Promise<void> {
     win.on('ready-to-show', () => win?.show());
     win.on('show', () => void manager.check());
     win.on('closed', () => { win = null; });
-    if (DEV_URL) void win.loadURL(DEV_URL);
-    else void win.loadURL(`${APP_ORIGIN}/index.html`);
+    // A new window starts on the requested screen; a message sent before the page loads would be lost.
+    const route = hash && /^#\/[\w/?=&.:-]*$/.test(hash) ? hash : '';
+    if (DEV_URL) void win.loadURL(`${DEV_URL}${route}`);
+    else void win.loadURL(`${APP_ORIGIN}/index.html${route}`);
     return win;
   }
 

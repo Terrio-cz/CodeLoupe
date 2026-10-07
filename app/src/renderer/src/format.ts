@@ -36,10 +36,6 @@ export function ms(n: number | null | undefined): string {
   return `${Math.round(n)} ms`;
 }
 
-export function duration(fromIso: string, toIso: string | null, now = Date.now()): string {
-  return ms((toIso ? Date.parse(toIso) : now) - Date.parse(fromIso));
-}
-
 export function ago(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return '—';
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
@@ -59,10 +55,4 @@ export function dateTime(iso: string | null | undefined): string {
 export function time(iso: string): string {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-/** mm:ss offset of a step from the start of its run. */
-export function offset(fromIso: string, atIso: string): string {
-  const s = Math.max(0, Math.round((Date.parse(atIso) - Date.parse(fromIso)) / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }

@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { DaemonStatus } from '../../shared/contract';
 import type { DaemonPhase, DaemonState } from '../../shared/ipc';
 import type { AppSettings } from '../../shared/settings';
@@ -26,6 +28,7 @@ export class DaemonManager extends EventEmitter {
   private timer: NodeJS.Timeout | null = null;
   private disposed = false;
   private mismatchTicks = 0;
+  private gaveUp = false;
 
   constructor(
     private readonly client: DaemonClient,
@@ -55,7 +58,7 @@ export class DaemonManager extends EventEmitter {
   run(): void {
     const tick = async () => {
       if (this.disposed) return;
-      await this.check().catch(() => undefined);
+      await this.check(true).catch(() => undefined);
       if (!this.disposed) this.timer = setTimeout(tick, this.periodMs());
     };
     void tick();
@@ -66,7 +69,11 @@ export class DaemonManager extends EventEmitter {
     if (this.timer) clearTimeout(this.timer);
   }
 
-  async check(): Promise<DaemonState> {
+  /**
+   * Reads /status. Only the periodic tick (`tick`) counts misses towards 'down'; checks asked for by the
+   * window or the page refresh the status but never trigger an outage or a start on their own.
+   */
+  async check(tick = false): Promise<DaemonState> {
     const port = this.port();
     const status = await this.client.status().catch(() => null);
     // A CLI start/stop in flight owns the state until it finishes.
@@ -80,8 +87,10 @@ export class DaemonManager extends EventEmitter {
       const foreign = this.foreign(status);
       if (!foreign) {
         this.mismatchTicks = 0;
+        // Running again after a manual stop means someone started it: the stop no longer applies.
+        if (this.state.manualStop || this.home.stoppedByUser()) this.home.setStoppedByUser(false);
         this.set({ phase: 'running', status, port, message: null, manualStop: false });
-      } else if (foreign.hard || ++this.mismatchTicks >= 3) {
+      } else if (foreign.hard || (tick && ++this.mismatchTicks >= 3)) {
         this.set({ phase: 'error', status: null, port, message: foreign.message });
       } else {
         // daemon.json is written after the daemon listens and removed on stop: give it a moment.
@@ -89,6 +98,7 @@ export class DaemonManager extends EventEmitter {
       }
       return this.state;
     }
+    if (!tick) return this.state;
     this.failures++;
     const threshold = this.everRunning ? 3 : 1;
     if (this.failures < threshold) return this.state;
@@ -101,12 +111,14 @@ export class DaemonManager extends EventEmitter {
 
   start(): Promise<DaemonState> {
     this.attempts = [];
+    this.home.setStoppedByUser(false);
     this.set({ manualStop: false });
     return this.serial(() => this.doStart());
   }
 
   stop(): Promise<DaemonState> {
     return this.serial(async () => {
+      this.home.setStoppedByUser(true);
       this.set({ phase: 'stopping', manualStop: true, message: null });
       try {
         await this.cli('stop');
@@ -120,6 +132,7 @@ export class DaemonManager extends EventEmitter {
 
   restart(): Promise<DaemonState> {
     return this.serial(async () => {
+      this.home.setStoppedByUser(false);
       this.set({ phase: 'stopping', manualStop: false, message: null });
       try { await this.cli('stop'); } catch { /* not running is fine */ }
       // Stay in 'stopping' between stop and start: a restart is not an outage.
@@ -144,13 +157,18 @@ export class DaemonManager extends EventEmitter {
     this.attempts = this.attempts.filter(t => now - t < ATTEMPT_WINDOW_MS);
     if (this.busy || now < this.nextStartAt) return;
     if (this.attempts.length >= MAX_ATTEMPTS) {
-      if (this.state.phase !== 'error') this.set({ phase: 'error', message: 'Daemon se nepodařilo spustit 5× za 10 minut. Zkontrolujte příkaz CLI v Nastavení.' });
+      if (!this.gaveUp) {
+        this.gaveUp = true;
+        this.set({ phase: 'error', message: 'Daemon se nepodařilo spustit 5× za 10 minut. Zkontrolujte příkaz CLI v Nastavení.' });
+        this.emit('gaveUp', this.state.message);
+      }
       return;
     }
     await this.serial(() => this.doStart());
   }
 
   private async doStart(): Promise<DaemonState> {
+    this.gaveUp = false;
     const now = Date.now();
     this.attempts.push(now);
     this.nextStartAt = now + Math.min(60_000, 5_000 * 2 ** (this.attempts.length - 1));
@@ -159,7 +177,7 @@ export class DaemonManager extends EventEmitter {
       await this.cli('start');
     } catch (e) {
       this.set({ phase: 'error', message: `Spuštění selhalo: ${(e as Error).message}` });
-      this.emit('failed', this.state);
+      this.emit('failed', this.state.message);
       return this.state;
     }
     if (!(await this.waitFor(true))) this.set({ phase: 'error', message: 'Daemon po spuštění neodpovídá na /status.' });
@@ -213,10 +231,29 @@ export class DaemonManager extends EventEmitter {
   }
 }
 
+/**
+ * On Windows a bare command name is looked up on PATH: an .exe runs, a .cmd/.bat cannot run without a
+ * shell (the CLI must be an .exe, or node/java plus the script path; docs/ui-spec.md § 8).
+ */
+export function resolveCommand(command: string, env: NodeJS.ProcessEnv = process.env, platform = process.platform): string {
+  if (platform !== 'win32' || /[\\/]/.test(command) || path.extname(command)) return command;
+  for (const dir of (env.PATH ?? env.Path ?? '').split(';').filter(Boolean)) {
+    if (fs.existsSync(path.join(dir, `${command}.exe`))) return path.join(dir, `${command}.exe`);
+    for (const ext of ['.cmd', '.bat']) {
+      if (fs.existsSync(path.join(dir, command + ext))) {
+        throw new Error(`„${command}“ je skript ${ext}, který nejde spustit bez shellu; v Nastavení zadejte node.exe (nebo java) a cestu ke CLI`);
+      }
+    }
+  }
+  return command;
+}
+
 function execCli(s: AppSettings, verb: 'start' | 'stop', port: number): Promise<string> {
   return new Promise((resolve, reject) => {
+    let command: string;
+    try { command = resolveCommand(s.cliCommand); } catch (e) { return reject(e); }
     // No shell: the command and its arguments go to the OS as an argv array.
-    execFile(s.cliCommand, [...s.cliArgs, verb], {
+    execFile(command, [...s.cliArgs, verb], {
       timeout: CLI_TIMEOUT_MS, windowsHide: true, shell: false,
       env: { ...process.env, CODELOUPE_PORT: String(port) },
     }, (err, stdout, stderr) => {

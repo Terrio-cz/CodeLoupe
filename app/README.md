@@ -8,7 +8,9 @@ agent runs; the launcher does that. Spec: [../docs/ui-spec.md](../docs/ui-spec.m
 
 ## Requirements
 
-Node.js ≥ 22.12 (npm ≥ 11 for `allowScripts`). Dependencies come from the public npm registry only.
+Node.js ≥ 22.12 (npm ≥ 11 honours `allowScripts`: only esbuild's install script runs). Packages come from
+the public npm registry only; the Electron binary itself is downloaded by `@electron/get` from Electron's
+GitHub releases on first run.
 
 ## Run
 
@@ -28,14 +30,14 @@ Settings are saved in `<userData>/settings.json` and edited on the Settings scre
 | Setting | Default | Notes |
 |---|---|---|
 | Data source | `mock` | `mock` serves the contract from deterministic data, `daemon` calls `/ui-api/v1/*` (CL-39). Daemon status and start/stop are always real. |
-| CLI command | `codeloupe` | Used for `start`/`stop`, without a shell. Only a native confirmation dialog can change it, never the page. On Windows use `node.exe` plus the path to `bin/codeloupe.mjs` until the Kotlin CLI ships (CL-56). |
+| CLI command | `codeloupe` | Used for `start`/`stop`, without a shell. Only a native confirmation dialog can change it, never the page. It must be an `.exe` or `node`/`java` plus a script path; a `.cmd`/`.bat` shim is refused with an explanation. On Windows today: `node.exe` plus the path to `bin/codeloupe.mjs`. |
 | Port | from `<home>/daemon.json`, then `CODELOUPE_PORT`, `config.json`, 47391 | An explicit override is passed to the daemon it starts. |
 | Start the daemon when it is down | on | Off after a manual stop (in the app or `codeloupe stop`) until the next manual start. |
 | Open at login | off | |
 
 Overrides that apply to one run only: `CODELOUPE_APP_CLI='["node","C:/…/bin/codeloupe.mjs"]'` and `CODELOUPE_APP_API=mock|daemon`.
 
-Verification modes:
+Verification modes (development builds only):
 - `CODELOUPE_APP_SCREENSHOTS=<dir>` captures every screen in light and dark mode, writes `metrics.json`, then quits.
 - `CODELOUPE_APP_TOUR=1|close` visits every screen so memory can be measured from the OS. With `close`, the run ends in the tray.
 

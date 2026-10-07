@@ -35,9 +35,27 @@ export class DaemonHome {
     return j && Number.isInteger(j.pid) && Number.isInteger(j.port) ? (j as unknown as DaemonInfo) : null;
   }
 
-  /** `codeloupe stop` leaves this marker so the app does not start the daemon against the user's will. */
+  /**
+   * `<home>/stopped`: a manual stop (here, or `codeloupe stop` once the CLI writes it, CL-62) that keeps the
+   * app from starting the daemon against the user's will, also across app restarts.
+   */
   stoppedByUser(): boolean {
-    return fs.existsSync(path.join(this.dir, 'stopped'));
+    return fs.existsSync(this.stopMarker);
+  }
+
+  setStoppedByUser(stopped: boolean): void {
+    try {
+      if (stopped) {
+        fs.mkdirSync(this.dir, { recursive: true });
+        fs.writeFileSync(this.stopMarker, new Date().toISOString());
+      } else {
+        fs.rmSync(this.stopMarker, { force: true });
+      }
+    } catch { /* the in-memory flag still applies */ }
+  }
+
+  private get stopMarker(): string {
+    return path.join(this.dir, 'stopped');
   }
 
   /** Port to watch: explicit override, then daemon.json, CODELOUPE_PORT, config.json, 47391. */

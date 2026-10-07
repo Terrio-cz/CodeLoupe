@@ -4,22 +4,33 @@ import type { DaemonPhase } from '../shared/ipc';
 import type { AppSettings } from '../shared/settings';
 
 const THROTTLE_MS = 60_000;
+const PAGE = 50;
+const MAX_PAGES = 10;
 
 type Kind = DaemonEvent['kind'] | 'daemon';
 
+interface Pending {
+  count: number;
+  last: DaemonEvent;
+}
+
 /**
- * Turns daemon events (GET events) and daemon outages into OS notifications: at most one per kind per
- * minute, each kind switchable in Settings. History is never replayed: the first poll only sets the cursor.
+ * Turns daemon events (GET events) and daemon outages into OS notifications. Events of one kind are merged:
+ * at most one notification per kind per minute, the rest are summed into the next one. Each kind can be
+ * switched off in Settings. History is never replayed: the first poll only sets the cursor.
  */
 export class Notifier {
   private epoch: string | null = null;
   private lastSeq: number | null = null;
   private readonly lastShown = new Map<Kind, number>();
+  private readonly pending = new Map<DaemonEvent['kind'], Pending>();
+  // Windows drops the click handler of a notification that was garbage-collected.
+  private readonly live = new Set<Notification>();
   private wasRunning = false;
   private outageShown = false;
 
   constructor(
-    private readonly fetchEvents: (since: number | null) => Promise<Events>,
+    private readonly fetchEvents: (since: number | null, limit: number) => Promise<Events>,
     private readonly settings: () => AppSettings,
     private readonly onClick: (hash: string) => void,
   ) {}
@@ -28,21 +39,33 @@ export class Notifier {
   reset(): void {
     this.epoch = null;
     this.lastSeq = null;
+    this.pending.clear();
   }
 
   async poll(): Promise<void> {
-    const res = await this.fetchEvents(this.lastSeq);
-    if (this.epoch !== res.epoch || this.lastSeq === null) {
+    if (this.lastSeq === null) {
+      const res = await this.fetchEvents(null, PAGE);
       this.epoch = res.epoch;
       this.lastSeq = res.lastSeq;
       return;
     }
-    this.lastSeq = Math.max(this.lastSeq, res.lastSeq);
-    for (const e of res.items) {
-      if (!this.enabled(e.kind)) continue;
-      const hash = `#/${e.ref.screen}`;
-      this.show(e.kind, e.title, e.body, hash);
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const res = await this.fetchEvents(this.lastSeq, PAGE);
+      if (res.epoch !== this.epoch) {
+        // The daemon numbers anew: re-baseline without notifying.
+        this.epoch = res.epoch;
+        this.lastSeq = res.lastSeq;
+        return;
+      }
+      for (const e of res.items) {
+        this.lastSeq = Math.max(this.lastSeq, e.seq);
+        if (!this.enabled(e.kind)) continue;
+        const p = this.pending.get(e.kind);
+        this.pending.set(e.kind, { count: (p?.count ?? 0) + 1, last: e });
+      }
+      if (res.items.length < PAGE) break;
     }
+    this.flush();
   }
 
   daemonPhase(phase: DaemonPhase): void {
@@ -59,6 +82,30 @@ export class Notifier {
     }
   }
 
+  /** A start that failed before the daemon ever ran (wrong CLI command, for example). */
+  startFailed(message: string | null): void {
+    if (this.wasRunning || this.outageShown || !this.settings().notify.daemon) return;
+    this.outageShown = true;
+    this.show('daemon', 'Daemon se nepodařilo spustit', message ?? 'Zkontrolujte příkaz CLI v Nastavení.', '#/settings', true);
+  }
+
+  /** Auto-start stopped trying (5 failures in 10 minutes). */
+  gaveUp(message: string | null): void {
+    if (!this.settings().notify.daemon) return;
+    this.outageShown = true;
+    this.show('daemon', 'Daemon se nedaří spustit', message ?? 'Zkontrolujte příkaz CLI v Nastavení.', '#/settings', true);
+  }
+
+  private flush(): void {
+    const now = Date.now();
+    for (const [kind, p] of this.pending) {
+      if (now - (this.lastShown.get(kind) ?? 0) < THROTTLE_MS) continue;
+      this.pending.delete(kind);
+      const title = p.count > 1 ? `${p.last.title} (+${p.count - 1} další)` : p.last.title;
+      this.show(kind, title, p.last.body, `#/${p.last.ref.screen}`);
+    }
+  }
+
   private enabled(kind: DaemonEvent['kind']): boolean {
     const n = this.settings().notify;
     if (kind === 'budget_breach') return n.budget;
@@ -72,7 +119,9 @@ export class Notifier {
     if (!force && now - (this.lastShown.get(kind) ?? 0) < THROTTLE_MS) return;
     this.lastShown.set(kind, now);
     const n = new Notification({ title, body, silent: kind !== 'budget_breach' });
-    n.on('click', () => this.onClick(hash));
+    this.live.add(n);
+    n.on('click', () => { this.live.delete(n); this.onClick(hash); });
+    n.on('close', () => this.live.delete(n));
     n.show();
   }
 }

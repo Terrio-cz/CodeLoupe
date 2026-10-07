@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import type { TaskSummary } from '../../../shared/contract';
 import { bridge, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
@@ -6,8 +6,10 @@ import { MarkdownView } from '../components/MarkdownView';
 import { Card, ErrorState, Loading, Search, Section, Select } from '../components/Parts';
 import { LayerBadge, StatusBadge, taskTone } from '../components/StatusBadge';
 import { ago, dateTime, num } from '../format';
-import { useSettings } from '../hooks';
+import { useDebounced, useSettings } from '../hooks';
 import { go, type Route } from '../router';
+
+const PAGE = 50;
 
 const columns: Column<TaskSummary>[] = [
   { key: 'id', header: 'ID', render: t => <span className="mono">{t.id}</span> },
@@ -29,7 +31,10 @@ function TaskList() {
   const [state, setState] = useState('');
   const [q, setQ] = useState('');
   const [settings] = useSettings();
-  const { data, error, loading, reload } = useApi('tasks', undefined, { project, state, q, limit: 200 });
+  const query = useDebounced(q);
+  const [cursor, setCursor] = useState('0');
+  useEffect(() => setCursor('0'), [project, state, query]);
+  const { data, error, loading, reload } = useApi('tasks', undefined, { project, state, q: query, limit: PAGE, cursor });
   return (
     <>
       <div className="filterbar">
@@ -41,7 +46,15 @@ function TaskList() {
       </div>
       <Card bodyClass="">
         {data ? (
-          <DataTable label="Úkoly" rows={data.items} columns={columns} rowKey={t => t.id} onOpen={t => go('tasks', t.id)} shortcuts={settings?.shortcuts} empty="Žádný úkol neodpovídá filtru." />
+          <>
+            <DataTable label="Úkoly" rows={data.items} columns={columns} rowKey={t => t.id} onOpen={t => go('tasks', t.id)} shortcuts={settings?.shortcuts} empty="Žádný úkol neodpovídá filtru." />
+            <div className="table-foot">
+              <span>{num(data.items.length ? Number(cursor) + 1 : 0)}–{num(Number(cursor) + data.items.length)} z {num(data.total)}</span>
+              <span style={{ flex: 1 }} />
+              <button className="btn" disabled={cursor === '0'} onClick={() => setCursor(String(Math.max(0, Number(cursor) - PAGE)))}>← Předchozí</button>
+              <button className="btn" disabled={!data.nextCursor} onClick={() => data.nextCursor && setCursor(data.nextCursor)}>Další →</button>
+            </div>
+          </>
         ) : loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst úkoly.'} onRetry={reload} />}
       </Card>
     </>
@@ -50,6 +63,7 @@ function TaskList() {
 
 function TaskDetailView({ id }: { id: string }) {
   const { data: t, error, reload } = useApi('tasks/:id', id);
+  const [openFailed, setOpenFailed] = useState(false);
   if (!t) return <Card>{error ? <ErrorState message={error.message} onRetry={reload} /> : <Loading />}</Card>;
   const done = t.criteria.filter(c => c.checked).length;
   return (
@@ -61,7 +75,8 @@ function TaskDetailView({ id }: { id: string }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           <Card>
             <h1 style={{ fontSize: 18, marginBottom: 6 }}>{t.summary}</h1>
-            <button className="link" onClick={() => void bridge().open.external(t.url)}>Otevřít v YouTracku ↗</button>
+            <button className="link" onClick={() => void bridge().open.external(t.url).then(ok => setOpenFailed(!ok))}>Otevřít v YouTracku ↗</button>
+            {openFailed && <span className="t2" role="status" style={{ marginLeft: 8 }}>Odkaz nevede na nastavenou YouTrack instanci, neotevřen.</span>}
             <div style={{ marginTop: 12 }}><MarkdownView source={t.description} /></div>
           </Card>
           <Card title={`Akceptační kritéria ${done}/${t.criteria.length}`}>

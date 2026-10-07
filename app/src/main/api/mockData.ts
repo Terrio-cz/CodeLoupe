@@ -1,7 +1,6 @@
 // Deterministic mock data that follows the read-only API contract (docs/ui-spec.md § 9).
 // Numbers are shaped after the measured baseline (plan.md § 1) so the screens look like real use.
 import {
-  weighted,
   type DaemonEvent,
   type DaemonSettings,
   type Environment,
@@ -10,10 +9,23 @@ import {
   type IndexHealth,
   type TaskDetail,
   type TaskSummary,
-  type Tokens,
   type WorktreeDetail,
   type WorktreeSummary,
 } from '../../shared/contract';
+
+// Token breakdown behind the mock cost series; the API itself only carries weighted totals.
+interface Tokens {
+  input: number;
+  cacheWrite5m: number;
+  cacheWrite1h: number;
+  cacheRead: number;
+  output: number;
+}
+
+/** Weighted cost of a token breakdown (analysis.md, plan.md § 1). */
+function weighted(t: Tokens): number {
+  return Math.round(t.input + 1.25 * t.cacheWrite5m + 2 * t.cacheWrite1h + 0.1 * t.cacheRead + 5 * t.output);
+}
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;

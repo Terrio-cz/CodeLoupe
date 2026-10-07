@@ -6,7 +6,7 @@ import { Drawer } from '../components/Drawer';
 import { Card, ErrorState, Loading, Search, Section, Select } from '../components/Parts';
 import { ChangeMark, LayerBadge, StatusBadge, taskTone } from '../components/StatusBadge';
 import { ago, num } from '../format';
-import { useSettings } from '../hooks';
+import { useDebounced, useSettings } from '../hooks';
 import { go, type Route } from '../router';
 
 const columns: Column<WorktreeSummary>[] = [
@@ -31,7 +31,8 @@ export function Branches({ route }: { route: Route }) {
   const [layer, setLayer] = useState('');
   const [q, setQ] = useState('');
   const [settings] = useSettings();
-  const { data, error, loading, reload } = useApi('worktrees', undefined, { repo, layer, q });
+  const query = useDebounced(q);
+  const { data, error, loading, reload } = useApi('worktrees', undefined, { repo, layer, q: query });
   const repos = [...new Map((data?.items ?? []).map(w => [w.repoId, w.repoName])).entries()];
 
   return (

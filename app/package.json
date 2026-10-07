@@ -2,7 +2,7 @@
   "name": "codeloupe-desktop",
   "version": "0.4.0",
   "private": true,
-  "description": "CodeLoupe desktop app: statistics, branches, agent runs, tasks and index health from the local daemon",
+  "description": "CodeLoupe desktop app: token usage and savings, branches, tasks, index health and gaps from the local daemon",
   "main": "out/main/index.js",
   "license": "UNLICENSED",
   "engines": {

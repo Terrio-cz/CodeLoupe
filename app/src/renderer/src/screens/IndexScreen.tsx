@@ -32,7 +32,7 @@ export function IndexScreen() {
     { key: 'kind', header: 'Druh', render: b => b.kind },
     { key: 'repo', header: 'Repo', render: b => names.get(b.repoId) ?? b.repoId },
     { key: 'dur', header: 'Délka', render: b => ms(b.durationMs), numeric: true },
-    { key: 'rss', header: 'Peak RSS', render: b => (b.peakRssMb === null ? '—' : <>{num(b.peakRssMb)} MB{b.peakRssMb > budget && <span className="chip flag-large_result" style={{ marginLeft: 6 }}>⚠ nad {budget} MB</span>}</>), numeric: true },
+    { key: 'rss', header: 'Peak RSS', render: b => (b.peakRssMb === null ? '—' : <>{num(b.peakRssMb)} MB{b.peakRssMb > budget && <span className="chip warn" style={{ marginLeft: 6 }}>⚠ nad {budget} MB</span>}</>), numeric: true },
     { key: 'files', header: 'Soubory', render: b => num(b.files), numeric: true },
     { key: 'status', header: 'Stav', render: b => b.status === 'failed' ? <span title={b.error ?? ''}><StatusBadge tone="critical">selhal</StatusBadge></span> : b.status === 'running' ? <StatusBadge tone="running">běží</StatusBadge> : <StatusBadge tone="ok">ok</StatusBadge> },
   ];

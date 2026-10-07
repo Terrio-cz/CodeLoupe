@@ -16,6 +16,9 @@ const TITLES: Record<Screen, string> = {
   overview: 'Přehled', branches: 'Větve', tasks: 'Úkoly', index: 'Index', gaps: 'Mezery',
   environment: 'Prostředí', settings: 'Nastavení',
 };
+const ICONS: Record<Screen, string> = {
+  overview: '◉', branches: '⑂', tasks: '☰', index: '▤', gaps: '⚑', environment: '⚿', settings: '⚙',
+};
 const KEYS: Record<string, Screen> = { o: 'overview', b: 'branches', t: 'tasks', i: 'index', g: 'gaps', e: 'environment', s: 'settings' };
 const WITH_RANGE: Screen[] = ['overview', 'gaps'];
 
@@ -49,6 +52,14 @@ export function App() {
     nav.reload();
   }, [daemon?.checkedAt]);
 
+  // Back from a restart or an outage: reload what the screens failed to get meanwhile.
+  const lastPhase = useRef(daemon?.phase);
+  useEffect(() => {
+    const prev = lastPhase.current;
+    lastPhase.current = daemon?.phase;
+    if (daemon?.phase === 'running' && prev && prev !== 'running') refreshAll();
+  }, [daemon?.phase]);
+
   useEffect(() => {
     let pendingG = 0;
     const onKey = (e: KeyboardEvent) => {
@@ -61,12 +72,14 @@ export function App() {
         if (s) { e.preventDefault(); s.focus(); }
         return;
       }
-      if (e.key === 'g') { pendingG = Date.now(); return; }
+      // The second key wins over a new prefix, so `g g` goes to Mezery.
       if (pendingG && Date.now() - pendingG < 1200 && KEYS[e.key]) {
         e.preventDefault();
         location.hash = href(KEYS[e.key]);
+        pendingG = 0;
+        return;
       }
-      pendingG = 0;
+      pendingG = e.key === 'g' ? Date.now() : 0;
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -80,7 +93,8 @@ export function App() {
   } : {};
 
   const link = (s: Screen) => (
-    <a key={s} className="nav-link" href={href(s)} aria-current={route.screen === s ? 'page' : undefined}>
+    <a key={s} className="nav-link" href={href(s)} aria-current={route.screen === s ? 'page' : undefined} title={TITLES[s]}>
+      <span className="nav-icon" aria-hidden="true">{ICONS[s]}</span>
       <span className="label-text">{TITLES[s]}</span>
       {counts[s] !== undefined && <span className="count">{counts[s]}</span>}
     </a>
