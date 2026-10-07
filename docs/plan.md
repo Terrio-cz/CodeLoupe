@@ -128,6 +128,7 @@ CLI `codeloupe …` ──HTTP (spustí daemon, když neběží)─────�
                          ├─ registry repozitářů a worktree (z `git worktree list`)
                          ├─ core: parse · extract · store · delta · resolve · write · format
                          ├─ jazykové adaptéry: kotlin, java
+                         ├─ tracker mirror (SQLite + FTS5, watcher jen při aktivních klientech)
                          ├─ telemetrie (`/status`, `calls.jsonl`)
                          └─ build worker (podproces, nízká priorita, max 1)
 ```
@@ -244,9 +245,17 @@ overloady a třída s konstruktory jsou jeden symbol.
 ## 6. Nástroje
 
 `root` = cesta do repozitáře nebo worktree (výchozí: výchozí větev repozitáře z `cwd` klienta). Výstup:
-kompaktní text, řádky 1-based, `limit` + `… +N dalších`. Strop: **≤ 12 nástrojů** celkem (popisy stojí tokeny
-v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`); dnes 6 (`find`, `outline`, `symbol`,
-`usages`, `calls`, `hierarchy`).
+kompaktní text, řádky 1-based, `limit` + `… +N dalších`. Strop: **≤ 14 nástrojů** celkem (popisy stojí tokeny
+v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`, `tasks mode=…`); dnes 7 kódových (`find`,
+`outline`, `symbol`, `usages`, `calls`, `hierarchy`, `changes`) + 2 trackerové (`issue`, `tasks`, jen když je
+tracker v konfiguraci).
+
+### Tracker (CL-26, CL-27, CL-29, CL-90)
+
+| Nástroj | Vrací |
+|---|---|
+| `issue(id, view=brief\|full, sections=[…], since)` | brief: pole, odkazy (epic s názvem, blokery se stavem), checklist kritérií, rejstřík sekcí; `full` celé; `sections` jen nadpisy popisu (prefix) nebo `criteria`/`fields`/`links`/`comments`/`attachments`/`history`. Druhé čtení ze stejného `root` → „unchanged since …“ (< 100 zn.), po změně jen rozdíl; `since=<ISO>` rozdíl proti verzi z té doby, `since=none` znovu celé |
+| `tasks(query, mode=list\|graph\|ready\|progress, depth, limit)` | 1 řádek na task (`id stav · typ · priorita ‹epic› název ⛔blokery`); `list` filtry ve stylu YouTrack + fulltext (FTS5); `graph` epic, závislosti, podúkoly, vazby (hloubka ≤ 3, řetězec jen svým směrem); `ready` otevřené listové tasky s vyřešenými závislostmi mimo větve git worktree (registr workspaců CL-66 později); `progress` epic: stavy, kritéria, blokery, otevřené tasky |
 
 ### Čtení
 
@@ -452,6 +461,31 @@ celou dobu vytížený jinými okny (CPU 40–97 %), `main` měřený souběžn�
   main mimo výstup, `bodies`, soubory bez změny deklarací, přidaný člen bez `~` třídy, `(KDoc only)`, limit,
   přesměrovaný overload a stejnojmenná funkce jiného balíčku, dva worktree na jedné merge-base souběžně, `git rm --cached`,
   chybějící git objekt = chyba, ne špatná odpověď).
+
+### Výsledek fáze 0.3a — tracker mirror (CL-26, CL-29, CL-27, CL-90, 2026-10-07)
+
+- Konfigurace `config.json` `trackers`: instance (URL, typ), zkratky projektů, zdroj tokenu (`env` nebo dotenv soubor +
+  klíč, čte jen daemon při každém požadavku), `repos` pro obsazené větve. Adaptér `TrackerAdapter` (YouTrack první):
+  stránkování „nejnovější `updated` první“ místo dat v dotazu (YouTrack čte data v časové zóně uživatele), historie
+  přes `activities` s epoch `start`. Terrio pravidla (lifecycle, completion) zůstávají v Terrio vrstvě.
+- Mirror `<home>/trackers/<name>.db`: issues (JSON bez komentářů), pole, odkazy (PARENT/SUBTASK/DEPENDS_ON/…),
+  kritéria `- [ ]`/`- [x]`, komentáře, metadata příloh, historie změn polí, až 5 předchozích verzí na issue (30 dní)
+  pro delty, contentless FTS5 nad názvem, popisem a komentáři. Mirror nikdy nesestoupí ke starší verzi.
+- Sync: poprvé celý projekt (stránky po 50), pak jen issues s posunutým `updated` od watermarku projektu (nejnovější
+  `updated`, který tracker sám vypsal, − 5 min; čtení jednoho issue ho neposouvá); víc než 10 změn najednou jedním
+  stránkovaným dotazem. Historie polí jen když se něco změnilo; její selhání sync nezastaví. Každých 6 h seznam id
+  odstraní smazané issues (každé ověřené dotazem), přesunuté issue se uloží pod novým id. Watcher je korutina, kterou spustí volání nástroje a která skončí
+  10 min po posledním — v klidu žádný časovač ani dotaz. Čtení `issue` > 30 s po syncu projektu se ptá jen na `updated`.
+- Token: nikde ve výstupu, chybě, `/status`, logu ani souboru mirroru (test proti lokálnímu HTTP fake včetně proxy,
+  která ozvěnou vrací hlavičky — body chyb se čistí).
+- Paměť čtení po `root` (bez `root` žádná); „unchanged“ nese stav a počet splněných kritérií, aby subagent bez
+  kontextu věděl, kde issue stojí, a `since=none` vrátí celé.
+- TER živě (674 issues, jen čtení): první sync 18–23 s, DB 14 MB; inkrementální sync bez změny 1 požadavek, 0,08 s;
+  dotazy `tasks` 0–4 ms. Issue (zn.): TER-591 brief 1 718 / full 2 967, TER-656 2 015 / 3 416, TER-650 460 / 2 648,
+  TER-666 1 125 / 2 598; opakované čtení ~100 zn. (~30 tokenů). `yt_get_issue` 2,4–3,2 tis. zn. bez komentářů,
+  5,4–6,3 tis. s komentáři a odkazy. `ready` na TER-164, TER-161, TER-163 = nezávislý výpočet nad YouTrack API
+  (11, 24, 10 tasků).
+- Mimo rozsah: zápisy (CL-28), registr workspaců (CL-66 — dnes větve git worktree), keychain OS.
 
 ## 10. Rizika
 

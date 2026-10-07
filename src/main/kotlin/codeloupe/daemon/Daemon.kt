@@ -6,6 +6,8 @@ import codeloupe.config.Config
 import codeloupe.platform.IsoTime
 import codeloupe.platform.ProcessMemory
 import codeloupe.repo.Registry
+import codeloupe.tracker.TrackerSettingsLoader
+import codeloupe.tracker.Trackers
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
 import io.ktor.http.ContentType
@@ -58,7 +60,9 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
     private val log = AppendLog(config.home.resolve("daemon.log"))
     private val queue = JobQueue(scope)
     val registry = Registry(config, queue, log = ::log)
-    private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")))
+    private val trackers = Trackers.open(TrackerSettingsLoader.load(config.home), config.home, scope, ::log)
+    private val tools = Tools.catalog(trackers)
+    private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = trackers::touch)
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
     private val pid = ProcessHandle.current().pid()
@@ -71,13 +75,14 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
             name = CodeLoupe.NAME, version = CodeLoupe.VERSION, pid = pid, port = config.port, home = config.home.toString(),
             uptimeSec = Instant.now().epochSecond - started.epochSecond, rssMb = ProcessMemory.rssMb(),
             heapMb = (runtime.totalMemory() - runtime.freeMemory()) / MB, cpuSec = cpu,
-            calls = runner.stats(), queue = queue.snapshot(), repos = registry.snapshot(),
+            calls = runner.stats(), queue = queue.snapshot(), repos = registry.snapshot(), trackers = trackers.summary(),
         )
     }
 
     fun stop() {
         server.stop(gracePeriodMillis = 100, timeoutMillis = 2_000)
         scope.cancel()
+        trackers.close()
         runCatching {
             val info = JsonFormat.json.decodeFromString(DaemonInfo.serializer(), Files.readString(infoFile))
             if (info.pid == pid) Files.deleteIfExists(infoFile)
@@ -133,12 +138,13 @@ class Daemon private constructor(val config: Config, private val exitOnShutdown:
                 if (!call.response.isCommitted) call.respondJson(HttpStatusCode.InternalServerError, error(reason))
             }
         }
-        val mcp = McpTools(runner)
+        val mcp = McpTools(runner, tools)
         mcpStatelessStreamableHttp(path = "/mcp") { mcp.server() }
         routing {
             get("/status") { call.respondJson(HttpStatusCode.OK, DaemonStatus.serializer(), status()) }
             post("/api/{tool}") {
-                val tool = Tools.named(call.parameters["tool"].orEmpty())
+                val name = call.parameters["tool"].orEmpty()
+                val tool = tools.firstOrNull { it.name == name }
                     ?: return@post call.respondJson(HttpStatusCode.NotFound, error("unknown tool"))
                 val args = readBody(call) ?: return@post call.respondJson(HttpStatusCode.InternalServerError, error("body too large"))
                 call.respondJson(HttpStatusCode.OK, ToolOutcome.serializer(), runner.run(tool, ToolArgs(args), "api"))

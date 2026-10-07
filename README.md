@@ -1,7 +1,8 @@
 # CodeLoupe
 
 On-demand code index for AI coding agents. Ask for a declaration, a file outline, its usages, callers or type
-hierarchy (branch changes soon), and get exactly that piece of code instead of grepping and reading whole files.
+hierarchy, or what a branch changed, and get exactly that piece of code instead of grepping and reading whole files.
+With a tracker configured it also mirrors your issues (YouTrack first) and answers issue reads and task queries locally.
 
 - **Any git repository**, no configuration: the base index follows the default branch and is built
   from git objects; every worktree of the repository shares it and adds an overlay of its own changed, new
@@ -27,6 +28,8 @@ build/install/codeloupe/bin/codeloupe find "*Repository" --kind interface
 build/install/codeloupe/bin/codeloupe usages OrderService.handle
 build/install/codeloupe/bin/codeloupe calls OrderService.handle --depth 2      # --callees for what it calls
 build/install/codeloupe/bin/codeloupe hierarchy Repository
+build/install/codeloupe/bin/codeloupe issue ABC-5 --section scope   # with a tracker configured
+build/install/codeloupe/bin/codeloupe tasks "epic: ABC-1" --mode ready
 build/install/codeloupe/bin/codeloupe status
 ```
 
@@ -53,6 +56,13 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `hierarchy` | supertypes and subtypes of a type (object expressions included, and lambdas converted to a `fun interface`), or what a member overrides and what overrides it |
 | `changes` | what the worktree changed against the merge-base with the default branch (committed and uncommitted), by declaration: `+` added, `~` body changed, `^` signature changed (with the old one), `-` removed; each with its callers and tests; `bodies=true` adds a line diff per declaration |
 
+With a tracker configured (see Configuration) two more tools answer from a local mirror of its projects:
+
+| Tool | Returns |
+|---|---|
+| `issue` | one issue as compact markdown: `view=brief` (fields, links, criteria checklist, section index), `full`, or `sections=[…]` (description headings by prefix, `criteria`, `fields`, `links`, `comments`, `attachments`, `history`). A second read from the same `root` answers `unchanged since …` or only what changed; `since=<ISO time>` diffs against that time, `since=none` shows it again |
+| `tasks` | one line per task (`id state · type · priority ‹epic› title ⛔blockers`). `mode=list` with a YouTrack-like `query` (`project: TER state: -Done #unresolved epic: TER-1 type: Bug {Fix versions}: 1.0 sort: id` plus full-text words), `graph` (an issue's epic, dependencies, subtasks, relations; `depth` ≤ 3), `ready` (open tasks without open subtasks whose dependencies are resolved and that no git worktree branch holds), `progress` (an epic: counts by state, criteria, blockers, open tasks) |
+
 Usages are resolved without an IDE or compiler: the scopes, imports and aliases a file sees, the receiver's
 type where syntax tells it (declared types, `Type(…)`, what a call returns, collection elements in lambdas), and
 overloads by argument count. Unsure hits are marked, never dropped. One heuristic: on a receiver of unknown type,
@@ -74,6 +84,26 @@ read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-s
 | Base branch of a repository | `origin/HEAD`, else `origin/main`, `origin/master`, `main`, `master` | `.codeloupe.json` `{ "baseBranch": "origin/master" }` in the main worktree |
 | Build worker heap, timeouts | 512 MB, query wait 10 s, build 10 min | `config.json` `buildHeapMb`, `queryTimeoutMs`, `buildTimeoutMs` |
 | Reuse of a worktree check | 1 s: queries within a second of the last check of their worktree share it | `config.json` `overlayCheckMs` (1 = check on every query) |
+| Trackers to mirror | none | `config.json` `trackers` (below) |
+| Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
+
+```json
+{
+  "trackers": [{
+    "name": "acme", "type": "youtrack", "url": "https://acme.youtrack.cloud", "projects": ["ABC", "OPS"],
+    "token": { "env": "YOUTRACK_TOKEN" },
+    "repos": ["C:/src/acme"]
+  }]
+}
+```
+
+The token comes from an environment variable (`{ "env": "NAME" }`) or a `KEY=value` file (`{ "dotenv": "<path>",
+"key": "NAME" }`), read by the daemon on each request; it never appears in answers, errors, `/status` or logs. The
+mirror (`<home>/trackers/<name>.db`, SQLite + FTS5) loads each project once, then a watcher asks only for issues whose
+`updated` moved — and only while tool calls arrive: no client, no polling. A read more than 30 s after the project's
+last sync checks that one issue's `updated` first. Mirroring is read-only. `repos` are git repositories whose worktree
+branch names (`ABC-5`, `feature/ABC-5-x`) mark tasks as taken for `tasks mode=ready`, besides every repository the
+daemon has indexed.
 
 The daemon listens on 127.0.0.1 only and refuses requests with a foreign `Host`, any `Origin`, or
 without the `x-codeloupe` header; responses carry `Connection: close`. Calls are logged (tool, latency,
@@ -94,6 +124,7 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 | `changes` | a worktree's declarations compared with the merge-base: matching, line diffs, callers and tests |
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
 | `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
+| `tracker`, `tracker.youtrack`, `tracker.mirror`, `tracker.read` | tracker adapter (YouTrack REST), SQLite mirror and watcher, `issue` / `tasks` answers |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |
 | `cli` | `codeloupe` commands and the daemon client |
