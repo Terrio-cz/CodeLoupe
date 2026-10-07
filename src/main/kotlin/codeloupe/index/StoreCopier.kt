@@ -13,7 +13,7 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
     private val file = source.prepareStatement("SELECT id, lang, module, source_set, package, hash, eol, errors, content FROM files WHERE path = ? AND deleted = 0")
     private val imports = source.prepareStatement("SELECT fqn, alias, star FROM imports WHERE file_id = ?")
     private val decls = source.prepareStatement("SELECT id, $DECL_COLUMNS, parent_id FROM decls WHERE file_id = ? ORDER BY id")
-    private val refs = source.prepareStatement("SELECT name, line, col, kind, recv, decl_id FROM refs WHERE file_id = ?")
+    private val refs = source.prepareStatement("SELECT $REF_COLUMNS, decl_id FROM refs WHERE file_id = ?")
     private val insertFile = target.prepareStatement(
         "INSERT INTO files(path, lang, module, source_set, package, hash, eol, errors, size, mtime, deleted, content) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)",
         Statement.RETURN_GENERATED_KEYS,
@@ -23,7 +23,9 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
         "INSERT INTO decls(file_id, $DECL_COLUMNS, parent_id) VALUES(?, ${List(DECL_COLUMN_COUNT) { "?" }.joinToString()}, ?)",
         Statement.RETURN_GENERATED_KEYS,
     )
-    private val insertRef = target.prepareStatement("INSERT INTO refs(file_id, name, line, col, kind, recv, decl_id) VALUES(?, ?, ?, ?, ?, ?, ?)")
+    private val insertRef = target.prepareStatement(
+        "INSERT INTO refs(file_id, $REF_COLUMNS, decl_id) VALUES(?, ${List(REF_COLUMN_COUNT) { "?" }.joinToString()}, ?)",
+    )
 
     /** Copies [path] (already removed from the target) with a new stamp; false when the source does not have it. */
     fun copy(path: String, size: Long, mtime: Long): Boolean {
@@ -55,9 +57,10 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
         }
         refs.rows(oldId) { rs ->
             insertRef.setLong(1, newId)
-            for (i in 1..5) insertRef.setObject(i + 1, rs.getObject(i))
-            val decl = rs.getLong(6).takeUnless { rs.wasNull() }
-            if (decl == null) insertRef.setNull(7, Types.INTEGER) else insertRef.setLong(7, declIds.getValue(decl))
+            for (i in 1..REF_COLUMN_COUNT) insertRef.setObject(i + 1, rs.getObject(i))
+            val decl = rs.getLong(REF_COLUMN_COUNT + 1).takeUnless { rs.wasNull() }
+            val declIndex = REF_COLUMN_COUNT + 2
+            if (decl == null) insertRef.setNull(declIndex, Types.INTEGER) else insertRef.setLong(declIndex, declIds.getValue(decl))
             insertRef.addBatch()
         }
         insertRef.executeBatch()
@@ -82,5 +85,9 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
         const val DECL_COLUMNS = "kind, name, container, fqn, receiver, params, param_count, returns, modifiers, supertypes, " +
             "start_line, decl_line, end_line, sig, hash, local"
         val DECL_COLUMN_COUNT = DECL_COLUMNS.split(',').size
+
+        // Every refs column but the ids; StoreCopierTest fails when the schema gains one this list lacks.
+        const val REF_COLUMNS = "name, line, col, kind, recv, bind, recv_type, args"
+        val REF_COLUMN_COUNT = REF_COLUMNS.split(',').size
     }
 }

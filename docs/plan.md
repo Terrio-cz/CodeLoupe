@@ -159,11 +159,26 @@ jeden soubor.
 - `imports`: FQN, alias, star
 - `decls`: kind, name, container, FQN, receiver, parametry (jména, typy, počet), návratový typ, modifikátory,
   anotace, supertypy, řádky deklarace/těla/KDocu, hash textu
-- `refs`: jméno, řádek, sloupec, druh (`call`, `nav`, `type`, `callable_ref`, `ctor`), receiver, id
-  obklopující deklarace
+- `refs`: jméno, řádek, sloupec, druh (`call`, `nav`, `type`, `callable_ref`, `named_arg`, `name`), text
+  receiveru (u `type` kvalifikátor `pkg` z `pkg.Type`, u `Type::m` typ, u `named_arg` jméno volané funkce či
+  konstruktoru), id obklopující deklarace; od formátu `2/kotlin-psi-3` navíc (CL-13):
+  - `bind` — jméno je vázané v kódu (parametr, parametr lambdy včetně `it`, proměnná `for`/`catch`, lokální
+    `val`/`fun`, subjekt `when`); hodnota = typový spec vazby, `""` = typ neznámý, prefix `^` = mezi vazbou a
+    použitím leží tělo třídy (jméno může být i jejím členem);
+  - `recv_type` — typový spec receiveru `x.m()`, je-li receiver lokální vazba nebo výraz (volání, řetěz, `as`,
+    `!!`, `?:`, `this` v lambdě s receiverem); u nekvalifikovaného jména spec implicitního receiveru lambdy
+    (`x.apply {}`, `x.run {}`, `with(x) {}`; lambda předaná jiné funkci má spec `&@ř:s#i` = receiver funkčního typu
+    jejího parametru `i` — `R.() -> T` dá `R`, `() -> T` žádný, neindexovaná funkce neznámý);
+  - `args` — počet argumentů volání (trailing lambda se počítá, spread = −1), pro rozlišení overloadů.
+- `decls.returns` bez deklarovaného typu = typový spec inicializátoru, `by lazy { … }` nebo těla výrazem;
+  parametry nesou příznaky `default` a `vararg`.
+- typový spec (`lang/TypeSpec`): text typu (`Foo`, `List<Foo>`), `@řádek:sloupec` = deklarovaný typ toho, na co
+  ukazuje reference na té pozici (návratový typ funkce, typ property, třída konstruktoru), `*spec` = prvek kolekce,
+  `a|b` = `a`, jinak `b` (`xs.first()` je metoda z indexu, nebo prvek `xs`). Lambdy `let/also/takeIf` dostanou za
+  `it` typ receiveru, `forEach/map/filter/first {…}` a spol. typ prvku. Spec se vyhodnotí až při dotazu — fakta
+  zůstávají jen z jednoho souboru.
 - `modules`: z `settings.gradle(.kts)` / `pom.xml` — moduly a závislosti `project(":x")` (náhrada IDEA
   `get_project_modules`)
-- lokální typy pro resolver: parametry a property s explicitním typem, `val x = Foo(...)`
 
 Pozice jen řádek/sloupec (CRLF vs LF nevadí).
 
@@ -196,10 +211,40 @@ Receiver: `this`/implicitní, `Typ.m()`, `x.m()` s typem z lokální inference. 
 `exact` (jediný viditelný kandidát) / `candidate` (víc možností, vrací všechny). **Nikdy nevynechat**:
 `usages` je nadmnožina `rg -w`. Žádný fallback na IDE.
 
+Implementace (CL-13, `query/usages`), pro každou referenci se jménem cíle (nebo aliasem jeho importu):
+
+1. Vázané jméno (`bind`) → lokální deklarace té funkce. Volání jde přes vazbu, kterou nejde zavolat (`flag()` při
+   `flag: Boolean` volá funkci); vazba za tělem třídy (`^`) může být i členem té třídy → `candidate`.
+2. Bez receiveru: implicitní receiver lambdy — `apply`/`run`/`with`, jinak z typu parametru volané funkce
+   (`R.() -> T` → `R`; `() -> T` nechá platit receiver vnější lambdy; funkce mimo index dá knihovní receiver; nejasný
+   typ = neznámý receiver, ve hře jsou všechny členy toho jména) — pak členy obklopujících tříd a receiverů extension
+   funkcí (od nejvnitřnější, včetně nadtypů, companionů a vnořených typů), pak top-level v pořadí explicitní import
+   (alias) → stejný package → star import. Receiver, jehož typ či nadtypy leží mimo index (`fun Route.x()`,
+   `object T : Table()`, enum), může jméno deklarovat sám, pokud je to jméno, které knihovny deklarují → odpověď
+   nalezená za ním je neúplná. Receiver `x` v `x.m()` se typuje celým resolverem včetně receiverů lambd.
+3. S receiverem: `this`/`this@L`/`super`, typ nebo package jako kvalifikátor (`Type.m` → companion, object, vnořené
+   typy, enum entry; `Type::m` i instanční člen), typový spec z indexu, property s deklarovaným nebo odvozeným
+   typem; velké jméno, které nic v dosahu nedeklaruje a nenese ho žádný typ v indexu, je knihovní typ
+   (`ByteBuffer.allocate`). Členy se hledají v nejbližší úrovni nadtypů, výš = dispatch (`candidate` pro přepsané
+   členy); extension funkce podle jména receiveru. Nic na typu z indexu → členy podtypů (smart cast, `candidate`);
+   nic na knihovním typu → extension na knihovních typech (`fun Throwable.f()` na `IOException`, `candidate`).
+4. Overloady se zužují počtem argumentů (výchozí hodnoty a `vararg` dávají rozsah); `x()` na property (`invoke`) jen
+   když žádná funkce nesedí. `private` deklarace je mimo svůj soubor nedosažitelná a neschová další úroveň.
+5. Neznámý receiver: všechny členy a extension daného jména → `candidate`. **Heuristika** (měří ji golden test): je-li
+   v indexu jediná, jméno není knihovní (členy jádra Kotlin/JDK + vše, co soubory importují z knihoven — odvozeno
+   z indexu, ne z pevného seznamu frameworků) a žádná jiná reference toho jména nevede jistě mimo index, je `exact`.
+
+Značky: `exact` = jistě jen cíl, `candidate` = může být cíl (dispatch, smart cast, sekundární konstruktor, named
+argument konstruktoru nebo `copy` vlastníka property), `other` = vede jinam; ve výstupu je jen počet (`all=true` je
+vypíše). Řádky `import`/`package` nejsou výskyty. Dotaz na víc různých deklarací (`usages id`) chce upřesnění;
+overloady a třída s konstruktory jsou jeden symbol.
+
 ## 6. Nástroje
 
 `root` = cesta do repozitáře nebo worktree (výchozí: výchozí větev repozitáře z `cwd` klienta). Výstup:
-kompaktní text, řádky 1-based, `limit` + `… +N dalších`.
+kompaktní text, řádky 1-based, `limit` + `… +N dalších`. Strop: **≤ 12 nástrojů** celkem (popisy stojí tokeny
+v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`); dnes 6 (`find`, `outline`, `symbol`,
+`usages`, `calls`, `hierarchy`).
 
 ### Čtení
 
@@ -208,9 +253,9 @@ kompaktní text, řádky 1-based, `limit` + `… +N dalších`.
 | `find(q, kind?, module?, test?)` | `path:start-end kind FQN signatura` |
 | `outline(file \| type)` | signatury členů s rozsahy, bez těl |
 | `symbol(name, body=true)` | text deklarace (anotace, KDoc, tělo) + `hash`; overloady podle parametrů |
-| `usages(name)` | výskyty seskupené podle obklopující deklarace, 1 řádek každý, exact/candidate |
-| `callers` / `callees(name, depth≤3)` | strom volání |
-| `hierarchy(type \| member)` | supertypy, implementace, override |
+| `usages(name, all?, limit?)` ✅ | výskyty seskupené podle souboru a obklopující deklarace, 1 řádek každý, `=` exact / `?` candidate; počet výskytů vedoucích jinam |
+| `calls(name, direction=callers\|callees, depth≤3)` ✅ | strom volání; pod první úrovní jen exact vazby, kandidáti jako počet (jeden nástroj místo dvou — strop 12 nástrojů) |
+| `hierarchy(type \| member)` ✅ | supertypy (i mimo index jménem), podtypy včetně enum entry, override nahoru i dolů |
 | `grep(pattern)` | `rg` nad rootem, zásahy označené obklopující deklarací |
 | `changes(root)` | změněné deklarace proti merge-base: `+ ~ ^ -`, volající, testy, volitelně tělo před/po |
 | `context(name)` | `symbol` + volající + volané jedním voláním |
@@ -285,7 +330,7 @@ codeloupe): reviewer a planner. Stejný model a effort. Výstup: tabulka metrik 
 |---|---|---|
 | 0 Spike + baseline | parser, RAM, chybovost; `codemetrics` + baseline | ✅ hotovo (§ 1, § 3) |
 | 1 Core + daemon ✅ | repo, daemon (single instance, HTTP MCP, fronta, `/status`), registry repozitářů, Kotlin adaptér, store, plný build v podprocesu, CLI `find/outline/symbol` | fixtury § 7 (Kotlin) zelené; build Terrio ≤ 10 s, DB ≤ 100 MB; restart daemonu okno přežije (jinak shim) |
-| 2 Čtení + resolver | `usages`, `callers/callees`, `hierarchy`, `grep`, `context`, `modules`, `check`; Java adaptér | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
+| 2 Čtení + resolver | ✅ `usages`, `calls` (callers/callees), `hierarchy` (CL-13/14/20); zbývá `grep`, `context`, `modules`, `check`; Java adaptér | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
 | 3 Vrstvy worktree | delta, vrstvy, líný sync, `changes`, úklid vrstev | změna/nový/smazaný soubor vidět v dalším dotazu; výchozí větev posunutá o 500 souborů → správné odpovědi, sync v P3 |
 | 4 Zápis *(podmíněná, po fázi 7)* | zápisové nástroje + pojistky + `rename_symbol` — jen když detektor mezer ukáže, že coder po `symbol` stejně čte celý soubor kvůli `Edit`, nebo když chybí rename bez IDEA | round-trip bajtově stejný (CRLF i LF); fuzz 200 zápisů + compile zelený; rename na 10 symbolech = compile zelený |
 | 5 Zátěž a platformy | 10 klientů paralelně (dotazy 8 worktree + sync + zápisy); testy na Linuxu (WSL/Docker) | budgety § 2; P0 p95 drží během P3; testy zelené na Windows i Linuxu |
@@ -333,6 +378,24 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
 - Testy: 34 (17 portovaných z Node + parita, CRLF/BOM, uzavírání spojení, chyby API, overlay ve View, čtení refů,
   řazení, fronta, hluboký soubor, opakování po selhání a timeout buildu, formát indexu).
 
+### Výsledek navigace: usages, calls, hierarchy (CL-13, CL-14, CL-20, 2026-10-07)
+
+- Golden test (`UsagesGoldenTest`, oracle `src/test/resources/golden/terrio-usages.json`): 44 symbolů Terria na
+  commitu 22d02d3f (třídy, rozhraní, object, enum a entry, companion členy, extension funkce včetně 10 stejnojmenných
+  podle receiveru, routy, repository, override, overloady podle počtu parametrů, private, `Type::member`, smart
+  cast, extension na knihovním typu, `this.x` v `apply`). Oracle ručně ověřený čtením kódu (328 řádků), bez IDE.
+  Výsledek: nadmnožina `rg -w` **100 %** (1 608/1 608 pozic), přesnost `exact` **100 %** (319/319), každé skutečné
+  použití je `exact` nebo `candidate` (328/328), `exact` samo pokryje 97,3 %, podíl `candidate` **11,9 %**. Dotaz
+  v testu p50 **16 ms**, max 145 ms.
+- Daemon (heap 96 MB): běžný dotaz desítky ms, `usages ApiKey.id` (3 446 referencí) 1,0 s poprvé / 0,65 s znovu,
+  `calls … depth 3` ~0,1–0,2 s; cache jsou LRU a obsah souborů se drží jen pro vypisované řádky. RSS po velkém dotazu
+  ~205 MB (budget 200) — sledovat v CL fáze 5.
+- Index: formát `2/kotlin-psi-3` (sloupce `bind`, `recv_type`, `args` v `refs`) → báze se po upgradu přestaví.
+- Stejná fixture sada v repu (`fixtures/kotlin/usages`) kryje super, cast, lambdy, alias, companion, enum, extension,
+  override/dispatch, overloady, private, `::`, smart cast, DSL receivery, sekundární konstruktor, FQ typ a nadmnožinu.
+- Známé meze: implementace přes `object : I {}` nejsou v `hierarchy` (výraz, ne deklarace); typ výsledku `let {}`,
+  indexace `xs[0]` a generik se neodvozuje (→ `candidate`); povýšení na `exact` u neznámého receiveru je heuristika.
+
 ### Výsledek fáze 3a — vrstvy worktree a líný sync báze (CL-16, 2026-10-07)
 
 Měřeno na Terriu (canonical + TER worktree, jen čtení) a na lokálním klonu (editace, posun báze); stroj byl po
@@ -340,27 +403,31 @@ celou dobu vytížený jinými okny (CPU 40–97 %), `main` měřený souběžn�
 
 - Změněný, nový i smazaný soubor vidět v dalším dotazu (test + klon Terria: editace → další dotaz 0,74 s včetně
   inicializace parseru v daemonu, další editace ~0,1 s). Hlavní worktree změny jiného worktree nevidí.
-- První dotaz ve worktree: TER-591 / 664 / 656 / 477 (13–72 změněných souborů) **0,6–0,75 s**; TER-114 (311 souborů
-  za bází, 149 parsovaných) 2,1 s. Po restartu daemonu se vrstvy znovu použijí z disku: 0,26–0,29 s.
+- První dotaz ve worktree: TER-591 / 664 / 656 / 477 (13–72 změněných souborů) **0,6–0,75 s**, při plně vytíženém
+  stroji 1,0–2,8 s (první parse v daemonu startuje parser); TER-114 (311 souborů za bází, 149 parsovaných) 2,1 s.
+  Po restartu daemonu se vrstvy znovu použijí z disku: 0,26–0,29 s.
 - Posun výchozí větve o 644 souborů (klon): sync ve worker v HEAVY lane 2,5 s, dotazy mezitím 89–201 ms ze staré
   báze se správnými odpověďmi; první dotaz worktree na nové bázi 1,65 s (182 souborů zkopírováno ze staré báze,
   0 parsováno). Malý posun (≤ 200 souborů) se synchronizuje inline před odpovědí.
-- Teplý dotaz těsně po sobě: p50 9–22 ms (main 9–17 ms). Dotaz po pauze platí výpis worktree: +30–55 ms podle
+- Teplý dotaz těsně po sobě: p50 9–22 ms, p95 24–27 ms po merge s CL-13 (main 9–17 ms). Dotaz po pauze platí výpis worktree: +30–55 ms podle
   zátěže stroje (Terrio: 1 150 adresářů, 2 200 zdrojů; `git status` ze JVM by stál ~60 ms + start procesu).
 - CPU: v klidu **0 ms za 30 s** (bez časovačů a watcherů). Výpis worktree ~60 ms CPU (atributy z výpisu adresáře;
   dotaz na atributy po souborech otevírá každý soubor a stál 270 ms CPU).
-- RSS daemonu: 141–145 MB (klon), 165–192 MB po parsování v daemonu (budget 200). Dynamický CDS archiv vypnut: po
+- RSS daemonu: 141–145 MB (klon), 165–192 MB po parsování v daemonu, 174 MB po merge s CL-13 (budget 200). Dynamický CDS archiv vypnut: po
   běhu s parserem obsahoval jeho třídy (+30 MB RSS) bez měřitelného zrychlení startu (670 vs 685 ms).
-- Testy: 39 (nově `OverlayTest`: dva worktree se změnou/novým/smazaným/ignorovaným souborem, CRLF návrat k bázi,
-  inline sync, posun o 500 souborů v HEAVY lane se starou bází mezitím, vrstva > 200 souborů a soubor > 512 KB ve
-  workeru, GC vrstvy smazaného worktree, znovupoužití vrstvy po restartu).
+- Testy: 58 po merge s CL-13/14/20 (nově `OverlayTest`: dva worktree se změnou/novým/smazaným/ignorovaným souborem,
+  CRLF návrat k bázi, inline sync, posun o 500 souborů v HEAVY lane se starou bází mezitím, vrstva > 200 souborů a
+  soubor > 512 KB ve workeru, velký soubor přepsaný beze změny (i s CRLF) bez workeru, sparse checkout, sdílené čekání
+  na pomalou obnovu, GC vrstvy smazaného worktree, znovupoužití vrstvy po restartu; `StoreCopierTest`).
+- Mimo rozsah založeno: CL-79 (kontrola worktree pro repozitáře se 100k+ soubory), CL-80 (worker s nízkou prioritou
+  na vytíženém stroji: build Terria 61 s místo 7 s).
 
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
 |---|---|
 | RAM/CPU při 8–10 oknech | jedna instance, fronta, build jen v podprocesu max 1, budget test fáze 5 |
-| Bez IDE horší přesnost | značky exact/candidate, nadmnožina `rg -w`, golden test; oracle se nahraje jednou (IDEA na 10 min, nebo ručně ověřená sada) a pak se IDE nepotřebuje; typy dál ověřuje build |
+| Bez IDE horší přesnost | značky exact/candidate, nadmnožina `rg -w`, golden test s ručně ověřeným oracle (44 symbolů, exact 100 %, CL-20) běží při každé změně extraktoru i resolveru; typy dál ověřuje build |
 | Daemon neběží při startu okna | autostart hook, CLI, doctor; volitelně služba OS |
 | Pád daemonu | bezstavové HTTP, autostart, ověření fáze 1, záložní shim |
 | Zastaralá data | kontrola změn při každém dotazu; vrstva vůči `B` |

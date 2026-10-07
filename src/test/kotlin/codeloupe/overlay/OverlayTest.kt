@@ -137,6 +137,9 @@ class OverlayTest {
         write(feature, GENERATED, big)
         Files.setLastModifiedTime(feature.resolve(GENERATED), java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 5_000))
         assertContains(find(registry, feature, "Generated.m11999"), "fun m11999")
+        // The same text checked out with CRLF line ends (autocrlf on Windows).
+        write(feature, GENERATED, BOM + big.replace(LF, CRLF))
+        assertContains(find(registry, feature, "Generated.m11999"), "fun m11999")
         assertEquals(0, launcher.overlays.get())
         assertEquals(0, registry.snapshot().single().overlays)
     }
@@ -239,6 +242,9 @@ class OverlayTest {
         const val BETA = "src/main/kotlin/demo/Beta.kt"
         const val GONE = "src/main/kotlin/demo/Gone.kt"
         const val GENERATED = "src/main/kotlin/many/Generated.kt"
+        const val BOM = "﻿"
+        const val LF = "\n"
+        const val CRLF = "\r\n"
 
         fun alpha(member: String) = "package demo\n\nclass Alpha {\n    fun $member() = 1\n}\n"
     }

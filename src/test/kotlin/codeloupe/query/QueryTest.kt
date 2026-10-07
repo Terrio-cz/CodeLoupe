@@ -54,6 +54,7 @@ class QueryTest {
         assertContains(symbol("OrderService.handle(_)"), "override fun handle(id: OrderId): Result {")
         assertContains(symbol("shop/Constructs.kt:70"), Regex("\\.handle {2}hash="))
         assertContains(symbol("String.shout"), "fun String.shout()")
+        assertContains(symbol("OrderService.create"), "fun create(repo: Repository<Order>): OrderService", message = "a companion member by Type.member")
         assertTrue(symbol("com.example.shop.Registry").startsWith("src/main/kotlin/com/example/shop/Constructs.kt:96-99"))
         assertContains(symbol("`weird name`.`does something with spaces`"), "fun `does something with spaces`() = Unit")
         assertContains(symbol("Missing"), "data object Missing : Result")

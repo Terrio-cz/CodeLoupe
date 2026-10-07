@@ -77,9 +77,12 @@ internal object OverlayPlanner {
                 }
                 // Too large to read into the daemon's heap: compared by hash as a stream, a build worker parses it.
                 if (stamp.size > InlineParse.MAX_FILE_BYTES) {
-                    when (Sha1.ofFile(Path.of(state.worktree, path))) {
-                        null -> state.scan[path]?.let { remembered[path] = it } ?: remembered.remove(path)
-                        base.hash(path) -> target -= path
+                    val file = Path.of(state.worktree, path)
+                    val raw = Sha1.ofFile(file)
+                    val baseHash = base.hash(path)
+                    when {
+                        raw == null -> state.scan[path]?.let { remembered[path] = it } ?: remembered.remove(path)
+                        raw == baseHash || Sha1.ofFile(file, normalized = true) == baseHash -> target -= path
                         else -> target[path] = stamp
                     }
                     continue

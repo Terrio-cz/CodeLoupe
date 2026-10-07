@@ -1,7 +1,8 @@
 package codeloupe.lang
 
 /**
- * One declaration. Lines are 1-based: [start] includes the KDoc above, [declStart] is the declaration itself.
+ * One declaration; [returns] is the declared type, or the [TypeSpec] of the initializer or expression body when
+ * there is none. Lines are 1-based: [start] includes the KDoc above, [declStart] is the declaration itself.
  * [parent] and the container chain refer to enclosing declarations of the same file (-1 = none).
  */
 data class DeclFact(

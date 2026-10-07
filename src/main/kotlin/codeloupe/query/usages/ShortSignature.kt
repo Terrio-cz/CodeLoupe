@@ -1,0 +1,24 @@
+package codeloupe.query.usages
+
+import codeloupe.query.DeclRow
+
+/** `[Container] fun Type.name(…)`: a declaration named compactly, parameters elided, for lines that only locate code. */
+internal object ShortSignature {
+    private const val MAX = 100
+
+    /** `path:line  [Container] fun name(…)` */
+    fun located(d: DeclRow): String = "${d.path}:${d.declLine}  ${of(d)}"
+
+    fun of(d: DeclRow): String {
+        val sig = d.sig
+        val at = sig.indexOf(d.name)
+        val open = if (at < 0) -1 else sig.indexOf('(', at + d.name.length)
+        val head = if (open >= 0 && sig.substring(at + d.name.length, open).trim('`', ' ').isEmpty()) {
+            sig.substring(0, open) + if (sig.startsWith("()", open)) "()" else "(…)"
+        } else {
+            sig
+        }
+        val text = (if (d.container.isNotEmpty()) "[${d.container}] " else "") + head
+        return if (text.length <= MAX) text else text.take(MAX - 1) + "…"
+    }
+}

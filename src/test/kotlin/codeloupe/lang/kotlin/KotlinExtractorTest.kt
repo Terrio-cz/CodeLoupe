@@ -103,6 +103,41 @@ class KotlinExtractorTest {
     }
 
     @Test
+    fun `references - local bindings, receiver type specs, argument counts`() {
+        fun ref(name: String, line: Int) = facts.refs.single { it.name == name && it.line == line }
+        assertEquals("List<Order>", ref("fold", 18).recvType)
+        assertEquals(2, ref("fold", 18).args)
+        assertEquals("OrderId", ref("id", 70).bind, "a parameter is a local binding with its type")
+        assertEquals(
+            "@69:${ref("find", 69).col}|*@69:${ref("repo", 69).col}", ref("id", 74).recvType,
+            "val order = repo.find(id): what find denotes, else (stdlib find) an element of repo",
+        )
+        assertEquals("", ref("local", 74).bind, "a local function")
+        assertEquals(1, ref("local", 74).args)
+        assertEquals("@102:${ref("create", 102).col}", ref("handle", 107).recvType)
+        assertEquals("@106:${ref("Registry", 106).col}", ref("register", 106).recvType, "a name not bound in code: typed by what it denotes")
+        assertEquals(null, ref("repo", 69).bind, "a property is not a local binding")
+    }
+
+    @Test
+    fun `references - lambda parameters and implicit receivers of standard library calls`() {
+        val text = """
+            class A {
+                fun f(xs: List<B>) {
+                    xs.forEach { it.g() }
+                    xs.map { b -> b.g() }
+                    B().apply { g() }
+                    with(xs.first()) { g() }
+                }
+            }
+        """.trimIndent()
+        val refs = Languages.extract("A.kt", text)!!.refs.filter { it.name == "g" }.sortedBy { it.line }
+        val first = Languages.extract("A.kt", text)!!.refs.single { it.name == "first" }
+        assertEquals(listOf("B", "B", "B", "@${first.line}:${first.col}|B"), refs.map { it.recvType })
+        assertEquals(listOf("it", "b", null, null), refs.map { it.recv })
+    }
+
+    @Test
     fun `CRLF and a BOM change only the hashes`() {
         val crlf = Languages.extract("Constructs.kt", Char(0xFEFF) + TEXT.replace("\n", "\r\n"))!!
         assertEquals(0, crlf.errors)

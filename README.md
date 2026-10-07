@@ -1,7 +1,7 @@
 # CodeLoupe
 
-On-demand code index for AI coding agents. Ask for a declaration, a file outline or (soon) usages and
-branch changes, and get exactly that piece of code instead of grepping and reading whole files.
+On-demand code index for AI coding agents. Ask for a declaration, a file outline, its usages, callers or type
+hierarchy (branch changes soon), and get exactly that piece of code instead of grepping and reading whole files.
 
 - **Any git repository**, no configuration: the base index follows the default branch and is built
   from git objects; every worktree of the repository shares it and adds an overlay of its own changed, new
@@ -24,6 +24,9 @@ JDK 25 (Gradle finds or downloads it as a toolchain; a bundled runtime is planne
 build/install/codeloupe/bin/codeloupe outline OrderService          # from inside a repository
 build/install/codeloupe/bin/codeloupe symbol "OrderService.handle(_)"
 build/install/codeloupe/bin/codeloupe find "*Repository" --kind interface
+build/install/codeloupe/bin/codeloupe usages OrderService.handle
+build/install/codeloupe/bin/codeloupe calls OrderService.handle --depth 2      # --callees for what it calls
+build/install/codeloupe/bin/codeloupe hierarchy Repository
 build/install/codeloupe/bin/codeloupe status
 ```
 
@@ -45,6 +48,15 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature` |
 | `outline` | members of a file or type with line ranges, no bodies |
 | `symbol` | one declaration's source (KDoc, annotations, body) by `Type.member`, `member(ParamType)`, `pkg.Type` or `File.kt:line`; large types collapse to header + members |
+| `usages` | every reference to a declaration, grouped by file and enclosing declaration, one code line each, `=` exact or `?` candidate; a superset of what `rg -w` finds in code, references that resolve elsewhere only counted (`all=true` lists them) |
+| `calls` | callers (default) or callees as a tree, depth ≤ 3; below the first level only exact links |
+| `hierarchy` | supertypes and subtypes of a type, or what a member overrides and what overrides it |
+
+Usages are resolved without an IDE or compiler: the scopes, imports and aliases a file sees, the receiver's
+type where syntax tells it (declared types, `Type(…)`, what a call returns, collection elements in lambdas), and
+overloads by argument count. Unsure hits are marked, never dropped. One heuristic: on a receiver of unknown type,
+a name the index declares only once (and no library declares, judging by the core API and the files' imports) is
+taken as exact. A name that matches several unrelated declarations must be qualified (`Type.member`).
 
 ## Desktop app
 
@@ -79,9 +91,12 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 | `repo` | repositories and worktrees → base index, base syncs, child-process builds |
 | `overlay` | per-worktree overlays: change checks, refreshes, cleanup of removed worktrees |
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
+| `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |
 | `cli` | `codeloupe` commands and the daemon client |
 
 `ParityTest` compares every tool answer with golden output of the Node.js prototype (phase 1); the
-TerrioImporter part runs where that repository is checked out (`CODELOUPE_TERRIO`).
+TerrioImporter part runs where that repository is checked out (`CODELOUPE_TERRIO`). `UsagesGoldenTest` checks
+`usages` on 44 TerrioImporter symbols against a manually verified oracle (`src/test/resources/golden`) and writes
+`build/reports/codeloupe/golden-usages.md`: superset of `rg -w`, precision of `exact` (≥ 95 %), candidate share.

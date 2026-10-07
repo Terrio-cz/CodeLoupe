@@ -1,6 +1,7 @@
 package codeloupe.index
 
 import codeloupe.lang.FileFacts
+import codeloupe.lang.ParamFact
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -26,7 +27,7 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
            supertypes, start_line, decl_line, end_line, sig, hash, local, parent_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         Statement.RETURN_GENERATED_KEYS,
     )
-    private val insertRef = db.prepareStatement("INSERT INTO refs(file_id, name, line, col, kind, recv, decl_id) VALUES(?, ?, ?, ?, ?, ?, ?)")
+    private val insertRef = db.prepareStatement("INSERT INTO refs(file_id, name, line, col, kind, recv, decl_id, bind, recv_type, args) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
     fun remove(path: String) {
         val id = fileId.run { setString(1, path); executeQuery().use { if (it.next()) it.getLong(1) else null } } ?: return
@@ -65,7 +66,7 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
                 setLong(1, id); setString(2, d.kind); setString(3, d.name); setString(4, d.container)
                 setString(5, listOf(facts.packageName, d.container, d.name).filter { it.isNotEmpty() }.joinToString("."))
                 setNullableString(6, d.receiver)
-                setString(7, JsonArray(d.params.map { buildJsonObject { put("name", JsonPrimitive(it.name)); put("type", JsonPrimitive(it.type)) } }).toString())
+                setString(7, paramsJson(d.params))
                 setInt(8, d.params.size); setNullableString(9, d.returns)
                 setString(10, d.modifiers.joinToString(" ")); setString(11, d.supertypes.joinToString(" "))
                 setInt(12, d.start); setInt(13, d.declStart); setInt(14, d.end); setString(15, d.sig); setString(16, d.hash)
@@ -77,6 +78,8 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
         for (r in facts.refs) insertRef.run {
             setLong(1, id); setString(2, r.name); setInt(3, r.line); setInt(4, r.col); setString(5, r.kind); setNullableString(6, r.recv)
             if (r.decl >= 0) setLong(7, declIds[r.decl]) else setNull(7, Types.INTEGER)
+            setNullableString(8, r.bind); setNullableString(9, r.recvType)
+            if (r.args != null) setInt(10, r.args) else setNull(10, Types.INTEGER)
             addBatch()
         }
         insertRef.executeBatch()
@@ -86,6 +89,18 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
     override fun close() {
         listOf(fileId, deleteFile, deleteImports, deleteDecls, deleteRefs, insertFile, insertImport, insertDecl, insertRef).forEach { it.close() }
     }
+
+    // Flags only when set: most parameters have neither.
+    private fun paramsJson(params: List<ParamFact>): String = JsonArray(
+        params.map { p ->
+            buildJsonObject {
+                put("name", JsonPrimitive(p.name))
+                put("type", JsonPrimitive(p.type))
+                if (p.default) put("default", JsonPrimitive(true))
+                if (p.vararg) put("vararg", JsonPrimitive(true))
+            }
+        },
+    ).toString()
 
     private fun PreparedStatement.insertReturningId(): Long {
         executeUpdate()

@@ -72,7 +72,7 @@ internal class DeclShapes(private val source: Source) {
     private fun nameOf(identifier: org.jetbrains.kotlin.com.intellij.psi.PsiElement?): String = identifier?.let(source::of) ?: "?"
 
     private fun params(parameters: List<KtParameter>): List<ParamFact> =
-        parameters.map { ParamFact(JsText.bare(nameOf(it.nameIdentifier)), type(it.typeReference) ?: "") }
+        parameters.map { ParamFact(JsText.bare(nameOf(it.nameIdentifier)), type(it.typeReference) ?: "", it.hasDefaultValue(), it.isVarArg) }
 
     private fun type(reference: KtTypeReference?): String? = reference?.let { JsText.squash(source.of(it)) }
 

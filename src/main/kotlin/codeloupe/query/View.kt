@@ -37,6 +37,30 @@ class View(baseFile: Path, overlayFile: Path? = null) : AutoCloseable {
         return query(sql, params, DeclRow::of)
     }
 
+    /** References matching [where] (aliases `r`/`f`), masked like [decls]. */
+    fun refs(where: String, params: Map<String, Any?> = emptyMap()): List<RefRow> {
+        val base = "SELECT ${RefRow.COLUMNS}, 'base' AS src FROM main.refs r JOIN main.files f ON f.id = r.file_id WHERE ($where)"
+        val sql = if (overlay) {
+            """SELECT ${RefRow.COLUMNS}, 'ov' AS src FROM ov.refs r JOIN ov.files f ON f.id = r.file_id WHERE ($where)
+           UNION ALL $base AND f.path NOT IN (SELECT path FROM ov.files)"""
+        } else {
+            base
+        }
+        return query(sql, params, RefRow::of)
+    }
+
+    /** Imports matching [where] (aliases `i`/`f`), masked like [decls]. */
+    fun imports(where: String, params: Map<String, Any?> = emptyMap()): List<ImportRow> {
+        val base = "SELECT i.fqn, i.alias, i.star, f.path FROM main.imports i JOIN main.files f ON f.id = i.file_id WHERE ($where)"
+        val sql = if (overlay) {
+            """SELECT i.fqn, i.alias, i.star, f.path FROM ov.imports i JOIN ov.files f ON f.id = i.file_id WHERE ($where)
+           UNION ALL $base AND f.path NOT IN (SELECT path FROM ov.files)"""
+        } else {
+            base
+        }
+        return query(sql, params, ImportRow::of)
+    }
+
     fun file(path: String): FileRow? {
         if (overlay) {
             val ov = query("SELECT *, 'ov' AS src FROM ov.files WHERE path = :path", mapOf("path" to path), FileRow::of).firstOrNull()
