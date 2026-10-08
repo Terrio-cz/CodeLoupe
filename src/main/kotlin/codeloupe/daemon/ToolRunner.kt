@@ -28,11 +28,13 @@ class ToolRunner(
     suspend fun run(tool: Tool, args: ToolArgs, via: String): ToolOutcome {
         val started = Instant.now()
         var wasBusy = false
+        var callRoot: String? = null
         onCall()
         val outcome = try {
             // A tool without a repository keys per-caller state on root: only the caller's own, never the shared default.
             val root = args.string("root")?.takeIf { it.isNotEmpty() } ?: (if (tool.needsRoot) defaultRoot else "")
                 ?: throw IllegalArgumentException("pass root: the absolute path of the repository or worktree to answer for")
+            callRoot = root.takeIf { it.isNotEmpty() }
             ToolOutcome(true, Timings.measure(TimedPart.TOOL) { tool.answer(registry, root, args) })
         } catch (e: CancellationException) {
             throw e
@@ -47,7 +49,7 @@ class ToolRunner(
         if (wasBusy) busy.incrementAndGet()
         val record = CallRecord(
             t = IsoTime.of(started), tool = tool.name, via = via, ms = Instant.now().toEpochMilli() - started.toEpochMilli(),
-            chars = outcome.text.length, ok = outcome.ok, busy = wasBusy, empty = EMPTY.containsMatchIn(outcome.text),
+            chars = outcome.text.length, ok = outcome.ok, busy = wasBusy, empty = EMPTY.containsMatchIn(outcome.text), root = callRoot,
         )
         window.record(record.tool, record.ms, record.chars, record.busy, record.empty)
         calls.append(JsonFormat.json.encodeToString(CallRecord.serializer(), record))

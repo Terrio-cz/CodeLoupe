@@ -82,6 +82,22 @@ class Overlays(
     fun known(worktree: String, baseCommit: String): OverlayVersion? = states[key(worktree)]?.view?.takeIf { it.base == baseCommit }
 
     /** Overlays of a repository that hold files. */
+    /**
+     * How a worktree's layer stands against [baseCommit]: `none` (never checked), `building` (a refresh runs), `error` (the last
+     * refresh failed), `stale` (built on another base) or `fresh`.
+     */
+    fun layer(worktree: String, baseCommit: String?): String {
+        val state = states[key(worktree)] ?: return "none"
+        val view = state.view
+        return when {
+            state.running?.isActive == true -> "building"
+            state.mustCheck -> "error"
+            view == null -> "none"
+            view.base != baseCommit -> "stale"
+            else -> "fresh"
+        }
+    }
+
     fun count(repoId: String): Int = states.values.count { it.repoId == repoId && it.entries.isNotEmpty() }
 
     /**

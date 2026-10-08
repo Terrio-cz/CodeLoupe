@@ -36,6 +36,15 @@ class EventStore(file: Path) : AutoCloseable {
             }
         }
 
+    /** Names this event log: it changes only when the file is deleted and `seq` starts over. */
+    @Synchronized
+    fun epoch(): String {
+        db.prepareStatement("SELECT value FROM meta WHERE key = 'epoch'").use { s -> s.executeQuery().use { if (it.next()) return it.getString(1) } }
+        val epoch = java.util.UUID.randomUUID().toString().take(12)
+        db.prepareStatement("INSERT OR IGNORE INTO meta(key, value) VALUES ('epoch', ?)").use { it.setString(1, epoch); it.executeUpdate() }
+        return epoch
+    }
+
     @Synchronized
     fun lastSeq(): Long = db.createStatement().use { s -> s.executeQuery("SELECT COALESCE(MAX(seq), 0) FROM events").use { it.next(); it.getLong(1) } }
 
@@ -107,6 +116,7 @@ class EventStore(file: Path) : AutoCloseable {
         // AUTOINCREMENT: a seq is never reused, even after the newest events are pruned.
         val SCHEMA = listOf(
             "CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)",
             "CREATE TABLE IF NOT EXISTS webhooks (id TEXT PRIMARY KEY, record TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS deliveries (id TEXT PRIMARY KEY, state TEXT NOT NULL, record TEXT NOT NULL, body TEXT)",
         )
