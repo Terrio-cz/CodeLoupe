@@ -104,7 +104,7 @@ internal class Callers(private val finder: UsageFinder, private val maxRefs: Int
     }
 
     private companion object {
-        const val TOP = 10
+        const val TOP = 5
         const val MAX_REFS = 2_000
         const val BUDGET = 20_000
         private val TYPE_REFS = setOf("type", "call", "nav", "name", "callable_ref")

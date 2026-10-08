@@ -25,7 +25,7 @@ object SymbolQuery {
             val end = to.coerceIn(start, lines.size)
             return lines.subList(start, end).joinToString("\n") { it.removeSuffix("\r") }
         }
-        val header = "${d.path}:${d.startLine}-${d.endLine}  ${d.fqn}  hash=${d.hash}"
+        val header = "${d.path}:${Format.range(d)}  ${d.fqn}  hash=${d.hash}"
         if (full || d.kind !in OutlineQuery.TYPE_KINDS || d.endLine - d.startLine <= BIG_TYPE_LINES) {
             return "$header\n${slice(d.startLine, d.endLine)}"
         }
