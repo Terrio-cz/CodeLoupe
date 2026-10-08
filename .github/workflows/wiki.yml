@@ -1,0 +1,47 @@
+name: Wiki
+
+# docs/wiki is the source of the GitHub wiki. A push to main that touches it mirrors the folder into
+# <repo>.wiki.git (tools/publish-wiki.mjs: idempotent, deletions mirrored, refuses without Home.md). A wiki that does not
+# exist yet (its first page was never created in the web UI) is a warning, not a failure.
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/wiki/**
+      - tools/publish-wiki.mjs
+      - .github/workflows/wiki.yml
+  workflow_dispatch:
+
+# One publish at a time, in order: a later run mirrors the whole folder anyway, so none is cancelled half way.
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Writing to the wiki repository is a contents: write on this job only.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      # Never publish a wiki with dead links.
+      - name: Check links
+        run: node tools/check-wiki-links.mjs
+
+      # The token reaches git through environment variables only (tools/publish-wiki.mjs); it is never printed.
+      - name: Publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node tools/publish-wiki.mjs
