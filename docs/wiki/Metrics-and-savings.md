@@ -13,6 +13,7 @@ codeloupe metrics gaps --since 2026-10-01               # where CodeLoupe calls 
 codeloupe metrics boilerplate --since 2026-09-23         # skeleton share of the new code files agents write
 codeloupe metrics hooks --since 2026-10-01               # how often the plugin's steering hook spoke and was followed
 codeloupe metrics orientation --since 2026-10-01         # ls/find/Glob in the first turns, with and without the session-start context
+codeloupe metrics weight --since 2026-10-01              # at which turn the longest sessions would have been warned that they carry too much
 ```
 
 `collect` writes one JSON report with, per role, median / p75 / sum of cost (relative price units: input 1, 5 min cache

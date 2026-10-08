@@ -14,6 +14,9 @@ object HookOutput {
         })
     }
 
+    /** A line shown to the user; the model does not get it and nothing is blocked. */
+    fun notice(text: String): JsonObject = buildJsonObject { put("systemMessage", text) }
+
     /** The tool call is refused and the model reads [reason]. */
     fun deny(reason: String): JsonObject = buildJsonObject {
         put("hookSpecificOutput", buildJsonObject {

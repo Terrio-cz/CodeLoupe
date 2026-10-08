@@ -68,6 +68,9 @@ never for documents, short files, builds, git or a repository the daemon has not
 A session in an indexed repository may begin with a line `CodeLoupe orientation for …` (branch, task, what the worktree changed, and with
 `sessionStart.map` the ranked repository map): start from it instead of `ls`, `find` or `git status`, and ask `outline`/`find`/`symbol` for the rest.
 
+The user may see a line `CodeLoupe: this session carries ~210k tokens …` when the context reaches 150k or 300k tokens: it is for them, about `/compact`
+or a fresh session; keep results small (`outline`, `symbol`, `doc` sections instead of whole files) so the next one comes later.
+
 ## If the tools fail
 
 - `connection refused` / the server shows as failed: the daemon is not running. Run `codeloupe start` (the plugin

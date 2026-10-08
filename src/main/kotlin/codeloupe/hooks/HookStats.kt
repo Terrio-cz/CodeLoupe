@@ -10,7 +10,9 @@ data class HookStats(
     val denied: Long = 0,
     /** Sessions that started with a map and the state of their worktree. */
     val sessions: Long = 0,
-    /** Calls left alone, by the reason: `off`, `ignored`, `no-context`, `not-a-search`, `other-files`, `not-indexed`, `small`, `repeat`, `capped`, `error`. */
+    /** Sessions told that they carry too much. */
+    val warnings: Long = 0,
+    /** Calls left alone, by the reason: `off`, `ignored`, `no-context`, `below-size`, `not-a-search`, `other-files`, `not-indexed`, `small`, `repeat`, `capped`, `error`. */
     val passed: Map<String, Long> = emptyMap(),
     val medianMs: Double = 0.0,
     val p95Ms: Double = 0.0,

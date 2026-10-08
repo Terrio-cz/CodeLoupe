@@ -25,7 +25,8 @@ Modes, in `<home>/config.json` (read on every call, no restart):
 
 ```json
 { "hooks": { "enabled": true, "steer": { "mode": "advise", "minLines": 150, "maxPerSession": 40, "giveUpAfter": 4 },
-             "sessionStart": { "enabled": true, "map": false, "budget": 1200, "changes": true, "changesLimit": 12 } } }
+             "sessionStart": { "enabled": true, "map": false, "budget": 1200, "changes": true, "changesLimit": 12 },
+             "weight": { "enabled": true, "warnAt": [150000, 300000], "top": 3 } } }
 ```
 
 - `advise` (default): the command runs and the model reads the equivalent call next to its result (`additionalContext`; permissions are not touched).
@@ -53,4 +54,22 @@ indexed (it never starts a build), and says nothing otherwise.
 `sessionStart.enabled: false` turns this hook off alone; `hooks.enabled: false` and `CODELOUPE_HOOKS=off` turn off all of them.
 `codeloupe metrics orientation --since 2026-10-01` counts `ls`/`find`/`tree`/`Glob` calls in the first 8 turns of sessions, with and without the
 hook's context in the transcript, to show whether the map pays for itself. `hooks.jsonl` records each start (kind, tokens, milliseconds; no text).
+
+## Session weight
+
+A long session is expensive to continue: every turn reads the whole context again. The `UserPromptSubmit` and `Stop` hooks ask the daemon
+for the weight of the session's transcript (`transcript_path` of the hook input) and, the first time the context reaches each size in
+`weight.warnAt` (default 150 000 and 300 000 tokens), show the user one line:
+
+> CodeLoupe: this session carries ~210k tokens, 62 % of it in 3 tool results (Read in turn 12, Bash in turn 13, Read in turn 14). Each turn reads it again: /compact, or start a new session when the task changes.
+
+When single results hold little (under 15 %) the line says so (`only 7 % of it in the 3 tool results that weigh most`): the weight is the conversation itself.
+The line goes to the user (`systemMessage`), not to the model, and nothing is ever blocked. A size is announced once per session, whichever of the two
+events sees it first, also across a daemon restart (`<home>/weight-warned.txt`); after `/compact` the sizes count again. Below the first size the hook is silent.
+
+The daemon reads the transcript incrementally with the parser of the metrics (a call reads only what was appended; a transcript far ahead of what was
+read, as in a session seen for the first time, is read in the background and answered from its tail meanwhile). Only names of tools and turn numbers
+leave the transcript. `GET /session-weight?path=<transcript>.jsonl` gives the same figures as JSON (`contextTokens`, `turns`, `heavy`, `level`, `complete`).
+`weight.enabled: false` turns this hook off alone. `codeloupe metrics weight --since 2026-10-01 [--longest 20]` replays the longest sessions of old
+transcripts through the verdict and prints at which turn each would have been warned.
 

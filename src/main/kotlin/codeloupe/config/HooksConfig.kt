@@ -7,13 +7,21 @@ import kotlinx.serialization.json.JsonPrimitive
  * The plugin's hooks, from `config.json` `hooks`: `enabled: false` turns every hook off at once; `steer` is the
  * `PreToolUse` hook that points shell searches and whole-file reads at CodeLoupe ([SteerConfig]); `sessionStart` is the
  * `SessionStart` hook that adds the repository map and the state of the worktree ([SessionStartConfig]). Read again on every
- * hook call, so a change needs no daemon restart.
+ * hook call, so a change needs no daemon restart. `weight` is the `UserPromptSubmit`/`Stop` hook that tells the user when a session
+ * carries too much ([WeightConfig]).
  */
 data class HooksConfig(
     val enabled: Boolean = true,
     val steer: SteerConfig = SteerConfig(),
     val sessionStart: SessionStartConfig = SessionStartConfig(),
+    val weight: WeightConfig = WeightConfig(),
 ) {
+    /**
+     * One advisory line the first time the context of a session reaches each of the [warnAt] sizes (tokens), naming the [top]
+     * tool results that weigh most. It never blocks; after `/compact` the sizes count again.
+     */
+    data class WeightConfig(val enabled: Boolean = true, val warnAt: List<Int> = listOf(150_000, 300_000), val top: Int = 3)
+
     /**
      * The context a session starts with: the worktree's state - branch, task and, when [changes] is on, the changed declarations
      * (at most [changesLimit] lines) - and, when [map] is on, the ranked map of the repository (a fresh session only), all within
@@ -44,6 +52,8 @@ data class HooksConfig(
             val start = section["sessionStart"] as? JsonObject
             val default = SteerConfig()
             val startDefault = SessionStartConfig()
+            val weight = section["weight"] as? JsonObject
+            val weightDefault = WeightConfig()
             return HooksConfig(
                 enabled = (section["enabled"] as? JsonPrimitive)?.content != "false",
                 steer = SteerConfig(
@@ -58,6 +68,11 @@ data class HooksConfig(
                     budget = number(start, "budget")?.coerceIn(100, 8_000) ?: startDefault.budget,
                     changes = (start?.get("changes") as? JsonPrimitive)?.content != "false",
                     changesLimit = number(start, "changesLimit")?.coerceIn(1, 100) ?: startDefault.changesLimit,
+                ),
+                weight = WeightConfig(
+                    enabled = (weight?.get("enabled") as? JsonPrimitive)?.content != "false",
+                    warnAt = (weight?.get("warnAt") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { n -> n > 0 } }?.sorted()?.distinct()?.takeIf { it.isNotEmpty() } ?: weightDefault.warnAt,
+                    top = number(weight, "top")?.coerceIn(1, 10) ?: weightDefault.top,
                 ),
             )
         }

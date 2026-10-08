@@ -1,5 +1,5 @@
 {
-  "description": "Starts the CodeLoupe daemon with the session, gives it the repository map, and points shell searches and whole-file reads at CodeLoupe",
+  "description": "Starts the CodeLoupe daemon with the session, gives it the repository map, points shell searches and whole-file reads at CodeLoupe, and says when a session carries too much",
   "hooks": {
     "SessionStart": [
       {
@@ -16,6 +16,28 @@
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/hook.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/hook.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
         "hooks": [
           {
             "type": "command",

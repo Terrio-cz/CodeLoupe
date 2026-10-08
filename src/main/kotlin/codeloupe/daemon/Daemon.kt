@@ -161,7 +161,7 @@ class Daemon private constructor(
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = { trackers.touch(); history.sample() })
     private val mcp = McpTools(runner, ::tools, JobTool(jobs))
     private val toolListFingerprint = mcp.fingerprint()
-    private val hooks = Hooks.create(config, registry, runner::callsOn) { trackers.projects() }
+    private val hooks = Hooks.create(config, registry, scope, runner::callsOn) { trackers.projects() }
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
     private val pid = ProcessHandle.current().pid()

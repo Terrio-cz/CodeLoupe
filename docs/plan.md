@@ -1224,6 +1224,22 @@ rozhoduje launcher.
   řádků, ale nemá zachycený výstup. Počet následných čtení v transkriptech (ověření karty) nebyl měřen: transkripty nenesou pár „souhrn →
   další čtení“ spolehlivě; měřím proto jen velikost a pokrytí.
 
+### Výsledek CL-140 — hlídač váhy relace (2026-10-09)
+
+- **Mechanismus**: hooky `UserPromptSubmit` a `Stop` (stejný skript `hook.sh`) pošlou daemonu `transcript_path`; `SessionWeights` čte transcript přírůstkově parserem metrik (`TranscriptParser` + `LineReader`, od posledního offsetu;
+  nedokončený poslední řádek počká) a vrací kontext posledního tahu, výsledky nástrojů nejvíc „přenášené“ (znaky × tahy, které je čtou, včetně příštího) a úroveň podle `weight.warnAt`. Transcript, který je daleko před přečteným
+  (relace viděná poprvé, restart daemona), se čte na pozadí a mezitím se odpoví z posledního 1 MB souboru. Řádek jde uživateli jako `systemMessage` (ne modelu), nic neblokuje; jednou na dosaženou velikost,
+  ať ji uvidí kterýkoli z hooků, a přežije restart (`weight-warned.txt`); po `/compact` se velikosti počítají znovu. `GET /session-weight?path=…jsonl` vrací totéž jako JSON (jen názvy nástrojů a čísla tahů).
+- **Prahy z dat** (`codeloupe metrics weight`, 544 hlavních relací od 2026-10-01 v Terrio transkriptech): absolutní **100k** překročí 191 relací (35 %) už v mediánu **8. tahu**, protože relace začínají v okolí 100k (systémový prompt, paměť, skilly, seznam nástrojů) —
+  to není „relace nese moc“. **150k** překročí 142 relací (26 %) v mediánu 26. tahu (7–78), **300k** 62 (11 %) v 99. tahu, 500k 29 (5 %) ve 192. Výchozí tedy **150 000 a 300 000**. Dvacet nejdelších relací týdne
+  (315 tahů v mediánu, špička kontextu 672k): varování při 150k v tahu 24 (11–55), při 300k v tahu 102 (29–148), všech 20 obou.
+- **Co nese kontext**: tři nejtěžší výsledky drží při varování jen medián **6 % (150k) a 4 % (300k)** kontextu (rozsah 1–23 %): váha je převážně samotná konverzace, ne jednotlivé výsledky (v souladu s kartou: ≈ 20 % jsou výsledky nástrojů).
+  Proto řádek jmenuje výsledky jen od 15 % kontextu, jinak říká „jen N % v nejtěžších výsledcích“; rada je vždy `/compact` nebo nová relace.
+- **Latence** (kopie skutečné relace, 10,9 MB, 3 384 řádků, 428 tahů, kontext 561k): první volání **65 ms** (z konce souboru, `complete=false`), celé přečtení na pozadí **110 ms**, další volání po připsání 4 řádků **medián 8,1 ms, max 9,7 ms**;
+  syntetický 10 MB transcript v testu: medián 6,2 ms na připsaný tah. Celý hook ≈ start bash + `curl` (viz CL-135) + těchto 8 ms; kritérium < 100 ms platí.
+- **Testy**: `SessionWeightsTest` (kontext, pořadí těžkých výsledků, přírůstkové čtení, nedokončený řádek, přepsaný transcript, čtení na pozadí, advisory bez textu, 10 MB), `WeightHooksTest` (ticho pod prvním prahem, jedna zpráva na práh z libovolného hooku,
+  po `/compact` znovu, restart nezopakuje, vypínače, `stop_hook_active`, chybějící/rozbitý soubor, parsování prahů), `SessionWeightDaemonTest` (endpoint, 404 pro nepřepis, hlavička, skript `hook.sh`).
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

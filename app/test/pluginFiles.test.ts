@@ -48,6 +48,14 @@ describe('Claude Code plugin files', () => {
     expect(script).not.toContain('set -e');
   });
 
+  it('tells the user when a session carries too much from UserPromptSubmit and Stop, through the same forwarding script', () => {
+    const hooks = JSON.parse(fs.readFileSync(path.join(pluginDir, 'hooks', 'hooks.json'), 'utf8')).hooks;
+    for (const event of ['UserPromptSubmit', 'Stop']) {
+      expect(hooks[event][0].hooks[0].command).toContain('${CLAUDE_PLUGIN_ROOT}/hooks/hook.sh');
+      expect(hooks[event][0].hooks[0].timeout).toBeLessThanOrEqual(10);
+    }
+  });
+
   it('has a skill that names every tool of the daemon', () => {
     const skill = fs.readFileSync(path.join(pluginDir, 'skills', 'codeloupe', 'SKILL.md'), 'utf8');
     expect(skill).toMatch(/^---\nname: codeloupe\ndescription: .+\n---/);
