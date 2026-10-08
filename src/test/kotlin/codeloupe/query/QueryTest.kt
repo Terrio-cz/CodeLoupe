@@ -39,10 +39,10 @@ class QueryTest {
     @Test
     fun `outline of a file and of a type`() {
         val file = OutlineQuery.run(view, "shop/Constructs.kt")
-        assertContains(file, Regex("^src/main/kotlin/com/example/shop/Constructs\\.kt {2}\\(\\d+ lines, package com\\.example\\.shop\\)"))
+        assertContains(file, Regex("^src/main/kotlin/com/example/shop/Constructs\\.kt {2}\\(\\d+ lines\\)"))
         assertContains(file, Regex("\n {2}68-75 {2}override fun handle\\(id: OrderId\\): Result"))
         val type = OutlineQuery.run(view, "OrderService")
-        assertContains(type, Regex("\n {2}85-87 {2}companion object Factory\n {4}86-86 {2}fun create"))
+        assertContains(type, Regex("\n {2}85-87 {2}companion object Factory\n {4}86 {2}fun create"))
         assertFalse("fun local" in type)
     }
 

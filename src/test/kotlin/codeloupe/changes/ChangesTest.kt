@@ -52,11 +52,11 @@ class ChangesTest {
         assertContains(text, "  ~ 4-6  [Billing] fun total(a: Int): Int")
         assertContains(text, "      callers 1: useAll (Use.kt)")
         assertContains(text, "      tests 1: BillingTest")
-        assertContains(text, "  ^ 8-8  [Billing] fun tax(a: Int, rate: Int): Int\n      was: fun tax(a: Int): Int")
-        assertContains(text, Regex("  - \\d+-\\d+  \\[Billing\\] fun legacy\\(\\): Int\n      still referenced by name 1: useAll \\(Use.kt\\)"))
-        assertContains(text, "  + 12-12  [Billing] fun discount(): Int")
-        assertContains(text, "$NEW  (new)\n  + 3-5  class Fresh  (with 1 member)\n")
-        assertContains(text, "$OLD  (deleted)\n  - 3-3  class Old")
+        assertContains(text, "  ^ 8  [Billing] fun tax(a: Int, rate: Int): Int\n      was: fun tax(a: Int): Int")
+        assertContains(text, Regex("  - \\d+  \\[Billing\\] fun legacy\\(\\): Int\n      still referenced by name 1: useAll \\(Use.kt\\)"))
+        assertContains(text, "  + 12  [Billing] fun discount(): Int")
+        assertContains(text, "./${NEW.substringAfterLast('/')}  (new)\n  + 3-5  class Fresh  (with 1 member)\n")
+        assertContains(text, "./${OLD.substringAfterLast('/')}  (deleted)\n  - 3  class Old")
         assertFalse("keep()" in text.substringBefore(NEW), "an unchanged member is not listed, line ends do not count")
         assertFalse("Extra" in text, "main's own changes are not the branch's")
     }
@@ -93,7 +93,7 @@ class ChangesTest {
         assertFalse("class Billing" in text, text)
         assertContains(text, "fun keep(): Int  (KDoc only)")
         assertContains(text, "… +4 more declarations (raise limit)")
-        assertEquals(1, text.lines().count { it.startsWith("src/main/kotlin/demo/More") }, "no file headings past the limit")
+        assertEquals(1, text.lines().count { it.startsWith("src/main/kotlin/demo/More") || it.startsWith("./More") }, "no file headings past the limit")
     }
 
     @Test
@@ -104,7 +104,7 @@ class ChangesTest {
         git(feature, "merge", "-q", "main")
         write(feature, PAY, "package demo\n\nclass Pay {\n    fun pay(a: Int, c: Int): Int = a + c\n\n    fun pay(a: String, b: Int = 0): Int = b\n}\n")
         val text = changes()
-        assertContains(text, "  ^ 4-4  [Pay] fun pay(a: Int, c: Int): Int\n      was: fun pay(a: Int): Int")
+        assertContains(text, "  ^ 4  [Pay] fun pay(a: Int, c: Int): Int\n      was: fun pay(a: Int): Int")
         assertContains(text, "may be redirected (fit the old signature, now resolve to another overload) 2: payAll (PayUse.kt) ×2")
     }
 
@@ -117,7 +117,7 @@ class ChangesTest {
         git(feature, "merge", "-q", "main")
         write(feature, "src/main/kotlin/one/Of.kt", "package one\n\nfun of(a: Int, b: Int): Int = a + b\n")
         val text = changes()
-        assertContains(text, "  ^ 3-3  fun of(a: Int, b: Int): Int")
+        assertContains(text, "  ^ 3  fun of(a: Int, b: Int): Int")
         assertFalse("may be redirected" in text, text)
     }
 
@@ -145,7 +145,7 @@ class ChangesTest {
             first.await() to second.await()
         }
         assertContains(a, "  ~ 4-6  [Billing] fun total(a: Int): Int")
-        assertContains(b, "  ~ 3-3  fun useAll(): Int")
+        assertContains(b, "  ~ 3  fun useAll(): Int")
     }
 
     @Test
@@ -153,13 +153,22 @@ class ChangesTest {
         git(feature, "rm", "-q", "--cached", USE)
         write(feature, USE, USE_TEXT.replace("total(1)", "total(5)"))
         val text = changes()
-        assertContains(text, "$USE\n  ~ 3-3  fun useAll(): Int")
+        assertContains(text, "$USE\n  ~ 3  fun useAll(): Int")
     }
 
-    private fun changes(bodies: Boolean = false, limit: Int = 60): String = runBlocking {
+    @Test
+    fun `callers of an added declaration come on request`() {
+        write(feature, BILLING, billing(extra = "\n    fun discount(): Int = 5\n"))
+        write(feature, USE, USE_TEXT.replace("Billing().legacy()", "Billing().legacy() + Billing().discount()"))
+        assertFalse("callers" in changes(), "no callers line under an added declaration")
+        assertContains(changes(callers = true), "  + 14  [Billing] fun discount(): Int\n      callers 1: useAll (Use.kt)")
+    }
+
+    private fun changes(bodies: Boolean = false, limit: Int = 60, callers: Boolean = false): String = runBlocking {
         val args = buildJsonObject {
             put("bodies", JsonPrimitive(bodies))
             put("limit", JsonPrimitive(limit))
+            put("callers", JsonPrimitive(callers))
         }
         ChangesTool.answer(registry, feature.toString(), ToolArgs(args))
     }
