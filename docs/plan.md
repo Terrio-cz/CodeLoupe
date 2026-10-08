@@ -590,6 +590,12 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   0 s CPU za 20 s v klidu, build báze 27 s. Malé repozitáře (Terrio, 2 200 zdrojů) jedou po staré cestě beze změny. Ztráta:
   soubor, který se liší od báze jen konci řádků, se v tomto režimu nepozná porovnáním textu (git ho ale při `autocrlf` většinou
   za změněný nepovažuje); rychlé čtení z předchozí báze po landu (CL-124) se pro velké repozitáře nepoužije (stál by průchod).
+- CL-117 (2026-10-08): toolchain aplikace na Vite 8.3, plugin-react 6, vitest 5 a `electron-vite` 6.0.0-beta.7 (první řada
+  s peer `vite ^8`; stabilní 5.0.0 končí u Vite 7, proto beta, přibitá přesně, Dependabot ji povýší na stabilní). Vite 8 přináší
+  `lightningcss` (MPL-2.0, 12 balíčků pro platformy): povolen úzkým pravidlem v `tools/npm-licenses.mjs`, protože jde o
+  nezměněnou build-time závislost, která se do instalátorů nedostává (renderer se builduje). `@types/node` zůstává na 24
+  (Node v Electronu 44), proto jeden `ignore` v dependabot.yml. Lockfile je z npm 10 (jako v CI): npm 9 ani `--legacy-peer-deps`
+  nezapisují licenční pole a peer záznamy, se kterými `npm ci` počítá.
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
   Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.
@@ -807,7 +813,7 @@ rozhoduje launcher.
 - Průvodce importem spouští tok CL-52 (inventář → výběr zdroje u konfliktů → import → volitelné nahrazení zdrojů odkazem → vrácení) a okno vidí jen jména, cesty a počty.
   Mazání, nahrazení zdrojů a návrat potvrzuje nativní dialog main procesu se jménem klíče a jeho spotřebiteli.
 - „Kopírovat“ je jen s OS re-autentizací (macOS Touch ID); na Windows a Linuxu Electron žádný dotaz na uživatele nemá, takže tlačítko tam není. Hodnota jde do schránky,
-  nikdy do okna, čtení je v auditu jako „CodeLoupe app (kopie do schránky)“ a schránka se po 60 s vyčistí, jen když ji nikdo mezitím nepřepsal.
+  nikdy do okna, čtení je v auditu jako „CodeLoupe app (clipboard copy)“ a schránka se po 60 s vyčistí, jen když ji nikdo mezitím nepřepsal.
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu a fixture stromu: přidání, rotace, import s nahrazením zdrojů,
   návrat bajt po bajtu a smazání; po každém kroku se hledá každá z testovacích hodnot v DOM stránky i v odpovědích daemona (nenašla se).
 
@@ -890,6 +896,61 @@ rozhoduje launcher.
   (první verze spadla na dvojtečce v popisu, proto se popis cituje), `brew style --cask` v CI proti lokálnímu tapu (našel dlouhý
   popis a chybějící `depends_on :macos`), testy v `tools/`. Neověřeno: instalace přes skutečný winget/Scoop/Homebrew, ta vyžaduje
   publikaci manifestů a vydání; to je krok vlastníka.
+
+### Výsledek aktualizací aplikace a daemona (CL-107, 2026-10-08)
+
+- **Kanál**: Windows (NSIS) a Linux (AppImage) se aktualizují samy přes `electron-updater` z GitHub vydání, integritu drží SHA-512 a
+  velikost z `latest.yml` / `latest-linux.yml` (bez `publisherName` se kontrola podpisu přeskočí, nepodepsaný instalátor by ji
+  neprošel). macOS jen oznámí novou verzi s odkazem (Squirrel.Mac chce Developer ID), stejně `.deb` a kopie ze Scoopu.
+- **Vlastní výběr vydání** (`app/src/main/update/ReleaseFeed.ts`) místo GitHub providera electron-updateru: ten rc posune jen na další
+  rc se stejným prvním identifikátorem (`rc1` → `rc2` nenajde, `rc.1` → `rc.2` ano) a z rc nikdy na finální vydání. Aplikace čte
+  `releases.atom` (jen zveřejněná vydání, draft je neviditelný), vybere nejnovější tag podle semveru a electron-updateru dá jen
+  adresář `releases/download/<tag>/`. Rc se jmenují `rc.N`.
+- **Soukromí**: jediný host je github.com (atom, `latest.yml`, instalátor s přesměrováním na CDN GitHubu); User-Agent `CodeLoupe`,
+  `Accept-Language: en`, žádné cookies; hlavičku `x-user-staging-id` (náhodné ID instalace pro postupné nasazení) electron-updater
+  vždy posílá, proto je přepsaná konstantou. Vypínač v Nastavení (`autoUpdate`) vypne i časovač; ruční „Zkontrolovat teď" zůstává.
+  `CODELOUPE_UPDATE_FEED` pro test přijme jen `http://127.0.0.1|localhost`.
+- **Výměna daemona**: instalátor (`installer.nsh`) zastaví daemon staré instalace a přepíše soubory, nová aplikace daemon spustí z nového
+  bundlu; AppImage daemona zastavit neumí, takže první spuštění nové verze starší daemon restartuje (`UpdateGuard`). Indexy:
+  `Store.FORMAT` se při změně přebuduje (už to dělal `Registry`), update-test to ověřuje podvrženým starším formátem. Nastavení
+  (`userData/settings.json`), vault tajemství a indexy (home daemona) aktualizace nezasáhne.
+- **Rollback**: před instalací se bundle běžící verze zkopíruje do `<userData>/update/previous` (≈ 180 MB, po úspěchu se maže). První běh
+  nové verze hlídá `UpdateGuard`: daemon nového bundlu má 90 s odpovědět, jinak (nebo při selhání startu) se spustí předchozí bundle,
+  zapíše se `rollback.json`, Nastavení to ukáže a upozornění vyskočí; rollback platí, dokud nepřijde další verze.
+- **Měření na Windows** (`tools/update-test.mjs`, rc.1 → rc.2, instalátor 239 MB, lokální feed): od startu aplikace po staženou,
+  ověřenou a zazálohovanou aktualizaci 13,1 s (přes loopback, na internetu rozhoduje rychlost linky), běh instalátoru 22,6 s,
+  nový daemon odpovídá 7,1 s po startu nové aplikace, rozbitý daemon → předchozí odpovídá 4,1 s po startu. Prošlo všech 24 kontrol
+  včetně: podvržený instalátor (stejná velikost, jeden změněný bajt) odmítnut, při vypnutých aktualizacích žádný požadavek,
+  nastavení a tajemství přežily, starší formát indexu přebudován. CI (`update-test` job, tři sestavení + test, ≈ 12 minut na OS,
+  rc.1 → rc.2 → rozbité rc.3): Windows runner (instalátor 231 MB) stažení a záloha 6 s, instalátor 25,9 s, nový daemon 3 s po startu,
+  návrat na předchozí 4 s; Ubuntu (AppImage 261 MB) 7,1 s, výměna souboru 0,3 s, nový daemon 5 s (starý daemon AppImage nezastaví,
+  nová aplikace ho restartuje), návrat z rozbitého rc.3 16 s. macOS se neaktualizuje samo: instalační smoke test na obou macOS
+  runnerech i na `.deb` ověří jen oznámení (falešný seznam vydání na 127.0.0.1 nabídne v99.0.0).
+- **Neověřeno**: skutečný feed na GitHubu (vyžaduje zveřejněné vydání), relaunch aplikace po instalaci (`--force-run`: instalátor ji spouští
+  s prostředím uživatele, test ji spouští sám), macOS (jen oznámení, testováno jednotkově).
+
+### Výsledek CL-63 — účty Claude a YouTrack (2026-10-08)
+
+- `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`, `default`) a YouTrack instance (`url`, `projects`, `token` = jméno
+  globálního tajemství `YOUTRACK_TOKEN_<ID>` ve storu). Bez souboru je jediným účtem `~/.claude`. Ingest čte `projects` každého vypsaného účtu a přiřazuje transcripty podle cesty
+  (`runs.path LIKE <configDir>/projects/%`), takže cena 7 d na účet je jeden SQL přes `usage_hours`; filtr Přehledu (`overview?account=`) používá stejný předpona v `hours` a `gapCount`.
+- Okna účtu: pracovní složka, která za 15 min volala CodeLoupe, patří účtu, jehož `projects/<ProjectDirName>` existuje (u dvou účtů tomu s novější změnou). E-mail účtu je jediné, co se čte z `.claude.json`.
+- YouTrack účty se k trackeru přidávají v `TrackerSettingsLoader` (token `TokenSource.Stored`, cache 30 s, spotřebitel „tracker mirror: <id>“ v auditu); mirror se staví při startu, proto přidání a odebrání
+  účtu restartuje daemon. Tracker z `config.json` je v tabulce jen ke čtení.
+- Souběh: aplikace (CLI), daemon (poznamenání použití) i test zapisují do téhož vaultu; `SecretStore` teď čte-mění-zapisuje pod zámkem `vault.env.lock` (zámek souboru + zámek JVM),
+  test se čtyřmi zapisovateli a dvěma čtenáři na samostatných instancích neztratil žádný záznam.
+- Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu, fixture složkám dvou účtů a lokálnímu fake YouTrack: přidání účtu, přejmenování, výchozí,
+  filtr Přehledu (390 → 130), přidání YouTrack účtu s tokenem, test spojení (fake instance dostala uložený token), rotace (dostala nový), odebrání (token ze storu pryč); token se nikdy neobjevil v DOM ani v odpovědích daemona.
+
+### Výsledek CL-119 — úvodní průvodce v aplikaci (2026-10-08)
+
+- `codeloupe repos add|list` (`RepoConfig`): zápis jen `workspaces.repos` do `config.json`, ostatní klíče a objektové položky s `roots` zůstanou, neplatný JSON se nepřepíše; složka bez `.git` se odmítne,
+  přidané repozitáře dostanou první dotaz, takže je daemon pozná a začne stavět index bez restartu. Průvodce volá toto CLI s cestami z nativního dialogu; stránka žádnou cestu nepíše.
+- Průvodce (čtyři kroky: repozitáře, YouTrack, Claude Code, skutečný dotaz `outline`) se ukáže, když v nastavení aplikace není `onboardingDone` a soubor před tím neexistoval (starší instalace ho nezačínají);
+  jde přeskočit po krocích i celý a z Nastavení otevřít znovu. Token YouTrack jde přes tok účtů do šifrovaného storu (klíč chrání stejný OS jako `safeStorage`, daemon ho čte podle jména).
+- Dotaz zkoušky je `outline` bez cíle (mapa repozitáře), ne `find *`: Java launcher ve Windows rozbaluje `*` v argumentech na soubory aktuální složky, takže glob v argv se do CLI nedostane.
+- Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools) na čistém profilu: první start ukáže průvodce, přidání repozitáře (jedna složka přijata, jedna odmítnuta) a zachování klíče v `config.json`,
+  účet YouTrack s tokenem (token jen ve storu, fake instance ho dostala), skutečný dotaz vrátil mapu fixture repozitáře, dokončení se zapamatovalo, z Nastavení se otevřel znovu, druhý start jde rovnou do aplikace.
 
 ## 10. Rizika
 

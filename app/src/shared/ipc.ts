@@ -4,6 +4,8 @@ import type { ActionsBridge } from './actions';
 import type { JobsBridge, LiveBridge } from './jobs';
 import type { ApiRequest } from './request';
 import type { EnvBridge } from './envActions';
+import type { AccountsBridge } from './accountActions';
+import type { OnboardingBridge } from './onboardingActions';
 
 export type DaemonPhase = 'unknown' | 'starting' | 'running' | 'stopping' | 'stopped' | 'down' | 'error';
 
@@ -49,6 +51,28 @@ export interface ClaudeConnectResult {
   manual: string[];
 }
 
+export type UpdatePhase = 'off' | 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
+
+/** What the app knows about updates (CL-107). */
+export interface UpdateState {
+  phase: UpdatePhase;
+  /** `install`: this installation updates itself; `notify`: it only says a release exists; `unavailable`: not a packaged app. */
+  mode: 'install' | 'notify' | 'unavailable';
+  /** Why the mode is not `install`, in words for the user. */
+  reason: string | null;
+  current: string;
+  /** The newer version found, if any. */
+  latest: string | null;
+  /** The release page of `latest`. */
+  releaseUrl: string | null;
+  /** Download progress 0-100 while `downloading`. */
+  percent: number | null;
+  message: string | null;
+  checkedAt: string | null;
+  /** Set when the daemon of this version failed to start and the previous one runs instead. */
+  rollback: { failedVersion: string; usingVersion: string; reason: string } | null;
+}
+
 /** The only surface the renderer gets (preload contextBridge). */
 export interface CodeLoupeBridge {
   api<T = unknown>(req: ApiRequest): Promise<ApiResult<T>>;
@@ -72,10 +96,22 @@ export interface CodeLoupeBridge {
     /** The commands for doing it by hand. */
     manual(kind: ClaudeConnectKind): Promise<string[]>;
   };
+  update: {
+    state(): Promise<UpdateState>;
+    /** Looks for a newer release now (also when automatic checks are off). */
+    check(): Promise<UpdateState>;
+    /** Restarts into the downloaded update. */
+    install(): Promise<void>;
+    /** Opens the release page of the newer version in the browser. */
+    openRelease(): Promise<boolean>;
+    onState(cb: (s: UpdateState) => void): () => void;
+  };
   actions: ActionsBridge;
   jobs: JobsBridge;
   live: LiveBridge;
   env: EnvBridge;
+  accounts: AccountsBridge;
+  onboarding: OnboardingBridge;
   metrics(): Promise<AppMetrics>;
   open: {
     worktree(id: string): Promise<boolean>;
@@ -99,6 +135,11 @@ export const CH = {
   claudeStatus: 'cl:claude:status',
   claudeConnect: 'cl:claude:connect',
   claudeManual: 'cl:claude:manual',
+  updateState: 'cl:update:state',
+  updateCheck: 'cl:update:check',
+  updateInstall: 'cl:update:install',
+  updateRelease: 'cl:update:release',
+  updatePush: 'cl:update:push',
   metrics: 'cl:metrics',
   openWorktree: 'cl:open:worktree',
   openConfig: 'cl:open:config',

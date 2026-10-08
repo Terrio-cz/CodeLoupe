@@ -24,6 +24,7 @@
     "dist": "electron-vite build && node scripts/stage-resources.mjs && electron-builder --publish never"
   },
   "dependencies": {
+    "electron-updater": "6.8.10",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
@@ -32,17 +33,17 @@
     "@types/node": "24.19.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vitejs/plugin-react": "5.2.0",
+    "@vitejs/plugin-react": "6.1.2",
     "electron": "44.6.0",
     "electron-builder": "26.15.3",
-    "electron-vite": "5.0.0",
+    "electron-vite": "6.0.0-beta.7",
     "eslint": "10.12.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.13.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.1",
-    "vite": "7.3.7",
-    "vitest": "4.1.11"
+    "vite": "8.3.4",
+    "vitest": "5.0.3"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,

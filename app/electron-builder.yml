@@ -10,8 +10,8 @@ directories:
 files:
   - out/**/*
   - package.json
-  # The renderer is bundled by Vite and main imports only Electron and Node modules.
-  - "!node_modules"
+  # The renderer is bundled by Vite; main requires Electron, Node and electron-updater (CL-107), which brings its own
+  # production dependencies along (electron-builder leaves out the dev tooling).
 extraResources:
   # stage/ is filled by scripts/stage-resources.mjs: the Gradle bundle and the Claude Code plugin.
   - from: stage/codeloupe
@@ -25,6 +25,15 @@ electronLanguages:
 artifactName: CodeLoupe-${version}-${os}-${arch}.${ext}
 # Ad hoc macOS signature (a no-op on the other platforms).
 afterPack: ./scripts/ad-hoc-sign.mjs
+# Auto-update (CL-107). `--publish never` publishes nothing; this makes electron-builder write the feed files
+# (latest.yml, latest-linux.yml: SHA-512 and size of each installer) and resources/app-update.yml. The release job attaches
+# the feed files to the draft release; the app finds a newer release itself and reads the files from that release's
+# directory (app/src/main/update), so no channel names are involved: always `latest`.
+publish:
+  provider: github
+  owner: Terrio-cz
+  repo: CodeLoupe
+  channel: latest
 
 win:
   target: nsis

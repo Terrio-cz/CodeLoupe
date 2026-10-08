@@ -16,6 +16,11 @@ const ALLOWED = new Set(['MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2
 // truncate-utf8-bytes (WTFPL, "do what you want") comes through electron-builder's file-name sanitizer; the installer
 // tooling is not part of the shipped app.
 const EXCEPTIONS = { 'node_modules/caniuse-lite': 'CC-BY-4.0', 'node_modules/truncate-utf8-bytes': 'WTFPL' };
+// lightningcss (and its per-platform binaries) comes with Vite 8 and is MPL-2.0: a file-level copyleft that binds whoever
+// modifies those files. We use it unmodified, as a build-time dependency of the app's toolchain; it is not shipped in the
+// installers (the renderer bundle is built, not linked) and nothing is vendored or patched. Decision CL-117, 2026-10-08.
+const EXCEPTION_PATTERNS = [{ path: /^node_modules\/lightningcss(-[a-z0-9-]+)?$/, license: 'MPL-2.0' }];
+const excepted = p => EXCEPTIONS[p.path] === p.license || EXCEPTION_PATTERNS.some(e => e.path.test(p.path) && e.license === p.license);
 
 function allowed(expression) {
   const tokens = expression.replace(/[()]/g, ' ').trim().split(/\s+/);
@@ -32,7 +37,7 @@ const packages = Object.entries(lock.packages).filter(([path]) => path !== '').m
   path,
 }));
 
-const violations = packages.filter(p => !(p.license && allowed(p.license)) && EXCEPTIONS[p.path] !== p.license);
+const violations = packages.filter(p => !(p.license && allowed(p.license)) && !excepted(p));
 const byLicense = {};
 for (const p of packages) byLicense[p.license ?? 'none'] = (byLicense[p.license ?? 'none'] ?? 0) + 1;
 

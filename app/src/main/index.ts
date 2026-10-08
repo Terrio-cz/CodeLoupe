@@ -19,6 +19,9 @@ import { Notifier } from './notifier';
 import { captureScreens, tour } from './screenshots';
 import { SettingsStore } from './settingsStore';
 import { AppTray } from './tray';
+import { UpdateGuard } from './update/UpdateGuard';
+import { setupUpdates } from './update/setupUpdates';
+import { UpdateDir } from './update/UpdateDir';
 import { canRecolourOverlay, titleBarOptions, titleBarOverlay, windowBackground } from './windowChrome';
 
 const DEV_URL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
@@ -47,9 +50,12 @@ async function main(): Promise<void> {
   await app.whenReady();
 
   // An installed app carries the daemon and its Java runtime in resources/codeloupe (CL-104).
-  const bundled = app.isPackaged
+  const shipped = app.isPackaged
     ? findBundledDaemon(process.resourcesPath, { appImage: process.env.APPIMAGE, stageDir: path.join(app.getPath('userData'), 'daemon'), version: app.getVersion() })
     : null;
+  // The daemon of this version did not start after an update (CL-107): the previous bundle runs until the next update.
+  const inForce = shipped ? UpdateGuard.bundleInForce(new UpdateDir(path.join(app.getPath('userData'), 'update')), app.getVersion()) : null;
+  const bundled = inForce?.bundle ?? shipped;
   const store = new SettingsStore(app.getPath('userData'), process.env, bundled);
   const home = new DaemonHome();
   let win: BrowserWindow | null = null;
@@ -73,10 +79,15 @@ async function main(): Promise<void> {
   handleAppScheme(path.join(__dirname, '../renderer'));
   nativeTheme.themeSource = store.get().theme;
 
+  const updates = setupUpdates({
+    userData: app.getPath('userData'), version: app.getVersion(), packaged: app.isPackaged, shipped, inForce, store, manager, notifier, env: process.env,
+  });
+  updates.service.on('state', s => { if (win && !win.isDestroyed()) win.webContents.send(CH.updatePush, s); });
+
   const claude = new ClaudeConnector(execClaude(), () => findMarketplace({ resources: app.isPackaged ? process.resourcesPath : null, appDir: __dirname }));
 
   const ipc = registerIpc({
-    store, manager, client, home, claude, source,
+    store, manager, client, home, claude, source, update: updates.service,
     trustedOrigins: [APP_ORIGIN, ...(DEV_URL ? [new URL(DEV_URL).origin] : [])],
     applySettings: (prev, next) => applySettings(prev, next),
   });
@@ -122,7 +133,7 @@ async function main(): Promise<void> {
   app.on('activate', () => openWindow());
   // Closing the window destroys it to free the renderer; the app lives on in the tray.
   app.on('window-all-closed', () => { /* keep running in the tray */ });
-  app.on('before-quit', () => { quitting = true; manager.dispose(); tray.destroy(); });
+  app.on('before-quit', () => { quitting = true; manager.dispose(); updates.dispose(); tray.destroy(); });
 
   const w = openWindow();
   if (TOUR) {
@@ -180,6 +191,7 @@ async function main(): Promise<void> {
     if (prev.theme !== next.theme) nativeTheme.themeSource = next.theme;
     if (prev.openAtLogin !== next.openAtLogin) app.setLoginItemSettings({ openAtLogin: next.openAtLogin });
     if (prev.apiSource !== next.apiSource) notifier.reset();
+    if (prev.autoUpdate !== next.autoUpdate) updates.service.settingsChanged();
     if (prev.portOverride !== next.portOverride || prev.apiSource !== next.apiSource) void manager.check();
     tray.update(manager.current);
   }
