@@ -30,6 +30,8 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
         "INSERT INTO refs(file_id, $REF_COLUMNS, decl_id) VALUES(?, ${List(REF_COLUMN_COUNT) { "?" }.joinToString()}, ?)",
     )
 
+    private val search = SearchIndexer(target)
+
     /** Copies [path] (already removed from the target) with a new stamp; false when the source does not have it. */
     fun copy(path: String, size: Long, mtime: Long): Boolean = copy(file, path, size, mtime)
 
@@ -37,16 +39,17 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
     fun copyIfSame(path: String, hash: String, size: Long, mtime: Long): Boolean = copy(fileWithHash.also { it.setString(2, hash) }, path, size, mtime)
 
     private fun copy(select: PreparedStatement, path: String, size: Long, mtime: Long): Boolean {
-        val (oldId, newId) = select.run {
+        val (oldId, newId, content) = select.run {
             setString(1, path)
             executeQuery().use { rs ->
                 if (!rs.next()) return false
-                rs.getLong(1) to insertFile.run {
+                val id = insertFile.run {
                     setString(1, path)
                     for (i in 2..8) setObject(i, rs.getObject(i))
                     setLong(9, size); setLong(10, mtime); setString(11, rs.getString(9))
                     insertReturningId()
                 }
+                Triple(rs.getLong(1), id, rs.getString(9))
             }
         }
         imports.rows(oldId) { rs ->
@@ -56,13 +59,19 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
         }
         // Parents precede their children (ids grow in declaration order), so every parent is mapped when needed.
         val declIds = HashMap<Long, Long>()
+        val searchEntries = ArrayList<SearchEntry>()
         decls.rows(oldId) { rs ->
             insertDecl.setLong(1, newId)
             for (i in 1..DECL_COLUMN_COUNT) insertDecl.setObject(i + 1, rs.getObject(i + 1))
             val parent = rs.getLong(DECL_COLUMN_COUNT + 2).takeUnless { rs.wasNull() }
             if (parent == null) insertDecl.setNull(DECL_COLUMN_COUNT + 2, Types.INTEGER) else insertDecl.setLong(DECL_COLUMN_COUNT + 2, declIds.getValue(parent))
-            declIds[rs.getLong(1)] = insertDecl.insertReturningId()
+            val declId = insertDecl.insertReturningId()
+            declIds[rs.getLong(1)] = declId
+            searchEntries += SearchEntry(
+                declId, rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(15) ?: "", rs.getInt(12), rs.getInt(13), rs.getInt(17) != 0,
+            )
         }
+        search.put(path, content, searchEntries)
         refs.rows(oldId) { rs ->
             insertRef.setLong(1, newId)
             for (i in 1..REF_COLUMN_COUNT) insertRef.setObject(i + 1, rs.getObject(i))
@@ -77,6 +86,8 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
 
     override fun close() {
         listOf(file, fileWithHash, imports, decls, refs, insertFile, insertImport, insertDecl, insertRef).forEach { it.close() }
+        search.close()
+        search.close()
     }
 
     private inline fun PreparedStatement.rows(fileId: Long, each: (java.sql.ResultSet) -> Unit) {
