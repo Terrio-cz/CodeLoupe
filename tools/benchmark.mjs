@@ -520,6 +520,7 @@ async function main() {
       const tl = await gn.tools();
       Object.assign(gnTools, { count: tl.length, list: tl });
       const names = JSON.parse((await gn.call('list_repos', {})).text.split('\n---')[0]).repositories;
+      resources.gitnexus.rssAfterStartMb = mb(treeRss(await snapshot(), gn.pid));
       const nameOf = r => names.find(n => path.resolve(n.path).toLowerCase() === path.resolve(r.gn).toLowerCase())?.name;
       for (const x of all) {
         if (!x.gn) { x.gnRes = null; continue; }
@@ -644,7 +645,15 @@ function renderMarkdown(d) {
     const p = pooled(results, k, r.name);
     L.push(`| ${label} | ${r.name} | ${p.n} | ${num(p.minimal)} | ${p.typical == null ? 'n/a' : num(p.typical)} | ${num(p.codeloupe)} | ${p.gitnexus == null ? 'n/a' : num(p.gitnexus)} |`);
   }
-  L.push('', '![Median tokens per question](benchmarks.svg)', '');
+  const us = results.filter(r => r.kind === 'usages');
+  L.push('', '### Usages: lines against references', '',
+    'rg counts every line that holds the word: the declaration, imports, KDoc links, string literals and unrelated symbols of the same name. CodeLoupe counts resolved references (exact plus candidate). Fewer references than lines is expected; the table is here so that a smaller answer is not mistaken for a more complete one.', '',
+    '| Repository | rg lines, median | CodeLoupe references, median | CodeLoupe references / rg lines, median |', '|---|---:|---:|---:|');
+  for (const r of [...meta.repos.map(x => x.name), null]) {
+    const rows = us.filter(x => (!r || x.repo === r) && !Number.isNaN(x.codeloupe.exact));
+    L.push(`| ${r ?? 'both'} | ${num(median(rows.map(x => x.minimal.hits)))} | ${num(median(rows.map(x => x.codeloupe.exact + (x.codeloupe.candidate || 0))))} | ${(median(rows.map(x => (x.codeloupe.exact + (x.codeloupe.candidate || 0)) / Math.max(1, x.minimal.hits)))).toFixed(2)} |`);
+  }
+  L.push('', 'Checked by hand on two items of the Exposed checkout at the commit above (`rg -n -w -g "*.kt" SCryptHasher` and `IntVectorColumnType`): the 5 lines for `SCryptHasher` are one call, the declaration, a string literal and two KDoc links (CodeLoupe: 1 reference); the 6 lines for `IntVectorColumnType` are three calls, one `is` check, the declaration and an import (CodeLoupe: 4).', '', '![Median tokens per question](benchmarks.svg)', '');
 
   L.push('### CodeLoupe against minimal grep, question by question', '', 'Minimal grep is a best case for grep (the agent never reads a line it does not need). Medians within 10 % of each other count as about the same.', '');
   const verdicts = [];
@@ -684,9 +693,9 @@ function renderMarkdown(d) {
     L.push(`| Peak memory while indexing, ${r.name} | ${a ? `${a.peakRssMb} MB (daemon + child JVM)` : 'n/a'} | ${b ? `${b.peakRssMb} MB` : 'not measured'} |`);
   }
   L.push(`| First \`changes\` in a new worktree of each repository | ${rc.perRepo.map(p => `${p.repo} ${secs(p.firstChangesMs)}`).join(', ')} | not measured (GitNexus's README describes worktrees sharing one store, with a copy updated incrementally for uncommitted changes; this script does not exercise it) |`);
-  L.push(`| Resident memory, idle | ${rc.idleRssMb} MB daemon (${rc.idleTreeRssMb} MB with children) | ${rg_.idleTreeRssMb == null ? 'not measured' : `${rg_.idleTreeRssMb} MB MCP server with the default buffer pool (${rg_.rssAfterQueriesMb} MB right after the queries)`} |`);
+  L.push(`| Resident memory, idle | ${rc.idleRssMb} MB daemon (${rc.idleTreeRssMb} MB with children) | ${rg_.idleTreeRssMb == null ? 'not measured' : `${rg_.idleTreeRssMb} MB MCP server after ${results.filter(r => r.gitnexus).length} queries, default buffer pool (${rg_.rssAfterStartMb ?? 'n/a'} MB right after it started; one Node process, the working set grows with the database pages it touches)`} |`);
   L.push(`| CPU while idle, 30 s | ${rc.idleCpuMsPer30s} ms | ${rg_.idleCpuMsPer30s == null ? 'not measured' : `${rg_.idleCpuMsPer30s} ms`} |`);
-  L.push(`| Files written into the repository checkout by indexing | ${rc.perRepo.map(p => `${p.repoWrites.files} (${p.repo})`).join(', ')} | ${rg_.perRepo.length ? rg_.perRepo.map(p => `${p.repoWrites.files} (${p.repo}: ${p.repoWrites.top.join(', ')})`).join(', ') : 'not measured'} |`);
+  L.push(`| Files written into the repository checkout by indexing (GitNexus: by default, \`--skip-agents-md\` and \`--skip-skills\` turn it off) |${rc.perRepo.map(p => `${p.repoWrites.files} (${p.repo})`).join(', ')} | ${rg_.perRepo.length ? rg_.perRepo.map(p => `${p.repoWrites.files} (${p.repo}: ${p.repoWrites.top.join(', ')})`).join(', ') : 'not measured'} |`);
   L.push(`| Index on disk | ${mbOf(rc.homeBytes)} (both repositories, whole home) | ${rg_.perRepo.length ? rg_.perRepo.map(p => `${p.repo} ${mbOf(p.homeBytes)}`).join(', ') : 'not measured'} |`);
   L.push(`| Daemon / server start | ${num(rc.startMs)} ms (\`codeloupe start\`) | the MCP server starts with the client |`, '');
   const missed = [];
