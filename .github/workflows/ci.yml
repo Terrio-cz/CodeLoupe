@@ -242,6 +242,11 @@ jobs:
           name: installer-${{ matrix.os }}
           path: installers
 
+      # `import` takes the screenshot of the virtual display; it is not on the runner image.
+      - name: Install ImageMagick
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends imagemagick
+
       - name: Install, run, query, uninstall
         shell: bash
         run: |
