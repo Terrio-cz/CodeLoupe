@@ -122,6 +122,9 @@ class Registry(
         return mergeBases.changes(repo(location.commonDir), location.worktree, withBefore = false)
     }
 
+    /** The state of [worktree]'s overlay layer on [repo]'s base (see [Overlays.layer]); reads state only, starts nothing. */
+    fun layer(worktree: String, repo: RepoState): String = overlays.layer(worktree, synchronized(repo) { repo.baseCommit })
+
     /** The main worktree of the repository whose git common dir is [commonDir]. */
     fun mainWorktree(commonDir: String): Path = Path.of(if (commonDir.endsWith("/.git")) commonDir.removeSuffix("/.git") else commonDir)
 

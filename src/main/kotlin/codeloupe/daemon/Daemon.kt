@@ -36,6 +36,8 @@ import codeloupe.platform.Timings
 import codeloupe.repo.Registry
 import codeloupe.tracker.TrackerSettingsLoader
 import codeloupe.tracker.Trackers
+import codeloupe.uiapi.UiApi
+import codeloupe.uiapi.uiApiRoutes
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
 import codeloupe.workspace.WorkspaceRef
@@ -101,9 +103,11 @@ class Daemon private constructor(
     val events = EventBus(eventStore, webhooks)
     val registry = Registry(config, queue, log = ::log, emit = events::emit)
     val jobs = JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
-    private val trackers = Trackers.open(TrackerSettingsLoader.load(config.home), config.home, scope, ::log)
+    private val trackerSettings = TrackerSettingsLoader.load(config.home)
+    private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
     private val tools = Tools.catalog(trackers)
     private val workspaces = Workspaces(config, registry, trackers)
+    private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope)
     private val resources = ResourceInventory(config, workspaces)
     private val reconcileConfig = config.workspaces.reconcile
     private val releases = ReleaseStore(config.home.resolve("releases.json"))
@@ -237,6 +241,7 @@ class Daemon private constructor(
             releaseRoutes(workspaces, releases, reconciler, ::released)
             portRoutes(ports)
             eventRoutes(events, webhooks, webhookKey)
+            uiApiRoutes(uiApi)
             post("/shutdown") {
                 val pending = jobs.pending()
                 if (pending > 0 && call.parameters["force"] != "1") {

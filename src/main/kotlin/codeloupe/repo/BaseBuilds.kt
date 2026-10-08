@@ -152,6 +152,7 @@ internal class BaseBuilds(
                 put("files", result.files)
                 put("errors", result.errors)
                 put("ms", result.ms)
+                result.peakRssMb?.let { put("peakRssMb", it) }
             },
         )
         result
