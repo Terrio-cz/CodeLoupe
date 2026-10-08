@@ -659,14 +659,29 @@ interface Gaps {
 }
 ```
 
-### 9.13 `GET /ui-api/v1/environment` (CL-54; jen metadata, nikdy hodnoty)
+### 9.13 `GET /ui-api/v1/environment` (CL-54, CL-55; jen metadata, nikdy hodnoty)
 ```ts
 interface Environment {
   keys: { name: string; scope: 'global' | 'repo' | 'workspace'; scopeRef: string | null;
-          source: 'store' | 'env' | 'file'; consumers: string[]; lastUsedAt: Iso | null; updatedAt: Iso }[];
-  storeReady: boolean;                 // false, dokud není CL-50
+          source: 'store' | 'file'; sourceRef: string | null;   // file = importováno z cesty sourceRef
+          consumers: string[]; reads: number;                  // z auditu, poslední čtenář první
+          lastUsedAt: Iso | null; createdAt: Iso; updatedAt: Iso;   // updatedAt = rotace, jinak vytvoření
+          ageDays: number; rotationDue: boolean }[];           // rotationDue: starší než rotationDays
+  storeReady: boolean;                 // false, dokud nefunguje žádný ochránce klíče (OS úložiště ani heslo)
+  rotationDays: number;                // config.json secrets.rotationDays, výchozí 90, 0 = připomínky vypnuty
 }
 ```
+
+### 9.13b `GET /ui-api/v1/environment/audit?name=&scope=&limit=` (CL-55)
+```ts
+interface EnvironmentAudit {
+  events: { at: Iso; name: string; scope: 'global' | 'repo' | 'workspace'; scopeRef: string | null;
+            action: 'read' | 'created' | 'rotated' | 'removed'; consumer: string }[];   // nejnovější první, limit 1..500 (100)
+}
+```
+Audit je append-only soubor `<home>/secrets/audit.log` (řádek JSON na událost, bez hodnoty); po 4 MB se přejmenuje na
+`audit.log.1`, takže zůstane zhruba 8 MB historie. Čtení zapisuje spotřebitele z `x-codeloupe-used-by` (`/env/values`) nebo
+`env run: <program>`; maskování hodnot a čtení metadat se nezapisuje.
 
 ### 9.13a `GET /ui-api/v1/accounts` (CL-63; jen metadata, nikdy tokeny)
 ```ts
@@ -763,7 +778,7 @@ Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevol
 | `tasks`, `tasks/{id}` | jen mirror (nikdy dotaz na tracker), kurzor = offset | `reads` 0, `mirror.lastReadAt` null (žádný čítač čtení) |
 | `index` | registr repozitářů, velikost a počty z indexu, sestavení z `build.done`/`overlay.refreshed` v `events.db` | `firstLine` chyb parseru 0, `kind` plného a inkrementálního buildu se neliší |
 | `gaps` | `report`: soubor `<home>/gaps-report.json` z `codeloupe metrics gaps --out` (příklady projdou scrubberem) | `summary` a `items` prázdné do ingestu (CL-62) |
-| `environment` | – | `keys: []`, `storeReady: false` do úložiště tajemství (CL-50) |
+| `environment` | metadata vaultu + audit (CL-50, CL-55); nikdy hodnota | `keys: []`, `storeReady: false`, dokud nefunguje žádný ochránce klíče |
 | `settings` | konfigurace daemonu, mirror, `tokenConfigured` (hodnota se nikdy nečte ven) | `budgets.dailyWeighted` null |
 | `events` | `events.db` + `epoch` (nová tabulka `meta`): `build_finished`, `build_failed` | `budget_breach`, `gap_new` se zatím nevysílají |
 

@@ -33,6 +33,7 @@ const SPECS: Record<Resource, ResourceSpec> = {
   index: ui('index'),
   gaps: ui('gaps', ['range', 'tool', 'reason']),
   environment: ui('environment'),
+  'environment/audit': ui('environment/audit', ['name', 'scope', 'limit']),
   settings: ui('settings'),
   events: ui('events', ['since', 'limit']),
   'status/history': daemon('/status/history'),

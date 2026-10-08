@@ -4,6 +4,8 @@ import {
   type DaemonEvent,
   type DaemonSettings,
   type Environment,
+  type EnvironmentAction,
+  type EnvironmentAudit,
   type Events,
   type GapReport,
   type Gaps,
@@ -31,6 +33,7 @@ function weighted(t: Tokens): number {
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
+const ROTATION_DAYS = 90;
 
 /** Small seeded PRNG so every launch shows the same data. */
 export function rng(seed: number): () => number {
@@ -349,18 +352,38 @@ export class MockData {
   }
 
   environment(): Environment {
-    const k = (name: string, scope: Environment['keys'][number]['scope'], scopeRef: string | null, source: Environment['keys'][number]['source'], consumers: string[], usedH: number | null, updatedD: number) =>
-      ({ name, scope, scopeRef, source, consumers, lastUsedAt: usedH === null ? null : iso(this.now - usedH * HOUR), updatedAt: iso(this.now - updatedD * DAY) });
+    const k = (name: string, scope: Environment['keys'][number]['scope'], scopeRef: string | null, source: Environment['keys'][number]['source'], consumers: string[], usedH: number | null, updatedD: number): Environment['keys'][number] =>
+      ({
+        name, scope, scopeRef, source, sourceRef: source === 'file' ? 'C:/Users/dev/IdeaProjects/TerrioImporter/.env' : null, consumers, reads: consumers.length * 7,
+        lastUsedAt: usedH === null ? null : iso(this.now - usedH * HOUR), createdAt: iso(this.now - (updatedD + 3) * DAY), updatedAt: iso(this.now - updatedD * DAY),
+        ageDays: updatedD, rotationDue: updatedD >= ROTATION_DAYS,
+      });
     return {
-      storeReady: false,
+      storeReady: true,
+      rotationDays: ROTATION_DAYS,
       keys: [
-        k('YOUTRACK_TOKEN', 'global', null, 'env', ['youtrack MCP', 'codeloupe mirror'], 0.05, 9),
+        k('YOUTRACK_TOKEN', 'global', null, 'store', ['youtrack MCP', 'codeloupe mirror'], 0.05, 9),
         k('TERRIO_API_KEY', 'repo', 'TerrioImporter', 'file', ['run/terrio.mjs api'], 20, 14),
-        k('GITHUB_TOKEN', 'global', null, 'env', ['gh'], 3, 30),
-        k('POSTGRES_PASSWORD', 'repo', 'TerrioImporter', 'file', ['docker compose'], 1, 60),
-        k('MOBBIN_API_KEY', 'workspace', 'terrio', 'env', [], null, 2),
+        k('GITHUB_TOKEN', 'global', null, 'store', ['gh'], 3, 120),
+        k('POSTGRES_PASSWORD', 'repo', 'TerrioImporter', 'file', ['docker compose'], 1, 95),
+        k('MOBBIN_API_KEY', 'workspace', 'terrio', 'store', [], null, 2),
       ],
     };
+  }
+
+  environmentAudit(name: string | null, limit: number): EnvironmentAudit {
+    const e = (hoursAgo: number, n: string, scope: EnvironmentAudit['events'][number]['scope'], scopeRef: string | null, action: EnvironmentAction, consumer: string) =>
+      ({ at: iso(this.now - hoursAgo * HOUR), name: n, scope, scopeRef, action, consumer });
+    const all = [
+      e(0.05, 'YOUTRACK_TOKEN', 'global', null, 'read', 'youtrack MCP'),
+      e(0.4, 'YOUTRACK_TOKEN', 'global', null, 'read', 'codeloupe mirror'),
+      e(1, 'POSTGRES_PASSWORD', 'repo', 'TerrioImporter', 'read', 'docker compose'),
+      e(3, 'GITHUB_TOKEN', 'global', null, 'read', 'gh'),
+      e(20, 'TERRIO_API_KEY', 'repo', 'TerrioImporter', 'read', 'run/terrio.mjs api'),
+      e(48, 'MOBBIN_API_KEY', 'workspace', 'terrio', 'created', 'app'),
+      e(216, 'YOUTRACK_TOKEN', 'global', null, 'rotated', 'app'),
+    ];
+    return { events: all.filter(x => name === null || x.name === name).slice(0, limit) };
   }
 
   settings(): DaemonSettings {

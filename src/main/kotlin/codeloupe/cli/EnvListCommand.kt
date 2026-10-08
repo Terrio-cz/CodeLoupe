@@ -13,12 +13,13 @@ class EnvListCommand : CliktCommand(name = "list") {
     private val repository by option("--repo", help = "...and in this repository")
     private val all by option("--all", help = "Every stored name of every scope").flag()
 
-    override fun help(context: Context) = "Names, scopes, sources and last use of the stored secrets; never a value."
+    override fun help(context: Context) = "Names, scopes, sources and last use of the stored secrets, ROTATE on those past the rotation age; never a value."
 
     override fun run() {
-        val store = SecretStore.open(ConfigLoader.load().home)
+        val config = ConfigLoader.load()
+        val store = SecretStore.open(config.home)
         val metas = if (all || (workspace == null && repository == null)) store.list() else store.visible(SecretStore.chain(workspace, repository))
         if (metas.isEmpty()) return echo("no secrets stored")
-        SecretReport.lines(metas).forEach(::echo)
+        SecretReport.lines(metas, config.secrets.rotationDays).forEach(::echo)
     }
 }

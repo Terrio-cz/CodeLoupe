@@ -7,7 +7,7 @@ import com.github.ajalt.clikt.core.subcommands
 /** `codeloupe env …` — the secret store: names and scopes in the clear, values only into a process started by `env run`. */
 class EnvCommand : CliktCommand(name = "env") {
     init {
-        subcommands(EnvListCommand(), EnvSetCommand(), EnvUnsetCommand(), EnvRunCommand(), EnvImportCommand())
+        subcommands(EnvListCommand(), EnvSetCommand(), EnvUnsetCommand(), EnvRunCommand(), EnvImportCommand(), EnvAuditCommand())
     }
 
     override fun help(context: Context) =
