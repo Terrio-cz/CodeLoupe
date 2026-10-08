@@ -327,3 +327,17 @@ pre.log.full { max-height: 420px; }
 .banner.info { border-left-color: var(--accent); }
 .form-row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; min-height: 36px; }
 .form-row > .label { color: var(--text-2); }
+
+/* Environment: add/rotate form and import wizard (CL-54) */
+.key-form { display: flex; flex-direction: column; gap: 12px; }
+.drawer-actions { display: flex; gap: 8px; margin-top: 4px; }
+.row-actions { display: inline-flex; gap: 6px; }
+.row-actions .btn { min-height: 24px; padding: 0 8px; }
+.import-table { table-layout: fixed; width: 100%; }
+table.data.import-table th, table.data.import-table td { white-space: normal; overflow-wrap: anywhere; }
+table.data.import-table td { vertical-align: top; height: auto; padding-top: 6px; padding-bottom: 6px; }
+.import-table.choose th:first-child { width: 84px; }
+.import-table ul.sources { margin: 0; padding: 0; list-style: none; }
+.import-table ul.sources li { overflow-wrap: anywhere; }
+.import-options { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; margin: 0; }
+.flags { display: inline-flex; flex-direction: column; gap: 2px; }

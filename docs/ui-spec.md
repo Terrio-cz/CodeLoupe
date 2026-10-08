@@ -266,23 +266,27 @@ Prostředí                       [Rozsah ▾] [🔍 hledat klíč]          [Im
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Hodnota se nikdy nezobrazí** po uložení; API ji nevrací vůbec (§ 9.13). Ve verzi CL-43 je obrazovka
-  jen ke čtení; tlačítka zápisu jsou neaktivní s popiskem „CL-54“.
+- **Hodnota se nikdy nezobrazí** po uložení; API ji nevrací vůbec (§ 9.13).
+- Sloupec Stáří (CL-55) značí klíč starší než `secrets.rotationDays` slovem „rotovat“; pod tabulkou je audit čtení a změn.
+- Odkazy `#/environment?add=1` a `#/environment?import=1` otevřou rovnou drawer přidání a průvodce importem.
 - „Naposledy“ a „Spotřebitelé“ = audit injektáže tajemství do procesů (CL-51, CL-55): každé vydání hodnoty
   procesu zapíše `name, consumer, at` (bez hodnoty).
 
 #### 3.7.1 Zápisové toky (CL-54)
 
 Úložiště: šifrovaný store (CL-50); aplikace hodnoty nikdy nedrží déle, než je nutné. Kanály IPC
-`env.set`, `env.rotate`, `env.delete`, `env.import.*`, `env.reveal` existují až s CL-54 a mají vlastní
-validaci (jméno `^[A-Z][A-Z0-9_]{0,63}$`, hodnota ≤ 16 KB).
+`env.capabilities`, `env.set` (přidání i rotace), `env.remove`, `env.scan`, `env.importRun`, `env.rollback`,
+`env.reveal` (`src/shared/envActions.ts`) mají vlastní validaci v main (jméno `^[A-Za-z_][A-Za-z0-9_]{0,63}$` jako store,
+hodnota 1 B až 16 KB bez NUL, rozsah `global` / `workspace:<cesta>` / `repo:<cesta>`, ID položek `^[0-9a-f]{12}$`).
+Main store sám nezapisuje: spustí CLI (`env set`, `env unset`, `env import …`, bez shellu) a hodnotu mu pošle na stdin, takže
+trezor, jeho ochrana klíče i audit zůstávají na jednom místě. Při zdroji dat Mock se nezapisuje nic.
 
 | Tok | Kroky |
 |---|---|
 | Přidat / upravit | Drawer „Přidat klíč“: jméno, rozsah, hodnota (`type=password`, bez autocomplete a spellchecku). Odeslání pošle hodnotu jediným voláním `env.set` do main procesu, renderer ihned vymaže stav pole a hodnotu nikdy nedostane zpět. Main ji uloží do storu (CL-50, klíč storu chráněný `safeStorage` / OS keychainem) a vrátí jen metadata. |
 | Rotovat | Stejný drawer s předvyplněným jménem; stará hodnota se nezobrazí, po uložení audit „rotated“. |
 | Import (wizard) | 1) Inventář: main projde Claude složky (CL-52) a vrátí jen jména, zdroj a počet výskytů. 2) Potvrzení: uživatel zaškrtne, co importovat. 3) Import: main přesune hodnoty do storu, renderer vidí jen průběh. 4) Volitelně nahrazení zdroje odkazem na store (CL-53) s náhledem změn (jen cesty a jména). |
-| Odhalit | Jen po OS re-auth: Windows Hello přes nativní helper (Electron nemá API), macOS `systemPreferences.promptTouchID`, Linux heslo přes polkit. Hodnota se ukáže v modálním okně vlastněném main procesem (ne v rendereru aplikace), zkopírovat jde jedním tlačítkem, okno se samo zavře po 30 s; po 60 s se schránka vyčistí, jen pokud stále obsahuje odhalenou hodnotu (porovnání hashe). |
+| Kopírovat | Jen po OS re-auth: macOS `systemPreferences.promptTouchID`; Windows Hello a polkit by chtěly nativní helper, který aplikace nemá, takže tam se tlačítko nenabízí vůbec (`env.capabilities`). Hodnotu nikdy nedostane renderer ani okno: main ji přečte z daemona jako pojmenovaného spotřebitele (zapíše se do auditu), vloží do schránky a po 60 s schránku vyčistí, jen pokud stále obsahuje tutéž hodnotu (porovnání hashe). |
 | Smazat | Potvrzovací dialog main procesu se jménem klíče a jeho spotřebiteli. |
 
 ### 3.7a Workspaces (CL-72)
@@ -902,7 +906,7 @@ stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 
     (worktree musí být v registru, role `worktree`; klíče musí být v plánu s verdiktem `confirm`), ukáže nativní
     potvrzovací dialog s tím, co se změní, a teprve pak volá daemon (`POST` s hlavičkou `x-codeloupe`, bez `Origin`).
     Bez důvěryhodného daemonu a v mock režimu se neprovedou.
-  - `env.*` (§ 3.7.1) — přibudou až s CL-54, se stejnou kontrolou odesílatele a vlastní validací.
+  - `env.*` (§ 3.7.1, CL-54) — se stejnou kontrolou odesílatele a vlastní validací; potvrzení mazání a nahrazení zdrojů dělá nativní dialog main procesu.
   - `open.worktree` a `open.external` jen když `/status.pid` odpovídá `daemon.json` (§ 8) — cizí proces na
     portu nic neotevře; `open.config` skládá cestu lokálně a kontrolu nepotřebuje.
 - `setPermissionRequestHandler` a `setPermissionCheckHandler` → vše zamítnout; `will-attach-webview` → zamítnout;
@@ -946,4 +950,4 @@ stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 
 
 - Obrazovky v prohlížeči na `/ui` (CL-40): prohlížeč posílá `Origin` jen u cross-origin a POST požadavků;
   pro same-origin GET z `/ui` bude potřeba vlastní rozhodnutí o ověření (token v URL fragmentu) — až s CL-40.
-- Zápisy prostředí (CL-54), auto-update, balení instalátoru (CL-45).
+- Auto-update a balení instalátoru (CL-45).
