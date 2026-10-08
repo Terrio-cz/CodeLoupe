@@ -28,5 +28,10 @@ if [ -z "$port" ]; then
 fi
 [ -n "$port" ] || exit 0
 
-curl -sf --connect-timeout 0.3 -m 2 -H 'x-codeloupe: 1' -H 'content-type: application/json' --data-binary @- "http://127.0.0.1:$port/hook" 2>/dev/null
+# A tool call is judged in milliseconds; a session start may wait for the repository map.
+IFS= read -r -d '' body
+wait=2
+case "$body" in *SessionStart*) wait=10 ;; esac
+
+curl -sf --connect-timeout 0.3 -m "$wait" -H 'x-codeloupe: 1' -H 'content-type: application/json' --data-binary @- "http://127.0.0.1:$port/hook" <<<"$body" 2>/dev/null
 exit 0

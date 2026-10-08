@@ -1093,7 +1093,7 @@ rozhoduje launcher.
 - **Latence** (stroj s desítkou paralelních oken, Git Bash, `spawnSync` jako Claude Code): rozhodnutí v daemonu **medián 3,5 ms, p95 6,8 ms** (při souběhu 9 / 18 ms; `/status` `hooks`);
   celý skript (start bash ≈ 32–36 ms + `curl` + daemon) **medián 62–87 ms při zátěži, 45 ms naprázdno** (měřeno proti pahýlu trasy). Kritérium „< 50 ms“ je tedy splněno jen naprázdno; čas
   dominuje start procesu bash, ne daemon. `bash /dev/tcp` místo `curl` ušetří ≈ 20 ms, ale na Windows nemá časový limit a na mrtvý port čeká ≈ 2 s (měřeno), proto zůstává `curl --connect-timeout 0.3`.
-  Zbytek (hook typu `http` bez procesu) je v nové kartě.
+  Zbytek (hook typu `http` bez procesu) je v kartě CL-146.
 - **Rozhodnutí**: výchozí `advise` (nic se neodmítá); soubory nové na větvi, které ještě nejsou v bázi, se berou jako neindexované.
 
 ### Výsledek CL-137 — vyhledávání pojmů nad deklaracemi (2026-10-08)
@@ -1161,6 +1161,23 @@ rozhoduje launcher.
   (~0,45 s), které na skenu nezávisí. Čtyři čtení tedy stojí jeden sken místo čtyř (součet −70 %), stěna při souběhu klesla o 15–40 %, ale pod 1,2 s se na 65 workspacech nedostala.
   Dál se nezrychlovalo (paralelní sken worktrees, souběh čtení procesů se skenem) bez dalšího měření; první čtení po startu zůstává o vteřiny delší (zahřívá JGit a historii úkolů).
 
+### Výsledek CL-136 — kontext na začátku relace (2026-10-09)
+
+- **Mechanismus**: `start-daemon.sh` (SessionStart `startup|resume|clear|compact`) po `codeloupe start` předá stdin skriptu `hook.sh` a ten zeptá daemona (`POST /hook`, čekání až 10 s).
+  `SessionContext` (daemon): jen pro git repozitář, který daemon už zaindexoval (build se nikdy nespouští), jinak 204. **Stav worktree** vždy: větev, id úkolu z názvu větve (`TaskPattern`),
+  výchozí větev a `changes` bez řádků s volajícími (nejvýš `changesLimit` řádků). **Mapa** (`outline` bez cíle, `focus` = změněné soubory, nejvýš 8) jen s `sessionStart.map: true`, v rozpočtu `budget`
+  tokenů (výchozí 1 200, 3,2 znaku na token jako `RepoMap`); stav smí zabrat 40 % rozpočtu. Resume/compact dostanou jen stav. Vypnutí: `sessionStart.enabled`, `hooks.enabled`, `CODELOUPE_HOOKS=off`.
+- **Rozpočet naměřený** (dva daemony na jednorázové domovině, `start-probe`): TerrioImporter (master, bez změn) **1 171 tokenů** (3 747 znaků, 63 řádků), CodeLoupe (větev s 9 změněnými soubory) **1 172 tokenů** (75 řádků); stav
+  samotný (resume, výchozí podoba) 54 tokenů bez změn a 399 tokenů s 63 změněnými deklaracemi. Čas hooku medián 0,67–0,83 s pro mapu (`changes` je většina), 0,2–0,7 s pro stav; start relace to unese, `PreToolUse` ne, proto je to jiný skript s delším limitem.
+- **Základní stav bez háčku** (`codeloupe metrics orientation --since 2026-10-01`, Terrio transkripty): 544 hlavních relací, **206 orientačních volání** (`ls` 188, `Glob` 10, `find` 8) v prvních 8 tazích, tj. **0,38 na relaci**, 166 relací (30 %) aspoň jedno.
+  Jejich výsledky stojí **≈ 256 tokenů na relaci**; ve stejných 8 tazích stojí čtení souborů ≈ 3 900 a hledání/čtení shellem ≈ 2 550 tokenů na relaci. Mapa o 1 200 tokenech je tedy 4,7× dražší než orientační příkazy, které by nahradila,
+  a zaplatí se jen tehdy, když ušetří aspoň pětinu čtení a hledání těch prvních tahů (a mapa se v kontextu veze celou relaci). Hlavní relace Terria běží navíc v pracovním adresáři mimo git repozitář: háček v nich mlčí.
+  **Rozhodnutí**: stav worktree je zapnutý (stojí desítky až stovky tokenů a nahrazuje `git status`/`changes`), mapa je **vypnutá** (`map: false`), dokud srovnání s/bez háčku neukáže přínos: `metrics orientation` už rozdělí relace podle toho,
+  zda transkript začíná řádkem `CodeLoupe orientation for …`.
+- **Testy**: `SessionStartDaemonTest` (skutečný daemon a repozitář na větvi `TER-5-…`: nezaindexovaný repozitář a ne-git adresář = 204 a žádný build, stav + mapa v rozpočtu, bez map jen stav, resume/compact, rozpočet 300 a přepínače čtené při každém volání,
+  nečitelný `config.json` = výchozí hodnoty, skript `start-daemon.sh` bez `codeloupe` v PATH, mrtvý port, `CODELOUPE_HOOKS=off`), `OrientationScanTest`.
+- **Zbytek**: měření „s a bez“ na pěti úkolech potřebuje relace, které háček skutečně dostaly; kritérium je přepsáno na základní stav a hotový nástroj a srovnání přešlo do karty CL-148.
+
 ### Výsledek CL-145 — README jako úvodní stránka, detail ve wiki (2026-10-09)
 
 - README (827 → ~130 řádků) je úvod: co a proč s grafem benchmarku, rychlý start (CLI, plugin), tabulka nástrojů, odkazy na
@@ -1175,6 +1192,23 @@ rozhoduje launcher.
   `tools/check-wiki-links.mjs` (stránky, nadpisy, soubory repozitáře, obrázky, README → wiki, sidebar) v CI i před publikací.
 - Pravidla psaní: odkaz na stránku je `[text](Page-Name#nadpis)`, na soubor repozitáře plná adresa `github.com/.../blob/main/...`
   (relativní cesty ve wiki nefungují). Nová funkce = nový řádek v README jen u nástroje; popis patří na stránku wiki.
+
+### Výsledek CL-139 — chyby překladu a testů s deklarací (2026-10-09)
+
+- **Rozhodnutí**: souhrn `run` po neúspěšném příkazu (exit ≠ 0) projde `triage`: chyby `e:` Gradlu/Kotlinu, `kotlinc` a `javac` se seskupí
+  podle nejvnitřnější nelokální deklarace (`path:od-do  [Kontejner] fun x(…)  · symbol Kontejner.x hash=…`, pod tím `řádek:sloupec  zpráva`,
+  stejné zprávy v jedné deklaraci sloučené `×n`). Zpráva, která se opakuje ve 3 a více deklaracích (kaskáda z jednoho chybějícího symbolu), se
+  řekne jednou: `same error ×3 in 3 declarations` s první deklarací. Neúspěšný test: první selhání jako `expected <a>, was <b>` (jiná výjimka
+  se jen zkrátí o balíček) a rámce vlastního kódu; první rámec v produkčním kódu nese deklaraci a volání `symbol`, bez něj první rámec
+  (test). Jméno v zpětných apostrofech `symbol` nepřečte, proto se adresuje `Soubor.kt:řádek`. Co index nezná (jiný repozitář, generovaný
+  soubor), zůstává řádek po řádku jako dosud. Souhrn nikdy neroste o víc než 15 % (jinak se vrátí původní).
+- **Fixtury**: skutečné výstupy `./gradlew compileKotlin`, `compileJava` (javac) a `test` z malého projektu s chybami
+  (`src/test/resources/outputs/triage`, cesty a jména přepsané, zdroje v `fixtures/triage`), test `TriageTest` (4 testy).
+- **Velikost souhrnu** (end-to-end přes daemon, stejné výstupy dřív → teď): Kotlin chyby 727 → 818 znaků (+12,5 %), javac 629 → 684 (+8,7 %),
+  neúspěšné testy 662 → 583 (−12 %).
+- **Mezery**: kontextové řádky `javac` (`symbol:`, `location:`) zůstávají za seskupenými chybami; `kotlinc` mimo Gradle má stejný formát
+  řádků, ale nemá zachycený výstup. Počet následných čtení v transkriptech (ověření karty) nebyl měřen: transkripty nenesou pár „souhrn →
+  další čtení“ spolehlivě; měřím proto jen velikost a pokrytí.
 
 ## 10. Rizika
 

@@ -5,13 +5,22 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * The plugin's hooks, from `config.json` `hooks`: `enabled: false` turns every hook off at once; `steer` is the
- * `PreToolUse` hook that points shell searches and whole-file reads at CodeLoupe ([SteerConfig]). Read again on every hook
- * call, so a change needs no daemon restart.
+ * `PreToolUse` hook that points shell searches and whole-file reads at CodeLoupe ([SteerConfig]); `sessionStart` is the
+ * `SessionStart` hook that adds the repository map and the state of the worktree ([SessionStartConfig]). Read again on every
+ * hook call, so a change needs no daemon restart.
  */
 data class HooksConfig(
     val enabled: Boolean = true,
     val steer: SteerConfig = SteerConfig(),
+    val sessionStart: SessionStartConfig = SessionStartConfig(),
 ) {
+    /**
+     * The context a session starts with: the worktree's state - branch, task and, when [changes] is on, the changed declarations
+     * (at most [changesLimit] lines) - and, when [map] is on, the ranked map of the repository (a fresh session only), all within
+     * [budget] tokens. The map is off until the comparison of sessions with and without it (`codeloupe metrics orientation`) says it pays.
+     */
+    data class SessionStartConfig(val enabled: Boolean = true, val map: Boolean = false, val budget: Int = 1_200, val changes: Boolean = true, val changesLimit: Int = 12)
+
     /**
      * `mode` is `advise` (the command runs and the model is told the equivalent CodeLoupe call), `redirect` (the first
      * time, the command is refused with the equivalent call; the same command again runs) or `off`. A source file counts as
@@ -32,7 +41,9 @@ data class HooksConfig(
             if (hooks is JsonPrimitive) return HooksConfig(enabled = hooks.content != "false")
             val section = hooks as? JsonObject ?: return HooksConfig()
             val steer = section["steer"] as? JsonObject
+            val start = section["sessionStart"] as? JsonObject
             val default = SteerConfig()
+            val startDefault = SessionStartConfig()
             return HooksConfig(
                 enabled = (section["enabled"] as? JsonPrimitive)?.content != "false",
                 steer = SteerConfig(
@@ -40,6 +51,13 @@ data class HooksConfig(
                     minLines = number(steer, "minLines")?.coerceAtLeast(1) ?: default.minLines,
                     maxPerSession = number(steer, "maxPerSession") ?: default.maxPerSession,
                     giveUpAfter = number(steer, "giveUpAfter")?.coerceAtLeast(1) ?: default.giveUpAfter,
+                ),
+                sessionStart = SessionStartConfig(
+                    enabled = (start?.get("enabled") as? JsonPrimitive)?.content != "false",
+                    map = (start?.get("map") as? JsonPrimitive)?.content == "true",
+                    budget = number(start, "budget")?.coerceIn(100, 8_000) ?: startDefault.budget,
+                    changes = (start?.get("changes") as? JsonPrimitive)?.content != "false",
+                    changesLimit = number(start, "changesLimit")?.coerceIn(1, 100) ?: startDefault.changesLimit,
                 ),
             )
         }

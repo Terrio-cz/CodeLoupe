@@ -34,7 +34,7 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 | Before creating an issue | `similar` (`summary`, `description`: tasks that already talk about it; extend or link one instead of a duplicate) | creating first, finding the duplicate later |
 | Change one declaration, add a member or an import, delete a declaration, rename a symbol (only when `edit` is on offer) | `edit` (`op` = `replace`, `insert_after`, `insert_before`, `insert_member`, `delete`, `add_imports`, `create_file`, `rename`; `name` as for `symbol`, `hash` = the `hash=` it printed; `rename` with `dry_run=true` first) | `Edit` with the old text, search and replace over files |
 | Change an issue's state or add a comment | `update` (`id`, `set={State: …}`, `comment`) | the tracker's UI |
-| `git status` / `git log` / `git diff --stat`, a quick gradle build or test run, any CLI with a long output | `run` (`command` = argv; a summary with every error line and a handle `job:<id>`; `doc path=job:<id>` reads the rest; `raw=true` for the whole output) | the raw Bash output |
+| `git status` / `git log` / `git diff --stat`, a quick gradle build or test run, any CLI with a long output | `run` (`command` = argv; a summary with every error line and a handle `job:<id>`; after a failed build or test run each compile error and failed test comes with its declaration and the `symbol` call and hash to read or edit it; `doc path=job:<id>` reads the rest; `raw=true` for the whole output) | the raw Bash output |
 | Which environment variables or secrets a workspace has | `env` (names, scopes, last use — never a value; start a process with them via `codeloupe env run -- <cmd>`) | reading `.env` files |
 | A test or build that takes a while | `job` (`action=start`, `command` = argv array, `cwd`, `slot` for shared resources; then `action=status`) | a blocking shell call |
 
@@ -64,6 +64,9 @@ first attempt is refused with that line: run the same command again when the ind
 never for documents, short files, builds, git or a repository the daemon has not indexed. It is switched off with
 `"hooks": { "enabled": false }` in the daemon's `config.json` (`"steer": { "mode": "off" }` for this hook alone) or
 `CODELOUPE_HOOKS=off` in Claude Code's environment; `codeloupe metrics hooks` counts what it said and what was followed.
+
+A session in an indexed repository may begin with a line `CodeLoupe orientation for …` (branch, task, what the worktree changed, and with
+`sessionStart.map` the ranked repository map): start from it instead of `ls`, `find` or `git status`, and ask `outline`/`find`/`symbol` for the rest.
 
 ## If the tools fail
 
