@@ -18,7 +18,10 @@ export interface UpdateDeps {
   enabled(): boolean;
   fetchText(url: string): Promise<string>;
   engine: UpdateEngine | null;
-  /** A feed directory on this machine (verification only, loopback): replaces GitHub. */
+  /**
+   * A feed directory on this machine (verification only, loopback): replaces GitHub. An installation that updates itself
+   * takes `latest.yml` and the installer from it; one that only notifies reads `releases.atom` from it.
+   */
   feedOverride?: string | null;
   /** Runs before the install: keeps the running daemon bundle for a rollback. A failure does not stop the update. */
   beforeInstall(version: string): Promise<void>;
@@ -100,17 +103,20 @@ export class UpdateService extends EventEmitter {
     this.set({ phase: 'checking', message: null, percent: null });
     try {
       const override = deps.feedOverride ?? null;
-      const release = override ? null : await findRelease(deps.current, deps.fetchText);
+      const engine = deps.mode.kind === 'install' ? deps.engine : null;
+      const release = engine && override ? null : await findRelease(deps.current, deps.fetchText, override ? `${override}releases.atom` : undefined);
       const checkedAt = (deps.now?.() ?? new Date()).toISOString();
+      if (!engine) {
+        this.set(release
+          ? { phase: 'available', latest: release.version, releaseUrl: release.pageUrl, checkedAt }
+          : { phase: 'idle', latest: null, releaseUrl: null, checkedAt });
+        return;
+      }
       if (!override && !release) {
         this.set({ phase: 'idle', latest: null, releaseUrl: null, checkedAt });
         return;
       }
-      if (deps.mode.kind !== 'install' || !deps.engine) {
-        if (release) this.set({ phase: 'available', latest: release.version, releaseUrl: release.pageUrl, checkedAt });
-        return;
-      }
-      await this.download(deps.engine, override ?? (release as ReleaseInfo).feedUrl, release, checkedAt);
+      await this.download(engine, override ?? (release as ReleaseInfo).feedUrl, release, checkedAt);
     } catch (e) {
       this.set({ phase: 'error', message: (e as Error).message.split('\n')[0], percent: null });
     }

@@ -57,7 +57,7 @@ export function isReleasePage(url: string): boolean {
   return url.startsWith(`${RELEASES}/tag/`) && !/[\s"'<>]/.test(url);
 }
 
-/** Reads the release feed and returns a newer release, or null. `fetchText` throws on a non-200 answer. */
-export async function findRelease(current: string, fetchText: (url: string) => Promise<string>): Promise<ReleaseInfo | null> {
-  return newestRelease(current, releaseTags(await fetchText(atomUrl)));
+/** Reads the release feed (`atom`: the local test feed's, otherwise GitHub's) and returns a newer release, or null. `fetchText` throws on a non-200 answer. */
+export async function findRelease(current: string, fetchText: (url: string) => Promise<string>, atom = atomUrl): Promise<ReleaseInfo | null> {
+  return newestRelease(current, releaseTags(await fetchText(atom)));
 }

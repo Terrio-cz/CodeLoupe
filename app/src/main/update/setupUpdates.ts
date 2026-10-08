@@ -34,8 +34,9 @@ export interface Updates {
 export function setupUpdates(w: UpdateWiring): Updates {
   const files = new UpdateDir(path.join(w.userData, 'update'));
   const mode = detectMode({ platform: process.platform, packaged: w.packaged, appImage: w.env.APPIMAGE, execPath: process.execPath, exists: fs.existsSync });
-  // Verification only (tools/update-test.mjs): a local feed, loopback addresses only, and an update that installs at once.
-  const override = mode.kind === 'install' ? feedOverride(w.env.CODELOUPE_UPDATE_FEED) : null;
+  // Verification only (tools/update-test.mjs, tools/installer-smoke.mjs): a local feed, loopback addresses only, and an
+  // update that installs at once.
+  const override = mode.kind === 'unavailable' ? null : feedOverride(w.env.CODELOUPE_UPDATE_FEED);
   const log = fileLog(path.join(files.dir, 'update.log'));
   const engine = mode.kind === 'install' ? createEngine(mode.engine, log) : null;
 

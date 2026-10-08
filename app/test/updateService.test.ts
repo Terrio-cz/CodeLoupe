@@ -47,6 +47,17 @@ describe('UpdateService', () => {
     expect(engine.quitAndInstall).not.toHaveBeenCalled();
   });
 
+  it('reads the release list of a local feed where the installation only notifies', async () => {
+    const asked: string[] = [];
+    const { service, engine } = setup({
+      mode: { kind: 'notify', reason: 'macOS' }, engine: null, feedOverride: 'http://127.0.0.1:47551/',
+      fetchText: async url => { asked.push(url); return atom('v99.0.0'); },
+    });
+    expect(await service.check()).toMatchObject({ phase: 'available', latest: '99.0.0' });
+    expect(asked).toEqual(['http://127.0.0.1:47551/releases.atom']);
+    expect(engine.download).not.toHaveBeenCalled();
+  });
+
   it('says it is up to date when the feed has nothing newer', async () => {
     const { service, engine } = setup({ fetchText: async () => atom('v0.9.0-rc.1') });
     expect(await service.check()).toMatchObject({ phase: 'idle', latest: null, checkedAt: '2026-10-08T12:00:00.000Z' });
