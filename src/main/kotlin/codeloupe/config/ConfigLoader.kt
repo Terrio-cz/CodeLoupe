@@ -10,7 +10,7 @@ import java.nio.file.Path
 
 /**
  * Where CodeLoupe keeps its state and how the daemon is reached. Override with CODELOUPE_HOME /
- * CODELOUPE_PORT / CODELOUPE_ROOT or `<home>/config.json` `{ "port": 47391 }`.
+ * CODELOUPE_PORT / CODELOUPE_ROOT or `<home>/config.json` `{ "port": 47391 }`; `workspaces` is described at [WorkspacesConfig].
  */
 object ConfigLoader {
     fun load(env: Map<String, String> = System.getenv(), os: String = System.getProperty("os.name")): Config {
@@ -27,6 +27,7 @@ object ConfigLoader {
             defaultRoot = env["CODELOUPE_ROOT"]?.takeIf { it.isNotEmpty() } ?: text("defaultRoot"),
             overlayCheckMs = number("overlayCheckMs") ?: 1_000,
             jobs = JobsConfig.parse(file),
+            workspaces = WorkspacesConfig.parse(file),
         )
     }
 
