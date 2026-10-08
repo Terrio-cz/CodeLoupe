@@ -840,11 +840,19 @@ Aplikace čte i několik stávajících jen čtecích cest daemonu; renderer je 
 | `reconcile` | `GET /reconcile` | – |
 | `releases` | `GET /workspaces/releases` | – |
 | `ports` | `GET /ports` | – |
+| `processes` | `GET /processes` | – (CL-71; zatím mimo `request.ts`) |
 | `status` | `GET /status` | – (sloty jobů; jinak ho čte main proces sám) |
 | `jobs` | `GET /jobs` | `limit` |
 | `jobs/:id` | `GET /jobs/{id}` | – (řetěz jobu) |
 | `webhooks` | `GET /webhooks` | – |
 | `deliveries` | `GET /webhooks/deliveries` | `limit` |
+
+
+`GET /workspaces?ram=1` (CL-71) přidá každému workspace `ramBytes` (pracovní sada procesů, které pracují v jeho adresáři) a
+`processes` (kolik jich je); bez `ram=1` jsou `null`. `GET /processes`: `{ generatedAt, workspaces: [{ repo, workspace, state, processes,
+rssMb, buildRssMb }], processes: [{ pid, startMs, kind: 'gradle-daemon' | 'gradle-worker' | 'kotlin-daemon' | 'gradle-client' | 'other', name,
+commandLine (maskovaná, ≤ 300 znaků), cwd, rssMb, repo, workspace, workspaceState, path, via: 'cwd' | 'last build' | 'command line', busy }], problems }`.
+V plánu `GET /reconcile` jsou build daemony jako položky `kind: 'process'` s klíčem `process:<pid>:<start>`.
 
 Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevolá; viz § 10. Mimo `api` jdou ještě dva
 stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 3.7b) a `live.subscribe` (proud událostí).

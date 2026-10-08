@@ -811,6 +811,37 @@ rozhoduje launcher.
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu a fixture stromu: přidání, rotace, import s nahrazením zdrojů,
   návrat bajt po bajtu a smazání; po každém kroku se hledá každá z testovacích hodnot v DOM stránky i v odpovědích daemona (nenašla se).
 
+### Výsledek CL-71 — build daemony a procesy po workspacech (2026-10-08)
+
+- **Procesy po workspacech** (`codeloupe.processes`, `GET /processes`, `ws processes`, `workspaces --ram`): proces patří workspace,
+  v jehož adresáři pracuje (nejhlubší shoda; worktrees bývají i uvnitř hlavního checkoutu), jinak workspace, kde naposledy stavěl
+  Gradle daemon, jinak workspace, jehož cesta je v příkazové řádce (na hranici cesty: `TER-5` není `TER-50`). Pracovní adresář čte
+  OS-specifický kód: `/proc/<pid>/cwd` (Linux), `lsof` (macOS), PEB procesu přes FFM na Windows (`NtQueryInformationProcess` +
+  `ReadProcessMemory`; stejné volání dává příkazovou řádku a pracovní sadu). Čtení 600 procesů trvá na Windows ~100 ms; první verze
+  volala `ProcessHandle.parent()` a stála 5 s (na Windows každé volání projde snímek všech procesů), proto rodič ve `ProcessInfo` není.
+- **Zjištění, které změnilo návrh**: Gradle daemon se spouští v `~/.gradle/daemon/<verze>` a jen po dobu buildu mění pracovní adresář na
+  projekt; po buildu se vrací. Nečinný daemon tedy podle cwd k žádnému worktree nepatří, a právě takové zůstávají po úkolu. Proto se
+  umístí podle vlastního logu `daemon-<pid>.out.log` (INFO řádky `Received command: Build{…, currentDir=…}` a `Marking the daemon as
+  busy / idle` jsou vždy, bez ohledu na úroveň logu klienta; čte se posledních 512 kB). Kotlin daemon a workery mají cwd z vlastního startu.
+- **Politika** (`ReconcilePlanner`, nový `TargetKind.PROCESS`, první v pořadí odstranění — drží adresář worktree): plánují se jen build
+  nástroje (Gradle daemon, worker, Kotlin daemon), ostatní procesy jen vypíše `ws processes`. Uvolněný workspace: `auto` (i s vypnutým
+  `auto`); aktivní: `keep`; landed/abandoned/orphan: `confirm`; `protect` pravidlo vyhrává. Daemon, který vznikl po uvolnění, uvolněním
+  pokryt není.
+- **Zastavení** (`ProcessStopper`) nevěří plánu: znovu ověří stejný proces (pid + čas startu), že je pořád build nástroj, pořád v tom workspace,
+  že v něm neběží `gradlew` klient (Kotlin daemon čeká na jakýkoli běžící Gradle build), že ho Gradle neoznačuje za busy a že on ani jeho
+  děti 0,6 s nespotřebovaly CPU. Pak `destroy`, po lhůtě `destroyForcibly`, děti také. Neprošlé = `blocked` s důvodem a znovu s backoffem.
+  Neodmítne se tím žádný cizí proces: berou se jen procesy registrovaných workspaců.
+- **Ověření**: testy se skutečnými podprocesy (cwd, příkazová řádka, RSS, idle × busy, klient ve stejném / jiném workspace, přesunutý proces, jiný
+  čas startu); daemon test: fixture repo se dvěma worktrees, falešné Gradle daemony s logem v Gradle home — po `ws release` zmizí nečinný
+  daemon a worker, `busy`, daemon druhého (aktivního) workspace, shell i cizí daemon zůstanou. Ručně na tomto stroji (Windows, reálný Gradle 9.6):
+  vedlejší worktree `CL-71-check`, `gradlew help` s vlastním `org.gradle.jvmargs` → tři nečinné daemony umístěné v něm (jeden 452 MB, dva 349–361 MB,
+  1,16 GB celkem); `ws release CL-71-check` se vrátil za 1,9 s (start JVM CLI), do 2 s byly všechny tři ukončeny (`reconcile.jsonl`: `removed`),
+  `ws release --list` prázdný, `git worktree remove` adresář smazal bez zámku. `ws processes` na TerrioImporter + CodeLoupe: ~600 procesů,
+  paměť po workspacech (např. CL-37: 6 procesů 576 MB, CL-63: gradle daemon 316 MB).
+- **Rozhodnutí**: neukončuje se nic mimo registrované workspace; žádné `taskkill` po jménu; Kotlin daemon se nikdy neukončí při běžícím Gradle buildu
+  (stejně jako `gradle stop-idle` v Terrio). Konfigurace `workspaces.gradleUserHome` pro Gradle home mimo `GRADLE_USER_HOME` a `~/.gradle`.
+  Paměť kontejnerů zůstává v `GET /resources?stats` (CL-72), procesová v `GET /processes`; obrazovka Workspaces je může sečíst.
+
 ### Výsledek CL-62 — ingest transcriptů, rozpočty a události pro aplikaci (2026-10-08)
 
 - **Ingest** (`codeloupe.ingest`, `<home>/transcripts.db`): líný, bez časovače. Volání UI API (`runs`, `overview`, `gaps`, `nav`,

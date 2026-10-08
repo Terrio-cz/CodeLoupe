@@ -13,6 +13,9 @@ internal object NativeCalls {
     fun kernel32(name: String, descriptor: FunctionDescriptor): MethodHandle =
         handle(SymbolLookup.libraryLookup("kernel32", Arena.global()), name, descriptor)
 
+    fun ntdll(name: String, descriptor: FunctionDescriptor): MethodHandle =
+        handle(SymbolLookup.libraryLookup("ntdll", Arena.global()), name, descriptor)
+
     fun libc(name: String, descriptor: FunctionDescriptor): MethodHandle =
         handle(Linker.nativeLinker().defaultLookup(), name, descriptor)
 
