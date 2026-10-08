@@ -179,6 +179,8 @@ build/install/codeloupe/bin/codeloupe code_tasks OrderService.handle   # the tas
 build/install/codeloupe/bin/codeloupe task_context ABC-5         # a planner's whole starting pack; asked again: what changed
 build/install/codeloupe/bin/codeloupe doc plan.md --section goal # a text file by digest, section or line window
 build/install/codeloupe/bin/codeloupe run -- git log -30         # a short command: its summary, the rest by handle (doc path=job:<id>)
+build/install/codeloupe/bin/codeloupe env list                   # secret names, scopes and last use; never a value
+build/install/codeloupe/bin/codeloupe env run --repo repo -- docker compose up   # a command with the secrets in its environment
 build/install/codeloupe/bin/codeloupe status
 ```
 
@@ -262,6 +264,31 @@ type where syntax tells it (declared types, `Type(…)`, what a call returns, co
 overloads by argument count. Unsure hits are marked, never dropped. One heuristic: on a receiver of unknown type,
 a name the index declares only once (and no library declares, judging by the core API and the files' imports) is
 taken as exact. A name that matches several unrelated declarations must be qualified (`Type.member`).
+
+## Secrets
+
+One store for the variables and secrets that Claude workspaces, MCP servers and scripts use, so that they live in one place
+and an agent never sees a value. `<home>/secrets/vault.env` (JSON) holds one AES-256-GCM ciphertext per name and scope, bound
+to its name and scope, and a random data key that only the OS can open: Windows DPAPI (current user), the macOS login
+Keychain, libsecret (`secret-tool`) on Linux, else a key derived from the passphrase in `CODELOUPE_PASSPHRASE` (PBKDF2-HMAC-SHA256,
+310 000 rounds). A vault is always opened the way it was made. The file name ends in `.env` on purpose: the workspace rules that
+deny reading `*.env` cover it.
+
+| | |
+|---|---|
+| `codeloupe env set NAME --scope global\|workspace:<id>\|repo:<id> [--source …]` | stores or rotates a value; read from stdin (a hidden prompt on a terminal), never from an argument |
+| `codeloupe env list [--workspace w] [--repo r] [--all]` | name, scope, source, created, rotated, last use and by what — metadata the file holds in the clear; no key is touched |
+| `codeloupe env unset NAME --scope …` | removes it |
+| `codeloupe env run [--workspace w] [--repo r] -- <command>` | the command's environment gets every secret that applies (global < workspace < repository, the narrowest wins); what it prints is masked line by line of every stored value |
+| MCP tool `env` | the same names, never a value; `workspace`, `repository`, `all` |
+| `GET /env/values?workspace=&repository=&names=A,B` | for a local MCP server or script: the values, in its own process. Needs `x-codeloupe-env-token` (the contents of `<home>/secrets/api-token.env`, made on first use, readable by this user only) and says who asks in `x-codeloupe-used-by` |
+
+Every text that leaves the daemon (events, webhooks, summaries, `run` answers, `doc path=job:<id>`) is masked of the stored values
+(six characters or more) before the pattern rules for other secret shapes, and a finished job's log file is rewritten with the
+values replaced by `***`, byte exact otherwise. Masking is by value: a program that transforms a secret before printing it (base64,
+split over lines) is not covered. A value on a command line is visible to this user's other processes while the command runs; use `env run`
+or the API instead. The Terrio workspace guard (`.claude/hooks/guard.ps1`) should deny reads of `…/codeloupe/secrets/` (add it to its
+`SecretFiles` pattern); until then only the `Read(**/*.env)` rule of `settings.json` covers the Read tool.
 
 ## Documents
 
@@ -610,6 +637,7 @@ accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
 | `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
 | `tracker`, `tracker.youtrack`, `tracker.mirror`, `tracker.read` | tracker adapter (YouTrack REST), SQLite mirror and watcher, `issue` / `tasks` / `similar` answers |
+| `secrets` | the encrypted vault, its key protectors (DPAPI, Keychain, libsecret, passphrase), `env run`, the `/env/values` route |
 | `compress` | `run`: output families (git status / log / diff, Gradle, test runners, generic) that shorten a command's output and keep every error line |
 | `doc` | documents as sections with handles: digest, outline, section and line-window fetch, hash and the per-caller delta memory behind `doc` and `task_context` |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |

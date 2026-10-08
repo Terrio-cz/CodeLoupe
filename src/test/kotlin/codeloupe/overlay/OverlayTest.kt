@@ -153,7 +153,8 @@ class OverlayTest {
         assertContains(find(registry, feature, "Alpha.one"), "fun one")
         write(repo, "src/main/kotlin/com/example/shop/Constructs.kt", "package com.example.shop\n\nclass Moved\n")
         commit(repo, "change outside the cone")
-        assertContains(find(registry, feature, "Moved"), "class Moved")
+        // The first query after the landing may still read the previous base (the worktree has not changed); then the base answers.
+        waitFor("the landing shows through the base") { find(registry, feature, "Moved").contains("class Moved") }
     }
 
     @Test
@@ -277,6 +278,39 @@ class OverlayTest {
         git(feature, "status", "--short")
         assertContains(find(registry, feature, "Alpha.one"), "fun one")
         assertEquals(spawns, Timings.gitSpawns(), "index refresh")
+    }
+
+    @Test
+    fun `an unchanged worktree is answered from the previous base while its overlay is re-derived after a landing`() {
+        val registry = Registry(config, queue)
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        write(repo, ALPHA, alpha("three"))
+        commit(repo, "landing")
+        assertEquals(0, registry.staleReads())
+        // The worktree has not moved: the pair its last check settled is still true of it, and nothing waits for the new one.
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertEquals(1, registry.staleReads(), "answered from the previous base")
+        waitFor("the overlay is re-derived against the landing") {
+            val before = registry.staleReads()
+            find(registry, feature, "Alpha.one")
+            registry.staleReads() == before
+        }
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertNone(find(registry, feature, "Alpha.three"), "the landing's code is not in the worktree")
+        // The default branch's own worktree changed on disk with the landing: it never reads the old pair.
+        assertContains(find(registry, repo, "Alpha.three"), "fun three")
+    }
+
+    @Test
+    fun `an edit of a worktree after a landing is never answered from the previous pair`() {
+        val registry = Registry(config, queue)
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        write(repo, ALPHA, alpha("three"))
+        commit(repo, "landing")
+        write(feature, ALPHA, alpha("edited"))
+        assertContains(find(registry, feature, "Alpha.edited"), "fun edited")
+        assertNone(find(registry, feature, "Alpha.one"), "the old body")
+        assertEquals(0, registry.staleReads())
     }
 
     private fun overlayFiles(): List<Path> = Files.walk(config.home).use { paths ->

@@ -13,6 +13,7 @@ import codeloupe.events.EventStore
 import codeloupe.events.WebhookKey
 import codeloupe.events.WebhookUrls
 import codeloupe.events.Webhooks
+import codeloupe.events.Scrubber
 import codeloupe.events.eventRoutes
 import codeloupe.jobs.JobRunner
 import codeloupe.jobs.JobTool
@@ -21,6 +22,9 @@ import codeloupe.ports.LocalPorts
 import codeloupe.ports.PortRegistry
 import codeloupe.ports.PortStore
 import codeloupe.ports.portRoutes
+import codeloupe.secrets.SecretAccess
+import codeloupe.secrets.SecretStore
+import codeloupe.secrets.envRoutes
 import codeloupe.reconcile.ReconcileExecutor
 import codeloupe.reconcile.ReconcilePlanner
 import codeloupe.reconcile.ReconcileRecorder
@@ -92,6 +96,7 @@ class Daemon private constructor(
     val config: Config,
     private val exitOnShutdown: Boolean,
     webhookBackoffMs: List<Long>,
+    secretStore: SecretStore? = null,
 ) {
     private val started = Instant.now()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -105,7 +110,8 @@ class Daemon private constructor(
     val jobs = JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
     private val trackerSettings = TrackerSettingsLoader.load(config.home)
     private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
-    private val tools = Tools.catalog(trackers, jobs)
+    private val secrets = SecretAccess(config.home, preset = secretStore)
+    private val tools = Tools.catalog(trackers, jobs, secrets)
     private val workspaces = Workspaces(config, registry, trackers)
     private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope)
     private val resources = ResourceInventory(config, workspaces)
@@ -146,6 +152,7 @@ class Daemon private constructor(
     }
 
     fun stop() {
+        Scrubber.knownValues = { emptyList() }
         server.stop(gracePeriodMillis = 100, timeoutMillis = 2_000)
         jobs.shutdown()
         scope.cancel()
@@ -198,6 +205,8 @@ class Daemon private constructor(
         ReconcileScheduler(scope, reconcileConfig, reconciler, events.live, { lastClientCall }, ::log).start()
         val info = DaemonInfo(pid, config.port, CodeLoupe.VERSION, IsoTime.of(started))
         Files.writeString(infoFile, JsonFormat.json.encodeToString(DaemonInfo.serializer(), info))
+        // Every outgoing text is masked of the values in the vault; nothing is opened while there is no vault yet.
+        Scrubber.knownValues = { if (secrets.vaultExists()) secrets.store?.knownValues().orEmpty() else emptyList() }
         log("daemon ${CodeLoupe.VERSION} pid $pid listening on 127.0.0.1:${config.port}")
     }
 
@@ -242,6 +251,7 @@ class Daemon private constructor(
             portRoutes(ports)
             eventRoutes(events, webhooks, webhookKey)
             uiApiRoutes(uiApi)
+            envRoutes(secrets)
             post("/shutdown") {
                 val pending = jobs.pending()
                 if (pending > 0 && call.parameters["force"] != "1") {
@@ -282,9 +292,9 @@ class Daemon private constructor(
          * Binds 127.0.0.1:<port>; fails with a BindException while another daemon holds the port, and with an
          * IllegalStateException when a non-default home asks for the default home's port ([PortPolicy]).
          */
-        fun start(config: Config, exitOnShutdown: Boolean = false, webhookBackoffMs: List<Long> = Webhooks.BACKOFF_MS): Daemon {
+        fun start(config: Config, exitOnShutdown: Boolean = false, webhookBackoffMs: List<Long> = Webhooks.BACKOFF_MS, secretStore: SecretStore? = null): Daemon {
             PortPolicy.refusal(config)?.let { throw IllegalStateException(it) }
-            return Daemon(config, exitOnShutdown, webhookBackoffMs).apply { start() }
+            return Daemon(config, exitOnShutdown, webhookBackoffMs, secretStore).apply { start() }
         }
     }
 }

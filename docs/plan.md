@@ -563,6 +563,13 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   pro 8 worktrees po parsu je naměřeno 230–240 MB (peak ≤ 240 MB, limit 300). Po landu platí první dotaz v každém worktree
   ~0,7 s (obnova overlaye proti nové bázi), ostatní ~100 ms. `BaseBuilds.sync` už nekopíruje bázi (100+ MB) pod zámkem repozitáře,
   na kterém stojí každý dotaz.
+- CL-124: po landu (pohyb větve, z níž je báze) nečeká první dotaz v nezměněném worktree na odvození overlaye proti nové bázi
+  (git, ~0,7 s). `Overlays.stale` projde worktree bez zámku (stejná chůze jako kontrola, ~30 ms) a když se razítka nezměnila,
+  odpoví z dvojice, kterou poslední kontrola ustálila: předchozí báze (drží se do dalšího swapu) + overlay na ní; odvození
+  proti nové bázi běží na pozadí (nejvýš 2 naráz). Editace worktree dvojici vyřadí — dotaz čeká na obnovu jako dřív, takže
+  změny agenta se vždy ukážou. Cena: worktree s řídkým checkoutem vidí soubory mimo kužel z nové báze až po odvození (~1 s);
+  worktree, které landing samo provedlo, má změněné soubory na disku a čeká jednou (0,7–1,0 s). Měřeno `tools/load-test.mjs`
+  (8 worktrees, 10 klientů, commit 12 souborů): p95 ostatních worktrees v 5 s po landu 97–184 ms (5 běhů; předtím ~700 ms).
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
   Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.

@@ -279,6 +279,8 @@ class JobRunner(
 
     private fun ended(record: JobRecord, ended: Ended): JobRecord {
         val started = record.startedAt
+        // The log is what an agent may read afterwards: stored secret values leave it before anything summarises it.
+        runCatching { LogMask.apply(Path.of(record.log), Scrubber.knownValues()) }.onFailure { log("job ${record.id}: log not masked: ${it.message}") }
         val summary = started?.let { runCatching { scrub(SummaryReader.read(Path.of(record.log))) }.getOrNull() }
         return record.copy(
             status = ended.status, exit = ended.exit, reason = ended.reason?.let(Scrubber::text), endedAt = IsoTime.now(),
