@@ -32,6 +32,7 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 | Before creating an issue | `similar` (`summary`, `description`: tasks that already talk about it; extend or link one instead of a duplicate) | creating first, finding the duplicate later |
 | Change an issue's state or add a comment | `update` (`id`, `set={State: …}`, `comment`) | the tracker's UI |
 | `git status` / `git log` / `git diff --stat`, a quick gradle build or test run, any CLI with a long output | `run` (`command` = argv; a summary with every error line and a handle `job:<id>`; `doc path=job:<id>` reads the rest; `raw=true` for the whole output) | the raw Bash output |
+| Which environment variables or secrets a workspace has | `env` (names, scopes, last use — never a value; start a process with them via `codeloupe env run -- <cmd>`) | reading `.env` files |
 | A test or build that takes a while | `job` (`action=start`, `command` = argv array, `cwd`, `slot` for shared resources; then `action=status`) | a blocking shell call |
 
 `issue`, `task_context`, `dispatch_plan`, `tasks`, `similar` and `update` work only when a tracker is configured for the daemon; `task_code` also works without one

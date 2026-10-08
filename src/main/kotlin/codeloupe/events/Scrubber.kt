@@ -27,7 +27,20 @@ object Scrubber {
         Regex("""\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}""") to MASK,
     )
 
-    fun text(value: String): String = RULES.fold(value) { acc, (regex, replacement) -> regex.replace(acc, replacement) }
+    /** The values of the secret store, set by the daemon: a text that holds one of them is masked, whatever it looks like. */
+    @Volatile
+    var knownValues: () -> Collection<String> = { emptyList() }
+
+    private const val MIN_KNOWN = 6
+
+    /** Stored values first, exactly; the pattern rules after, for what looks like a secret and is not stored. */
+    fun text(value: String): String = RULES.fold(known(value)) { acc, (regex, replacement) -> regex.replace(acc, replacement) }
+
+    /** [text] with only the given secret [values] masked, for output that must otherwise stay as it is. */
+    fun mask(text: String, values: Collection<String>): String =
+        values.filter { it.length >= MIN_KNOWN }.sortedByDescending { it.length }.fold(text) { acc, secret -> if (secret in acc) acc.replace(secret, MASK) else acc }
+
+    private fun known(text: String): String = mask(text, runCatching { knownValues() }.getOrDefault(emptyList()))
 
     /** Every string in [element], scrubbed. */
     fun json(element: JsonElement): JsonElement = when (element) {
