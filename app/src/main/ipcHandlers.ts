@@ -11,12 +11,15 @@ import { commandLines, type ClaudeConnector } from './claude/ClaudeConnector';
 import type { DaemonHome } from './daemon/DaemonHome';
 import type { DaemonManager } from './daemon/DaemonManager';
 import type { SettingsStore } from './settingsStore';
+import { isReleasePage } from './update/ReleaseFeed';
+import type { UpdateService } from './update/UpdateService';
 
 export interface IpcContext {
   store: SettingsStore;
   manager: DaemonManager;
   home: DaemonHome;
   claude: ClaudeConnector;
+  update: UpdateService;
   source(): ApiSource;
   /** Origins the renderer may be loaded from: app://codeloupe, plus the Vite dev server in development. */
   trustedOrigins: string[];
@@ -80,6 +83,15 @@ export function registerIpc(ctx: IpcContext): void {
     const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
     if (response !== 0) return 'cancelled' as const;
     return ctx.claude.connect(k, port);
+  });
+  handle(CH.updateState, () => ctx.update.current);
+  handle(CH.updateCheck, () => ctx.update.check());
+  handle(CH.updateInstall, () => { ctx.update.install(); });
+  handle(CH.updateRelease, async () => {
+    const url = ctx.update.current.releaseUrl;
+    if (!url || !isReleasePage(url)) return false;
+    await shell.openExternal(url);
+    return true;
   });
   handle(CH.metrics, () => metrics());
   handle(CH.openWorktree, async (id: unknown) => {

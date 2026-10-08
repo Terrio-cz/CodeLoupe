@@ -3,6 +3,7 @@ import type { AppMetrics } from '../../../shared/ipc';
 import { splitArgs, type AppSettings } from '../../../shared/settings';
 import { bridge, useApi } from '../api';
 import { ClaudeCodeCard } from '../components/ClaudeCodeCard';
+import { UpdateCard } from '../components/UpdateCard';
 import { Card, Segmented } from '../components/Parts';
 import { num, tokens } from '../format';
 import { publishSettings, useDaemon, useSettings } from '../hooks';
@@ -89,6 +90,8 @@ export function Settings() {
       </Card>
 
       <ClaudeCodeCard />
+
+      <UpdateCard />
 
       <Card title="Daemon (jen čtení)" actions={<button className="btn" onClick={() => void bridge().open.config()}>Ukázat config.json</button>}>
         {d ? (
