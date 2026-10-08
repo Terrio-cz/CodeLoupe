@@ -1,0 +1,14 @@
+{
+  "os": "win32",
+  "arch": "x64",
+  "port": 63099,
+  "firstQueryMs": 2980,
+  "warmQueryMs": 311,
+  "daemonRssMb": 114,
+  "daemonHeapMb": 18,
+  "version": "0.1.0",
+  "runtime": "openjdk version \"25.0.3\" 2026-04-21\r",
+  "bundleMb": 181.3,
+  "runtimeMb": 88.1,
+  "zipMb": 132.6
+}

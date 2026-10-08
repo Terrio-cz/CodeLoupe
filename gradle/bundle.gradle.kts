@@ -18,6 +18,16 @@ val bundleName = "codeloupe-${project.version}-$bundleOs-$bundleArch"
 // systems, the management beans behind the daemon's /status, java.util.logging.
 val extraModules = listOf("java.logging", "jdk.crypto.ec", "jdk.zipfs", "jdk.management")
 
+// jdeps lists what the classes of the jars mention, and the Kotlin compiler mentions javac without running it to parse a file:
+// jdk.compiler is 3 MB of classes plus the 10 MB `ct.sym` that comes with it. (java.desktop looks as unused but is not: without
+// it the parser worker returns no facts.) tools/bundle-smoke.mjs parses Kotlin and Java files with the bundle's runtime.
+val skippedModules = setOf("jdk.compiler")
+
+// Files jlink leaves in a runtime that nothing here uses: the class-data archive for heaps over 32 GB (the daemon runs with
+// 80 MB, the worker with 512 MB, so compressed oops always apply and `classes_nocoops.jsa` is never mapped), and the import
+// library for linking against the JVM (Windows).
+val unusedRuntimeFiles = listOf("classes_nocoops.jsa", "jvm.lib")
+
 // Script plugins have no generated accessors for the java and application plugins.
 val javaExtension = extensions.getByType<JavaPluginExtension>()
 val toolchainHome = extensions.getByType<JavaToolchainService>().launcherFor(javaExtension.toolchain).map { it.metadata.installationPath.asFile }
@@ -31,6 +41,8 @@ val bundleRuntime = tasks.register("bundleRuntime") {
     dependsOn(installDist)
     inputs.dir(libDir)
     inputs.property("extraModules", extraModules)
+    inputs.property("skippedModules", skippedModules)
+    inputs.property("unusedRuntimeFiles", unusedRuntimeFiles)
     inputs.property("jdk", toolchainHome.map { it.absolutePath })
     outputs.dir(runtimeDir)
     doLast {
@@ -48,7 +60,7 @@ val bundleRuntime = tasks.register("bundleRuntime") {
             jdk.resolve("bin/jdeps$exe").absolutePath, "--multi-release", javaExtension.toolchain.languageVersion.get().toString(),
             "--ignore-missing-deps", "--print-module-deps", *jars.toTypedArray(), capture = true,
         ).trim().split(',').filter { it.isNotBlank() }
-        val modules = (found + extraModules).toSortedSet().joinToString(",")
+        val modules = (found + extraModules).filter { it !in skippedModules }.toSortedSet().joinToString(",")
         logger.lifecycle("jlink modules: $modules")
         val out = runtimeDir.get().asFile
         out.deleteRecursively()
@@ -56,6 +68,7 @@ val bundleRuntime = tasks.register("bundleRuntime") {
             jdk.resolve("bin/jlink$exe").absolutePath, "--add-modules", modules, "--output", out.absolutePath,
             "--strip-debug", "--no-header-files", "--no-man-pages", "--compress", "zip-6", "--generate-cds-archive",
         )
+        out.walkTopDown().filter { it.isFile && it.name in unusedRuntimeFiles }.forEach { check(it.delete()) { "cannot delete $it" } }
     }
 }
 
