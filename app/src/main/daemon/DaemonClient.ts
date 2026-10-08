@@ -11,8 +11,9 @@ export class HttpError extends Error {
 }
 
 /**
- * GET-only client of the local daemon. Always 127.0.0.1, never an Origin header, a fresh connection per
- * call (the daemon closes every socket so a restart cannot break a pooled one).
+ * Client of the local daemon: GET for everything the screens read, POST only for the few actions main confirms
+ * with the user first (`actions/`). Always 127.0.0.1, never an Origin header, a fresh connection per call
+ * (the daemon closes every socket so a restart cannot break a pooled one).
  */
 export class DaemonClient {
   constructor(private readonly port: () => number) {}
@@ -22,16 +23,29 @@ export class DaemonClient {
   }
 
   get<T>(path: string, timeoutMs = 5000): Promise<T> {
+    return this.send<T>('GET', path, undefined, timeoutMs);
+  }
+
+  /** POST of a JSON body; the reply is parsed like a GET's. */
+  post<T>(path: string, body: unknown, timeoutMs = 30_000): Promise<T> {
+    return this.send<T>('POST', path, JSON.stringify(body), timeoutMs);
+  }
+
+  private send<T>(method: 'GET' | 'POST', path: string, body: string | undefined, timeoutMs: number): Promise<T> {
     if (!path.startsWith('/')) return Promise.reject(new Error('path must be absolute'));
     const port = this.port();
+    const payload = body === undefined ? undefined : Buffer.from(body, 'utf8');
     return new Promise<T>((resolve, reject) => {
       // Settle exactly once: a daemon that restarts mid-response fails the response, not the request.
       let done = false;
       const ok = (v: T) => { if (!done) { done = true; resolve(v); } };
       const fail = (e: Error) => { if (!done) { done = true; reject(e); } };
       const req = http.request(
-        { host: HOST, port, path, method: 'GET', agent: false, timeout: timeoutMs,
-          headers: { host: `${HOST}:${port}`, 'x-codeloupe': '1', accept: 'application/json' } },
+        { host: HOST, port, path, method, agent: false, timeout: timeoutMs,
+          headers: {
+            host: `${HOST}:${port}`, 'x-codeloupe': '1', accept: 'application/json',
+            ...(payload ? { 'content-type': 'application/json', 'content-length': String(payload.length) } : {}),
+          } },
         res => {
           const chunks: Buffer[] = [];
           let size = 0;
@@ -57,7 +71,7 @@ export class DaemonClient {
         });
       req.on('timeout', () => req.destroy(new Error('daemon did not answer in time')));
       req.on('error', fail);
-      req.end();
+      req.end(payload);
     });
   }
 }

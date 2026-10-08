@@ -47,6 +47,7 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 |---|---|---|---|
 | `#/overview` | Přehled | — | `overview`, `/status` |
 | `#/branches` · `#/branches/:id` | Větve | drawer (520 px) | `worktrees`, `worktrees/{id}` |
+| `#/workspaces` · `#/workspaces/<repo>%2F<name>` | Workspaces (CL-72) | drawer (520 px) | `/workspaces`, `/resources`, `/reconcile`, `/workspaces/releases`, `/ports` (§ 9.18) |
 | `#/tasks` · `#/tasks/:id` | Úkoly | celá stránka s panelem vlastností vpravo | `tasks`, `tasks/{id}` |
 | `#/index` | Index | — | `index` |
 | `#/gaps` | Mezery | řádek se rozbalí | `gaps` |
@@ -282,6 +283,41 @@ validaci (jméno `^[A-Z][A-Z0-9_]{0,63}$`, hodnota ≤ 16 KB).
 | Import (wizard) | 1) Inventář: main projde Claude složky (CL-52) a vrátí jen jména, zdroj a počet výskytů. 2) Potvrzení: uživatel zaškrtne, co importovat. 3) Import: main přesune hodnoty do storu, renderer vidí jen průběh. 4) Volitelně nahrazení zdroje odkazem na store (CL-53) s náhledem změn (jen cesty a jména). |
 | Odhalit | Jen po OS re-auth: Windows Hello přes nativní helper (Electron nemá API), macOS `systemPreferences.promptTouchID`, Linux heslo přes polkit. Hodnota se ukáže v modálním okně vlastněném main procesem (ne v rendereru aplikace), zkopírovat jde jedním tlačítkem, okno se samo zavře po 30 s; po 60 s se schránka vyčistí, jen pokud stále obsahuje odhalenou hodnotu (porovnání hashe). |
 | Smazat | Potvrzovací dialog main procesu se jménem klíče a jeho spotřebiteli. |
+
+### 3.7a Workspaces (CL-72)
+
+Registr workspaces daemonu (`codeloupe workspaces`) spojený s Docker inventářem a plánem úklidu: co každý worktree drží a co
+se s tím stane. Jen čtení, dvě akce jdou přes main proces (§ 10).
+
+```
+Workspaces                                 [Repo ▾] [Stav ▾] [🔍 hledat]  ☐ Zjistit disk a paměť
+┌ Aktivní 12 ┬ Dokončené 4 ┬ Opuštěné 1 ┬ Sirotci 1 ┬ Čeká na potvrzení 7 ┬ Uvolněné 1 ┐
+┌ Čeká na potvrzení úklidu (7) ──────────────── [Vybrat vše] [Potvrdit úklid vybraných (2)] ┐
+│ ☐ container  cltest_TER-3_db   TER-3   the workspace is abandoned                         │
+│ ☑ directory  …/TER-9           TER-9   a directory under a worktree root that git has …   │
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│ Workspace  Repo   Stav        Úkol   Větev          Docker             Porty  Disk RAM  Aktivita  Úklid │
+│ TER-1      wsrepo ● aktivní   TER-1  ↑1 nesloučeno  1 kont. · 1 vol.   19000  —    1 MB  před 9 min —    │
+│ TER-3      wsrepo ● opuštěný  TER-3  ↑1 nesloučeno  1 kont. · 1 vol.   —      —    —     před 37 dny 3 čeká na potvrzení │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- Všechny stavy registru: **aktivní**, **dokončený** (`landed`), **opuštěný**, **sirotek** (adresář pod kořenem worktrees,
+  který git nezná), a navíc **chybí v registru** pro workspace, který zmizel, ale jeho Docker prostředky zůstaly, a příznak
+  **uvolněný** (`ws release`). Filtr stavu je zná všechny; dlaždice se řídí filtrem repozitáře.
+- Řádek = jeden workspace spojený podle repa a jména workspace s prostředky (jen `owned` a `adopted`, cizí se nezobrazují),
+  záznamy plánu, uvolněním a porty. „Disk“ a „RAM“ se zjišťují jen na vyžádání (`size=1` projde soubory, `stats=1` se ptá
+  Dockeru na paměť běžících kontejnerů workspace).
+- Drawer: souhrn (větev, sloučení, úkol z mirroru, aktivita, disk, paměť), uvolnění (zbývá / opakuje se), Docker prostředky
+  s verdiktem (`auto` uklidí se samo, `confirm` čeká na potvrzení, `keep`, `protected`) a důvodem, počtem pokusů a poslední
+  chybou, porty s tím, co je drží (volný / používá workspace / koliduje).
+- **Uvolnit workspace…** (jen worktree, ne hlavní): main nejprve přečte registr a plán daemonu, ukáže v nativním dialogu,
+  které prostředky se odstraní, a po potvrzení zavolá `POST /workspaces/release`; úklid běží v daemonu na pozadí a stránka
+  se po dobu, kdy něco zbývá, obnovuje po 5 s.
+- **Potvrdit úklid…** (u workspace i hromadně nahoře): stránka pošle jen klíče položek plánu; main je ověří proti
+  aktuálnímu plánu (jen verdikt `confirm`), v nativním dialogu vypíše, co se smaže (kontejnery, sítě, volumes, images,
+  adresáře), a po potvrzení zavolá `POST /reconcile/run {confirm}`. Výsledek po položkách (odstraněno / už neexistovalo /
+  používané — zkusí se znovu / selhalo) se ukáže pod tlačítkem. V mock režimu akce nic nemění.
 
 ### 3.8 Nastavení
 
@@ -754,6 +790,22 @@ webhooků (`budget.breach`, `gap.new`).
 | Nastavení | `settings`, `/status` |
 | Tray, notifikace | `/status`, `events` |
 
+### 9.18 Cesty daemonu mimo `/ui-api/v1` (CL-72)
+
+Aplikace čte i několik stávajících jen čtecích cest daemonu; renderer je smí žádat jen jako zdroje v `request.ts`
+(pevná cesta, povolené klíče query), typy jsou v `app/src/shared/workspaces.ts`:
+
+| Zdroj | Cesta | Query |
+|---|---|---|
+| `status/history` | `GET /status/history` | – |
+| `workspaces` | `GET /workspaces` | `repo`, `size` |
+| `resources` | `GET /resources` | `stats` (paměť běžících kontejnerů workspace, `memoryBytes`) |
+| `reconcile` | `GET /reconcile` | – |
+| `releases` | `GET /workspaces/releases` | – |
+| `ports` | `GET /ports` | – |
+
+Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevolá; viz § 10.
+
 ### 9.17 Zdroje dat a implementace
 
 - CL-39 se staví v **Kotlin portu** (závisí na CL-56); Node prototyp ho nedostane.
@@ -806,6 +858,11 @@ webhooků (`budget.breach`, `gap.new`).
   - `open.external(url)` — pro „Otevřít v YouTracku“ (`TaskDetail.url`) i odkazy z markdownu; povolí se jen
     `https:` a origin přesně shodný s některou instancí z nastavení daemonu (`new URL().origin`, žádné
     porovnání prefixu); jiné odkazy se zobrazí jen jako text.
+  - **Akce** (`app/src/shared/actions.ts`, jediné zápisy aplikace kromě nastavení): `workspaceRelease({ repo, path })`,
+    `reconcileRun({ keys })`, `gapsRefresh()`. Stránka jen žádá; main ověří žádost proti vlastním datům daemonu
+    (worktree musí být v registru, role `worktree`; klíče musí být v plánu s verdiktem `confirm`), ukáže nativní
+    potvrzovací dialog s tím, co se změní, a teprve pak volá daemon (`POST` s hlavičkou `x-codeloupe`, bez `Origin`).
+    Bez důvěryhodného daemonu a v mock režimu se neprovedou.
   - `env.*` (§ 3.7.1) — přibudou až s CL-54, se stejnou kontrolou odesílatele a vlastní validací.
   - `open.worktree` a `open.external` jen když `/status.pid` odpovídá `daemon.json` (§ 8) — cizí proces na
     portu nic neotevře; `open.config` skládá cestu lokálně a kontrolu nepotřebuje.

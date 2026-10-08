@@ -37,11 +37,21 @@ const SPECS: Record<Resource, ResourceSpec> = {
   settings: ui('settings'),
   events: ui('events', ['since', 'limit']),
   'status/history': daemon('/status/history'),
+  workspaces: daemon('/workspaces', ['repo', 'size']),
+  resources: daemon('/resources', ['stats']),
+  reconcile: daemon('/reconcile'),
+  releases: daemon('/workspaces/releases'),
+  ports: daemon('/ports'),
 };
 
 // No `.` or `..` alone: the daemon would normalise them into another path.
 const ID = /^(?!\.{1,2}$)[A-Za-z0-9._:-]{1,100}$/;
 const MAX_VALUE = 200;
+
+/** How long the daemon may take: a reading that walks files (`size`) or asks Docker for each container (`stats`) takes seconds on a big repository. */
+export function timeoutMs(req: ApiRequest): number {
+  return req.query?.size || req.query?.stats ? 120_000 : 5_000;
+}
 
 export type Validated = { ok: true; path: string; request: ApiRequest } | { ok: false; error: string };
 
