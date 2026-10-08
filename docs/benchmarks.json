@@ -1,0 +1,4014 @@
+{
+ "meta": {
+  "date": "2026-10-08",
+  "machine": {
+   "os": "Windows_NT 10.0.26200",
+   "cpu": "13th Gen Intel(R) Core(TM) i7-13700F",
+   "cores": 24,
+   "ramGb": 64,
+   "node": "v20.6.1"
+  },
+  "versions": {
+   "ripgrep": "ripgrep 14.1.1 (rev eecfd55deb)",
+   "git": "git version 2.51.0.windows.1"
+  },
+  "codeloupe": {
+   "sha": "b2a695ed4cc2163bc4822ed9d4b7846d0276cde1",
+   "dirty": false,
+   "version": "0.1.0",
+   "home": "throwaway (--work)",
+   "port": 47651
+  },
+  "baselines": {
+   "minimal": "rg lines only (rg -n -w, rg -n for source: plus the exact declaration lines, as if the agent knew the range); git diff --stat for the branch",
+   "typical": "rg with 3 lines of context per hit (rg -n -w -C3); whole-file read for source and outline questions; full git diff for the branch"
+  },
+  "charsPerToken": 3.16,
+  "itemsPerQuestion": 8,
+  "repos": [
+   {
+    "name": "exposed",
+    "url": "https://github.com/JetBrains/Exposed",
+    "license": "Apache-2.0",
+    "base": "023a6a3a73c5a3717b824a152b506edc28b662f0",
+    "tip": "be0b6ebc08346b270085be65eeb188d494e651f0",
+    "ktFiles": 319,
+    "ktLines": 53662,
+    "grepPatterns": [
+     "lateinit var",
+     "require(",
+     "error(",
+     "@Deprecated"
+    ]
+   },
+   {
+    "name": "codeloupe",
+    "url": "https://github.com/Terrio-cz/CodeLoupe",
+    "license": "PolyForm-Noncommercial-1.0.0",
+    "base": "f370022024d544549cd94e4568745d29b90de5cf",
+    "tip": "489b6122f76d33bc1a8b33549d5084a6044815c7",
+    "ktFiles": 457,
+    "ktLines": 19701,
+    "grepPatterns": [
+     "error(",
+     "Exception"
+    ]
+   }
+  ],
+  "gitnexusSetup": {
+   "version": "1.6.12",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "nodeForGitNexus": "22.23.3",
+   "bufferPoolBytes": 2147483648
+  }
+ },
+ "results": [
+  {
+   "repo": "exposed",
+   "kind": "declaration",
+   "id": "ExposedGradlePlugin",
+   "minimal": {
+    "chars": 1575,
+    "tokens": 499,
+    "lines": 46,
+    "calls": 2,
+    "ms": 445.7,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 2091,
+    "tokens": 662,
+    "lines": 66,
+    "calls": 2,
+    "ms": 445.8
+   },
+   "codeloupe": {
+    "chars": 1563,
+    "tokens": 495,
+    "lines": 46,
+    "calls": 1,
+    "ms": 14,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4763,
+    "tokens": 1508,
+    "lines": 68,
+    "calls": 1,
+    "ms": 188.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "declaration",
+   "id": "Alias",
+   "minimal": {
+    "chars": 4432,
+    "tokens": 1403,
+    "lines": 101,
+    "calls": 2,
+    "ms": 383,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 14060,
+    "tokens": 4450,
+    "lines": 331,
+    "calls": 2,
+    "ms": 383.1
+   },
+   "codeloupe": {
+    "chars": 4314,
+    "tokens": 1366,
+    "lines": 101,
+    "calls": 1,
+    "ms": 14,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 21895,
+    "tokens": 6929,
+    "lines": 348,
+    "calls": 1,
+    "ms": 229.3,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "declaration",
+   "id": "JsonColumnMarker",
+   "minimal": {
+    "chars": 447,
+    "tokens": 142,
+    "lines": 11,
+    "calls": 2,
+    "ms": 456.6,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 73924,
+    "tokens": 23394,
+    "lines": 1903,
+    "calls": 2,
+    "ms": 456.8
+   },
+   "codeloupe": {
+    "chars": 477,
+    "tokens": 151,
+    "lines": 11,
+    "calls": 1,
+    "ms": 12.1,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 11845,
+    "tokens": 3749,
+    "lines": 210,
+    "calls": 1,
+    "ms": 243.4,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "declaration",
+   "id": "TransactionsHolderProvider",
+   "minimal": {
+    "chars": 879,
+    "tokens": 279,
+    "lines": 22,
+    "calls": 2,
+    "ms": 413.4,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 3546,
+    "tokens": 1123,
+    "lines": 101,
+    "calls": 2,
+    "ms": 413.5
+   },
+   "codeloupe": {
+    "chars": 912,
+    "tokens": 289,
+    "lines": 22,
+    "calls": 1,
+    "ms": 10.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 5231,
+    "tokens": 1656,
+    "lines": 88,
+    "calls": 1,
+    "ms": 249.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "declaration",
+   "id": "CustomFunction",
+   "minimal": {
+    "chars": 607,
+    "tokens": 193,
+    "lines": 17,
+    "calls": 2,
+    "ms": 371.8,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 29223,
+    "tokens": 9248,
+    "lines": 748,
+    "calls": 2,
+    "ms": 372
+   },
+   "codeloupe": {
+    "chars": 626,
+    "tokens": 199,
+    "lines": 17,
+    "calls": 1,
+    "ms": 10,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 18091,
+    "tokens": 5725,
+    "lines": 325,
+    "calls": 1,
+    "ms": 257.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "declaration",
+   "id": "SCryptHasher",
+   "minimal": {
+    "chars": 1919,
+    "tokens": 608,
+    "lines": 43,
+    "calls": 2,
+    "ms": 397.6,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 2037,
+    "tokens": 645,
+    "lines": 48,
+    "calls": 2,
+    "ms": 397.6
+   },
+   "codeloupe": {
+    "chars": 1920,
+    "tokens": 608,
+    "lines": 43,
+    "calls": 1,
+    "ms": 10.4,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 5938,
+    "tokens": 1880,
+    "lines": 102,
+    "calls": 1,
+    "ms": 271.5,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "declaration",
+   "id": "KotlinLocalDateColumnType",
+   "minimal": {
+    "chars": 530,
+    "tokens": 168,
+    "lines": 15,
+    "calls": 2,
+    "ms": 413.7,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 6228,
+    "tokens": 1971,
+    "lines": 197,
+    "calls": 2,
+    "ms": 413.8
+   },
+   "codeloupe": {
+    "chars": 527,
+    "tokens": 167,
+    "lines": 15,
+    "calls": 1,
+    "ms": 9.9,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 13533,
+    "tokens": 4283,
+    "lines": 233,
+    "calls": 1,
+    "ms": 271.7,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "declaration",
+   "id": "IntVectorColumnType",
+   "minimal": {
+    "chars": 1591,
+    "tokens": 504,
+    "lines": 41,
+    "calls": 2,
+    "ms": 424.9,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 73922,
+    "tokens": 23394,
+    "lines": 1903,
+    "calls": 2,
+    "ms": 425.2
+   },
+   "codeloupe": {
+    "chars": 1596,
+    "tokens": 506,
+    "lines": 41,
+    "calls": 1,
+    "ms": 10.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 15568,
+    "tokens": 4927,
+    "lines": 261,
+    "calls": 1,
+    "ms": 264,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "member",
+   "id": "Column.nameUnquoted",
+   "minimal": {
+    "chars": 543,
+    "tokens": 172,
+    "lines": 8,
+    "calls": 2,
+    "ms": 380.5,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 10588,
+    "tokens": 3351,
+    "lines": 238,
+    "calls": 2,
+    "ms": 380.6
+   },
+   "codeloupe": {
+    "chars": 511,
+    "tokens": 162,
+    "lines": 8,
+    "calls": 1,
+    "ms": 9.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1379,
+    "tokens": 437,
+    "lines": 33,
+    "calls": 1,
+    "ms": 166.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "member",
+   "id": "SchemaUtilityApi.mapMissingColumnStatementsTo",
+   "minimal": {
+    "chars": 2406,
+    "tokens": 762,
+    "lines": 45,
+    "calls": 2,
+    "ms": 369.6,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 33867,
+    "tokens": 10718,
+    "lines": 667,
+    "calls": 2,
+    "ms": 369.7
+   },
+   "codeloupe": {
+    "chars": 2373,
+    "tokens": 751,
+    "lines": 45,
+    "calls": 1,
+    "ms": 9.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4067,
+    "tokens": 1288,
+    "lines": 48,
+    "calls": 1,
+    "ms": 172.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "member",
+   "id": "SchemaUtilityApi.logTimeSpent",
+   "minimal": {
+    "chars": 749,
+    "tokens": 238,
+    "lines": 16,
+    "calls": 2,
+    "ms": 367.2,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 33881,
+    "tokens": 10722,
+    "lines": 667,
+    "calls": 2,
+    "ms": 367.3
+   },
+   "codeloupe": {
+    "chars": 716,
+    "tokens": 227,
+    "lines": 16,
+    "calls": 1,
+    "ms": 9.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1758,
+    "tokens": 557,
+    "lines": 33,
+    "calls": 1,
+    "ms": 166.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "member",
+   "id": "Column.defaultValueInDb",
+   "minimal": {
+    "chars": 237,
+    "tokens": 75,
+    "lines": 3,
+    "calls": 2,
+    "ms": 372.9,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 10537,
+    "tokens": 3335,
+    "lines": 238,
+    "calls": 2,
+    "ms": 373
+   },
+   "codeloupe": {
+    "chars": 265,
+    "tokens": 84,
+    "lines": 3,
+    "calls": 1,
+    "ms": 10.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1826,
+    "tokens": 578,
+    "lines": 44,
+    "calls": 1,
+    "ms": 182.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "member",
+   "id": "UserDataHolder.removeUserData",
+   "minimal": {
+    "chars": 285,
+    "tokens": 91,
+    "lines": 3,
+    "calls": 2,
+    "ms": 391.8,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 5230,
+    "tokens": 1656,
+    "lines": 119,
+    "calls": 2,
+    "ms": 392
+   },
+   "codeloupe": {
+    "chars": 294,
+    "tokens": 94,
+    "lines": 3,
+    "calls": 1,
+    "ms": 10.2,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1401,
+    "tokens": 444,
+    "lines": 33,
+    "calls": 1,
+    "ms": 179.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "member",
+   "id": "Table.isCustomPKNameDefined",
+   "minimal": {
+    "chars": 322,
+    "tokens": 102,
+    "lines": 5,
+    "calls": 2,
+    "ms": 363.2,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 105534,
+    "tokens": 33397,
+    "lines": 2310,
+    "calls": 2,
+    "ms": 363.3
+   },
+   "codeloupe": {
+    "chars": 327,
+    "tokens": 104,
+    "lines": 5,
+    "calls": 1,
+    "ms": 10.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2154,
+    "tokens": 682,
+    "lines": 52,
+    "calls": 1,
+    "ms": 173.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "member",
+   "id": "IdentifiersCache.getOrPut",
+   "minimal": {
+    "chars": 359,
+    "tokens": 114,
+    "lines": 4,
+    "calls": 2,
+    "ms": 408.6,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 10131,
+    "tokens": 3207,
+    "lines": 200,
+    "calls": 2,
+    "ms": 408.7
+   },
+   "codeloupe": {
+    "chars": 358,
+    "tokens": 114,
+    "lines": 4,
+    "calls": 1,
+    "ms": 11.1,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 5294,
+    "tokens": 1676,
+    "lines": 138,
+    "calls": 1,
+    "ms": 181.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "member",
+   "id": "InsertStatement.columnsWithDatabaseDefaults",
+   "minimal": {
+    "chars": 415,
+    "tokens": 132,
+    "lines": 8,
+    "calls": 2,
+    "ms": 383.6,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 5798,
+    "tokens": 1835,
+    "lines": 138,
+    "calls": 2,
+    "ms": 383.6
+   },
+   "codeloupe": {
+    "chars": 574,
+    "tokens": 182,
+    "lines": 10,
+    "calls": 1,
+    "ms": 11.1,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2650,
+    "tokens": 839,
+    "lines": 58,
+    "calls": 1,
+    "ms": 204,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "outline",
+   "id": "ExposedGradlePlugin.kt",
+   "minimal": {
+    "chars": 620,
+    "tokens": 197,
+    "lines": 12,
+    "calls": 1,
+    "ms": 34.3,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 1942,
+    "tokens": 615,
+    "lines": 65,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 683,
+    "tokens": 217,
+    "lines": 12,
+    "calls": 1,
+    "ms": 10.6,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "outline",
+   "id": "Alias.kt",
+   "minimal": {
+    "chars": 4118,
+    "tokens": 1304,
+    "lines": 60,
+    "calls": 1,
+    "ms": 30.7,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 13913,
+    "tokens": 4403,
+    "lines": 330,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 3950,
+    "tokens": 1250,
+    "lines": 59,
+    "calls": 1,
+    "ms": 10.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "outline",
+   "id": "ColumnType.kt",
+   "minimal": {
+    "chars": 20925,
+    "tokens": 6622,
+    "lines": 343,
+    "calls": 1,
+    "ms": 34.6,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 73816,
+    "tokens": 23360,
+    "lines": 1902,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 19381,
+    "tokens": 6134,
+    "lines": 303,
+    "calls": 1,
+    "ms": 13.2,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "outline",
+   "id": "TransactionsHolder.kt",
+   "minimal": {
+    "chars": 547,
+    "tokens": 174,
+    "lines": 13,
+    "calls": 1,
+    "ms": 39.8,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 3412,
+    "tokens": 1080,
+    "lines": 100,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 700,
+    "tokens": 222,
+    "lines": 13,
+    "calls": 1,
+    "ms": 9.2,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "outline",
+   "id": "Function.kt",
+   "minimal": {
+    "chars": 8250,
+    "tokens": 2611,
+    "lines": 141,
+    "calls": 1,
+    "ms": 35.5,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 29118,
+    "tokens": 9215,
+    "lines": 747,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 12333,
+    "tokens": 3903,
+    "lines": 140,
+    "calls": 1,
+    "ms": 10.6,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "outline",
+   "id": "SCryptHasher.kt",
+   "minimal": {
+    "chars": 467,
+    "tokens": 148,
+    "lines": 10,
+    "calls": 1,
+    "ms": 33.8,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 1936,
+    "tokens": 613,
+    "lines": 47,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 908,
+    "tokens": 288,
+    "lines": 10,
+    "calls": 1,
+    "ms": 9.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "outline",
+   "id": "KotlinDateColumnType.kt",
+   "minimal": {
+    "chars": 2999,
+    "tokens": 950,
+    "lines": 45,
+    "calls": 1,
+    "ms": 35.7,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 6057,
+    "tokens": 1917,
+    "lines": 196,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 2480,
+    "tokens": 785,
+    "lines": 45,
+    "calls": 1,
+    "ms": 9.8,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "usages",
+   "id": "ExposedGradlePlugin",
+   "minimal": {
+    "chars": 1742,
+    "tokens": 552,
+    "lines": 10,
+    "calls": 1,
+    "ms": 362.8,
+    "hits": 9
+   },
+   "typical": {
+    "chars": 9540,
+    "tokens": 3019,
+    "lines": 71,
+    "calls": 1,
+    "ms": 371.6
+   },
+   "codeloupe": {
+    "chars": 1214,
+    "tokens": 385,
+    "lines": 15,
+    "calls": 1,
+    "ms": 13.3,
+    "answered": true,
+    "exact": 5,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 3359,
+    "tokens": 1063,
+    "lines": 61,
+    "calls": 1,
+    "ms": 197.1,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "usages",
+   "id": "Alias",
+   "minimal": {
+    "chars": 4355,
+    "tokens": 1379,
+    "lines": 29,
+    "calls": 1,
+    "ms": 423.2,
+    "hits": 28
+   },
+   "typical": {
+    "chars": 21999,
+    "tokens": 6962,
+    "lines": 189,
+    "calls": 1,
+    "ms": 382
+   },
+   "codeloupe": {
+    "chars": 2816,
+    "tokens": 892,
+    "lines": 44,
+    "calls": 1,
+    "ms": 19.4,
+    "answered": true,
+    "exact": 21,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 17640,
+    "tokens": 5583,
+    "lines": 341,
+    "calls": 1,
+    "ms": 220.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "usages",
+   "id": "JsonColumnMarker",
+   "minimal": {
+    "chars": 2152,
+    "tokens": 682,
+    "lines": 15,
+    "calls": 1,
+    "ms": 354.2,
+    "hits": 14
+   },
+   "typical": {
+    "chars": 12363,
+    "tokens": 3913,
+    "lines": 105,
+    "calls": 1,
+    "ms": 353.1
+   },
+   "codeloupe": {
+    "chars": 2115,
+    "tokens": 670,
+    "lines": 30,
+    "calls": 1,
+    "ms": 16.6,
+    "answered": true,
+    "exact": 10,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 11441,
+    "tokens": 3621,
+    "lines": 203,
+    "calls": 1,
+    "ms": 245.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "usages",
+   "id": "TransactionsHolderProvider",
+   "minimal": {
+    "chars": 6410,
+    "tokens": 2029,
+    "lines": 36,
+    "calls": 1,
+    "ms": 358.5,
+    "hits": 35
+   },
+   "typical": {
+    "chars": 35718,
+    "tokens": 11304,
+    "lines": 265,
+    "calls": 1,
+    "ms": 360.1
+   },
+   "codeloupe": {
+    "chars": 4544,
+    "tokens": 1438,
+    "lines": 59,
+    "calls": 1,
+    "ms": 14.4,
+    "answered": true,
+    "exact": 25,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 4523,
+    "tokens": 1432,
+    "lines": 81,
+    "calls": 1,
+    "ms": 191.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "usages",
+   "id": "CustomFunction",
+   "minimal": {
+    "chars": 15627,
+    "tokens": 4946,
+    "lines": 84,
+    "calls": 1,
+    "ms": 376.4,
+    "hits": 83
+   },
+   "typical": {
+    "chars": 62262,
+    "tokens": 19704,
+    "lines": 480,
+    "calls": 1,
+    "ms": 353.3
+   },
+   "codeloupe": {
+    "chars": 5624,
+    "tokens": 1780,
+    "lines": 64,
+    "calls": 1,
+    "ms": 12.5,
+    "answered": true,
+    "exact": 77,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 17509,
+    "tokens": 5541,
+    "lines": 318,
+    "calls": 1,
+    "ms": 235.1,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "usages",
+   "id": "SCryptHasher",
+   "minimal": {
+    "chars": 793,
+    "tokens": 251,
+    "lines": 6,
+    "calls": 1,
+    "ms": 392.2,
+    "hits": 5
+   },
+   "typical": {
+    "chars": 4757,
+    "tokens": 1506,
+    "lines": 40,
+    "calls": 1,
+    "ms": 708.9
+   },
+   "codeloupe": {
+    "chars": 639,
+    "tokens": 203,
+    "lines": 5,
+    "calls": 1,
+    "ms": 10.9,
+    "answered": true,
+    "exact": 1,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 4637,
+    "tokens": 1468,
+    "lines": 95,
+    "calls": 1,
+    "ms": 225.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "usages",
+   "id": "KotlinLocalDateColumnType",
+   "minimal": {
+    "chars": 3596,
+    "tokens": 1138,
+    "lines": 20,
+    "calls": 1,
+    "ms": 461.4,
+    "hits": 19
+   },
+   "typical": {
+    "chars": 18671,
+    "tokens": 5909,
+    "lines": 136,
+    "calls": 1,
+    "ms": 476.5
+   },
+   "codeloupe": {
+    "chars": 2544,
+    "tokens": 806,
+    "lines": 32,
+    "calls": 1,
+    "ms": 11.3,
+    "answered": true,
+    "exact": 16,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 13121,
+    "tokens": 4153,
+    "lines": 226,
+    "calls": 1,
+    "ms": 233.8,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "usages",
+   "id": "IntVectorColumnType",
+   "minimal": {
+    "chars": 858,
+    "tokens": 272,
+    "lines": 7,
+    "calls": 1,
+    "ms": 443.9,
+    "hits": 6
+   },
+   "typical": {
+    "chars": 5184,
+    "tokens": 1641,
+    "lines": 48,
+    "calls": 1,
+    "ms": 454.6
+   },
+   "codeloupe": {
+    "chars": 957,
+    "tokens": 303,
+    "lines": 14,
+    "calls": 1,
+    "ms": 10.3,
+    "answered": true,
+    "exact": 4,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 14039,
+    "tokens": 4443,
+    "lines": 254,
+    "calls": 1,
+    "ms": 242.3,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "callers",
+   "id": "Column.nameUnquoted",
+   "minimal": {
+    "chars": 729,
+    "tokens": 231,
+    "lines": 5,
+    "calls": 1,
+    "ms": 426.4,
+    "hits": 4
+   },
+   "typical": {
+    "chars": 4214,
+    "tokens": 1334,
+    "lines": 32,
+    "calls": 1,
+    "ms": 397.1
+   },
+   "codeloupe": {
+    "chars": 705,
+    "tokens": 224,
+    "lines": 4,
+    "calls": 1,
+    "ms": 12.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1142,
+    "tokens": 362,
+    "lines": 26,
+    "calls": 1,
+    "ms": 182.7,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "callers",
+   "id": "SchemaUtilityApi.mapMissingColumnStatementsTo",
+   "minimal": {
+    "chars": 727,
+    "tokens": 231,
+    "lines": 6,
+    "calls": 1,
+    "ms": 398.9,
+    "hits": 5
+   },
+   "typical": {
+    "chars": 4329,
+    "tokens": 1370,
+    "lines": 40,
+    "calls": 1,
+    "ms": 432.9
+   },
+   "codeloupe": {
+    "chars": 1065,
+    "tokens": 338,
+    "lines": 5,
+    "calls": 1,
+    "ms": 14,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1876,
+    "tokens": 594,
+    "lines": 41,
+    "calls": 1,
+    "ms": 164.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "callers",
+   "id": "SchemaUtilityApi.logTimeSpent",
+   "minimal": {
+    "chars": 6791,
+    "tokens": 2150,
+    "lines": 40,
+    "calls": 1,
+    "ms": 509.7,
+    "hits": 39
+   },
+   "typical": {
+    "chars": 31228,
+    "tokens": 9883,
+    "lines": 252,
+    "calls": 1,
+    "ms": 550.2
+   },
+   "codeloupe": {
+    "chars": 2242,
+    "tokens": 710,
+    "lines": 13,
+    "calls": 1,
+    "ms": 11.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1214,
+    "tokens": 385,
+    "lines": 26,
+    "calls": 1,
+    "ms": 152,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "callers",
+   "id": "Column.defaultValueInDb",
+   "minimal": {
+    "chars": 861,
+    "tokens": 273,
+    "lines": 6,
+    "calls": 1,
+    "ms": 509.3,
+    "hits": 5
+   },
+   "typical": {
+    "chars": 2872,
+    "tokens": 909,
+    "lines": 26,
+    "calls": 1,
+    "ms": 448.1
+   },
+   "codeloupe": {
+    "chars": 452,
+    "tokens": 144,
+    "lines": 3,
+    "calls": 1,
+    "ms": 11.9,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1642,
+    "tokens": 520,
+    "lines": 37,
+    "calls": 1,
+    "ms": 167.3,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "callers",
+   "id": "UserDataHolder.removeUserData",
+   "minimal": {
+    "chars": 409,
+    "tokens": 130,
+    "lines": 4,
+    "calls": 1,
+    "ms": 424.1,
+    "hits": 3
+   },
+   "typical": {
+    "chars": 2626,
+    "tokens": 832,
+    "lines": 24,
+    "calls": 1,
+    "ms": 451.4
+   },
+   "codeloupe": {
+    "chars": 448,
+    "tokens": 142,
+    "lines": 3,
+    "calls": 1,
+    "ms": 11.2,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1192,
+    "tokens": 378,
+    "lines": 26,
+    "calls": 1,
+    "ms": 169.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "callers",
+   "id": "Table.isCustomPKNameDefined",
+   "minimal": {
+    "chars": 586,
+    "tokens": 186,
+    "lines": 5,
+    "calls": 1,
+    "ms": 453.9,
+    "hits": 4
+   },
+   "typical": {
+    "chars": 3573,
+    "tokens": 1131,
+    "lines": 32,
+    "calls": 1,
+    "ms": 482.3
+   },
+   "codeloupe": {
+    "chars": 550,
+    "tokens": 175,
+    "lines": 4,
+    "calls": 1,
+    "ms": 26.8,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1836,
+    "tokens": 582,
+    "lines": 45,
+    "calls": 1,
+    "ms": 155,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "callers",
+   "id": "IdentifiersCache.getOrPut",
+   "minimal": {
+    "chars": 6886,
+    "tokens": 2180,
+    "lines": 40,
+    "calls": 1,
+    "ms": 396.5,
+    "hits": 39
+   },
+   "typical": {
+    "chars": 36355,
+    "tokens": 11505,
+    "lines": 294,
+    "calls": 1,
+    "ms": 369
+   },
+   "codeloupe": {
+    "chars": 2140,
+    "tokens": 678,
+    "lines": 14,
+    "calls": 1,
+    "ms": 10.6,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4990,
+    "tokens": 1580,
+    "lines": 131,
+    "calls": 1,
+    "ms": 200,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "callers",
+   "id": "InsertStatement.columnsWithDatabaseDefaults",
+   "minimal": {
+    "chars": 611,
+    "tokens": 194,
+    "lines": 4,
+    "calls": 1,
+    "ms": 372.3,
+    "hits": 3
+   },
+   "typical": {
+    "chars": 3239,
+    "tokens": 1025,
+    "lines": 24,
+    "calls": 1,
+    "ms": 385.7
+   },
+   "codeloupe": {
+    "chars": 510,
+    "tokens": 162,
+    "lines": 3,
+    "calls": 1,
+    "ms": 9.9,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2337,
+    "tokens": 740,
+    "lines": 51,
+    "calls": 1,
+    "ms": 174.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "hierarchy",
+   "id": "MigrationUtilityApi",
+   "minimal": {
+    "chars": 300,
+    "tokens": 95,
+    "lines": 3,
+    "calls": 1,
+    "ms": 385.2,
+    "hits": 2
+   },
+   "typical": {
+    "chars": 2255,
+    "tokens": 714,
+    "lines": 16,
+    "calls": 1,
+    "ms": 382.3
+   },
+   "codeloupe": {
+    "chars": 602,
+    "tokens": 191,
+    "lines": 6,
+    "calls": 1,
+    "ms": 8.9,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 3328,
+    "tokens": 1054,
+    "lines": 61,
+    "calls": 1,
+    "ms": 267.4,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "hierarchy",
+   "id": "CustomFunction",
+   "minimal": {
+    "chars": 3425,
+    "tokens": 1084,
+    "lines": 18,
+    "calls": 1,
+    "ms": 579.7,
+    "hits": 17
+   },
+   "typical": {
+    "chars": 16577,
+    "tokens": 5246,
+    "lines": 136,
+    "calls": 1,
+    "ms": 452.1
+   },
+   "codeloupe": {
+    "chars": 7115,
+    "tokens": 2252,
+    "lines": 37,
+    "calls": 1,
+    "ms": 9.9,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 17509,
+    "tokens": 5541,
+    "lines": 318,
+    "calls": 1,
+    "ms": 230.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "hierarchy",
+   "id": "MySQLMetadata",
+   "minimal": {
+    "chars": 152,
+    "tokens": 49,
+    "lines": 2,
+    "calls": 1,
+    "ms": 447.6,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 928,
+    "tokens": 294,
+    "lines": 8,
+    "calls": 1,
+    "ms": 547.6
+   },
+   "codeloupe": {
+    "chars": 657,
+    "tokens": 208,
+    "lines": 6,
+    "calls": 1,
+    "ms": 10.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 8125,
+    "tokens": 2572,
+    "lines": 144,
+    "calls": 1,
+    "ms": 241.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "hierarchy",
+   "id": "EntityID",
+   "minimal": {
+    "chars": 56025,
+    "tokens": 17730,
+    "lines": 333,
+    "calls": 1,
+    "ms": 614.9,
+    "hits": 332
+   },
+   "typical": {
+    "chars": 324394,
+    "tokens": 102657,
+    "lines": 2575,
+    "calls": 1,
+    "ms": 563.2
+   },
+   "codeloupe": {
+    "chars": 501,
+    "tokens": 159,
+    "lines": 4,
+    "calls": 1,
+    "ms": 9.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 13961,
+    "tokens": 4419,
+    "lines": 255,
+    "calls": 1,
+    "ms": 199.5,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "hierarchy",
+   "id": "AbstractQuery",
+   "minimal": {
+    "chars": 1695,
+    "tokens": 537,
+    "lines": 11,
+    "calls": 1,
+    "ms": 739.9,
+    "hits": 10
+   },
+   "typical": {
+    "chars": 6603,
+    "tokens": 2090,
+    "lines": 59,
+    "calls": 1,
+    "ms": 490
+   },
+   "codeloupe": {
+    "chars": 2611,
+    "tokens": 827,
+    "lines": 21,
+    "calls": 1,
+    "ms": 10.1,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 19668,
+    "tokens": 6225,
+    "lines": 373,
+    "calls": 1,
+    "ms": 211.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "hierarchy",
+   "id": "NextVal",
+   "minimal": {
+    "chars": 305,
+    "tokens": 97,
+    "lines": 3,
+    "calls": 1,
+    "ms": 502.3,
+    "hits": 2
+   },
+   "typical": {
+    "chars": 865,
+    "tokens": 274,
+    "lines": 9,
+    "calls": 1,
+    "ms": 469.8
+   },
+   "codeloupe": {
+    "chars": 924,
+    "tokens": 293,
+    "lines": 8,
+    "calls": 1,
+    "ms": 8.8,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 12613,
+    "tokens": 3992,
+    "lines": 241,
+    "calls": 1,
+    "ms": 232.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "hierarchy",
+   "id": "JdbcExposedDatabaseMetadata",
+   "minimal": {
+    "chars": 230,
+    "tokens": 73,
+    "lines": 2,
+    "calls": 1,
+    "ms": 700.2,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 1190,
+    "tokens": 377,
+    "lines": 8,
+    "calls": 1,
+    "ms": 1406.6
+   },
+   "codeloupe": {
+    "chars": 523,
+    "tokens": 166,
+    "lines": 5,
+    "calls": 1,
+    "ms": 10,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 13602,
+    "tokens": 4305,
+    "lines": 211,
+    "calls": 1,
+    "ms": 265.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "hierarchy",
+   "id": "MySQLPropertyProvider",
+   "minimal": {
+    "chars": 168,
+    "tokens": 54,
+    "lines": 2,
+    "calls": 1,
+    "ms": 1354.5,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 905,
+    "tokens": 287,
+    "lines": 8,
+    "calls": 1,
+    "ms": 542.1
+   },
+   "codeloupe": {
+    "chars": 497,
+    "tokens": 158,
+    "lines": 5,
+    "calls": 1,
+    "ms": 11.1,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 8349,
+    "tokens": 2643,
+    "lines": 132,
+    "calls": 1,
+    "ms": 216.5,
+    "answered": true
+   }
+  },
+  {
+   "repo": "exposed",
+   "kind": "grep",
+   "id": "lateinit var",
+   "minimal": {
+    "chars": 4740,
+    "tokens": 1500,
+    "lines": 30,
+    "calls": 1,
+    "ms": 417.2,
+    "hits": 30
+   },
+   "typical": null,
+   "codeloupe": {
+    "chars": 5228,
+    "tokens": 1655,
+    "lines": 78,
+    "calls": 1,
+    "ms": 28.6,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "grep",
+   "id": "require(",
+   "minimal": {
+    "chars": 4866,
+    "tokens": 1540,
+    "lines": 30,
+    "calls": 1,
+    "ms": 530,
+    "hits": 30
+   },
+   "typical": null,
+   "codeloupe": {
+    "chars": 4616,
+    "tokens": 1461,
+    "lines": 68,
+    "calls": 1,
+    "ms": 30.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "grep",
+   "id": "error(",
+   "minimal": {
+    "chars": 5171,
+    "tokens": 1637,
+    "lines": 30,
+    "calls": 1,
+    "ms": 701.6,
+    "hits": 30
+   },
+   "typical": null,
+   "codeloupe": {
+    "chars": 4235,
+    "tokens": 1341,
+    "lines": 60,
+    "calls": 1,
+    "ms": 36.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "grep",
+   "id": "@Deprecated",
+   "minimal": {
+    "chars": 3114,
+    "tokens": 986,
+    "lines": 30,
+    "calls": 1,
+    "ms": 853.1,
+    "hits": 30
+   },
+   "typical": null,
+   "codeloupe": {
+    "chars": 3623,
+    "tokens": 1147,
+    "lines": 65,
+    "calls": 1,
+    "ms": 23.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "exposed",
+   "kind": "changes",
+   "id": "023a6a3..be0b6eb",
+   "minimal": {
+    "chars": 8624,
+    "tokens": 2730,
+    "lines": 139,
+    "calls": 1,
+    "ms": 101.7,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 257435,
+    "tokens": 81467,
+    "lines": 5656,
+    "calls": 1,
+    "ms": 105.6
+   },
+   "codeloupe": {
+    "chars": 14046,
+    "tokens": 4445,
+    "lines": 150,
+    "calls": 1,
+    "ms": 1154.6,
+    "answered": true,
+    "exact": null,
+    "candidate": 11
+   },
+   "gitnexus": {
+    "chars": 69037,
+    "tokens": 21848,
+    "lines": 1400,
+    "calls": 1,
+    "ms": 252.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "declaration",
+   "id": "MetricsCollector",
+   "minimal": {
+    "chars": 1539,
+    "tokens": 488,
+    "lines": 20,
+    "calls": 2,
+    "ms": 89.8,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 1624,
+    "tokens": 514,
+    "lines": 26,
+    "calls": 2,
+    "ms": 89.8
+   },
+   "codeloupe": {
+    "chars": 1465,
+    "tokens": 464,
+    "lines": 20,
+    "calls": 1,
+    "ms": 10.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4586,
+    "tokens": 1452,
+    "lines": 83,
+    "calls": 1,
+    "ms": 188.8,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "declaration",
+   "id": "StoreUpdater",
+   "minimal": {
+    "chars": 3299,
+    "tokens": 1044,
+    "lines": 75,
+    "calls": 2,
+    "ms": 89.1,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 3538,
+    "tokens": 1120,
+    "lines": 86,
+    "calls": 2,
+    "ms": 89.1
+   },
+   "codeloupe": {
+    "chars": 3252,
+    "tokens": 1030,
+    "lines": 75,
+    "calls": 1,
+    "ms": 11.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4650,
+    "tokens": 1472,
+    "lines": 46,
+    "calls": 1,
+    "ms": 204.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "declaration",
+   "id": "Delivery",
+   "minimal": {
+    "chars": 688,
+    "tokens": 218,
+    "lines": 22,
+    "calls": 2,
+    "ms": 108.7,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 762,
+    "tokens": 242,
+    "lines": 27,
+    "calls": 2,
+    "ms": 108.7
+   },
+   "codeloupe": {
+    "chars": 692,
+    "tokens": 219,
+    "lines": 22,
+    "calls": 1,
+    "ms": 11.1,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 6798,
+    "tokens": 2152,
+    "lines": 163,
+    "calls": 1,
+    "ms": 221.1,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "declaration",
+   "id": "BusyException",
+   "minimal": {
+    "chars": 275,
+    "tokens": 88,
+    "lines": 3,
+    "calls": 2,
+    "ms": 111.4,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 302,
+    "tokens": 96,
+    "lines": 6,
+    "calls": 2,
+    "ms": 111.5
+   },
+   "codeloupe": {
+    "chars": 256,
+    "tokens": 82,
+    "lines": 3,
+    "calls": 1,
+    "ms": 9.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1626,
+    "tokens": 515,
+    "lines": 43,
+    "calls": 1,
+    "ms": 181.5,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "declaration",
+   "id": "Format",
+   "minimal": {
+    "chars": 765,
+    "tokens": 243,
+    "lines": 14,
+    "calls": 2,
+    "ms": 115.4,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 793,
+    "tokens": 251,
+    "lines": 17,
+    "calls": 2,
+    "ms": 115.5
+   },
+   "codeloupe": {
+    "chars": 770,
+    "tokens": 244,
+    "lines": 14,
+    "calls": 1,
+    "ms": 9.6,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2816,
+    "tokens": 892,
+    "lines": 61,
+    "calls": 1,
+    "ms": 160.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "declaration",
+   "id": "IssueLink",
+   "minimal": {
+    "chars": 308,
+    "tokens": 98,
+    "lines": 4,
+    "calls": 2,
+    "ms": 97.9,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 383,
+    "tokens": 122,
+    "lines": 9,
+    "calls": 2,
+    "ms": 98
+   },
+   "codeloupe": {
+    "chars": 274,
+    "tokens": 87,
+    "lines": 4,
+    "calls": 1,
+    "ms": 10.8,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2766,
+    "tokens": 876,
+    "lines": 73,
+    "calls": 1,
+    "ms": 160.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "declaration",
+   "id": "RefRow",
+   "minimal": {
+    "chars": 1148,
+    "tokens": 364,
+    "lines": 26,
+    "calls": 2,
+    "ms": 84.5,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 1205,
+    "tokens": 382,
+    "lines": 31,
+    "calls": 2,
+    "ms": 84.7
+   },
+   "codeloupe": {
+    "chars": 1147,
+    "tokens": 363,
+    "lines": 26,
+    "calls": 1,
+    "ms": 12.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 8499,
+    "tokens": 2690,
+    "lines": 203,
+    "calls": 1,
+    "ms": 163.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "declaration",
+   "id": "ReleaseStore",
+   "minimal": {
+    "chars": 2541,
+    "tokens": 805,
+    "lines": 57,
+    "calls": 2,
+    "ms": 90.6,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 2891,
+    "tokens": 915,
+    "lines": 70,
+    "calls": 2,
+    "ms": 90.6
+   },
+   "codeloupe": {
+    "chars": 2446,
+    "tokens": 775,
+    "lines": 57,
+    "calls": 1,
+    "ms": 11.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 7442,
+    "tokens": 2356,
+    "lines": 142,
+    "calls": 1,
+    "ms": 158.8,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "member",
+   "id": "ProcessMemory.peakRssMb",
+   "minimal": {
+    "chars": 382,
+    "tokens": 121,
+    "lines": 2,
+    "calls": 2,
+    "ms": 109.6,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 3325,
+    "tokens": 1053,
+    "lines": 65,
+    "calls": 2,
+    "ms": 109.7
+   },
+   "codeloupe": {
+    "chars": 281,
+    "tokens": 89,
+    "lines": 2,
+    "calls": 1,
+    "ms": 10.4,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4575,
+    "tokens": 1448,
+    "lines": 126,
+    "calls": 2,
+    "ms": 162.4,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "member",
+   "id": "NativeCalls.kernel32",
+   "minimal": {
+    "chars": 302,
+    "tokens": 96,
+    "lines": 3,
+    "calls": 2,
+    "ms": 125.2,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 1077,
+    "tokens": 341,
+    "lines": 23,
+    "calls": 2,
+    "ms": 125.2
+   },
+   "codeloupe": {
+    "chars": 281,
+    "tokens": 89,
+    "lines": 3,
+    "calls": 1,
+    "ms": 10.4,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 5153,
+    "tokens": 1631,
+    "lines": 131,
+    "calls": 1,
+    "ms": 133.7,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "member",
+   "id": "Visibility.aliases",
+   "minimal": {
+    "chars": 359,
+    "tokens": 114,
+    "lines": 4,
+    "calls": 2,
+    "ms": 109.2,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 1648,
+    "tokens": 522,
+    "lines": 28,
+    "calls": 2,
+    "ms": 109.3
+   },
+   "codeloupe": {
+    "chars": 375,
+    "tokens": 119,
+    "lines": 4,
+    "calls": 1,
+    "ms": 10.1,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2519,
+    "tokens": 798,
+    "lines": 67,
+    "calls": 1,
+    "ms": 142.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "member",
+   "id": "Utf8Output.install",
+   "minimal": {
+    "chars": 277,
+    "tokens": 88,
+    "lines": 6,
+    "calls": 2,
+    "ms": 100.4,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 909,
+    "tokens": 288,
+    "lines": 24,
+    "calls": 2,
+    "ms": 100.5
+   },
+   "codeloupe": {
+    "chars": 305,
+    "tokens": 97,
+    "lines": 6,
+    "calls": 1,
+    "ms": 10.1,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4173,
+    "tokens": 1321,
+    "lines": 114,
+    "calls": 2,
+    "ms": 159.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "member",
+   "id": "BaseFiles.paths",
+   "minimal": {
+    "chars": 300,
+    "tokens": 95,
+    "lines": 4,
+    "calls": 2,
+    "ms": 122.6,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 1669,
+    "tokens": 529,
+    "lines": 42,
+    "calls": 2,
+    "ms": 122.7
+   },
+   "codeloupe": {
+    "chars": 288,
+    "tokens": 92,
+    "lines": 4,
+    "calls": 1,
+    "ms": 10.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 3218,
+    "tokens": 1019,
+    "lines": 81,
+    "calls": 2,
+    "ms": 165.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "member",
+   "id": "Categorizer.categorize",
+   "minimal": {
+    "chars": 467,
+    "tokens": 148,
+    "lines": 6,
+    "calls": 2,
+    "ms": 119.9,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 3004,
+    "tokens": 951,
+    "lines": 46,
+    "calls": 2,
+    "ms": 119.9
+   },
+   "codeloupe": {
+    "chars": 461,
+    "tokens": 146,
+    "lines": 6,
+    "calls": 1,
+    "ms": 10.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 5337,
+    "tokens": 1689,
+    "lines": 103,
+    "calls": 1,
+    "ms": 168.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "member",
+   "id": "MirrorStore.attachments",
+   "minimal": {
+    "chars": 468,
+    "tokens": 149,
+    "lines": 6,
+    "calls": 2,
+    "ms": 126.7,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 14642,
+    "tokens": 4634,
+    "lines": 243,
+    "calls": 2,
+    "ms": 126.8
+   },
+   "codeloupe": {
+    "chars": 463,
+    "tokens": 147,
+    "lines": 6,
+    "calls": 1,
+    "ms": 9.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4307,
+    "tokens": 1363,
+    "lines": 98,
+    "calls": 2,
+    "ms": 161.5,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "member",
+   "id": "JobReport.exitCode",
+   "minimal": {
+    "chars": 474,
+    "tokens": 150,
+    "lines": 6,
+    "calls": 2,
+    "ms": 128.7,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 3482,
+    "tokens": 1102,
+    "lines": 72,
+    "calls": 2,
+    "ms": 128.8
+   },
+   "codeloupe": {
+    "chars": 475,
+    "tokens": 151,
+    "lines": 6,
+    "calls": 1,
+    "ms": 9.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2555,
+    "tokens": 809,
+    "lines": 63,
+    "calls": 1,
+    "ms": 149.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "outline",
+   "id": "MetricsCollector.kt",
+   "minimal": {
+    "chars": 641,
+    "tokens": 203,
+    "lines": 8,
+    "calls": 1,
+    "ms": 39.9,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 1457,
+    "tokens": 462,
+    "lines": 25,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 593,
+    "tokens": 188,
+    "lines": 7,
+    "calls": 1,
+    "ms": 13.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "outline",
+   "id": "StoreUpdater.kt",
+   "minimal": {
+    "chars": 841,
+    "tokens": 267,
+    "lines": 17,
+    "calls": 1,
+    "ms": 42.3,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 3464,
+    "tokens": 1097,
+    "lines": 85,
+    "calls": 1,
+    "ms": 0.2
+   },
+   "codeloupe": {
+    "chars": 652,
+    "tokens": 207,
+    "lines": 13,
+    "calls": 1,
+    "ms": 9.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "outline",
+   "id": "Delivery.kt",
+   "minimal": {
+    "chars": 525,
+    "tokens": 167,
+    "lines": 17,
+    "calls": 1,
+    "ms": 71.7,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 693,
+    "tokens": 220,
+    "lines": 26,
+    "calls": 1,
+    "ms": 0.3
+   },
+   "codeloupe": {
+    "chars": 829,
+    "tokens": 263,
+    "lines": 17,
+    "calls": 1,
+    "ms": 9.9,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "outline",
+   "id": "BusyException.kt",
+   "minimal": {
+    "chars": 68,
+    "tokens": 22,
+    "lines": 2,
+    "calls": 1,
+    "ms": 63.2,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 186,
+    "tokens": 59,
+    "lines": 5,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 152,
+    "tokens": 49,
+    "lines": 2,
+    "calls": 1,
+    "ms": 10.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "outline",
+   "id": "Format.kt",
+   "minimal": {
+    "chars": 490,
+    "tokens": 156,
+    "lines": 6,
+    "calls": 1,
+    "ms": 43.6,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 723,
+    "tokens": 229,
+    "lines": 16,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 307,
+    "tokens": 98,
+    "lines": 6,
+    "calls": 1,
+    "ms": 9.3,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "outline",
+   "id": "IssueLink.kt",
+   "minimal": {
+    "chars": 81,
+    "tokens": 26,
+    "lines": 2,
+    "calls": 1,
+    "ms": 47.4,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 255,
+    "tokens": 81,
+    "lines": 8,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 242,
+    "tokens": 77,
+    "lines": 5,
+    "calls": 1,
+    "ms": 11.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "outline",
+   "id": "RefRow.kt",
+   "minimal": {
+    "chars": 494,
+    "tokens": 157,
+    "lines": 16,
+    "calls": 1,
+    "ms": 48.4,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 1141,
+    "tokens": 362,
+    "lines": 30,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 667,
+    "tokens": 212,
+    "lines": 16,
+    "calls": 1,
+    "ms": 13.2,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "outline",
+   "id": "ReleaseStore.kt",
+   "minimal": {
+    "chars": 1027,
+    "tokens": 325,
+    "lines": 16,
+    "calls": 1,
+    "ms": 45.1,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 2743,
+    "tokens": 869,
+    "lines": 69,
+    "calls": 1,
+    "ms": 0.1
+   },
+   "codeloupe": {
+    "chars": 902,
+    "tokens": 286,
+    "lines": 20,
+    "calls": 1,
+    "ms": 12.8,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "usages",
+   "id": "MetricsCollector",
+   "minimal": {
+    "chars": 1527,
+    "tokens": 484,
+    "lines": 11,
+    "calls": 1,
+    "ms": 114,
+    "hits": 10
+   },
+   "typical": {
+    "chars": 8421,
+    "tokens": 2665,
+    "lines": 80,
+    "calls": 1,
+    "ms": 113.5
+   },
+   "codeloupe": {
+    "chars": 1381,
+    "tokens": 438,
+    "lines": 18,
+    "calls": 1,
+    "ms": 10.9,
+    "answered": true,
+    "exact": 6,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 3176,
+    "tokens": 1006,
+    "lines": 76,
+    "calls": 1,
+    "ms": 172.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "usages",
+   "id": "StoreUpdater",
+   "minimal": {
+    "chars": 1170,
+    "tokens": 371,
+    "lines": 9,
+    "calls": 1,
+    "ms": 108.5,
+    "hits": 8
+   },
+   "typical": {
+    "chars": 5792,
+    "tokens": 1833,
+    "lines": 64,
+    "calls": 1,
+    "ms": 113.8
+   },
+   "codeloupe": {
+    "chars": 873,
+    "tokens": 277,
+    "lines": 14,
+    "calls": 1,
+    "ms": 11.1,
+    "answered": true,
+    "exact": 4,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 1460,
+    "tokens": 463,
+    "lines": 39,
+    "calls": 1,
+    "ms": 162.1,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "usages",
+   "id": "Delivery",
+   "minimal": {
+    "chars": 4533,
+    "tokens": 1435,
+    "lines": 32,
+    "calls": 1,
+    "ms": 111.5,
+    "hits": 31
+   },
+   "typical": {
+    "chars": 16189,
+    "tokens": 5124,
+    "lines": 167,
+    "calls": 1,
+    "ms": 111.9
+   },
+   "codeloupe": {
+    "chars": 3542,
+    "tokens": 1121,
+    "lines": 47,
+    "calls": 1,
+    "ms": 11.6,
+    "answered": true,
+    "exact": 29,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 6162,
+    "tokens": 1950,
+    "lines": 156,
+    "calls": 1,
+    "ms": 166,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "usages",
+   "id": "BusyException",
+   "minimal": {
+    "chars": 1337,
+    "tokens": 424,
+    "lines": 11,
+    "calls": 1,
+    "ms": 132,
+    "hits": 10
+   },
+   "typical": {
+    "chars": 6114,
+    "tokens": 1935,
+    "lines": 77,
+    "calls": 1,
+    "ms": 113.5
+   },
+   "codeloupe": {
+    "chars": 1195,
+    "tokens": 379,
+    "lines": 19,
+    "calls": 1,
+    "ms": 10.2,
+    "answered": true,
+    "exact": 6,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 1421,
+    "tokens": 450,
+    "lines": 36,
+    "calls": 1,
+    "ms": 151.4,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "usages",
+   "id": "Format",
+   "minimal": {
+    "chars": 2550,
+    "tokens": 807,
+    "lines": 19,
+    "calls": 1,
+    "ms": 95.9,
+    "hits": 18
+   },
+   "typical": {
+    "chars": 9396,
+    "tokens": 2974,
+    "lines": 96,
+    "calls": 1,
+    "ms": 122.6
+   },
+   "codeloupe": {
+    "chars": 1954,
+    "tokens": 619,
+    "lines": 32,
+    "calls": 1,
+    "ms": 9.9,
+    "answered": true,
+    "exact": 15,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 2032,
+    "tokens": 644,
+    "lines": 54,
+    "calls": 1,
+    "ms": 164,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "usages",
+   "id": "IssueLink",
+   "minimal": {
+    "chars": 937,
+    "tokens": 297,
+    "lines": 8,
+    "calls": 1,
+    "ms": 88,
+    "hits": 7
+   },
+   "typical": {
+    "chars": 4824,
+    "tokens": 1527,
+    "lines": 51,
+    "calls": 1,
+    "ms": 114.2
+   },
+   "codeloupe": {
+    "chars": 689,
+    "tokens": 219,
+    "lines": 11,
+    "calls": 1,
+    "ms": 9.6,
+    "answered": true,
+    "exact": 4,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 2534,
+    "tokens": 802,
+    "lines": 66,
+    "calls": 1,
+    "ms": 159.5,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "usages",
+   "id": "RefRow",
+   "minimal": {
+    "chars": 4832,
+    "tokens": 1530,
+    "lines": 40,
+    "calls": 1,
+    "ms": 115.1,
+    "hits": 39
+   },
+   "typical": {
+    "chars": 22998,
+    "tokens": 7278,
+    "lines": 260,
+    "calls": 1,
+    "ms": 111.7
+   },
+   "codeloupe": {
+    "chars": 3541,
+    "tokens": 1121,
+    "lines": 49,
+    "calls": 1,
+    "ms": 9.9,
+    "answered": true,
+    "exact": 28,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 7387,
+    "tokens": 2338,
+    "lines": 196,
+    "calls": 1,
+    "ms": 163.4,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "usages",
+   "id": "ReleaseStore",
+   "minimal": {
+    "chars": 1801,
+    "tokens": 570,
+    "lines": 14,
+    "calls": 1,
+    "ms": 145.8,
+    "hits": 13
+   },
+   "typical": {
+    "chars": 9067,
+    "tokens": 2870,
+    "lines": 88,
+    "calls": 1,
+    "ms": 222.2
+   },
+   "codeloupe": {
+    "chars": 1579,
+    "tokens": 500,
+    "lines": 22,
+    "calls": 1,
+    "ms": 10.3,
+    "answered": true,
+    "exact": 10,
+    "candidate": 0
+   },
+   "gitnexus": {
+    "chars": 5442,
+    "tokens": 1723,
+    "lines": 135,
+    "calls": 1,
+    "ms": 156.4,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "callers",
+   "id": "ProcessMemory.peakRssMb",
+   "minimal": {
+    "chars": 941,
+    "tokens": 298,
+    "lines": 7,
+    "calls": 1,
+    "ms": 129.8,
+    "hits": 6
+   },
+   "typical": {
+    "chars": 3790,
+    "tokens": 1200,
+    "lines": 45,
+    "calls": 1,
+    "ms": 127.8
+   },
+   "codeloupe": {
+    "chars": 299,
+    "tokens": 95,
+    "lines": 3,
+    "calls": 1,
+    "ms": 10.6,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4149,
+    "tokens": 1313,
+    "lines": 113,
+    "calls": 2,
+    "ms": 150.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "callers",
+   "id": "NativeCalls.kernel32",
+   "minimal": {
+    "chars": 2712,
+    "tokens": 859,
+    "lines": 18,
+    "calls": 1,
+    "ms": 127.9,
+    "hits": 17
+   },
+   "typical": {
+    "chars": 7175,
+    "tokens": 2271,
+    "lines": 71,
+    "calls": 1,
+    "ms": 132.1
+   },
+   "codeloupe": {
+    "chars": 1183,
+    "tokens": 375,
+    "lines": 11,
+    "calls": 1,
+    "ms": 10,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4843,
+    "tokens": 1533,
+    "lines": 124,
+    "calls": 1,
+    "ms": 142.8,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "callers",
+   "id": "Visibility.aliases",
+   "minimal": {
+    "chars": 1748,
+    "tokens": 554,
+    "lines": 13,
+    "calls": 1,
+    "ms": 184,
+    "hits": 12
+   },
+   "typical": {
+    "chars": 8846,
+    "tokens": 2800,
+    "lines": 95,
+    "calls": 1,
+    "ms": 200.6
+   },
+   "codeloupe": {
+    "chars": 334,
+    "tokens": 106,
+    "lines": 3,
+    "calls": 1,
+    "ms": 9.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2210,
+    "tokens": 700,
+    "lines": 60,
+    "calls": 1,
+    "ms": 154.9,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "callers",
+   "id": "Utf8Output.install",
+   "minimal": {
+    "chars": 624,
+    "tokens": 198,
+    "lines": 7,
+    "calls": 1,
+    "ms": 152.5,
+    "hits": 6
+   },
+   "typical": {
+    "chars": 3637,
+    "tokens": 1151,
+    "lines": 47,
+    "calls": 1,
+    "ms": 129.4
+   },
+   "codeloupe": {
+    "chars": 503,
+    "tokens": 160,
+    "lines": 5,
+    "calls": 1,
+    "ms": 9.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 3707,
+    "tokens": 1174,
+    "lines": 101,
+    "calls": 2,
+    "ms": 152.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "callers",
+   "id": "BaseFiles.paths",
+   "minimal": {
+    "chars": 7685,
+    "tokens": 2432,
+    "lines": 54,
+    "calls": 1,
+    "ms": 155.1,
+    "hits": 53
+   },
+   "typical": {
+    "chars": 26930,
+    "tokens": 8523,
+    "lines": 271,
+    "calls": 1,
+    "ms": 126.2
+   },
+   "codeloupe": {
+    "chars": 200,
+    "tokens": 64,
+    "lines": 2,
+    "calls": 1,
+    "ms": 10.1,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2771,
+    "tokens": 877,
+    "lines": 68,
+    "calls": 2,
+    "ms": 149.3,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "callers",
+   "id": "Categorizer.categorize",
+   "minimal": {
+    "chars": 1835,
+    "tokens": 581,
+    "lines": 13,
+    "calls": 1,
+    "ms": 131.5,
+    "hits": 12
+   },
+   "typical": {
+    "chars": 4327,
+    "tokens": 1370,
+    "lines": 37,
+    "calls": 1,
+    "ms": 124.8
+   },
+   "codeloupe": {
+    "chars": 576,
+    "tokens": 183,
+    "lines": 4,
+    "calls": 1,
+    "ms": 9.9,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4840,
+    "tokens": 1532,
+    "lines": 96,
+    "calls": 1,
+    "ms": 138.5,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "callers",
+   "id": "MirrorStore.attachments",
+   "minimal": {
+    "chars": 4241,
+    "tokens": 1343,
+    "lines": 27,
+    "calls": 1,
+    "ms": 120.2,
+    "hits": 26
+   },
+   "typical": {
+    "chars": 20231,
+    "tokens": 6403,
+    "lines": 181,
+    "calls": 1,
+    "ms": 127.6
+   },
+   "codeloupe": {
+    "chars": 684,
+    "tokens": 217,
+    "lines": 5,
+    "calls": 1,
+    "ms": 11.4,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 3711,
+    "tokens": 1175,
+    "lines": 85,
+    "calls": 2,
+    "ms": 157.3,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "callers",
+   "id": "JobReport.exitCode",
+   "minimal": {
+    "chars": 286,
+    "tokens": 91,
+    "lines": 4,
+    "calls": 1,
+    "ms": 140,
+    "hits": 3
+   },
+   "typical": {
+    "chars": 2066,
+    "tokens": 654,
+    "lines": 24,
+    "calls": 1,
+    "ms": 173.3
+   },
+   "codeloupe": {
+    "chars": 331,
+    "tokens": 105,
+    "lines": 3,
+    "calls": 1,
+    "ms": 9.8,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2168,
+    "tokens": 687,
+    "lines": 56,
+    "calls": 1,
+    "ms": 137.8,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "hierarchy",
+   "id": "TokenSource",
+   "minimal": {
+    "chars": 336,
+    "tokens": 107,
+    "lines": 3,
+    "calls": 1,
+    "ms": 146.6,
+    "hits": 2
+   },
+   "typical": {
+    "chars": 1736,
+    "tokens": 550,
+    "lines": 16,
+    "calls": 1,
+    "ms": 142.9
+   },
+   "codeloupe": {
+    "chars": 260,
+    "tokens": 83,
+    "lines": 4,
+    "calls": 1,
+    "ms": 10,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2553,
+    "tokens": 808,
+    "lines": 67,
+    "calls": 1,
+    "ms": 155,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "hierarchy",
+   "id": "Submission",
+   "minimal": {
+    "chars": 219,
+    "tokens": 70,
+    "lines": 3,
+    "calls": 1,
+    "ms": 117.5,
+    "hits": 2
+   },
+   "typical": {
+    "chars": 603,
+    "tokens": 191,
+    "lines": 8,
+    "calls": 1,
+    "ms": 163.2
+   },
+   "codeloupe": {
+    "chars": 258,
+    "tokens": 82,
+    "lines": 4,
+    "calls": 1,
+    "ms": 11.5,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 1866,
+    "tokens": 591,
+    "lines": 49,
+    "calls": 1,
+    "ms": 159.2,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "hierarchy",
+   "id": "ViewTool",
+   "minimal": {
+    "chars": 640,
+    "tokens": 203,
+    "lines": 9,
+    "calls": 1,
+    "ms": 135.1,
+    "hits": 8
+   },
+   "typical": {
+    "chars": 5765,
+    "tokens": 1825,
+    "lines": 64,
+    "calls": 1,
+    "ms": 128.2
+   },
+   "codeloupe": {
+    "chars": 797,
+    "tokens": 253,
+    "lines": 12,
+    "calls": 1,
+    "ms": 9.6,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2063,
+    "tokens": 653,
+    "lines": 57,
+    "calls": 1,
+    "ms": 180.8,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "hierarchy",
+   "id": "BuildLauncher",
+   "minimal": {
+    "chars": 169,
+    "tokens": 54,
+    "lines": 2,
+    "calls": 1,
+    "ms": 121.4,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 964,
+    "tokens": 306,
+    "lines": 8,
+    "calls": 1,
+    "ms": 113
+   },
+   "codeloupe": {
+    "chars": 247,
+    "tokens": 79,
+    "lines": 3,
+    "calls": 1,
+    "ms": 9.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 3426,
+    "tokens": 1085,
+    "lines": 88,
+    "calls": 1,
+    "ms": 161.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "hierarchy",
+   "id": "WsOwnedCommand",
+   "minimal": {
+    "chars": 629,
+    "tokens": 200,
+    "lines": 7,
+    "calls": 1,
+    "ms": 128.6,
+    "hits": 6
+   },
+   "typical": {
+    "chars": 4453,
+    "tokens": 1410,
+    "lines": 48,
+    "calls": 1,
+    "ms": 149
+   },
+   "codeloupe": {
+    "chars": 807,
+    "tokens": 256,
+    "lines": 10,
+    "calls": 1,
+    "ms": 12,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4110,
+    "tokens": 1301,
+    "lines": 101,
+    "calls": 1,
+    "ms": 168.7,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "hierarchy",
+   "id": "TrackerAdapter",
+   "minimal": {
+    "chars": 140,
+    "tokens": 45,
+    "lines": 2,
+    "calls": 1,
+    "ms": 132.1,
+    "hits": 1
+   },
+   "typical": {
+    "chars": 918,
+    "tokens": 291,
+    "lines": 8,
+    "calls": 1,
+    "ms": 124.5
+   },
+   "codeloupe": {
+    "chars": 185,
+    "tokens": 59,
+    "lines": 3,
+    "calls": 1,
+    "ms": 9.4,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 3814,
+    "tokens": 1207,
+    "lines": 91,
+    "calls": 1,
+    "ms": 164.4,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "hierarchy",
+   "id": "Action",
+   "minimal": {
+    "chars": 502,
+    "tokens": 159,
+    "lines": 4,
+    "calls": 1,
+    "ms": 136.1,
+    "hits": 3
+   },
+   "typical": {
+    "chars": 1184,
+    "tokens": 375,
+    "lines": 12,
+    "calls": 1,
+    "ms": 173.5
+   },
+   "codeloupe": {
+    "chars": 312,
+    "tokens": 99,
+    "lines": 5,
+    "calls": 1,
+    "ms": 8.7,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 2613,
+    "tokens": 827,
+    "lines": 72,
+    "calls": 1,
+    "ms": 159.3,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "hierarchy",
+   "id": "Tool",
+   "minimal": {
+    "chars": 366,
+    "tokens": 116,
+    "lines": 5,
+    "calls": 1,
+    "ms": 167,
+    "hits": 4
+   },
+   "typical": {
+    "chars": 3178,
+    "tokens": 1006,
+    "lines": 32,
+    "calls": 1,
+    "ms": 137
+   },
+   "codeloupe": {
+    "chars": 1165,
+    "tokens": 369,
+    "lines": 16,
+    "calls": 1,
+    "ms": 8.8,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": {
+    "chars": 4772,
+    "tokens": 1511,
+    "lines": 129,
+    "calls": 1,
+    "ms": 172.6,
+    "answered": true
+   }
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "grep",
+   "id": "error(",
+   "minimal": {
+    "chars": 4719,
+    "tokens": 1494,
+    "lines": 30,
+    "calls": 1,
+    "ms": 99.4,
+    "hits": 30
+   },
+   "typical": null,
+   "codeloupe": {
+    "chars": 3964,
+    "tokens": 1255,
+    "lines": 58,
+    "calls": 1,
+    "ms": 13.9,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "grep",
+   "id": "Exception",
+   "minimal": {
+    "chars": 3585,
+    "tokens": 1135,
+    "lines": 30,
+    "calls": 1,
+    "ms": 115,
+    "hits": 30
+   },
+   "typical": null,
+   "codeloupe": {
+    "chars": 3093,
+    "tokens": 979,
+    "lines": 60,
+    "calls": 1,
+    "ms": 14.9,
+    "answered": true,
+    "exact": null,
+    "candidate": null
+   },
+   "gitnexus": null
+  },
+  {
+   "repo": "codeloupe",
+   "kind": "changes",
+   "id": "f370022..489b612",
+   "minimal": {
+    "chars": 5573,
+    "tokens": 1764,
+    "lines": 88,
+    "calls": 1,
+    "ms": 49.5,
+    "hits": 0
+   },
+   "typical": {
+    "chars": 246444,
+    "tokens": 77989,
+    "lines": 4539,
+    "calls": 1,
+    "ms": 55.4
+   },
+   "codeloupe": {
+    "chars": 12206,
+    "tokens": 3863,
+    "lines": 169,
+    "calls": 1,
+    "ms": 345.3,
+    "answered": true,
+    "exact": null,
+    "candidate": 3
+   },
+   "gitnexus": {
+    "chars": 68525,
+    "tokens": 21686,
+    "lines": 2566,
+    "calls": 1,
+    "ms": 176.1,
+    "answered": true
+   }
+  }
+ ],
+ "resources": {
+  "codeloupe": {
+   "perRepo": [
+    {
+     "repo": "exposed",
+     "firstIndexMs": 7333,
+     "peakRssMb": 517,
+     "homeBytes": 43331830,
+     "repoWrites": {
+      "files": 0,
+      "top": []
+     },
+     "firstChangesMs": 5916
+    },
+    {
+     "repo": "codeloupe",
+     "firstIndexMs": 2654,
+     "peakRssMb": 452,
+     "homeBytes": 51151629,
+     "repoWrites": {
+      "files": 0,
+      "top": []
+     },
+     "firstChangesMs": 1136
+    }
+   ],
+   "startMs": 3867,
+   "rssAfterStartMb": 105,
+   "cliCallMs": 307,
+   "idleRssMb": 206,
+   "idleTreeRssMb": 213,
+   "idleCpuMsPer30s": 0,
+   "idleCpuTreeMsPer30s": 16,
+   "homeBytes": 65253397,
+   "heapMb": 44
+  },
+  "gitnexus": {
+   "perRepo": [
+    {
+     "repo": "exposed",
+     "firstIndexMs": 127778,
+     "peakRssMb": 2583,
+     "repoWrites": {
+      "files": 8,
+      "top": [
+       "CLAUDE.md",
+       ".claude",
+       "AGENTS.md"
+      ]
+     },
+     "toolReportedMs": 111100,
+     "homeBytes": 1118478155,
+     "graph": "41409 nodes, 79980 edges"
+    },
+    {
+     "repo": "codeloupe",
+     "firstIndexMs": 67649,
+     "peakRssMb": 1431,
+     "repoWrites": {
+      "files": 8,
+      "top": [
+       ".claude",
+       "AGENTS.md",
+       "CLAUDE.md"
+      ]
+     },
+     "toolReportedMs": 53100,
+     "homeBytes": 147887184,
+     "graph": "12641 nodes, 26251 edges"
+    }
+   ],
+   "rssAfterStartMb": 114,
+   "rssAfterQueriesMb": 3361,
+   "idleTreeRssMb": 3325,
+   "idleCpuMsPer30s": 15,
+   "cliCallMs": 914,
+   "homeBytes": 14666775
+  }
+ },
+ "notMeasured": [],
+ "tools": {
+  "codeloupe": {
+   "count": 13,
+   "chars": 11844,
+   "tokens": 3749,
+   "perTool": [
+    {
+     "name": "find",
+     "chars": 919
+    },
+    {
+     "name": "grep",
+     "chars": 1023
+    },
+    {
+     "name": "outline",
+     "chars": 1152
+    },
+    {
+     "name": "symbol",
+     "chars": 702
+    },
+    {
+     "name": "context",
+     "chars": 615
+    },
+    {
+     "name": "usages",
+     "chars": 685
+    },
+    {
+     "name": "calls",
+     "chars": 592
+    },
+    {
+     "name": "hierarchy",
+     "chars": 490
+    },
+    {
+     "name": "changes",
+     "chars": 794
+    },
+    {
+     "name": "task_code",
+     "chars": 897
+    },
+    {
+     "name": "doc",
+     "chars": 1153
+    },
+    {
+     "name": "run",
+     "chars": 1305
+    },
+    {
+     "name": "job",
+     "chars": 1503
+    }
+   ]
+  },
+  "gitnexus": {
+   "count": 17,
+   "chars": 69962,
+   "tokens": 22140,
+   "perTool": [
+    {
+     "name": "list_repos",
+     "chars": 1851
+    },
+    {
+     "name": "query",
+     "chars": 3596
+    },
+    {
+     "name": "cypher",
+     "chars": 4773
+    },
+    {
+     "name": "context",
+     "chars": 7724
+    },
+    {
+     "name": "detect_changes",
+     "chars": 3007
+    },
+    {
+     "name": "check",
+     "chars": 2121
+    },
+    {
+     "name": "rename",
+     "chars": 2021
+    },
+    {
+     "name": "impact",
+     "chars": 21116
+    },
+    {
+     "name": "explain",
+     "chars": 4026
+    },
+    {
+     "name": "pdg_query",
+     "chars": 3752
+    },
+    {
+     "name": "route_map",
+     "chars": 1602
+    },
+    {
+     "name": "tool_map",
+     "chars": 1067
+    },
+    {
+     "name": "shape_check",
+     "chars": 1748
+    },
+    {
+     "name": "api_impact",
+     "chars": 2738
+    },
+    {
+     "name": "group_list",
+     "chars": 507
+    },
+    {
+     "name": "group_sync",
+     "chars": 3462
+    },
+    {
+     "name": "trace",
+     "chars": 4833
+    }
+   ]
+  }
+ }
+}

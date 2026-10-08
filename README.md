@@ -16,10 +16,146 @@ With a tracker configured it also mirrors your issues (YouTrack first) and answe
   and deleted files, checked when a query arrives (no file watchers, no CPU while idle).
 - **No IDE**: the Kotlin compiler's own parser (syntax only, no classpath) and SQLite.
 - **One daemon per machine** for every agent window, started on demand; heavy builds run one at a time
-  in a short-lived child JVM at low priority, so the daemon stays small (140–190 MB).
+  in a short-lived child JVM at low priority, so the daemon stays small (about 210 MB resident with two repositories
+  indexed, [measured](#benchmarks)).
 - **MCP** over Streamable HTTP (stateless) plus the same tools on a CLI.
 
 Languages: Kotlin (Java next). Status and roadmap: [docs/plan.md](docs/plan.md) (Czech).
+
+[What it is good for](#what-it-is-good-for) · [Benchmarks](#benchmarks) · [How it differs](#how-it-differs) ·
+[Limitations](#limitations) · [Use](#use)
+
+## What it is good for
+
+An agent working on a Kotlin repository keeps asking a few questions: where is this declared, what does this file
+contain, who uses this, who calls this, what are its subtypes, what did my branch change. Without an index it answers
+them with `rg` and by reading files. CodeLoupe answers each with one call that returns the relevant piece of code.
+What the agent has to read, median over the questions of each kind on two public repositories (tokens are characters
+divided by 3.16; method and every row in [docs/benchmarks.md](docs/benchmarks.md)):
+
+| Task | Tool | CodeLoupe | grep + read | grep, minimal |
+|---|---|---:|---:|---:|
+| Read a type | `symbol` | 326 | 789 | 322 |
+| Read a member | `symbol` | 117 | 1,746 | 118 |
+| Outline of a file | `outline` | 222 | 615 | 197 |
+| Who uses a type | `usages` | 560 | 2,997 | 626 |
+| Who calls a member | `calls` | 169 | 1,352 | 286 |
+| Subtypes of a type | `hierarchy` | 179 | 464 | 102 |
+| Text search, 30 hits | `grep` | 1,298 | n/a | 1,497 |
+| What a branch changed | `changes` | 4,154 | 79,728 | 2,247 |
+
+*grep + read* is what an agent without an index typically does: `rg` with context lines, a whole-file read, the full
+`git diff`. *grep, minimal* is a best case that assumes the agent never reads a line it does not need (for source
+lookups it is given the exact line range, for the branch `git diff --stat`). Against grep + read, CodeLoupe's answers
+are 5–41 % of the size (9 % summed over all questions) and take one call where grep needs two for source lookups.
+Against the best case they are about the same for source lookups, smaller for usages and callers, and larger for
+outline, subtypes and branch changes: CodeLoupe returns more per line (the enclosing declaration of every hit, exact
+against candidate marks, callers and tests of every changed declaration), and `git diff --stat` says less.
+
+Beyond navigation, and not part of the benchmark: worktrees of one repository share one index and each adds only its own
+edits; long commands run in the daemon so an agent's turn can end ([Jobs and events](#jobs-and-events)); a tracker mirror
+answers issue reads locally; `codeloupe metrics` shows from Claude Code transcripts where an agent's context goes
+([Measuring agent runs](#measuring-agent-runs)).
+
+## Benchmarks
+
+`node tools/benchmark.mjs` asks the same questions of a grep-and-read baseline, CodeLoupe and
+[GitNexus](https://github.com/abhigyanpatwari/GitNexus) over public repositories at pinned commits
+(`JetBrains/Exposed` `023a6a3`, 319 Kotlin files without tests; CodeLoupe `f370022`, 457 files), and writes
+[docs/benchmarks.md](docs/benchmarks.md), [docs/benchmarks.json](docs/benchmarks.json) and the chart below. Run of
+2026-10-08 on Windows 11, i7-13700F, 64 GB, CodeLoupe 0.1.0 (commit `b2a695e`), `gitnexus@1.6.12` from npm.
+
+![Median tokens read per question](docs/benchmarks.svg)
+
+Tokens read per question, median over 15–16 questions of each kind (2 for the branch, 6 for text search):
+
+| Task | CodeLoupe | GitNexus | grep + read | grep, minimal |
+|---|---:|---:|---:|---:|
+| Read a type | 326 | 2,016 | 789 | 322 |
+| Read a member | 117 | 929 | 1,746 | 118 |
+| Outline of a file | 222 | n/a | 615 | 197 |
+| Who uses a type | 560 | 1,596 | 2,997 | 626 |
+| Who calls a member | 169 | 720 | 1,352 | 286 |
+| Subtypes of a type | 179 | 1,406 | 464 | 102 |
+| Text search, 30 hits | 1,298 | n/a | n/a | 1,497 |
+| What a branch changed | 4,154 | 21,767 | 79,728 | 2,247 |
+
+GitNexus 1.6.12 has no outline or text-search tool, so those rows are `n/a`. Its `context` answers are JSON cards (callers,
+callees, process membership), not the same content as CodeLoupe's, so the comparison is of what is read, not of what is
+learned. Both tools answered every question they have a tool for; for 8 of GitNexus's 82 answers (names that exist more
+than once) it needed a second call with the file path, and both answers are counted.
+
+Cost of having the tool, same run:
+
+| | CodeLoupe | GitNexus |
+|---|---:|---:|
+| Tool definitions in the agent's context (`tools/list`) | 13 tools, 3,749 tokens | 17 tools, 22,140 tokens |
+| First index, Exposed / CodeLoupe | 7.3 s / 2.7 s | 128 s / 68 s |
+| Peak memory while indexing, Exposed | 517 MB | 2,583 MB |
+| Memory after the queries | 206 MB daemon, both repositories | 3,325 MB MCP server after 82 queries (114 MB at start) |
+| CPU while idle, 30 s | 0 ms | 15 ms |
+| Warm call (median, per question kind) | 10–11 ms; 26 ms text search; 750 ms branch changes | 155–213 ms; 214 ms branch changes |
+| Index on disk, Exposed / CodeLoupe | 62 MB for both | 1,067 MB / 141 MB |
+| Files written into your checkout by indexing | 0 | 8 (`AGENTS.md`, `CLAUDE.md`, `.claude/skills/`; off with `--skip-agents-md` and `--skip-skills`) |
+
+What the numbers do not show:
+
+- They count what an agent reads, not whether it finishes a task; the controlled agent benchmark of
+  [docs/plan.md](docs/plan.md) § 8.4 has not been run.
+- One run on a shared workstation: token counts are deterministic, timings and memory are indicative and vary between
+  runs.
+- Two repositories, one of them CodeLoupe's own, questions chosen by a fixed rule that favours grep (names unique in the
+  repository). GitNexus's default database buffer pool (428 MiB here) was too small to index Exposed; the benchmark sets
+  2 GiB for `analyze`, as the error message suggests. GitNexus's worktree handling and newer builds than 1.6.12 were not
+  measured. An IDE-based MCP server cannot be started by a script and is not measured.
+
+## How it differs
+
+| | CodeLoupe | GitNexus 1.6.12 | IDE-based MCP (IntelliJ IDEA's built-in server) |
+|---|---|---|---|
+| Needs a running IDE | No | No ([README](https://github.com/abhigyanpatwari/GitNexus#readme): CLI and MCP server, editors are clients) | Yes: the server is part of the IDE and serves "the projects opened in the IDE" ([JetBrains docs](https://www.jetbrains.com/help/idea/mcp-server.html)) |
+| Languages | Kotlin; Java planned | 16 listed in its README: TypeScript, JavaScript, Python, Java, Kotlin, C#, Go, Rust, PHP, Ruby, Swift, C, C++, Objective-C, Dart, Zig | Those the IDE supports |
+| How references are resolved | Syntax only (Kotlin compiler's parser, no classpath); unsure hits are marked `candidate`, never dropped | Graph built from tree-sitter parsers; answers carry an `epistemic` field (`exact` or `lower-bound`) and list unresolved boundaries | The IDE's own semantic model |
+| Index | SQLite; the default branch, built from git objects | Embedded graph database (LadybugDB), no database server; built by `gitnexus analyze` | The IDE's indexes |
+| Keeping it current | No watchers: the worktree is checked when a query arrives | Re-run `analyze`, or `analyze --watch`; running MCP servers reopen a new index (README) | The IDE |
+| Worktrees | One base index, an overlay per worktree; first `changes` in a new worktree took 1.1–5.9 s (measured) | README: linked worktrees share one store, a checkout with uncommitted changes gets its own incrementally updated graph (not measured) | Each opened project |
+| Writes into your checkout | Nothing (measured) | `AGENTS.md`, `CLAUDE.md` section, `.claude/skills/` by default (measured; flags turn it off) | n/a |
+| Tool definitions in context | 3,749 tokens, 13 tools (measured; more with a tracker configured) | 22,140 tokens, 17 tools (measured) | Not measured by the script; an earlier one-off measurement of an older IDE server: 25 tools, about 12.4k tokens ([context-audit](docs/context-audit.md)) |
+| Install | Bundle with its own Java runtime, 135 MB zip ([Bundle](#bundle)); or JDK 25 and Gradle | Node.js 22.18+ (the package's `engines`) and the npm package, 231 MB unpacked (`npm view gitnexus dist.unpackedSize`) | Part of the IDE |
+| Beyond navigation | Tracker mirror, task ↔ code links, jobs in the daemon, transcript metrics | Execution flows, impact analysis, route and API maps, Cypher queries, optional embeddings, web UI (README) | Refactorings, inspections, run configurations, debugger, database tools (JetBrains docs) |
+| Licence | [PolyForm Noncommercial 1.0.0](LICENSE) | [PolyForm Noncommercial 1.0.0](https://github.com/abhigyanpatwari/GitNexus/blob/main/LICENSE); its README points to the maintainers for commercial licensing | Per the IDE's licence (not examined) |
+
+Facts about GitNexus and the JetBrains server were read from their public documentation and package metadata on
+2026-10-08; "measured" means [tools/benchmark.mjs](tools/benchmark.mjs).
+
+Another tool fits better when:
+
+- the repository is not Kotlin: GitNexus (16 languages) or the IDE;
+- you need the compiler's exact answer, a refactoring or inspections: an IDE-based server;
+- you ask conceptual questions ("how does checkout work"), want execution flows, blast-radius analysis or API route
+  maps: GitNexus has tools for them, CodeLoupe has none;
+- you search text in files that are not Kotlin or `.kts`: `rg` searches every file type;
+- you want only the list of changed files: `git diff --stat` is smaller than `changes` (2,247 against 4,154 tokens);
+- the repository is small enough that reading the files costs little.
+
+Both CodeLoupe and GitNexus are source-available under the PolyForm Noncommercial licence, so neither is a free choice
+for commercial use; the IDE-based server follows the IDE's licence.
+
+## Limitations
+
+- **Languages**: Kotlin (`.kt`, and `.kts` for text search) today; Java is next. Other files are not indexed.
+- **Syntax-level resolution**: no classpath, no compiler. Overloads are told apart by argument count, receivers by the
+  types syntax shows, so some references stay `candidate` and a name shared by unrelated declarations must be
+  qualified (`Type.member`). `usages` counts resolved references, not every line that holds the word.
+- **Search**: no semantic or conceptual search, no execution-flow or impact analysis; `find`, `grep`, `usages`, `calls`,
+  `hierarchy` work on names.
+- **Runtime**: git ≥ 2.31, and the bundle or JDK 25. One daemon of about 200 MB; a repository's first query builds its
+  index (seconds for the repositories measured, longer for larger ones; the largest measured has 802 Kotlin files including tests).
+- **Licence**: source-available under [PolyForm Noncommercial 1.0.0](LICENSE), not open source in the OSI sense. It
+  allows personal, research, educational and other noncommercial use and does not allow commercial use without
+  agreement with the licensor. GitNexus is under the same licence; check your own situation before choosing either.
+- **Evidence**: the benchmark measures answer size, latency and resources, not agent task success; it covers two
+  repositories and one machine. Treat the percentages as a measurement of these cases, not a general guarantee.
 
 ## Requirements
 
@@ -448,6 +584,13 @@ the release pipeline (CL-106), auto-update (CL-107). CI cost and runners: [docs/
 `node tools/profile.mjs --cli build/install/codeloupe/bin/codeloupe --home <tmp> --root <repo> --worktree <worktree>`
 profiles a warm query, the first query in a worktree and (with `--clone`) an overlay refresh: client latency split
 by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktree walk, SQL, the rest of the tool and HTTP.
+
+`node tools/benchmark.mjs --work <scratch dir>` reproduces [docs/benchmarks.md](docs/benchmarks.md) after `./gradlew installDist`
+(needs git, ripgrep and network; about 25 minutes). It clones the public repositories at pinned commits into the scratch
+directory, installs GitNexus there from npm (`--no-gitnexus` skips it, `--rg <binary>` points at a ripgrep that is not on
+`PATH`), starts its own daemon on port 47651 (`--port`) with a throwaway home, never touches the daemon on the default
+port, and writes `docs/benchmarks.md`, `.json` and `.svg`; `--report-only docs/benchmarks.json` rewrites the markdown and
+the chart from a saved run.
 
 `node tools/load-test.mjs --install build/install/codeloupe --source <repo>` clones the repository into a scratch directory, adds
 eight worktrees and runs ten client loops against a throwaway daemon; midway it commits a change to the default branch (a base
