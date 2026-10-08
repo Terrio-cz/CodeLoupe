@@ -31,4 +31,6 @@ data class ResourceEntry(
     val project: String? = null,
     /** Containers: the host ports it publishes. */
     val publishedPorts: List<Int> = emptyList(),
+    /** Running containers of a workspace, only when asked for (`/resources?stats=1`): one Engine reading each. */
+    val memoryBytes: Long? = null,
 )

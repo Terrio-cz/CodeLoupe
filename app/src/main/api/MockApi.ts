@@ -11,6 +11,7 @@ import type { ApiRequest, Query } from '../../shared/request';
 import { HttpError } from '../daemon/DaemonClient';
 import type { ApiSource } from './ApiSource';
 import { MockData } from './mockData';
+import { MockWorkspaces } from './mockWorkspaces';
 
 const DAY = 86_400_000;
 
@@ -28,9 +29,11 @@ const TOOL_CALLS: ToolCalls[] = [
 export class MockApi implements ApiSource {
   readonly kind = 'mock';
   private readonly data: MockData;
+  private readonly workspaces: MockWorkspaces;
 
   constructor(now = Date.now()) {
     this.data = new MockData(now);
+    this.workspaces = new MockWorkspaces(now);
   }
 
   async get(req: ApiRequest): Promise<unknown> {
@@ -54,6 +57,11 @@ export class MockApi implements ApiSource {
       case 'settings': return d.settings();
       case 'events': return d.events(q.since === undefined ? null : Number(q.since));
       case 'status/history': return d.statusHistory();
+      case 'workspaces': return this.workspaces.workspaces(q.size === '1' || q.size === 1);
+      case 'resources': return this.workspaces.resources(q.stats === '1' || q.stats === 1);
+      case 'reconcile': return this.workspaces.reconcile();
+      case 'releases': return this.workspaces.releases();
+      case 'ports': return this.workspaces.ports();
       default: return unreachable(req.resource);
     }
   }

@@ -7,11 +7,13 @@ import { IndexScreen } from './screens/IndexScreen';
 import { Overview } from './screens/Overview';
 import { Settings } from './screens/Settings';
 import { Tasks } from './screens/Tasks';
+import { Workspaces } from './screens/Workspaces';
 
 /** The component of each screen; a screen in screenList.ts without an entry here does not compile. */
 export const VIEWS: Record<Screen, (route: Route) => ReactNode> = {
   overview: () => <Overview />,
   branches: route => <Branches route={route} />,
+  workspaces: route => <Workspaces route={route} />,
   tasks: route => <Tasks route={route} />,
   index: () => <IndexScreen />,
   gaps: () => <Gaps />,
