@@ -49,6 +49,8 @@ linux:
     - deb
   category: Development
   icon: installer/icon.png
+  # Not `codeloupe`: that is the CLI, which the bundle ships in resources/codeloupe/bin.
+  executableName: codeloupe-desktop
   # A deb needs a maintainer address; this one is a placeholder that goes nowhere until the project has a contact.
   maintainer: Terrio <codeloupe@users.noreply.github.com>
 deb:

@@ -164,7 +164,8 @@ jobs:
               dpkg-deb -x app/dist/*.deb unpacked/deb
               chmod +x app/dist/*.AppImage
               (cd unpacked && ../app/dist/*.AppImage --appimage-extract > /dev/null)
-              test -f unpacked/squashfs-root/CodeLoupe
+              ls unpacked/squashfs-root
+              test -f unpacked/squashfs-root/codeloupe-desktop
               deb_dir=$(find unpacked/deb -type d -path '*resources/codeloupe' | head -n 1)
               node tools/bundle-smoke.mjs "$deb_dir"
               node tools/bundle-smoke.mjs unpacked/squashfs-root/resources/codeloupe
