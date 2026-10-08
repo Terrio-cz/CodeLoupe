@@ -626,7 +626,7 @@ on, because the runtime is. CI builds them in the `bundle` job and keeps them fo
 |---|---|---|
 | Windows x64 | `CodeLoupe-<v>-win-x64.exe` (NSIS, per user, one click) | Starts the app when it ends. An update or uninstall first stops the installation's own daemon. The uninstaller asks whether to delete the data (`%LOCALAPPDATA%\codeloupe`, `%APPDATA%\codeloupe-desktop`); `/S` and updates keep it. |
 | macOS arm64, x64 | `CodeLoupe-<v>-mac-arm64.dmg`, `CodeLoupe-<v>-mac-x64.dmg` | Drag to Applications. Removing the app leaves the data in `~/Library/Caches/codeloupe` and `~/Library/Application Support/codeloupe-desktop` until it is deleted by hand. |
-| Linux x64 | `CodeLoupe-<v>-linux-x64.AppImage`, `.deb` | The AppImage copies the bundle to `<userData>/daemon/<version>` once, because the daemon outlives its mount. Removing the app leaves the data in `~/.cache/codeloupe` and `~/.config/codeloupe-desktop`. |
+| Linux x64 | `CodeLoupe-<v>-linux-x86_64.AppImage`, `-linux-amd64.deb` | The AppImage copies the bundle to `<userData>/daemon/<version>` once, because the daemon outlives its mount. Removing the app leaves the data in `~/.cache/codeloupe` and `~/.config/codeloupe-desktop`. |
 
 An installed app reads real data (`apiSource: daemon`) and starts the daemon from its own runtime; the CLI command in
 Settings stays on its default and is resolved at start-up, so an update never leaves a stale path.
@@ -648,7 +648,7 @@ public CI run of the tag.
 |---|---|---|
 | Windows | `winget install Terrio.CodeLoupe` or `scoop install codeloupe` (once the owner has submitted the manifests) | A package manager downloads the file without the Mark of the Web, which is what SmartScreen judges. |
 | macOS | `brew install --cask codeloupe` | The cask removes the quarantine flag after installing. |
-| Linux | the `.AppImage` (`chmod +x`) or `sudo apt install ./CodeLoupe-<v>-linux-x64.deb` | Nothing to allow. |
+| Linux | the `.AppImage` (`chmod +x`) or `sudo apt install ./CodeLoupe-<v>-linux-amd64.deb` | Nothing to allow. |
 
 A download from the browser needs one manual allow, once:
 

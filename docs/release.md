@@ -16,7 +16,7 @@ A release is a tag. `git tag v1.2.3 && git push origin v1.2.3` runs [release.yml
 
 | File | Content |
 |---|---|
-| `CodeLoupe-<v>-win-x64.exe`, `-mac-arm64.dmg`, `-mac-x64.dmg`, `-linux-x64.AppImage`, `-linux-amd64.deb` | Installers with the daemon and its Java runtime (see the README, Installers) |
+| `CodeLoupe-<v>-win-x64.exe`, `-mac-arm64.dmg`, `-mac-x64.dmg`, `-linux-x86_64.AppImage`, `-linux-amd64.deb` | Installers with the daemon and its Java runtime (see the README, Installers) |
 | `codeloupe-<v>-<os>-<arch>.zip` | The bundle alone: `bin/`, `lib/`, `runtime/` |
 | `codeloupe-<v>-daemon-sbom.cdx.json` | CycloneDX SBOM of the daemon and CLI (Gradle runtime classpath) |
 | `codeloupe-<v>-app-sbom.cdx.json` | CycloneDX SBOM of the app's npm dependencies that ship (no dev tooling). Electron and Chromium come inside the installer with their own `LICENSES` files |

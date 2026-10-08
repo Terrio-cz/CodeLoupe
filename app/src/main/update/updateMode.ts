@@ -24,7 +24,7 @@ export interface ModeEnv {
 export function detectMode(env: ModeEnv): UpdateMode {
   if (!env.packaged) return { kind: 'unavailable', reason: 'Vývojová verze se neaktualizuje.' };
   if (env.platform === 'win32') {
-    const uninstaller = path.join(path.dirname(env.execPath), `Uninstall ${path.basename(env.execPath)}`);
+    const uninstaller = path.win32.join(path.win32.dirname(env.execPath), `Uninstall ${path.win32.basename(env.execPath)}`);
     return env.exists(uninstaller)
       ? { kind: 'install', engine: 'nsis' }
       : { kind: 'notify', reason: 'Kopie bez instalátoru (například ze Scoopu): aktualizujte stejným správcem balíčků.' };

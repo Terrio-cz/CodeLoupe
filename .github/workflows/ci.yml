@@ -385,7 +385,7 @@ jobs:
         shell: bash
         run: |
           ext=exe; [ "${{ runner.os }}" = Linux ] && ext=AppImage
-          os=win-x64; [ "${{ runner.os }}" = Linux ] && os=linux-x64
+          os=win-x64; [ "${{ runner.os }}" = Linux ] && os=linux-x86_64
           run=; [ "${{ runner.os }}" = Linux ] && run="xvfb-run -a"
           $run node tools/update-test.mjs \
             --old "updates/0.0.1-rc.1/CodeLoupe-0.0.1-rc.1-$os.$ext" --new "updates/0.0.1-rc.2/CodeLoupe-0.0.1-rc.2-$os.$ext" \
