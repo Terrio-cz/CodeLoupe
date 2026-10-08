@@ -8,8 +8,10 @@ object EventTypes {
     const val BUILD_DONE = "build.done"
     const val OVERLAY_REFRESHED = "overlay.refreshed"
     const val RECONCILE_ACTION = "reconcile.action"
+    const val BUDGET_BREACH = "budget.breach"
+    const val GAP_NEW = "gap.new"
 
-    val ALL = listOf(JOB_STARTED, JOB_FINISHED, JOB_NOTIFY, BUILD_DONE, OVERLAY_REFRESHED, RECONCILE_ACTION)
+    val ALL = listOf(JOB_STARTED, JOB_FINISHED, JOB_NOTIFY, BUILD_DONE, OVERLAY_REFRESHED, RECONCILE_ACTION, BUDGET_BREACH, GAP_NEW)
 
     /** Whether [type] matches one of [filters]; no filters match everything. */
     fun matches(filters: List<String>, type: String): Boolean =

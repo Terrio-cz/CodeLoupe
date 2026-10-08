@@ -5,6 +5,9 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /** Sorts tool calls into categories by ordered [CategoryRule]s; a call no rule takes is `other`. */
 class Categorizer(private val rules: List<CategoryRule>) {
+    /** The rules as text: stored categories are stale when it changes. */
+    val fingerprint: String = rules.joinToString("\n")
+
     fun categorize(name: String, input: JsonObject): String {
         val file = (input["file_path"] as? JsonPrimitive)?.content.orEmpty()
         val command = (input["command"] as? JsonPrimitive)?.content.orEmpty().trim().replaceFirst(LEADING_CD, "")

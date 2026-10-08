@@ -113,7 +113,7 @@ class Daemon private constructor(
     private val secrets = SecretAccess(config.home, preset = secretStore, rotationDays = config.secrets.rotationDays)
     private val tools = Tools.catalog(trackers, jobs, secrets)
     private val workspaces = Workspaces(config, registry, trackers)
-    private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets)
+    private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets, ::log)
     private val resources = ResourceInventory(config, workspaces)
     private val reconcileConfig = config.workspaces.reconcile
     private val releases = ReleaseStore(config.home.resolve("releases.json"))
@@ -156,6 +156,7 @@ class Daemon private constructor(
         server.stop(gracePeriodMillis = 100, timeoutMillis = 2_000)
         jobs.shutdown()
         scope.cancel()
+        uiApi.close()
         jobs.close()
         eventStore.close()
         trackers.close()
@@ -195,6 +196,7 @@ class Daemon private constructor(
         } catch (e: Exception) {
             server.stop(0, 0)
             scope.cancel()
+            uiApi.close()
             jobs.close()
             eventStore.close()
             throw generateSequence<Throwable>(e) { it.cause }.filterIsInstance<BindException>().firstOrNull() ?: e

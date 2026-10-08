@@ -3,6 +3,7 @@ package codeloupe.uiapi
 import codeloupe.CodeLoupe
 import codeloupe.TestRepos
 import codeloupe.config.Config
+import codeloupe.config.MetricsConfig
 import codeloupe.config.WorkspacesConfig
 import codeloupe.daemon.Daemon
 import codeloupe.secrets.PassphraseProtector
@@ -46,7 +47,9 @@ class UiApiTest {
     private val port = ServerSocket(0).use { it.localPort }
     private val home = TestRepos.tmpDir("ui-home")
     private val daemon = Daemon.start(
-        Config(home, port, 60_000, 120_000, 512, null, workspaces = WorkspacesConfig(repos = listOf(WorkspacesConfig.Repo(repo.toString())))),
+        Config(home, port, 60_000, 120_000, 512, null, workspaces = WorkspacesConfig(repos = listOf(WorkspacesConfig.Repo(repo.toString()))),
+            metrics = MetricsConfig(transcriptDirs = listOf(TestRepos.tmpDir("ui-transcripts").toString())),
+        ),
         secretStore = SecretStore(home.resolve("secrets").resolve("vault.env"), PassphraseProtector("pw".toCharArray(), iterations = 1_000)),
     )
     private val http = HttpClient.newHttpClient()
