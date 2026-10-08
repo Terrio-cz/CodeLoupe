@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AccountOutcome } from '../../../shared/accountActions';
 import type { Accounts as AccountsData } from '../../../shared/contract';
 import { bridge, refreshAll, useApi } from '../api';
+import { BaselineNote } from '../components/BaselineNote';
 import { ClaudeAccountDrawer, RenameDrawer, TokenDrawer, YoutrackAccountDrawer } from '../components/AccountDrawers';
 import { DataTable, type Column } from '../components/DataTable';
 import { Icon } from '../components/Icon';
@@ -54,7 +55,7 @@ export function Accounts() {
     },
     { key: 'windows', header: 'Windows', render: a => a.windows, numeric: true },
     { key: 'cost', header: 'Cost 7d', render: a => tokens(a.weighted7d), numeric: true },
-    { key: 'saved', header: 'Saved', render: a => (a.savedPct7d > 0 ? pct(a.savedPct7d) : '—'), numeric: true },
+    { key: 'saved', header: 'Saved', render: a => (a.savedPct7d === null ? '—' : pct(a.savedPct7d, 1)), numeric: true },
     { key: 'used', header: 'Last used', render: a => ago(a.lastUsedAt) },
     {
       key: 'actions', header: 'Actions',
@@ -99,6 +100,7 @@ export function Accounts() {
         {data ? <DataTable label="YouTrack accounts" rows={data.youtrack} columns={youtrackColumns} rowKey={a => a.id} empty="No YouTrack accounts. Add an instance with a token." />
           : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Could not load accounts.'} onRetry={reload} />}
       </Card>
+      {data && <BaselineNote baseline={data.baseline} />}
       <p className="footnote muted">Cost and windows are assigned to an account by the folder the transcript lives in. Tokens are kept only in the encrypted store; this screen never shows them.</p>
       {panel?.kind === 'claude-add' && <ClaudeAccountDrawer onClose={() => setPanel(null)} onDone={done} />}
       {panel?.kind === 'claude-rename' && <RenameDrawer id={panel.id} label={panel.label} onClose={() => setPanel(null)} onDone={done} />}

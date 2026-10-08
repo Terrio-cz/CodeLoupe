@@ -85,6 +85,19 @@ class RunQueries(private val db: TranscriptDb) {
         }
     }
 
+    /** The same hour buckets run by run, with each run's role, total cost and last write; with [transcriptPrefix] only one account's runs. */
+    fun usageRows(fromHour: Long, toHour: Long, transcriptPrefix: String? = null): List<HourUsage> = synchronized(db.reader) {
+        val filter = if (transcriptPrefix == null) "" else " AND r.path LIKE ? ESCAPE '\\'"
+        db.reader.prepareStatement(
+            "SELECT h.hour, r.role, h.cost, r.cost, r.end_ms FROM usage_hours h JOIN runs r ON r.id = h.run_id WHERE h.hour >= ? AND h.hour < ?$filter",
+        ).use { s ->
+            s.setLong(1, fromHour)
+            s.setLong(2, toHour)
+            if (transcriptPrefix != null) s.setString(3, likePrefix(transcriptPrefix))
+            s.executeQuery().use { r -> buildList { while (r.next()) add(HourUsage(r.getLong(1), r.getString(2), r.getDouble(3), r.getLong(4), r.getLong(5))) } }
+        }
+    }
+
     fun gaps(fromMs: Long, tool: String?, kinds: List<String>, limit: Int): List<GapRecord> = synchronized(db.reader) {
         val where = StringBuilder("g.at_ms >= ? AND g.kind != 'busy'")
         val args = arrayListOf<Any>(fromMs)

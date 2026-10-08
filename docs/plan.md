@@ -390,6 +390,14 @@ takže tento řízený benchmark agentů zůstává nespuštěný.
 
 2 týdny po nasazení `codeloupe metrics compare baseline.json after.json`; týdenní report mezer.
 
+**Úspora v aplikaci (CL-133).** Daemon porovnává běhy z ingestu s baseline reportem v `<home>/baseline.json` (uloží ho
+`codeloupe metrics collect --since … --until … --label baseline --baseline`; čte se znovu při změně souboru). Metoda: průměrná
+cena běhu role z baseline (součet / počet běhů, ne medián: medián šikmého rozdělení leží pod součtem stejných běhů a úspora by
+vycházela záporně i bez změny) × běh role v rozsahu; hotový běh bez role v baseline nebo ještě běžící běh se počítá skutečnou
+cenou na obou stranách. Procento je z porovnaných běhů, vedle něj `coveredShare`. Je to srovnání s průměrným během před
+nasazením, ne řízený benchmark (§ 8.4); mix úkolů se v baseline a po nasazení může lišit. Bez baseline obrazovky ukážou pomlčku
+a návod, nic se neodhaduje.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
@@ -929,7 +937,7 @@ rozhoduje launcher.
   jejich nové řádky. Shoda s `codeloupe metrics collect --since 2026-09-08` na stejných souborech: 2 442 z 2 449 běhů shodných
   v ceně, tazích, peak kontextu, roli, TER, délce i chybách; zbylých 7 jsou běhy, které mezi oběma čteními ještě rostly.
   Generovaný test se 2 651 běhy: každé řazení seznamu a kroky < 200 ms, druhý průchod nečte nic.
-- **Rozhodnutí**: baseline po rolích daemon nemá, takže `baselineRange` a úspory zůstávají 0 (nevymýšlí se odhad); `busy` volání
+- **Rozhodnutí**: daemon zprvu baseline po rolích neměl, takže `baselineRange` a úspory byly 0 (nevymýšlí se odhad; baseline od CL-133 viz § 8.5); `busy` volání
   nejsou mezera pro UI (je to zátěž daemonu). Seznam běhů a kroky vystavuje API, i když obrazovka Runs z UI vypadla (§ 3.3):
   data jsou potřeba pro Overview a pro případnou obrazovku v aplikaci.
 
