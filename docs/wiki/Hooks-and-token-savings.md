@@ -4,9 +4,10 @@ that answer with less than a plain read would.
 ## The SessionStart hook
 
 The [Claude Code plugin](Claude-Code-integration#1-plugin-recommended) registers two hooks. `SessionStart`
-(`startup|resume|clear`) runs [`start-daemon.sh`](https://github.com/Terrio-cz/CodeLoupe/blob/main/plugin/hooks/start-daemon.sh)
-and so `codeloupe start`: the daemon is up before the first tool call. It never fails a session and prints nothing
-unless asked, because the output of a SessionStart hook reaches the model.
+(`startup|resume|clear|compact`) runs [`start-daemon.sh`](https://github.com/Terrio-cz/CodeLoupe/blob/main/plugin/hooks/start-daemon.sh)
+and so `codeloupe start`: the daemon is up before the first tool call. It then asks the daemon for the state of the worktree (branch,
+task, what it changed) and, if switched on, the repository map: [Plugin hooks](Plugin-hooks#session-start). It never fails a session
+and prints nothing else unless asked, because the output of a SessionStart hook reaches the model.
 
 | Setting | Effect |
 |---|---|
