@@ -46,7 +46,7 @@ indexed (it never starts a build), and says nothing otherwise.
 
 - **State of the worktree** (always, when the hook is on): `CodeLoupe orientation for <worktree>: branch TER-5-x (task TER-5), default branch main`,
   then what the worktree changed against the merge-base, by declaration (`changes` without the callers, at most `changesLimit` lines).
-- **Map** (`"map": true`; off by default, see the measurement in [docs/plan.md](../plan.md)): the ranked repository map (`outline` without a target) within
+- **Map** (`"map": true`; off by default, see the measurement in [docs/plan.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/docs/plan.md)): the ranked repository map (`outline` without a target) within
   `budget` tokens (default 1200, 3.2 characters a token as `outline` counts), centred on the files the worktree changed. A resumed or compacted session
   gets the state alone; it has seen the map.
 
