@@ -39,7 +39,7 @@ export function UpdateCard() {
           <><dt>Daemon</dt><dd>Daemon verze {state.rollback.failedVersion} se nespustil ({state.rollback.reason}), běží předchozí verze {state.rollback.usingVersion}.</dd></>
         )}
       </dl>
-      <div className="form-row">
+      <div className="actions" style={{ margin: '12px 0 4px' }}>
         <label className="check">
           <input type="checkbox" checked={settings.autoUpdate} disabled={state.mode === 'unavailable'} onChange={e => void update({ autoUpdate: e.target.checked })} /> Hledat novou verzi automaticky
         </label>

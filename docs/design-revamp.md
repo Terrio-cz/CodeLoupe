@@ -1,8 +1,8 @@
 # CodeLoupe Desktop — design revamp
 
-Stav 2026-10-08 · větev `CL-design-revamp`. Vizuální vrstva aplikace (`app/src/renderer`) pro všech deset obrazovek
-(Přehled, Větve, Workspaces, Úkoly, Joby, Běhy, Index, Mezery, Prostředí, Nastavení), jejich detaily a stavy, a vlastní
-titulková lišta okna; data, IPC, kontrakt a chování se nemění. Nahrazuje § 6 (tokeny) a doplňuje § 1, § 5 a § 7
+Stav 2026-10-08 · větev `CL-design-revamp`. Vizuální vrstva aplikace (`app/src/renderer`) pro všech jedenáct obrazovek
+(Přehled, Větve, Workspaces, Úkoly, Joby, Běhy, Index, Mezery, Prostředí, Účty, Nastavení), jejich detaily a stavy,
+úvodní průvodce (na stejném vsazeném panelu, kroky jako segmenty, akce stále na očích) a vlastní titulková lišta okna; data, IPC, kontrakt a chování se nemění. Nahrazuje § 6 (tokeny) a doplňuje § 1, § 5 a § 7
 v [ui-spec.md](ui-spec.md).
 Před/po: [design-revamp/](design-revamp/).
 

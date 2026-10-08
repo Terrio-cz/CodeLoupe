@@ -340,6 +340,8 @@ button, select, input { font: inherit; color: inherit; }
 .check input[type='checkbox']:checked { background: var(--accent); border-color: var(--accent); }
 .check input[type='checkbox']:checked::before { transform: translateX(12px); background: #ffffff; }
 .check input[type='checkbox']:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.check:has(input:disabled) { opacity: 0.5; cursor: default; }
+.check input[type='checkbox']:disabled { cursor: default; }
 .filterbar { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
 .filterbar .hint { flex: 1 1 320px; font-size: var(--fs-sm); }
 
@@ -418,6 +420,7 @@ table.data tr.group > td { background: var(--surface-2); border-bottom: 1px soli
 table.data td.wrap { white-space: normal; }
 table.data td.ellipsis { max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
 table.data td.ellipsis.narrow { max-width: 240px; }
+table.data td.two-line { padding-top: 6px; padding-bottom: 6px; line-height: 1.35; }
 table.data td.wrap-cell { white-space: normal; min-width: 170px; line-height: 1.35; padding-top: 6px; padding-bottom: 6px; }
 /* Row pickers: native checkboxes and radios (keyboard, forms) in the accent colour, sized to the row. */
 table.data input:is([type='checkbox'], [type='radio']) { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; vertical-align: middle; cursor: pointer; }
@@ -717,15 +720,23 @@ table.data.import-table td { vertical-align: top; height: auto; padding-top: 8px
   .content::after { display: none; }
 }
 
-/* First-run onboarding (CL-119) */
-.onboarding-scroll { flex: 1; min-height: 0; overflow: auto; }
-.onboarding { min-height: 100%; max-width: 880px; margin: 0 auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 16px; }
+/* ── First-run onboarding (CL-119): the same inset panel as the screens, steps as pills, actions stay in view ── */
+.onboarding-scroll {
+  flex: 1; min-height: 0; overflow: auto; margin: 0 8px 8px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--shadow-1), inset 0 1px 0 var(--highlight);
+}
+.onboarding { min-height: 100%; max-width: 880px; margin: 0 auto; padding: var(--s-8) var(--s-6) 0; display: flex; flex-direction: column; gap: var(--s-4); }
 .onboarding-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.onboarding-head h1 { margin: 0; font-size: 20px; }
-.steps { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
-.steps li[aria-current='step'] .btn { background: var(--accent-weak); color: var(--accent-text); }
+.onboarding-head h1 { margin: 0; font-size: var(--fs-xl); letter-spacing: -0.02em; }
+.steps { display: flex; gap: 2px; list-style: none; margin: 0; padding: 2px; flex-wrap: wrap; align-self: flex-start; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); }
+.steps .btn { min-height: 26px; }
+.steps li[aria-current='step'] .btn { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow-1), inset 0 0 0 1px var(--border-strong); }
 .steps li.done .btn { color: var(--text-2); }
 .onboarding-body { flex: 1; display: flex; flex-direction: column; gap: 12px; }
-.onboarding-foot { display: flex; gap: 8px; align-items: center; }
-.onboarding pre.mono { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); padding: 8px; border-radius: 6px; max-height: 320px; overflow: auto; }
-.onboarding pre.warn { border-left: 3px solid var(--warning); }
+.onboarding-body ul.plain { margin: 4px 0 0; padding-left: 18px; }
+.onboarding-foot {
+  position: sticky; bottom: 0; display: flex; gap: 8px; align-items: center;
+  padding: var(--s-3) 0 var(--s-4); background: var(--bg); border-top: 1px solid var(--border);
+}
+.onboarding pre.mono { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); padding: 10px 12px; border-radius: var(--r-md); max-height: 320px; overflow: auto; box-shadow: inset 0 0 0 1px var(--border); }
+.onboarding pre.warn { box-shadow: inset 3px 0 0 var(--warning), inset 0 0 0 1px var(--border); }
