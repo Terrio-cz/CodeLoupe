@@ -8,7 +8,7 @@ data class HookRecord(
     val t: String,
     val hook: String,
     val tool: String,
-    /** `advised` or `denied`. */
+    /** `advised`, `denied`, or `context` for a session start. */
     val decision: String,
     /** The kind of advice (`search:usages`, `read`, …). */
     val why: String,
@@ -17,4 +17,6 @@ data class HookRecord(
     val session: String,
     val root: String? = null,
     val ms: Double = 0.0,
+    /** Size of the context a session start added, in tokens (3.2 characters each); 0 for the other hooks. */
+    val tokens: Int = 0,
 )

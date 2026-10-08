@@ -24,7 +24,8 @@ a row without a CodeLoupe call on that repository in between: an agent that cann
 Modes, in `<home>/config.json` (read on every call, no restart):
 
 ```json
-{ "hooks": { "enabled": true, "steer": { "mode": "advise", "minLines": 150, "maxPerSession": 40, "giveUpAfter": 4 } } }
+{ "hooks": { "enabled": true, "steer": { "mode": "advise", "minLines": 150, "maxPerSession": 40, "giveUpAfter": 4 },
+             "sessionStart": { "enabled": true, "map": false, "budget": 1200, "changes": true, "changesLimit": 12 } } }
 ```
 
 - `advise` (default): the command runs and the model reads the equivalent call next to its result (`additionalContext`; permissions are not touched).
@@ -36,3 +37,20 @@ command text) and how many were followed by a CodeLoupe code call on the same wo
 `/status` has `hooks` (calls, advised, denied, why the rest was left alone, median and p95 ms of the decision).
 `codeloupe metrics hooks --replay --since 2026-10-01` runs the shell and read calls of old transcripts through the same
 decision and prints how many it would advise and with which call (counts only; sizes from the transcript's own results).
+
+## Session start
+
+The `SessionStart` hook (`startup`, `resume`, `clear`, `compact`) starts the daemon as before and then asks it for the context a session
+begins with, so the first turns need not go to `ls`, `find` and `git status`. It speaks only for a git repository the daemon has already
+indexed (it never starts a build), and says nothing otherwise.
+
+- **State of the worktree** (always, when the hook is on): `CodeLoupe orientation for <worktree>: branch TER-5-x (task TER-5), default branch main`,
+  then what the worktree changed against the merge-base, by declaration (`changes` without the callers, at most `changesLimit` lines).
+- **Map** (`"map": true`; off by default, see the measurement in [docs/plan.md](../plan.md)): the ranked repository map (`outline` without a target) within
+  `budget` tokens (default 1200, 3.2 characters a token as `outline` counts), centred on the files the worktree changed. A resumed or compacted session
+  gets the state alone; it has seen the map.
+
+`sessionStart.enabled: false` turns this hook off alone; `hooks.enabled: false` and `CODELOUPE_HOOKS=off` turn off all of them.
+`codeloupe metrics orientation --since 2026-10-01` counts `ls`/`find`/`tree`/`Glob` calls in the first 8 turns of sessions, with and without the
+hook's context in the transcript, to show whether the map pays for itself. `hooks.jsonl` records each start (kind, tokens, milliseconds; no text).
+
