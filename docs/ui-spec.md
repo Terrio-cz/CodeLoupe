@@ -48,6 +48,7 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 | `#/overview` | Přehled | — | `overview`, `/status` |
 | `#/branches` · `#/branches/:id` | Větve | drawer (520 px) | `worktrees`, `worktrees/{id}` |
 | `#/workspaces` · `#/workspaces/<repo>%2F<name>` | Workspaces (CL-72) | drawer (520 px) | `/workspaces`, `/resources`, `/reconcile`, `/workspaces/releases`, `/ports` (§ 9.18) |
+| `#/jobs` · `#/jobs/:id` | Joby (CL-89) | drawer (1040 px) | `/jobs`, `/jobs/{id}`, `/status` (sloty), `/webhooks`, `/webhooks/deliveries`, `/events/stream` (§ 9.18) |
 | `#/tasks` · `#/tasks/:id` | Úkoly | celá stránka s panelem vlastností vpravo | `tasks`, `tasks/{id}` |
 | `#/index` | Index | — | `index` |
 | `#/gaps` | Mezery | řádek se rozbalí | `gaps` |
@@ -318,6 +319,38 @@ Workspaces                                 [Repo ▾] [Stav ▾] [🔍 hledat]  
   aktuálnímu plánu (jen verdikt `confirm`), v nativním dialogu vypíše, co se smaže (kontejnery, sítě, volumes, images,
   adresáře), a po potvrzení zavolá `POST /reconcile/run {confirm}`. Výsledek po položkách (odstraněno / už neexistovalo /
   používané — zkusí se znovu / selhalo) se ukáže pod tlačítkem. V mock režimu akce nic nemění.
+
+### 3.7b Joby (CL-89)
+
+Joby daemonu (`codeloupe job start`): co běží, co čeká na slot, co skončilo a jak, a webhooky, které o tom dostaly zprávu.
+Jen čtení; obrazovka se obnovuje z proudu událostí daemonu.
+
+```
+Joby                                       [Stav ▾] [🔍 hledat job, příkaz, štítek]  Posledních 12 jobů · živě
+┌ Běží 2 ┬ Ve frontě 3 ┬ Hotové 4 ┬ Selhané 2 ┬ Zamítnuté a zrušené 1 ┐
+┌ Sloty a kdo je drží ──────────────────────────────────────────────────────────────────┐
+│ gradle-test  2/2 ████████  drží: J…K2QF · TER-671  J…M9ZD · TER-672  · čeká 2: J…P4TX · TER-664 … │
+│ vps-test     0/1 ░░░░░░░░  volný                                                      │
+┌ Job              Stav                 Příkaz              Slot         Štítek  Řetěz        Začátek  Doba ┐
+│ J…A1B2  ● selhalo (exit 1)  gradlew test …   gradle-test  TER-671  2 kroky po skončení  před 31 min 3,2 min │
+└ Webhooky ───────────────────────────┐ ┌ Log doručení ───────────────────────────────────┐
+```
+
+- Stavy jobu: **čeká** (na slot), **běží**, **hotovo** (exit 0), **selhalo (exit n)**, **zamítnuto** politikou, **zrušeno**,
+  **ztraceno** (daemon se zastavil, než skončil), **chyba** (program nešel spustit). Stav je slovo + tečka, ne jen barva.
+- **Sloty** jsou z `/status` `jobs.slots`: kapacita, kdo slot drží (běžící joby) a kdo čeká ve frontě, s proklikem na job.
+- **Živě**: main otevře `GET /events/stream` (SSE, navazuje po posledním `Last-Event-ID`, znovu se připojuje s prodlevou
+  1 → 15 s), jen dokud je obrazovka otevřená; stránka dostane jen typ události a id jobu (ne data) a po 200 ms bez další
+  události načte joby, sloty a doručení znovu. Bez proudu (mock) se běžící joby obnovují po 10 s.
+- **Detail (drawer)**: stav, doba, štítek, příkaz; **Log: souhrn** jako první — počty testů (prošlo / selhalo / přeskočeno),
+  první chybové řádky a posledních 15 řádků, jak je spočítal daemon (`JobSummary`); teprve tlačítko „Zobrazit celý log“
+  přečte konec logu (max 400 řádků / 96 kB). Dokončené joby jen: log běžícího jobu ještě nemá z uložených hodnot
+  vymaskovaná tajemství, takže se nečte. Main čte soubor `<home>/jobs/<id>.log` podle id (cestu ze záznamu jen porovná),
+  odstraní barevné kódy a skryje věci podobné tajemstvím (tokeny, `Bearer …`, `KLÍČ=hodnota`, `https://user:heslo@`).
+- **Řetěz dokončení**: úkoly navazující na job (`--then`, `--on-failure`) jako kroky řetězu (job → následný job) a
+  deklarované kroky (`notify`, `webhook`, `job`) s adresou bez query; „Probudí agenta“ = `wake`.
+- **Webhooky**: odběry (adresa bez query, události, od kdy) a log doručení (stav: doručeno / čeká / opakuje (n.) /
+  selhalo, pokusy, poslední HTTP kód nebo chyba, kdy). Správa odběrů (přidání, smazání) zůstává v CLI.
 
 ### 3.8 Nastavení
 
@@ -803,8 +836,14 @@ Aplikace čte i několik stávajících jen čtecích cest daemonu; renderer je 
 | `reconcile` | `GET /reconcile` | – |
 | `releases` | `GET /workspaces/releases` | – |
 | `ports` | `GET /ports` | – |
+| `status` | `GET /status` | – (sloty jobů; jinak ho čte main proces sám) |
+| `jobs` | `GET /jobs` | `limit` |
+| `jobs/:id` | `GET /jobs/{id}` | – (řetěz jobu) |
+| `webhooks` | `GET /webhooks` | – |
+| `deliveries` | `GET /webhooks/deliveries` | `limit` |
 
-Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevolá; viz § 10.
+Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevolá; viz § 10. Mimo `api` jdou ještě dva
+stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 3.7b) a `live.subscribe` (proud událostí).
 
 ### 9.17 Zdroje dat a implementace
 

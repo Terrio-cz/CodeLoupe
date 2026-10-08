@@ -74,7 +74,7 @@ async function main(): Promise<void> {
 
   const claude = new ClaudeConnector(execClaude(), () => findMarketplace({ resources: app.isPackaged ? process.resourcesPath : null, appDir: __dirname }));
 
-  registerIpc({
+  const ipc = registerIpc({
     store, manager, client, home, claude, source,
     trustedOrigins: [APP_ORIGIN, ...(DEV_URL ? [new URL(DEV_URL).origin] : [])],
     applySettings: (prev, next) => applySettings(prev, next),
@@ -158,7 +158,7 @@ async function main(): Promise<void> {
     });
     win.on('ready-to-show', () => win?.show());
     win.on('show', () => void manager.check());
-    win.on('closed', () => { win = null; });
+    win.on('closed', () => { win = null; ipc.onWindowClosed(); });
     // A new window starts on the requested screen; a message sent before the page loads would be lost.
     const route = hash && /^#\/[\w/?=&.:-]*$/.test(hash) ? hash : '';
     if (DEV_URL) void win.loadURL(`${DEV_URL}${route}`);
