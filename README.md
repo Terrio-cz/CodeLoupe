@@ -50,6 +50,7 @@ claude plugin install codeloupe@codeloupe
 
 - **Navigate and review**: `find`, `outline`, `symbol`, `context`, `usages`, `calls`, `hierarchy`, `grep`, and `changes` (the
   declarations a branch changed, with callers and tests). Unsure references are marked `candidate`, never dropped.
+- **Steer**: the plugin's hook points shell searches and whole-file reads of indexed source at the call that answers them.
 - **Edit by declaration**: `edit` replaces, inserts, deletes and renames declarations, verified before anything is written.
 - **Run long commands**: `job` runs builds and tests in the daemon so an agent's turn can end; `run` answers a short command
   with a summary and a handle to the rest.

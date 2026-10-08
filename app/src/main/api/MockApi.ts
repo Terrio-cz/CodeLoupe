@@ -124,6 +124,7 @@ export class MockApi implements ApiSource {
     return {
       range: r,
       generatedAt: new Date(d.now).toISOString(),
+      baseline: { state: 'ok', label: 'baseline', since: '2026-09-23', until: '2026-10-06', runs: 2_373, coveredShare: 0.86, message: null },
       kpis: {
         weightedToday: sum(today), weightedYesterdaySameTime: sum(yesterday),
         weightedRange, baselineRange, savedTokens,

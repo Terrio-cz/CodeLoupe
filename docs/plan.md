@@ -390,6 +390,14 @@ takže tento řízený benchmark agentů zůstává nespuštěný.
 
 2 týdny po nasazení `codeloupe metrics compare baseline.json after.json`; týdenní report mezer.
 
+**Úspora v aplikaci (CL-133).** Daemon porovnává běhy z ingestu s baseline reportem v `<home>/baseline.json` (uloží ho
+`codeloupe metrics collect --since … --until … --label baseline --baseline`; čte se znovu při změně souboru). Metoda: průměrná
+cena běhu role z baseline (součet / počet běhů, ne medián: medián šikmého rozdělení leží pod součtem stejných běhů a úspora by
+vycházela záporně i bez změny) × běh role v rozsahu; hotový běh bez role v baseline nebo ještě běžící běh se počítá skutečnou
+cenou na obou stranách. Procento je z porovnaných běhů, vedle něj `coveredShare`. Je to srovnání s průměrným během před
+nasazením, ne řízený benchmark (§ 8.4); mix úkolů se v baseline a po nasazení může lišit. Bez baseline obrazovky ukážou pomlčku
+a návod, nic se neodhaduje.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
@@ -929,7 +937,7 @@ rozhoduje launcher.
   jejich nové řádky. Shoda s `codeloupe metrics collect --since 2026-09-08` na stejných souborech: 2 442 z 2 449 běhů shodných
   v ceně, tazích, peak kontextu, roli, TER, délce i chybách; zbylých 7 jsou běhy, které mezi oběma čteními ještě rostly.
   Generovaný test se 2 651 běhy: každé řazení seznamu a kroky < 200 ms, druhý průchod nečte nic.
-- **Rozhodnutí**: baseline po rolích daemon nemá, takže `baselineRange` a úspory zůstávají 0 (nevymýšlí se odhad); `busy` volání
+- **Rozhodnutí**: daemon zprvu baseline po rolích neměl, takže `baselineRange` a úspory byly 0 (nevymýšlí se odhad; baseline od CL-133 viz § 8.5); `busy` volání
   nejsou mezera pro UI (je to zátěž daemonu). Seznam běhů a kroky vystavuje API, i když obrazovka Runs z UI vypadla (§ 3.3):
   data jsou potřeba pro Overview a pro případnou obrazovku v aplikaci.
 
@@ -1033,6 +1041,35 @@ rozhoduje launcher.
 - **Mezery a rozhodnutí**: rename nenahrazuje IDE pro odkazy mimo index (reflexe, řetězce, generovaný kód, `getX()` Javy ↔ vlastnost Kotlinu — vypsané jako kandidáti);
   `Terrio` doplní `{"write": {"linkedWorktreesOnly": true}}` do vlastního `.codeloupe.json` (mimo tento repozitář); brána `auto` je bez transkriptů zavřená a výslovně se otevírá
   `write.mode: on`.
+
+### Výsledek CL-135 — háčky vedou od shellu a celých čtení k CodeLoupe (2026-10-08)
+
+- **Mechanismus**: pluginový `PreToolUse` na `Bash|PowerShell|Read` volá jediný skript `plugin/hooks/hook.sh` (stdin → `curl` na `POST /hook` lokálního daemona, vždy `exit 0`).
+  Celé rozhodnutí je v daemonu (`codeloupe.hooks`): `ShellWords` → `ShellIntents` (rg/grep/git grep/find/cat/head/tail/sed/Get-Content/Select-String, `cd`, `timeout`,
+  `bash -c`, here-dokumenty, Windows i Git Bash cesty) → `Steering` (rozpoznání vzoru: deklarace → `find`, jméno → `usages`, řetězec/regex → `grep`, výpis souborů → `find`/`outline`,
+  celé čtení ≥ 150 řádků → `outline`) → `Hooks` (režim, ochrana proti opakování, limity, log). Odpověď `advise` je `additionalContext` bez `permissionDecision`
+  (oprávnění se nemění); `redirect` vrací `deny` jen pro příkaz, který jasně míří na zdrojáky (glob `*.kt`, `--type kotlin`, zdrojový soubor), podruhé stejný příkaz projde.
+  Vypínač na jednom místě: `config.json` `hooks.enabled=false` (čte se při každém volání, bez restartu) nebo `CODELOUPE_HOOKS=off`. Formáty vstupu a výstupu hooků jsou podle
+  dokumentace Claude Code; živé ověření nebylo možné (účet narazil na týdenní limit), `claude plugin validate --strict` prošel.
+- **Nezasahuje**: daemon neběží (skript končí bez čekání, když chybí `daemon.json`; zastaralý `daemon.json` stojí nejvýš `--connect-timeout 0.3`), repozitář nebyl indexován (hook nikdy nespouští build),
+  soubor není v bázi nebo je kratší než `minLines`, `Read` s `offset`/`limit`, příkaz není hledání/čtení zdrojáku (build, git, `.md`/`.json`, hledání ve výstupu roury, čtení useknuté `head`/`grep`),
+  stejný příkaz podruhé v relaci, relace po `maxPerSession` (40) radách a relace, která `giveUpAfter` (4) rad za sebou nepoužila žádné volání CodeLoupe na tom repozitáři
+  (agent bez nástrojů, např. `terrio-coder`, tak dostane nejvýš čtyři rady). Rada má kolem 260 znaků (≈ 65 tokenů při 4 znacích na token).
+- **Tabulka rozhodnutí**: `SteeringTest` (tvary příkazů: hledání, čtení, roury, uvozovky, here-dokument, Windows `C:\`, `/c/`, PowerShell, a vše, čeho se nesmí dotknout), `ShellWordsTest`,
+  `PatternShapeTest`, `HooksTest` (režimy, opakování, limity, výpadek indexu a konfigurace), `HooksDaemonTest` (skutečný daemon a repozitář, nezaindexovaný repozitář = 204, hlavička, skript
+  `hook.sh` včetně mrtvého portu, chybějícího `daemon.json`, `CODELOUPE_HOOKS=off`, nesmyslného vstupu), `HookUsageTest`, `HookReplayTest`.
+- **Měření nad skutečnými daty** (`codeloupe metrics hooks --replay --since 2026-10-01`, transkripty Terrio, 2 416 běhů, 61 861 volání Bash/PowerShell/Read; velikosti souborů podle výsledků v transkriptech,
+  zmizelé worktree se berou jako indexované, je-li v jejich okolí git repozitář se zdrojáky = horní odhad toho, co by řekl daemon, který ty repozitáře zná):
+  **11 003 volání (17,8 %) by dostalo radu**, kdyby se každá rada brala: `grep` 8 017, `usages` 1 142, celé čtení → `outline` 1 128 (ze 7 992 `Read`), `find` 563, výpis souborů → `outline`/`find` 112 + 41.
+  Nechané být: nejde o hledání/čtení kódu 29 090, jiné než zdrojové soubory 13 420, krátké/částečné čtení 7 258, neindexováno 849, opakování 241.
+  Podle programu (rada / rozpoznaná volání): `rg` 5 429 / 10 333, `grep` 1 736 / 7 741, `sed` 1 581 / 6 823, `cat` 1 038 / 4 934, `head` 278 / 4 072, `find` 99 / 314.
+  V týchž transkriptech nebylo **žádné** volání CodeLoupe; s výchozím `giveUpAfter` 4 by hook při neuposlechnutí promluvil jen **948×** (1,5 %), tj. ≈ 62 tisíc tokenů rad za týden.
+  Kolik z těch 17,8 % agenti uposlechnou, nevíme; ukáže to `codeloupe metrics hooks` (rady z `hooks.jsonl`, následované voláním kódového nástroje na témže worktree do 180 s podle `calls.jsonl`).
+- **Latence** (stroj s desítkou paralelních oken, Git Bash, `spawnSync` jako Claude Code): rozhodnutí v daemonu **medián 3,5 ms, p95 6,8 ms** (při souběhu 9 / 18 ms; `/status` `hooks`);
+  celý skript (start bash ≈ 32–36 ms + `curl` + daemon) **medián 62–87 ms při zátěži, 45 ms naprázdno** (měřeno proti pahýlu trasy). Kritérium „< 50 ms“ je tedy splněno jen naprázdno; čas
+  dominuje start procesu bash, ne daemon. `bash /dev/tcp` místo `curl` ušetří ≈ 20 ms, ale na Windows nemá časový limit a na mrtvý port čeká ≈ 2 s (měřeno), proto zůstává `curl --connect-timeout 0.3`.
+  Zbytek (hook typu `http` bez procesu) je v nové kartě.
+- **Rozhodnutí**: výchozí `advise` (nic se neodmítá); soubory nové na větvi, které ještě nejsou v bázi, se berou jako neindexované.
 
 ### Výsledek CL-137 — vyhledávání pojmů nad deklaracemi (2026-10-08)
 

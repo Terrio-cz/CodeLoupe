@@ -11,6 +11,7 @@ codeloupe metrics collect --since 2026-09-23 --until 2026-10-02 --label baseline
 codeloupe metrics compare baseline-2026-10-08.json after-2026-10-20.json
 codeloupe metrics gaps --since 2026-10-01               # where CodeLoupe calls fell short, by week and query shape
 codeloupe metrics boilerplate --since 2026-09-23         # skeleton share of the new code files agents write
+codeloupe metrics hooks --since 2026-10-01               # how often the plugin's steering hook spoke and was followed
 ```
 
 `collect` writes one JSON report with, per role, median / p75 / sum of cost (relative price units: input 1, 5 min cache
@@ -20,7 +21,22 @@ tool categories ranked by what their results cost while they stay in context. Th
 symbol or file, and calls answered empty, busy or with candidates only. Large windows are read one run at a time; add
 `CODELOUPE_OPTS=-Xmx1g` when a single transcript holds huge lines. `config.json` `metrics`: `transcriptDirs`,
 `categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
-ones), `defaultCategories` (false = only yours) and `ingestTtlMs` (see below).
+ones), `defaultCategories` (false = only yours) and `ingestTtlMs` (see below); the hook command is described in [Plugin hooks](Plugin-hooks).
+
+## Savings against a baseline
+
+Savings in the desktop app are measured against a baseline report in the daemon's home. Collect it over a period before CodeLoupe
+and store it with `--baseline`; the daemon reads `<home>/baseline.json` again whenever it changes:
+
+```bash
+codeloupe metrics collect --since 2026-09-23 --until 2026-10-02 --label baseline --baseline --dir ~/.claude/projects/<project>
+```
+
+A finished run whose role the baseline has counts the baseline's mean cost of one run of that role (the mean, because the
+runs of a period are compared as totals); every other run counts what it really cost on both sides. The saving is thus a
+comparison with the average run of the same role before CodeLoupe, not a controlled benchmark, and the screens say how much
+of the cost was compared. The Accounts screen applies the same figure to the runs of each Claude account. Without a
+baseline file they show a dash and how to create one.
 
 ## In the desktop app
 

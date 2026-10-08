@@ -3,14 +3,15 @@ package codeloupe.uiapi
 import kotlinx.serialization.Serializable
 
 /**
- * The Overview screen. What the daemon cannot know yet (cost, baseline and savings come from the transcript ingest of
- * CL-62) is zero or empty, not missing.
+ * The Overview screen. Cost comes from the transcript ingest (CL-62); baseline and savings from the baseline report in the
+ * daemon's home (CL-133) and are zero or null, with [baseline] saying why, when there is none.
  */
 @Serializable
 data class Overview(
     val range: String,
     val generatedAt: String,
     val kpis: Kpis,
+    val baseline: BaselineInfo,
     val budget: Budget,
     val costSeries: List<CostPoint>,
     val savingsByTool: List<SavedByTool>,
@@ -21,9 +22,12 @@ data class Overview(
         val weightedToday: Long,
         val weightedYesterdaySameTime: Long,
         val weightedRange: Long,
+        /** What the runs of the range would have cost at the baseline (runs without a baseline at their real cost); 0 without one. */
         val baselineRange: Long,
+        /** [baselineRange] minus [weightedRange]; negative when the runs cost more than the baseline. */
         val savedTokens: Long,
-        val savedPct: Double,
+        /** Percent saved on the runs that have a baseline; null when none could be compared. */
+        val savedPct: Double?,
         /** Distinct roots that called CodeLoupe in the last 15 minutes: one per working window. */
         val activeWindows: Int,
         val queriedWorktrees: Int,

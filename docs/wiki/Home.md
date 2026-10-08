@@ -26,6 +26,7 @@ short version, a landing page and the download, is the
 | [Trackers](Trackers) | the YouTrack mirror and the tools on top of it |
 | [Environment and secrets](Environment-and-secrets) | the encrypted store, `env run`, import, audit |
 | [Hooks and token savings](Hooks-and-token-savings) | the session hook, `doc` and the layers that keep the context small |
+| [Plugin hooks](Plugin-hooks) | the `PreToolUse` hook that points searches and whole-file reads at CodeLoupe, its modes and measurements |
 | [Metrics and savings](Metrics-and-savings) | where an agent's cost goes, measured from transcripts |
 | [Desktop app](Desktop-app) | the tray app and its screens, accounts |
 

@@ -13,6 +13,7 @@
 * [Trackers](Trackers)
 * [Environment and secrets](Environment-and-secrets)
 * [Hooks and token savings](Hooks-and-token-savings)
+* [Plugin hooks](Plugin-hooks)
 * [Metrics and savings](Metrics-and-savings)
 * [Desktop app](Desktop-app)
 

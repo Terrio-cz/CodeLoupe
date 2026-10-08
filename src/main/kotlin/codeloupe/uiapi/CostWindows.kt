@@ -10,20 +10,22 @@ import java.time.ZoneId
  * Weighted tokens by day and hour from the hourly buckets of the ingest. Days are the daemon's local days; the buckets are
  * whole hours, so in a zone whose offset has minutes a day's edge is off by up to half an hour.
  */
-internal class CostWindows(private val hours: Map<Long, Double>, private val zone: ZoneId) {
+internal class CostWindows(private val hours: Map<Long, Double>, private val zone: ZoneId, private val baselineHours: Map<Long, Double> = emptyMap()) {
     /** Tokens used from [from] (inclusive) to [to] (exclusive), instants in epoch ms. */
-    fun between(from: Long, to: Long): Long = Math.round(hours.entries.sumOf { (h, c) -> if (h * RunWriter.HOUR_MS in from until to) c else 0.0 })
+    fun between(from: Long, to: Long): Long = sum(hours, from, to)
+
+    private fun sum(of: Map<Long, Double>, from: Long, to: Long): Long = Math.round(of.entries.sumOf { (h, c) -> if (h * RunWriter.HOUR_MS in from until to) c else 0.0 })
 
     fun hourly(count: Int, now: Instant): List<Overview.CostPoint> {
         val last = Math.floorDiv(now.toEpochMilli(), RunWriter.HOUR_MS)
-        return (last - count + 1..last).map { h -> Overview.CostPoint(IsoTime.of(Instant.ofEpochMilli(h * RunWriter.HOUR_MS)), Math.round(hours[h] ?: 0.0), 0) }
+        return (last - count + 1..last).map { h -> Overview.CostPoint(IsoTime.of(Instant.ofEpochMilli(h * RunWriter.HOUR_MS)), Math.round(hours[h] ?: 0.0), Math.round(baselineHours[h] ?: 0.0)) }
     }
 
     fun daily(count: Int, today: LocalDate): List<Overview.CostPoint> = (count - 1 downTo 0).map { back ->
         val day = today.minusDays(back.toLong())
         val from = day.atStartOfDay(zone).toInstant().toEpochMilli()
         val to = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        Overview.CostPoint(IsoTime.of(Instant.ofEpochMilli(from)), between(from, to), 0)
+        Overview.CostPoint(IsoTime.of(Instant.ofEpochMilli(from)), between(from, to), sum(baselineHours, from, to))
     }
 
     companion object {

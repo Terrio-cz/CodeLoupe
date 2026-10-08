@@ -3,8 +3,8 @@ that answer with less than a plain read would.
 
 ## The SessionStart hook
 
-The [Claude Code plugin](Claude-Code-integration#1-plugin-recommended) registers one hook, `SessionStart`
-(`startup|resume|clear`), which runs [`start-daemon.sh`](https://github.com/Terrio-cz/CodeLoupe/blob/main/plugin/hooks/start-daemon.sh)
+The [Claude Code plugin](Claude-Code-integration#1-plugin-recommended) registers two hooks. `SessionStart`
+(`startup|resume|clear`) runs [`start-daemon.sh`](https://github.com/Terrio-cz/CodeLoupe/blob/main/plugin/hooks/start-daemon.sh)
 and so `codeloupe start`: the daemon is up before the first tool call. It never fails a session and prints nothing
 unless asked, because the output of a SessionStart hook reaches the model.
 
@@ -15,10 +15,15 @@ unless asked, because the output of a SessionStart hook reaches the model.
 
 The hook needs `bash` (Git Bash on Windows, which Claude Code uses anyway).
 
+The second hook, `PreToolUse` on `Bash`, `PowerShell` and `Read`, points shell searches (`rg`, `grep`, `find -name`) and
+reads of whole indexed source files at the CodeLoupe call that answers them. It fails open, advises by default and has one
+switch to turn every hook off: [Plugin hooks](Plugin-hooks).
+
 ## Where the tokens go
 
 | Layer | What it saves | Details |
 |---|---|---|
+| Steering hook | a shell search or a whole-file read of indexed source is answered by a pointer to `find`, `usages`, `grep` or `outline` | [Plugin hooks](Plugin-hooks) |
 | Declaration-level answers | `symbol`, `outline`, `usages`, `calls`, `hierarchy` and `changes` return the piece asked for instead of files: 4-41 % of the size of grep and whole-file reads, 8 % summed | [Benchmarks](Benchmarks) |
 | `run` | a short command answered with a summary (every error line kept) and a handle to the full output: about 88 % less over the recorded set | [Tools reference](Tools-reference) |
 | `job` | a long command runs in the daemon, so no turn is held open on a build | [Jobs and events](Jobs-and-events) |

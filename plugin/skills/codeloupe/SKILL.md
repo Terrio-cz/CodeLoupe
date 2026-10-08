@@ -54,6 +54,16 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 - Long commands go to `job`: start it, end the turn when there is nothing else to do, and read `status` when you
   continue. Do not hold a turn open on a slow build.
 
+## Hooks of the plugin
+
+After a shell search (`rg`, `grep`, `find -name`, `git grep`) or a read of a whole indexed source file (`cat`, `head`, `sed -n`, `Read`
+without `offset`/`limit`, 150 lines or more) a `PreToolUse` hook may add one line naming the CodeLoupe call that answers the same
+question (`usages`, `find`, `grep`, `outline`). Use it instead of reading the output you were about to get. In `redirect` mode the
+first attempt is refused with that line: run the same command again when the index cannot answer. The hook speaks once per command,
+never for documents, short files, builds, git or a repository the daemon has not indexed. It is switched off with
+`"hooks": { "enabled": false }` in the daemon's `config.json` (`"steer": { "mode": "off" }` for this hook alone) or
+`CODELOUPE_HOOKS=off` in Claude Code's environment; `codeloupe metrics hooks` counts what it said and what was followed.
+
 ## If the tools fail
 
 - `connection refused` / the server shows as failed: the daemon is not running. Run `codeloupe start` (the plugin

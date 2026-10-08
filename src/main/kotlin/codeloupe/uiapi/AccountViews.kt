@@ -2,9 +2,13 @@ package codeloupe.uiapi
 
 import codeloupe.accounts.AccountRoots
 import codeloupe.accounts.Accounts
+import codeloupe.accounts.ClaudeAccount
 import codeloupe.accounts.ClaudeProfiles
 import codeloupe.daemon.CallRecord
+import codeloupe.ingest.AccountUsage
+import codeloupe.ingest.RunWriter
 import codeloupe.ingest.Transcripts
+import codeloupe.metrics.BaselineStore
 import codeloupe.platform.IsoTime
 import codeloupe.secrets.SecretAccess
 import codeloupe.tracker.TrackerMirror
@@ -28,16 +32,22 @@ internal class AccountViews(
         val recent = calls.after(now.minusSeconds(ACTIVE_WINDOW_S)).filter { instant(it)?.isAfter(now.minusSeconds(ACTIVE_WINDOW_S)) == true }.mapNotNull { it.root }.distinct()
         val windows = recent.mapNotNull { roots.accountOf(it) }.groupingBy { it }.eachCount()
         val since = now.minusSeconds(7 * 86_400).toEpochMilli()
+        val baseline = transcripts.baseline.state()
+        val loaded = (baseline as? BaselineStore.State.Loaded)?.baseline
+        val firstHour = Math.floorDiv(since, RunWriter.HOUR_MS)
+        val untilHour = Math.floorDiv(now.toEpochMilli(), RunWriter.HOUR_MS) + 1
+        val finishedBefore = now.minusSeconds(ACTIVE_WINDOW_S).toEpochMilli()
+        fun saved(a: ClaudeAccount) = loaded?.let { Savings(transcripts.queries.usageRows(firstHour, untilHour, AccountUsage.prefix(a.projects)), it, finishedBefore).from(firstHour).savedPct }
         return AccountsView(
             claude = claude.map { a ->
                 val used = transcripts.usage.totals(a.projects, since)
                 AccountsView.Claude(
                     id = a.id, label = a.label, email = profiles.email(a), configDir = a.configDir.toString(), isDefault = a.isDefault, implicit = a.implicit,
-                    exists = Files.isDirectory(a.configDir), windows = windows[a.id] ?: 0, weighted7d = used.weighted, savedPct7d = 0.0,
+                    exists = Files.isDirectory(a.configDir), windows = windows[a.id] ?: 0, weighted7d = used.weighted, savedPct7d = saved(a),
                     lastUsedAt = used.lastUsedMs?.let { IsoTime.of(Instant.ofEpochMilli(it)) },
                 )
             },
-            youtrack = youtrack(),
+            youtrack = youtrack(), baseline = BaselineInfo.of(baseline),
         )
     }
 

@@ -354,6 +354,7 @@ export class MockData {
 
   accounts(): Accounts {
     return {
+      baseline: { state: 'ok', label: 'baseline', since: '2026-09-23', until: '2026-10-06', runs: 2_373, coveredShare: null, message: null },
       claude: [
         { id: 'default', label: 'Account A', email: 'a@example.test', configDir: 'C:/Users/dev/.claude', isDefault: true, implicit: false, exists: true, windows: 4, weighted7d: 12_100_000, savedPct7d: 14, lastUsedAt: iso(this.now - 2 * 60_000) },
         { id: 'b', label: 'Account B', email: 'b@example.test', configDir: 'C:/Users/dev/.claude-b', isDefault: false, implicit: false, exists: true, windows: 2, weighted7d: 6_800_000, savedPct7d: 11, lastUsedAt: iso(this.now - HOUR) },

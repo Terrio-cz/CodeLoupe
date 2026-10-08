@@ -3,13 +3,14 @@ package codeloupe.uiapi
 import codeloupe.daemon.CallRecord
 import codeloupe.ingest.RunWriter
 import codeloupe.ingest.Transcripts
+import codeloupe.metrics.BaselineStore
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
 /**
  * The Overview screen: CodeLoupe's own call telemetry, and the cost, budget and gap figures of the transcript ingest. Baseline
- * and savings need a per-role baseline the daemon does not keep yet and are zero.
+ * and savings come from `<home>/baseline.json` ([Savings]); without one they are zero and the answer says why.
  */
 internal class OverviewViews(
     private val calls: CallLog,
@@ -29,18 +30,27 @@ internal class OverviewViews(
         val todayStart = today.atStartOfDay(zone).toInstant()
         val yesterdayStart = today.minusDays(1).atStartOfDay(zone).toInstant()
         val lastHour = Math.floorDiv(now.toEpochMilli(), RunWriter.HOUR_MS)
-        val windows = CostWindows(transcripts.queries.hours(CostWindows.firstHour(now, maxOf(days, 2)), lastHour + 1, account?.transcriptPrefix), zone)
+        val firstHour = CostWindows.firstHour(now, maxOf(days, 2))
+        val baseline = transcripts.baseline.state()
+        val savings = (baseline as? BaselineStore.State.Loaded)?.let {
+            Savings(transcripts.queries.usageRows(firstHour, lastHour + 1, account?.transcriptPrefix), it.baseline, now.minusSeconds(ACTIVE_WINDOW_S).toEpochMilli())
+        }
+        val windows = CostWindows(transcripts.queries.hours(firstHour, lastHour + 1, account?.transcriptPrefix), zone, savings?.baselineHours().orEmpty())
         val series = if (days == 1L) windows.hourly(HOURS_PER_DAY, now) else windows.daily(days.toInt(), today)
         val usedToday = windows.between(todayStart.toEpochMilli(), Long.MAX_VALUE)
+        val weightedRange = series.sumOf { it.weighted }
+        val compared = savings?.from(Math.floorDiv(Instant.parse(series.first().t).toEpochMilli(), RunWriter.HOUR_MS))
+        val baselineRange = if (compared?.savedPct == null) 0L else series.sumOf { it.baseline }
         val sameTimeYesterday = yesterdayStart.plus(Duration.between(todayStart, now))
         return Overview(
             range = range, generatedAt = now.toString(),
             kpis = Overview.Kpis(
-                usedToday, windows.between(yesterdayStart.toEpochMilli(), sameTimeYesterday.toEpochMilli()), series.sumOf { it.weighted }, 0, 0, 0.0, recent.size, queried,
+                usedToday, windows.between(yesterdayStart.toEpochMilli(), sameTimeYesterday.toEpochMilli()), weightedRange, baselineRange, if (baselineRange == 0L) 0 else baselineRange - weightedRange, compared?.savedPct, recent.size, queried,
                 records.size, percentile(records.map { it.ms }, 50), transcripts.queries.gapCount(now.minusSeconds(days * 86_400).toEpochMilli(), account?.transcriptPrefix),
                 transcripts.queries.gapCount(now.minusSeconds(NEW_GAP_S).toEpochMilli(), account?.transcriptPrefix),
             ),
-            budget = Overview.Budget(transcripts.budgets.dailyWeighted, usedToday), costSeries = series, savingsByTool = emptyList(),
+            baseline = BaselineInfo.of(baseline, compared?.coveredShare), budget = Overview.Budget(transcripts.budgets.dailyWeighted, usedToday),
+            costSeries = if (compared?.savedPct == null) series.map { it.copy(baseline = 0) } else series, savingsByTool = emptyList(),
             toolCalls = records.groupBy { it.tool }.map { (tool, rs) ->
                 Overview.ToolCalls(
                     tool, rs.size, percentile(rs.map { it.ms }, 50), percentile(rs.map { it.ms }, 95), rs.sumOf { it.chars.toLong() } / rs.size,

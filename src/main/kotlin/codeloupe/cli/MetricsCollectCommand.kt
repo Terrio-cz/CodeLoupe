@@ -2,6 +2,7 @@ package codeloupe.cli
 
 import codeloupe.JsonFormat
 import codeloupe.config.ConfigLoader
+import codeloupe.metrics.BaselineStore
 import codeloupe.metrics.MetricsCollector
 import codeloupe.metrics.MetricsRender
 import codeloupe.metrics.MetricsReport
@@ -9,6 +10,7 @@ import codeloupe.metrics.MetricsSetup
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
@@ -25,6 +27,7 @@ class MetricsCollectCommand : CliktCommand(name = "collect") {
     private val roles by option(help = "Comma-separated roles to print in detail, with their top commands")
     private val dir by option(help = "Transcript project directory (repeatable; default: all under ~/.claude/projects)").multiple()
     private val out by option(help = "Report file (default: <label>-<date>.json)")
+    private val baseline by option(help = "Write the report as the daemon's baseline (<home>/baseline.json): the desktop app then shows savings against it").flag()
 
     override fun help(context: Context) = "Read the transcripts of a period and write one JSON report."
 
@@ -32,7 +35,7 @@ class MetricsCollectCommand : CliktCommand(name = "collect") {
         val config = ConfigLoader.load()
         val setup = MetricsSetup(config)
         val report = MetricsCollector(setup.categorizer()).collect(setup.projectDirs(dir), label, MetricsSetup.instant(since), until?.let(MetricsSetup::instant))
-        val file = Path.of(out ?: "$label-${LocalDate.now()}.json")
+        val file = if (baseline) config.home.resolve(BaselineStore.FILE).also { Files.createDirectories(config.home) } else Path.of(out ?: "$label-${LocalDate.now()}.json")
         Files.writeString(file, PRETTY.encodeToString(MetricsReport.serializer(), report) + "\n")
         echo(MetricsRender.summary(report.aggregate, roles?.split(',')?.toSet()))
         echo("runs ${report.runs.size} -> $file")
