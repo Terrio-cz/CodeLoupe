@@ -139,6 +139,14 @@ class DocTest {
     }
 
     @Test
+    fun `a markdown document has no error index, an output with banners does`() {
+        assertTrue(doc(plan("\nThis step may fail with an error.\n")).errors.isEmpty())
+        val banners = "=== build ===\nok\n=== test ===\nFAILED: BillingTest\nat line\n"
+        assertEquals(1, doc(banners, "ci.log").errors.size)
+        assertEquals(listOf("build", "test"), doc(banners, "ci.log").sections.map { it.handle })
+    }
+
+    @Test
     fun `the doc tool reads a file under root and answers unchanged on the second read`() {
         dir.resolve("brain").createDirectories()
         dir.resolve("brain/TER-5.md").writeText(plan())

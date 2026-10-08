@@ -40,10 +40,11 @@ class Doc(val id: String, val sections: List<DocSection>, val errors: List<Windo
             val lines = text.replace("\r\n", "\n").lines().let { if (it.isNotEmpty() && it.last().isEmpty()) it.dropLast(1) else it }
             val headings = headings(lines)
             val sections = if (headings.size >= 2) byHeadings(lines, headings) else windows(lines)
-            return Doc(id, sections, errors(lines), lines.joinToString("\n"))
+            // A markdown document talks about errors in prose; the index is for output, which has none or only banners.
+            return Doc(id, sections, if (headings.count { it.markdown } >= 2) emptyList() else errors(lines), lines.joinToString("\n"))
         }
 
-        private class Heading(val line: Int, val level: Int, val title: String)
+        private class Heading(val line: Int, val level: Int, val title: String, val markdown: Boolean = true)
 
         private fun headings(lines: List<String>): List<Heading> {
             var fenced = false
@@ -52,7 +53,7 @@ class Doc(val id: String, val sections: List<DocSection>, val errors: List<Windo
                 if (line.trimStart().startsWith("```")) fenced = !fenced
                 if (fenced) continue
                 val heading = HEADING.find(line)?.let { Heading(i, it.groupValues[1].length, it.groupValues[2]) }
-                    ?: BANNER.find(line)?.let { Heading(i, 1, it.groupValues[1]) }
+                    ?: BANNER.find(line)?.let { Heading(i, 1, it.groupValues[1], markdown = false) }
                 if (heading != null) found += heading
             }
             return found
