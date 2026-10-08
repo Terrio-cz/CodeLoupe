@@ -16,12 +16,12 @@ internal class MemberLookup(private val cache: IndexCache, private val types: Ty
         return Resolution(levels[nearest], complete = true, further = levels.drop(nearest + 1).flatten())
     }
 
-    /** `Type.name`: nested types and enum entries, members of an object, of the companion objects. */
+    /** `Type.name`: nested types and enum entries, static members, members of an object, of the companion objects. */
     fun static(type: DeclRow, name: String, accept: (DeclRow) -> Boolean): Resolution {
         val children = cache.children(type)
         val nested = children.filter { it.name == name && it.kind in Kinds.CLASSIFIERS && accept(it) }
         val holders = (if (type.kind == "object" || type.kind == "companion") listOf(type) else emptyList()) + children.filter { it.kind == "companion" }
-        val members = holders.map { instance(types.closure(it), name, accept) }
+        val members = holders.map { instance(types.closure(it), name, accept) } + instance(types.closure(type), name) { Kinds.isStatic(it) && accept(it) }
         return Resolution(nested + members.flatMap { it.decls }, complete = true, further = members.flatMap { it.further })
     }
 

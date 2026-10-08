@@ -12,6 +12,10 @@ import type { DaemonHome } from './daemon/DaemonHome';
 import type { DaemonManager } from './daemon/DaemonManager';
 import type { SettingsStore } from './settingsStore';
 import { registerActions } from './actions/registerActions';
+import { JOB_CH } from '../shared/jobs';
+import { JobLogReader } from './jobs/JobLogReader';
+import { EventStream } from './live/EventStream';
+import { registerLive } from './live/registerLive';
 import { GapReportRefresh } from './gaps/GapReportRefresh';
 
 export interface IpcContext {
@@ -27,7 +31,7 @@ export interface IpcContext {
 }
 
 /** Registers every IPC channel; each handler checks that the call comes from the app's own page. */
-export function registerIpc(ctx: IpcContext): void {
+export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
   const handle = <A extends unknown[], R>(channel: string, fn: (...args: A) => Promise<R> | R) => {
     ipcMain.handle(channel, (event: IpcMainInvokeEvent, ...args: unknown[]) => {
       if (!trusted(event, ctx.trustedOrigins)) throw new Error('untrusted sender');
@@ -39,6 +43,10 @@ export function registerIpc(ctx: IpcContext): void {
     gapsRefresh: new GapReportRefresh(() => ctx.store.get(), () => ctx.home.dir),
     client: ctx.client, daemonTrusted: () => ctx.manager.trusted, mock: () => ctx.source().kind === 'mock',
   }, handle);
+  const stream = new EventStream(() => ctx.manager.port(), e => {
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(JOB_CH.livePush, e);
+  });
+  const live = registerLive(stream, new JobLogReader(ctx.client, () => ctx.home.dir), handle, () => ctx.source().kind === 'daemon' && ctx.manager.trusted);
   handle(CH.api, (req: unknown) => callApi(ctx, req));
   handle(CH.daemonState, () => ctx.manager.check());
   handle(CH.daemonStart, () => ctx.manager.start());
@@ -120,6 +128,7 @@ export function registerIpc(ctx: IpcContext): void {
     await shell.openExternal(target.toString());
     return true;
   });
+  return { onWindowClosed: live.reset };
 }
 
 async function callApi(ctx: IpcContext, input: unknown): Promise<ApiResult<unknown>> {
