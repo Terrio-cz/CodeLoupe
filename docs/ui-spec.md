@@ -397,6 +397,9 @@ Nastavení
 │ Vzhled           (•) Systém ( ) Světlý ( ) Tmavý    ☑ Klávesové zkratky               │
 │ Notifikace       ☑ rozpočty  ☑ dokončené buildy  ☑ nové mezery  ☑ daemon spadl        │
 │                                                                    [Uložit]           │
+├ Aktualizace (CL-107) ───────────────────────────────────────────────────────────────┤
+│ Verze 0.9.0-rc.1 · Stav: Verze 0.9.0-rc.2 je stažená a ověřená…                       │
+│ ☑ Hledat novou verzi automaticky     [Restartovat a aktualizovat] [Zkontrolovat teď]  │
 ├ Daemon (jen čtení, z GET settings) ─────────────────────────────────────────────────┤
 │ Home %LOCALAPPDATA%\codeloupe · config.json [Otevřít]                                 │
 │ Repozitáře, YouTrack instance (token: nastaven ✓), rozpočty (denní 25M)               │
@@ -412,6 +415,11 @@ Nastavení
   uživatelem; přepsání také proměnnou `CODELOUPE_APP_CLI` (JSON pole) při spuštění aplikace.
 - Port: výchozí z `<home>/daemon.json` (zapisuje daemon), jinak `CODELOUPE_PORT` / `config.json` / 47391;
   ruční přepsání je explicitní a předá se spouštěnému daemonu jako `CODELOUPE_PORT`.
+- **Aktualizace** (CL-107): karta ukazuje verzi, stav poslední kontroly a přepínač `autoUpdate` (vypnutý = aplikace se sama na nic
+  neptá; ruční „Zkontrolovat teď“ funguje vždy). Instalace, které se aktualizují samy (Windows NSIS, Linux AppImage), nabídnou po
+  stažení a ověření SHA-512 „Restartovat a aktualizovat“; macOS, `.deb` a kopie ze Scoopu ukážou „Otevřít stránku vydání“ (jen
+  odkaz na GitHub vydání tohoto repozitáře, cestu skládá main ze stavu). Když se daemon nové verze nespustil, karta řekne, že běží
+  předchozí. Totéž přijde jako notifikace (nejde vypnout: stává se zřídka a týká se aplikace samotné).
 
 ### 3.9 Účty (CL-63, plán)
 
