@@ -1,4 +1,4 @@
-# Hooks of the plugin
+The plugin registers two hooks: `SessionStart` starts the daemon ([Hooks and token savings](Hooks-and-token-savings#the-sessionstart-hook)), and `PreToolUse` steers searches and whole-file reads, described here.
 
 Agents still reach for `rg`, `grep`, `cat` and whole-file reads. A hook runs outside the model and costs no tokens, so the
 plugin points those calls at the CodeLoupe call that answers them. All hooks go through one script (`plugin/hooks/hook.sh`:

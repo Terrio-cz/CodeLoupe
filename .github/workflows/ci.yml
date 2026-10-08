@@ -34,6 +34,9 @@ jobs:
 
       - run: node --test tools/*.test.mjs
 
+      # Every link of docs/wiki and every wiki link of the README resolves to an existing page, heading or file.
+      - run: node tools/check-wiki-links.mjs
+
   # The winget, Scoop and Homebrew manifests of a release (CL-130) from fixture files, checked by the tools that exist on
   # a runner: the generator's own tests above, `brew style` for the cask here. winget has no hosted runner image.
   manifests:

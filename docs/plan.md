@@ -115,7 +115,7 @@ Technické budgety: daemon ustáleně ≤ 200 MB (JVM), špička ≤ 300 MB; bui
   Python, Go) později bez změny jádra.
 - Cache: `<home>/repos/<repo-id>/` (repo-id = hash git common dir) → víc repozitářů, víc workspaců,
   jedna instance.
-- Licence: **PolyForm Noncommercial 1.0.0** (uživatel 2026-10-08, CL-100: lidé to nesmějí prodávat ani komerčně využívat; nejsilnější ochrana při veřejném repu). README, konfigurační reference, CHANGELOG — součást v1.
+- Licence: **PolyForm Noncommercial 1.0.0** (uživatel 2026-10-08, CL-100: lidé to nesmějí prodávat ani komerčně využívat; nejsilnější ochrana při veřejném repu). README (úvod) + wiki (příručka, konfigurační reference), CHANGELOG — součást v1.
 
 ## 5. Architektura
 
@@ -1135,6 +1135,21 @@ rozhoduje launcher.
   Sken sám stojí ~12 ms na worktree (CodeLoupe 52 worktrees 0,75 s, TerrioImporter 13 worktrees 0,18 s) a zbývá jako nejdelší část; za ním čeká `GET /reconcile` ještě na čtení tabulky procesů
   (~0,45 s), které na skenu nezávisí. Čtyři čtení tedy stojí jeden sken místo čtyř (součet −70 %), stěna při souběhu klesla o 15–40 %, ale pod 1,2 s se na 65 workspacech nedostala.
   Dál se nezrychlovalo (paralelní sken worktrees, souběh čtení procesů se skenem) bez dalšího měření; první čtení po startu zůstává o vteřiny delší (zahřívá JGit a historii úkolů).
+
+### Výsledek CL-145 — README jako úvodní stránka, detail ve wiki (2026-10-09)
+
+- README (827 → ~130 řádků) je úvod: co a proč s grafem benchmarku, rychlý start (CLI, plugin), tabulka nástrojů, odkazy na
+  wiki, instalace, licence. Uživatelská a vývojářská příručka je **GitHub wiki v angličtině**; zdrojem je `docs/wiki/`
+  (jedna stránka = jeden soubor, `Home.md`, `_Sidebar.md`, `_Footer.md`), takže se mění s kódem a prochází review.
+  `docs/plan.md` a `docs/ui-spec.md` zůstávají v repozitáři (pracovní dokumenty, česky), stejně `docs/ci.md`,
+  `docs/code-signing.md` (záznamy rozhodnutí s čísly), `docs/benchmarks.md` (generovaný report) a `app/README.md`;
+  `docs/release.md` se stal stránkou wiki *Packaging and releasing*.
+- Publikace: `tools/publish-wiki.mjs` zrcadlí `docs/wiki` do `Terrio-cz/CodeLoupe.wiki.git` (idempotentní, mazání stránek se
+  zrcadlí, bez `Home.md` odmítne), workflow `wiki.yml` běží při pushi na `main`, který sáhne na `docs/wiki/**`
+  (`GITHUB_TOKEN`, `contents: write` jen v tom jobu, token jde do gitu jen přes proměnné prostředí). Odkazy kontroluje
+  `tools/check-wiki-links.mjs` (stránky, nadpisy, soubory repozitáře, obrázky, README → wiki, sidebar) v CI i před publikací.
+- Pravidla psaní: odkaz na stránku je `[text](Page-Name#nadpis)`, na soubor repozitáře plná adresa `github.com/.../blob/main/...`
+  (relativní cesty ve wiki nefungují). Nová funkce = nový řádek v README jen u nástroje; popis patří na stránku wiki.
 
 ## 10. Rizika
 
