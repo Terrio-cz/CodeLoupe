@@ -16,7 +16,8 @@ Languages: Kotlin (Java next). Status and roadmap: [docs/plan.md](docs/plan.md) 
 
 ## Requirements
 
-JDK 25 (Gradle finds or downloads it as a toolchain; a bundled runtime is planned), git ≥ 2.31.
+git ≥ 2.31 and either the [bundle](#bundle) (it carries its own Java runtime) or, to build from source, JDK 25
+(Gradle finds or downloads it as a toolchain).
 
 ## Use
 
@@ -175,6 +176,29 @@ daemon has indexed.
 The daemon listens on 127.0.0.1 only and refuses requests with a foreign `Host`, any `Origin`, or
 without the `x-codeloupe` header; responses carry `Connection: close`. Calls are logged (tool, latency,
 size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
+
+## Bundle
+
+```bash
+./gradlew bundle     # build/distributions/codeloupe-<version>-<os>-<arch>.zip
+```
+
+The zip holds `bin/` (launchers), `lib/` (jars) and `runtime/`, a jlink runtime with only the modules the jars use
+(found by `jdeps`) plus the ones needed at run time. The launchers prefer `runtime/` to any JDK on the machine, so the
+bundle runs without Java. jlink output runs only on the OS it was built on, so CI builds one bundle per OS
+(`bundle` job in [ci.yml](.github/workflows/ci.yml)); the Electron installer takes the same directory.
+`node tools/bundle-smoke.mjs <bundle dir>` runs a query on a PATH without any Java and prints the sizes and the
+daemon's RSS; CI runs it on every push and keeps the numbers as `bundle-report-<os>` artifacts.
+
+Measured in CI on 2026-10-08 (Temurin 25.0.4, tiny repository, daemon idle after its first index build):
+
+| OS | Zip | Unpacked (runtime) | Daemon RSS | First / warm query |
+|---|---|---|---|---|
+| Linux x64 | 139.8 MB | 195 MB (105 MB) | 109 MB | 3.6 s / 0.25 s |
+| Windows x64 | 135.3 MB | 182 MB (92 MB) | 104 MB | 9.1 s / 0.34 s |
+| macOS arm64 | 134.4 MB | 185 MB (95 MB) | 94 MB | 2.3 s / 0.16 s |
+
+The first query includes starting the daemon and creating the class-data archive.
 
 ## Develop
 
