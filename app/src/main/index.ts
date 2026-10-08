@@ -8,6 +8,7 @@ import type { ApiSource } from './api/ApiSource';
 import { DaemonApi } from './api/DaemonApi';
 import { MockApi } from './api/MockApi';
 import { APP_ORIGIN, handleAppScheme, registerAppScheme } from './appProtocol';
+import { ClaudeConnector, execClaude, findMarketplace } from './claude/ClaudeConnector';
 import { DaemonClient } from './daemon/DaemonClient';
 import { DaemonHome } from './daemon/DaemonHome';
 import { DaemonManager } from './daemon/DaemonManager';
@@ -66,8 +67,10 @@ async function main(): Promise<void> {
   handleAppScheme(path.join(__dirname, '../renderer'));
   nativeTheme.themeSource = store.get().theme;
 
+  const claude = new ClaudeConnector(execClaude(), () => findMarketplace({ resources: app.isPackaged ? process.resourcesPath : null, appDir: __dirname }));
+
   registerIpc({
-    store, manager, home, source,
+    store, manager, home, claude, source,
     trustedOrigins: [APP_ORIGIN, ...(DEV_URL ? [new URL(DEV_URL).origin] : [])],
     applySettings: (prev, next) => applySettings(prev, next),
   });

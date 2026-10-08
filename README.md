@@ -45,11 +45,39 @@ simply not used when that directory is not writable. `JAVA_OPTS` / `CODELOUPE_OP
 
 ### Claude Code
 
-`codeloupe mcp-config` prints the `.mcp.json` entry:
+Two ways to connect, both ending in the same MCP server (`http://127.0.0.1:47391/mcp`, header `x-codeloupe: 1`, no secret).
+`codeloupe` must be on `PATH` (the [bundle](#bundle)'s `bin/`) for the session hook; without it the plugin still works
+while the daemon runs (tray app, `codeloupe start`).
 
-```json
-{ "codeloupe": { "type": "http", "url": "http://127.0.0.1:47391/mcp", "headers": { "x-codeloupe": "1" } } }
+**1. Plugin (recommended)** — MCP server, a skill saying which tool to use when, and a `SessionStart` hook that runs
+`codeloupe start`, so the daemon is up with the session. The repository is its own marketplace:
+
+```bash
+claude plugin marketplace add Terrio-cz/CodeLoupe      # or the path of a checkout / the app's claude-plugin folder
+claude plugin install codeloupe@codeloupe              # --scope user (default) | project | local
 ```
+
+The plugin lives in [plugin/](plugin/) (`.claude-plugin/plugin.json`, `.mcp.json`, `hooks/`, `skills/codeloupe/`) and the
+marketplace manifest in [.claude-plugin/marketplace.json](.claude-plugin/marketplace.json). Check changes with
+`claude plugin validate plugin --strict` and `claude plugin validate .`; try it for one session without installing:
+`claude --plugin-dir plugin`. Hook settings: `CODELOUPE_BIN` (launcher if not on `PATH`), `CODELOUPE_HOOK_VERBOSE=1`
+(print why it did nothing). The hook needs `bash` (Git Bash on Windows, which Claude Code uses anyway) and never fails a session.
+
+**2. MCP entry only** — no skill, no autostart:
+
+```bash
+claude mcp add --transport http --scope user codeloupe http://127.0.0.1:47391/mcp --header "x-codeloupe: 1"
+```
+
+**From the desktop app**: Settings → *Claude Code* shows whether `claude` is found and what is connected, and the
+buttons *Připojit plugin…* and *Přidat jen MCP server…* run exactly the commands above (after a native confirmation that
+lists them, with the daemon's current port), through the `claude` CLI, so Claude Code writes its own configuration.
+Without `claude` on `PATH` the card shows the commands to run by hand. The plugin is added from the marketplace folder
+next to the app (`resources/claude-plugin` when packaged, `CODELOUPE_PLUGIN_DIR` to override, the repository root in a
+development run); the installer must ship `.claude-plugin/marketplace.json` and `plugin/` there (CL-104).
+
+A daemon on another port: set `CODELOUPE_PORT` for it and for Claude Code (the plugin's URL reads it); for the MCP entry
+the app writes the port it watches, and `codeloupe mcp-config` prints the entry for the configured one.
 
 Tools take `root` — the absolute path of the repository or worktree to answer for.
 

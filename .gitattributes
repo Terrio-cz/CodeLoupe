@@ -4,3 +4,5 @@ gradlew text eol=lf
 *.jar binary
 # Golden outputs carry hashes of fixture text: keep the fixtures byte-identical on every OS.
 src/test/resources/fixtures/** text eol=lf
+# The plugin hook runs under bash on every OS: a CRLF checkout would break it.
+plugin/hooks/*.sh text eol=lf

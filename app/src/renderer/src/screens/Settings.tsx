@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AppMetrics } from '../../../shared/ipc';
 import { splitArgs, type AppSettings } from '../../../shared/settings';
 import { bridge, useApi } from '../api';
+import { ClaudeCodeCard } from '../components/ClaudeCodeCard';
 import { Card, Segmented } from '../components/Parts';
 import { num, tokens } from '../format';
 import { publishSettings, useDaemon, useSettings } from '../hooks';
@@ -86,6 +87,8 @@ export function Settings() {
         </div>
         {saved && <div className="toast" role="status">{saved}</div>}
       </Card>
+
+      <ClaudeCodeCard />
 
       <Card title="Daemon (jen čtení)" actions={<button className="btn" onClick={() => void bridge().open.config()}>Ukázat config.json</button>}>
         {d ? (

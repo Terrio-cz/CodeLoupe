@@ -2,11 +2,12 @@ import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } f
 import fs from 'node:fs';
 import path from 'node:path';
 import type { DaemonSettings, WorktreeDetail } from '../shared/contract';
-import { CH, type ApiResult, type AppMetrics } from '../shared/ipc';
+import { CH, type ApiResult, type AppMetrics, type ClaudeConnectKind } from '../shared/ipc';
 import { validateRequest, type ApiRequest } from '../shared/request';
 import { applyRendererUpdate, isValidCli, type AppSettings } from '../shared/settings';
 import type { ApiSource } from './api/ApiSource';
 import { HttpError } from './daemon/DaemonClient';
+import { commandLines, type ClaudeConnector } from './claude/ClaudeConnector';
 import type { DaemonHome } from './daemon/DaemonHome';
 import type { DaemonManager } from './daemon/DaemonManager';
 import type { SettingsStore } from './settingsStore';
@@ -15,6 +16,7 @@ export interface IpcContext {
   store: SettingsStore;
   manager: DaemonManager;
   home: DaemonHome;
+  claude: ClaudeConnector;
   source(): ApiSource;
   /** Origins the renderer may be loaded from: app://codeloupe, plus the Vite dev server in development. */
   trustedOrigins: string[];
@@ -58,6 +60,26 @@ export function registerIpc(ctx: IpcContext): void {
     const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
     if (response !== 0) return ctx.store.get();
     return ctx.store.save({ ...ctx.store.get(), cliCommand: (command as string).trim(), cliArgs: args });
+  });
+  handle(CH.claudeStatus, () => ctx.claude.status());
+  handle(CH.claudeManual, (kind: unknown) => commandLines(claudeKind(kind), ctx.manager.port(), ctx.claude.marketplaceDir()));
+  handle(CH.claudeConnect, async (kind: unknown) => {
+    const k = claudeKind(kind);
+    const port = ctx.manager.port();
+    // The renderer only asks; the user sees the exact commands in a native dialog the page cannot click.
+    const win = BrowserWindow.getFocusedWindow();
+    const opts = {
+      type: 'question' as const,
+      buttons: ['Připojit', 'Zrušit'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'CodeLoupe',
+      message: k === 'mcp' ? 'Přidat CodeLoupe do Claude Code jako MCP server (uživatelská úroveň)?' : 'Nainstalovat plugin CodeLoupe do Claude Code?',
+      detail: commandLines(k, port, ctx.claude.marketplaceDir()).join('\n'),
+    };
+    const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
+    if (response !== 0) return 'cancelled' as const;
+    return ctx.claude.connect(k, port);
   });
   handle(CH.metrics, () => metrics());
   handle(CH.openWorktree, async (id: unknown) => {
@@ -126,6 +148,11 @@ function trusted(event: IpcMainInvokeEvent, origins: string[]): boolean {
   } catch {
     return false;
   }
+}
+
+function claudeKind(kind: unknown): ClaudeConnectKind {
+  if (kind !== 'mcp' && kind !== 'plugin') throw new Error('invalid kind');
+  return kind;
 }
 
 function isDir(p: string): boolean {
