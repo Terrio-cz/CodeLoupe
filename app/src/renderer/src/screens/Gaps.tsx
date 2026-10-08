@@ -1,7 +1,9 @@
 import { Fragment, useState } from 'react';
 import type { GapKind } from '../../../shared/contract';
 import { useApi } from '../api';
-import { Card, ErrorState, KpiTile, Loading, Select } from '../components/Parts';
+import { CountUp } from '../components/CountUp';
+import { Icon } from '../components/Icon';
+import { Card, Empty, ErrorState, KpiTile, Loading, Select } from '../components/Parts';
 import { ago, dateTime, num, pct } from '../format';
 import { byWeek, filterRows, KIND_LABELS, totalOf } from '../gapReport';
 import { useRange } from '../hooks';
@@ -20,7 +22,7 @@ export function Gaps() {
   const [open, setOpen] = useState<string | null>(null);
   const { data, error, loading, reload } = useApi('gaps', undefined, { range });
 
-  if (!data) return <Card>{loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst mezery.'} onRetry={reload} />}</Card>;
+  if (!data) return loading ? <><Loading variant="kpis" /><Card bodyClass=""><Loading variant="table" /></Card></> : <Card><ErrorState message={error?.message ?? 'Nelze načíst mezery.'} onRetry={reload} /></Card>;
 
   const report = data.report;
   const rows = report ? filterRows(report, { range, tool, kind }) : [];
@@ -33,23 +35,22 @@ export function Gaps() {
       <div className="filterbar">
         <Select label="Nástroj" value={tool} onChange={setTool} options={[{ value: '', label: 'Všechny nástroje' }, ...tools.map(t => ({ value: t, label: t }))]} />
         <Select label="Druh" value={kind} onChange={setKind} options={[{ value: '', label: 'Všechny druhy' }, ...(Object.keys(KIND_LABELS) as GapKind[]).map(k => ({ value: k, label: KIND_LABELS[k] }))]} />
-        <span className="muted">Mezera = volání CodeLoupe, které nestačilo: agent sáhl po rg/sed/cat/Read na stejný cíl, nebo odpověď byla prázdná, busy či jen kandidáti.</span>
+        <span className="muted hint">Mezera = volání CodeLoupe, které nestačilo: agent sáhl po rg/sed/cat/Read na stejný cíl, nebo odpověď byla prázdná, busy či jen kandidáti.</span>
       </div>
 
       {!report ? (
         <Card title="Týdenní report">
-          <div className="state">
-            <div>Daemon v transkriptech Claude Code zatím nenašel žádný běh, tak není z čeho report složit. Čte je při prvním dotazu (<span className="mono">~/.claude/projects</span>).</div>
-            <button className="btn" onClick={reload}>Zkusit znovu</button>
-          </div>
+          <Empty icon="gaps" action={<button className="btn" onClick={reload}>Zkusit znovu</button>}>
+            Daemon v transkriptech Claude Code zatím nenašel žádný běh, tak není z čeho report složit. Čte je při prvním dotazu (<span className="mono">~/.claude/projects</span>).
+          </Empty>
         </Card>
       ) : (
         <>
-          <section className="card" aria-label="Souhrn reportu">
+          <section aria-label="Souhrn reportu">
             <div className="kpis">
-              <KpiTile label="Mezery v rozsahu" value={num(total)} ctx={`${num(rows.length)} řádků reportu`} />
-              <KpiTile label="Volání CodeLoupe v reportu" value={num(seenCalls)} ctx={`${num(report.runs)} běhů agentů`} />
-              <KpiTile label="Podíl mezer" value={seenCalls ? pct((totalOf(report.rows) / seenCalls) * 100, 1) : '—'} ctx="mezery / volání, celý report" />
+              <KpiTile label="Mezery v rozsahu" value={<CountUp value={total} format={num} />} ctx={`${num(rows.length)} řádků reportu`} />
+              <KpiTile label="Volání CodeLoupe v reportu" value={<CountUp value={seenCalls} format={num} />} ctx={`${num(report.runs)} běhů agentů`} />
+              <KpiTile label="Podíl mezer" value={seenCalls ? <CountUp value={(totalOf(report.rows) / seenCalls) * 100} format={v => pct(v, 1)} /> : '—'} ctx="mezery / volání, celý report" />
               <KpiTile label="Report" value={ago(report.generatedAt)} ctx={report.since ? `od ${report.since}` : undefined} />
             </div>
           </section>
@@ -63,7 +64,7 @@ export function Gaps() {
                   </tr>
                 </thead>
                 {rows.length === 0 ? (
-                  <tbody><tr><td colSpan={5} className="muted">Žádné mezery v tomto rozsahu a filtru.</td></tr></tbody>
+                  <tbody><tr><td colSpan={5} className="empty-cell"><Empty icon="check">Žádné mezery v tomto rozsahu a filtru.</Empty></td></tr></tbody>
                 ) : byWeek(rows).map(([week, inWeek]) => (
                   <tbody key={week}>
                     <tr className="group">
@@ -84,7 +85,7 @@ export function Gaps() {
           </Card>
         </>
       )}
-      <p className="muted" style={{ margin: 0 }}>
+      <p className="muted footnote">
         Report je totéž co <span className="mono">codeloupe metrics gaps</span> za posledních 30 dní, jen z transkriptů, které daemon už načetl; rozsah nahoře vybírá týdny.
       </p>
 
@@ -110,7 +111,7 @@ export function Gaps() {
                         <td className="num">{num(s.count)}</td><td>{ago(s.lastAt)}</td>
                         <td>
                           <button className="btn ghost" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : key)}>
-                            {expanded ? '▾ Skrýt' : '▸ Výskyty'}
+                            <Icon name="chevron" size={14} className={expanded ? 'open' : undefined} />{expanded ? 'Skrýt' : 'Výskyty'}
                           </button>
                         </td>
                       </tr>

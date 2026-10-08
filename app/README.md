@@ -73,3 +73,7 @@ Budget ≤ 300 MB RSS. The GPU and network services run inside the main process,
 - about 250 MB right after start;
 - about 290 MB after visiting every screen in both themes;
 - about 140 MB in the tray only.
+
+The entrance animations repaint in software (no GPU), and Chromium holds the raster memory for a few seconds: a quick
+run through every screen peaks around 400 MB and settles back to about 310 MB when idle
+([docs/design-revamp.md](../docs/design-revamp.md), Paměť).

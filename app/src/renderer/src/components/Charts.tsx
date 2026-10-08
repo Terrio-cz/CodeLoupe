@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { tokens } from '../format';
+import { Icon } from './Icon';
 
 export interface CostPoint {
   t: string;
@@ -16,6 +17,7 @@ const H = 220, PAD = { l: 52, r: 12, t: 12, b: 26 };
 export function CostChart({ points, hourly }: { points: CostPoint[]; hourly: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const fill = `cost-fill-${useId().replace(/:/g, '')}`;
   const svg = useRef<SVGSVGElement>(null);
   const box = useRef<HTMLDivElement>(null);
   // The viewBox follows the real width so text and strokes are never stretched.
@@ -60,10 +62,10 @@ export function CostChart({ points, hourly }: { points: CostPoint[]; hourly: boo
   return (
     <div>
       <div className="legend" style={{ marginBottom: 8 }}>
-        <span><span className="sw" aria-hidden="true" />Skutečnost {tokens(sumActual)}</span>
-        <span><span className="sw base" aria-hidden="true" />Baseline {tokens(sumBase)}</span>
+        <span><span className="sw" aria-hidden="true" />Skutečnost <strong>{tokens(sumActual)}</strong></span>
+        <span><span className="sw base" aria-hidden="true" />Baseline <strong>{tokens(sumBase)}</strong></span>
         <span style={{ flex: 1 }} />
-        <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}>{asTable ? 'Graf' : 'Tabulka'}</button>
+        <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}><Icon name={asTable ? 'chart' : 'table'} size={14} />{asTable ? 'Graf' : 'Tabulka'}</button>
       </div>
       {asTable ? (
         <div className="table-wrap" style={{ maxHeight: 220 }}>
@@ -82,30 +84,37 @@ export function CostChart({ points, hourly }: { points: CostPoint[]; hourly: boo
             onMouseMove={onMove}
             onMouseLeave={() => setHover(null)}
           >
+            <defs>
+              <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="var(--series-1)" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="var(--series-1)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
             {geo.ticks.map(t => (
               <g key={t}>
-                <line x1={PAD.l} x2={W - PAD.r} y1={geo.y(t)} y2={geo.y(t)} stroke={t === 0 ? 'var(--axis)' : 'var(--grid)'} strokeWidth={1} />
+                <line x1={PAD.l} x2={W - PAD.r} y1={geo.y(t)} y2={geo.y(t)} stroke={t === 0 ? 'var(--axis)' : 'var(--grid)'} strokeWidth={1} strokeDasharray={t === 0 ? undefined : '2 4'} />
                 <text x={PAD.l - 8} y={geo.y(t) + 4} textAnchor="end" fontSize="11" fill="var(--text-muted)">{tokens(t)}</text>
               </g>
             ))}
             {points.map((p, i) => (i % every === 0 ? (
               <text key={p.t} x={geo.x(i)} y={H - 6} textAnchor="middle" fontSize="11" fill="var(--text-muted)">{label(p.t)}</text>
             ) : null))}
-            <path d={geo.area} fill="var(--series-1)" opacity={0.12} />
-            <path d={geo.baseline} fill="none" stroke="var(--series-baseline)" strokeWidth={2} strokeDasharray="5 4" />
-            <path d={geo.actual} fill="none" stroke="var(--series-1)" strokeWidth={2} strokeLinejoin="round" />
+            <path className="reveal" d={geo.area} fill={`url(#${fill})`} />
+            <path className="reveal" d={geo.baseline} fill="none" stroke="var(--series-baseline)" strokeWidth={1.5} strokeDasharray="5 4" />
+            <path className="draw" pathLength={1} d={geo.actual} fill="none" stroke="var(--series-1)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
             {hover !== null && h && (
               <g>
-                <line x1={geo.x(hover)} x2={geo.x(hover)} y1={PAD.t} y2={H - PAD.b} stroke="var(--axis)" />
-                <circle cx={geo.x(hover)} cy={geo.y(h.weighted)} r={4} fill="var(--series-1)" stroke="var(--surface)" strokeWidth={2} />
+                <line className="crosshair" x1={geo.x(hover)} x2={geo.x(hover)} y1={PAD.t} y2={H - PAD.b} />
+                <circle cx={geo.x(hover)} cy={geo.y(h.baseline)} r={3} fill="var(--surface)" stroke="var(--series-baseline)" strokeWidth={1.5} />
+                <circle className="hover-dot" cx={geo.x(hover)} cy={geo.y(h.weighted)} r={4.5} fill="var(--series-1)" stroke="var(--surface)" strokeWidth={2} />
               </g>
             )}
           </svg>
           {hover !== null && h && (
             <div className="tooltip" style={{ left: `${(geo.x(hover) / W) * 100}%`, top: `${(geo.y(Math.max(h.weighted, h.baseline)) / H) * 100}%` }}>
-              <strong>{label(h.t)}</strong><br />
-              Skutečnost {tokens(h.weighted)}<br />
-              Baseline {tokens(h.baseline)}
+              <strong>{label(h.t)}</strong>
+              <div className="row"><span className="sw" aria-hidden="true" />Skutečnost {tokens(h.weighted)}</div>
+              <div className="row"><span className="sw base" aria-hidden="true" />Baseline {tokens(h.baseline)}</div>
             </div>
           )}
         </div>
@@ -124,11 +133,11 @@ export function niceStep(raw: number): number {
 export function BarList({ label, items, noteWidth }: { label: string; items: { name: string; value: number; note?: string }[]; noteWidth?: number }) {
   const max = Math.max(1, ...items.map(i => i.value));
   return (
-    <ul className="bar-list" aria-label={label} style={noteWidth ? ({ '--note-w': `${noteWidth}px` } as React.CSSProperties) : undefined}>
-      {items.map(i => (
+    <ul className="bar-list" aria-label={label} style={noteWidth ? ({ '--note-w': `${noteWidth}px` } as CSSProperties) : undefined}>
+      {items.map((i, n) => (
         <li key={i.name}>
           <span className="mono">{i.name}</span>
-          <span className="bar-track" aria-hidden="true"><span style={{ width: `${(i.value / max) * 100}%` }} /></span>
+          <span className="bar-track" aria-hidden="true"><span style={{ width: `${(i.value / max) * 100}%`, '--i': n } as CSSProperties} /></span>
           <span className="num">{tokens(i.value)}</span>
           <span className="num muted">{i.note}</span>
         </li>

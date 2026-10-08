@@ -14,7 +14,8 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
   nákladů hotových běhů z transkriptů (kolik stály a kde), ne sledování toho, co agent právě dělá. Je tu od CL-40
   (2026-10-08) nad API z CL-62 a odebere se jedním řádkem v `screenList.ts`.
 - **Hustý developer-tool styl** (Browserbase, Mintlify, Vercel, Linear): levý sidebar, tabulky s 32px řádky,
-  postranní detail panely, žádné dekorace, ilustrace ani gradienty. Čísla tabulková (`tabular-nums`).
+  postranní detail panely, žádné ilustrace; jediný gradient je výplň plochy pod čarou grafu. Čísla tabulková
+  (`tabular-nums`). Vizuální směr a pohyb: [design-revamp.md](design-revamp.md).
 - **Světlý i tmavý režim** ze stejných tokenů (§ 6), výchozí = systém.
 - **Bezpečnost**: renderer nemá Node ani síť; data jdou jen přes preload IPC do main procesu, který volá
   výhradně `127.0.0.1:<port>` (§ 10).
@@ -497,41 +498,13 @@ Notifikace se slučují (max 1 za typ za minutu), každá se dá vypnout v Nasta
 
 ## 6. Design tokeny
 
-Písmo: `system-ui, "Segoe UI Variable", "Segoe UI", -apple-system, sans-serif`; mono: `"Cascadia Mono",
-"JetBrains Mono", ui-monospace, monospace`. Velikosti: 12 / 13 (základ) / 15 / 18 / 22 px. Mřížka 4 px.
-Radius 6 (prvky), 8 (karty). Řádek tabulky 32 px, topbar 48 px, sidebar 216 px.
+Tokeny, typografie, mřížka, elevace a pohyb: [design-revamp.md](design-revamp.md) § Tokeny (CL-design-revamp
+nahradil původní tabulku). Platí dál:
 
-| Token | Světlý | Tmavý | Účel |
-|---|---|---|---|
-| `--bg` | `#f9f9f7` | `#0d0d0d` | plocha aplikace |
-| `--surface` | `#ffffff` | `#161615` | karty, tabulky |
-| `--surface-2` | `#f3f3f0` | `#1f1f1d` | hlavička tabulky, hover |
-| `--sidebar` | `#f3f3f0` | `#121211` | sidebar |
-| `--border` | `#e4e3dd` | `#2c2c2a` | hairline mezi oblastmi (dekorativní) |
-| `--border-control` | `#82817c` | `#787772` | okraj inputů, selectů, checkboxů (≥ 3:1 na všech pozadích, WCAG 1.4.11) |
-| `--text` | `#0b0b0b` | `#f5f5f3` | primární text |
-| `--text-2` | `#52514e` | `#c3c2b7` | sekundární |
-| `--text-muted` | `#65645f` | `#9a9993` | popisky, osy |
-| `--accent` | `#2a78d6` | `#3987e5` | výplně (pruhy, indikátor výběru), fokus |
-| `--accent-text` | `#1f66c2` | `#5b9cec` | odkazy a text v barvě akcentu |
-| `--accent-weak` | `#e8f1fc` | `#16263a` | vybraný řádek |
-| `--btn-primary-bg` / `-fg` | `#1f66c2` / `#ffffff` | `#3987e5` / `#0d0d0d` | primární tlačítko |
-| `--focus` | `#2a78d6` | `#6da7ec` | 2 px focus ring + 2 px offset |
-| `--ok` | `#0ca30c` (text `#006300`) | `#0ca30c` | stav ok |
-| `--warning` | `#fab219` (text `#8a5a00`) | `#fab219` | varování |
-| `--serious` | `#ec835a` (text `#a8431a`) | `#ec835a` | vážné |
-| `--critical` | `#d03b3b` (text `#b83232`) | `#e66767` | chyba |
-
-| `--series-1` | `#2a78d6` | `#3987e5` | graf: skutečnost |
-| `--series-baseline` | `#898781` | `#898781` | graf: baseline (přerušovaná) |
-| `--grid` | `#e1e0d9` | `#2c2c2a` | mřížka grafu |
-| `--axis` | `#c3c2b7` | `#383835` | osa |
-
-Kontrast textových tokenů (`--text*`, `--accent-text`, stavové `text`) je ≥ 4,5:1 a `--border-control` ≥ 3:1 proti **všem čtyřem**
-pozadím (`--bg`, `--surface`, `--surface-2`, `--accent-weak`) v obou režimech; kontroluje to test
-`app/test/tokens.test.ts`. Stavové tečky v světlém režimu (warning, serious) jsou pod 3:1, proto vždy
-s ikonou a textem.
-
+- Kontrast textových tokenů (`--text*`, `--accent-text`, stavové `-text`) je ≥ 4,5:1 a `--border-control` ≥ 3:1
+  proti všem pozadím (`--bg`, `--surface`, `--surface-2`, `--accent-weak`, `--sidebar`) v obou režimech a stavový
+  text i na pozadí své pilulky (`--*-weak`); kontroluje to test `app/test/tokens.test.ts`. Stavové tečky jsou vždy
+  s textem.
 - Grafové barvy podle validované referenční palety (dataviz skill); stavové barvy se nikdy nepoužijí pro
   sérii a vždy jdou s ikonou + textem. Text nikdy nemá barvu série.
 - Tmavý režim je vlastní sada kroků, ne inverze. `prefers-color-scheme` + přepínač v Nastavení
@@ -550,7 +523,8 @@ s ikonou a textem.
 - Reflow (1.4.10): pod ~900 CSS px (200 % zoom) je drawer přes celou šířku a sidebar sbalený.
 - Grafy: `role="img"` + `aria-label` se shrnutím, tabulkový pohled, legenda pro ≥ 2 série.
 - Stav nikdy jen barvou (StatusBadge, ChangeMark).
-- `prefers-reduced-motion`: bez animací draweru; jinak max 150 ms.
+- `prefers-reduced-motion`: žádné animace ani odpočet čísel; jinak interakce ≤ 180 ms, vstupy ≤ 360 ms, kreslení grafu
+  ≤ 900 ms (design-revamp.md § Pohyb v aplikaci).
 - Měřítko textu: layout snese 200 % zoom (`Ctrl +`), tabulky se horizontálně posouvají uvnitř karty.
 
 ## 8. Správa daemonu (main proces)
