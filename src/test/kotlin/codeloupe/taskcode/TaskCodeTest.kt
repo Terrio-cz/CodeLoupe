@@ -50,7 +50,7 @@ class TaskCodeTest {
             issue["description"] = JsonPrimitive(
                 "## Context\nThe `Billing.total` path is read by `src/main/kotlin/demo/Use.kt` and served on `GET /v1/orders/{id}`.\n" +
                     "Billing rules move to a new `src/main/kotlin/demo/Later.kt`; `Nonexistent.foo` is gone.\n\n" +
-                    "## Acceptance criteria\n- [ ] Routes keep answering\n- [ ] `useAll()` stays green\n",
+                    "## Acceptance criteria\n- [ ] Routes keep answering\n- [ ] `useAll()` stays green\n- [ ] `docs/notes.md` says so\n",
             )
         }
         val mirror = TrackerMirror(instance, YouTrackAdapter(fake), mirrorStore, 30_000)
@@ -129,9 +129,9 @@ class TaskCodeTest {
         assertContains(text, Regex("= $USE +← `src/main/kotlin/demo/Use.kt` in Context"))
         assertContains(text, Regex("= $USE:3-3  fun useAll\\(\\): Int +← `useAll\\(\\)` in criterion 2"))
         assertContains(text, Regex("~ $ROUTES:4  holds `/v1/orders/` +← `GET /v1/orders/\\{id}` in Context"))
-        assertContains(text, Regex("\\+ src/main/kotlin/demo/Later.kt  not in the index: new\\? +← `src/main/kotlin/demo/Later.kt` in Context"))
+        assertContains(text, Regex("\\+ src/main/kotlin/demo/Later.kt  not in the repository: new\\? +← `src/main/kotlin/demo/Later.kt` in Context"))
         assertContains(text, "not in the index: `Nonexistent.foo`")
-        assertContains(text, Regex("= docs/notes.md  \(not indexed\) +← `docs/notes.md` in criterion 3"))
+        assertContains(text, Regex("= docs/notes.md  \\(not indexed\\) +← `docs/notes.md` in criterion 3"))
         assertFalse("landed" in text, text)
 
         val onUse = answer(USE)
