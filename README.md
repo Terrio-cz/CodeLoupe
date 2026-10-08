@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/banner-dark.svg">
+    <img alt="CodeLoupe: read less, know more" src="docs/brand/banner-light.svg" width="830">
+  </picture>
+</p>
+
 # CodeLoupe
 
 On-demand code index for AI coding agents. Ask for a declaration, a file outline, its usages, callers or type
