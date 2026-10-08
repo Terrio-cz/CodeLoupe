@@ -19,7 +19,7 @@ object WorkspaceRender {
 
     private const val COLUMNS = 7
 
-    // state · name · task (tracker state) · branch · ahead · activity · size, then the note as a last column.
+    // state · name · task (tracker state) · branch · ahead · activity · size and memory, then the note as a last column.
     private fun row(w: Workspace): List<String> = listOf(
         w.state.name.lowercase(),
         w.name,
@@ -27,7 +27,7 @@ object WorkspaceRender {
         w.branch ?: w.head?.take(8)?.let { "($it)" } ?: "",
         w.merge?.let { if (it.merged) "merged" else "+${it.ahead}" } ?: "",
         w.lastActivity?.take(10).orEmpty(),
-        listOfNotNull(w.sizeBytes?.let(::megabytes), w.note).joinToString("  "),
+        listOfNotNull(w.sizeBytes?.let(::megabytes), w.ramBytes?.let { "${megabytes(it)} RAM in ${w.processes ?: 0} processes" }, w.note).joinToString("  "),
     )
 
     private fun megabytes(bytes: Long) = "%.1f MB".format(java.util.Locale.ROOT, bytes / 1_048_576.0)

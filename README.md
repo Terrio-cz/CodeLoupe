@@ -391,10 +391,11 @@ port but the daemon's, unless `remoteWebhooks` lists the https origin; redirects
 
 ## Workspaces
 
-`codeloupe workspaces [--repo <path>] [--state orphan] [--size] [--json]` and `GET /workspaces?repo=&size=1` (JSON, for the
+`codeloupe workspaces [--repo <path>] [--state orphan] [--size] [--ram] [--json]` and `GET /workspaces?repo=&size=1&ram=1` (JSON, for the
 app) list every worktree of the configured repositories: role, branch, task id (from the branch name, else the directory
 name, by the repository's task pattern), commits ahead of the default branch, the task's state from the tracker mirror,
-last activity (newer of the HEAD commit and the last git operation in the worktree) and, with `size`, disk size.
+last activity (newer of the HEAD commit and the last git operation in the worktree) and, with `size`, disk size and, with `ram`, the
+working set of the processes that work in the directory and how many they are.
 State: `active`; `landed` (everything is on the default branch and the task is resolved or has commits there);
 `abandoned` (unmerged work, idle for more than `abandonedDays`); `orphan` (a directory under a worktree root git has no
 worktree for, or a worktree whose directory is gone). Nothing is removed: orphans are only reported. Git is read in-process,
@@ -496,6 +497,30 @@ cleanup of leftovers.
 `auto` is off by default. `protect` patterns are regular expressions tried (case-insensitively, anywhere in the name,
 so anchor them) against each name of a resource and its compose project; without `kinds` they also cover directories.
 
+### Processes and build daemons per workspace
+
+`codeloupe ws processes [--workspace TER-5] [--json]` (`GET /processes`) lists the processes that work in a workspace
+directory and the memory each workspace holds. A process belongs to the workspace whose directory holds its working directory
+(the deepest one when worktrees sit inside the main checkout), or else the one whose path appears in its command line (at a path
+boundary: `TER-5` is not `TER-50`). The working directory comes from the process itself: `/proc/<pid>/cwd` on Linux, `lsof` on
+macOS, the PEB of the process on Windows. Another user's or a protected process is not seen. A Gradle daemon works in the project's
+directory only while a build runs and goes back to its own directory after it, so an idle daemon is placed by its own log
+(`<gradle user home>/daemon/<version>/daemon-<pid>.out.log`: the directory of the last `Received command: Build{…}` and the last
+`Marking the daemon as busy / idle`; the Gradle user home is `workspaces.gradleUserHome`, `GRADLE_USER_HOME` or `~/.gradle`).
+An idle daemon left behind by a finished task is what keeps hundreds of MB, and on Windows what keeps the worktree directory
+from being deleted, which is why the reconciler stops it. `via` in the output says whether a process was placed by its
+`cwd`, by its `last build` or by its `command line`.
+
+The reconciler plans **build tools only**: Gradle daemons and workers, and the Kotlin compile daemon. Other processes (an editor, a
+shell, a dev server) are listed and never touched. A build tool of a **released** workspace is an `auto` entry (`process:<pid>:<start>`)
+and is stopped without asking, also with `auto` off, once it is checked again at the moment of the stop: it is the same process (pid
+and start time), still a build tool, still placed in that workspace, **idle** (Gradle's own log does not mark it busy, and neither it nor
+its children use CPU for 0.6 s) and no `gradlew` build runs in that workspace. The Kotlin daemon serves every workspace, so it waits for any running Gradle build. A process
+that fails these checks is *blocked* and retried with the usual backoff. Processes of a workspace that landed, was abandoned or is an
+orphan are `confirm` entries (`ws reconcile --confirm process:…`), those of an active workspace are kept. A `protect` rule that
+matches the command line, the working directory or the workspace path keeps a process untouched. Only processes of registered
+workspaces are ever considered, so processes of other projects are not.
+
 ### Ports per workspace
 
 With `"ports": { "range": [19000, 19999] }` under `workspaces`, a workspace asks for a port by name:
@@ -511,8 +536,13 @@ workspace's. `codeloupe status` shows `portAllocations`.
 
 ## Desktop app
 
-`app/` holds the Electron desktop app (tray, notifications, daemon start/stop, screens over the daemon's
-read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
+`app/` holds the Electron desktop app (tray, notifications, daemon start/stop). Screens, light and dark: Overview (cost and
+savings, p95 latency, daemon memory and CPU with the budget warnings), Branches (changed declarations, callers, tests, the
+runs of the task), Workspaces (every registry state with its Docker resources, ports, disk and memory; release and confirmed
+cleanup), Tasks, Jobs (states, slots and holders, live, logs with the summary first, chains, webhooks), Runs (what each agent
+run cost and where), Index, Gaps (the weekly gap report), Environment and Settings. They read the daemon's UI API and a few
+of its read-only routes; the two actions that change something ask in a native dialog first. See [app/README.md](app/README.md)
+and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
 
 ## Configuration
 
@@ -724,6 +754,7 @@ accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram
 | `jobs` | commands run for agents: policy hook, slots, processes, summaries, completion actions, `job` tool |
 | `workspace` | `GET /workspaces`: worktrees, branches, tasks, merge and tracker state, orphan directories |
 | `reconcile` | `GET /reconcile`, `POST /reconcile/run`: policy, executor, backoff state, scheduler, journal |
+| `processes` | `GET /processes`: processes by workspace directory, memory per workspace, stopping the build tools of released workspaces |
 | `docker` | Docker Engine API client (named pipe / unix socket), ownership labels, compose override, `GET /resources`: owned / adopted / unowned |
 | `events` | event log, server-sent-events stream, webhook subscriptions and deliveries |
 | `cli` | `codeloupe` commands and the daemon client |

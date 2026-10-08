@@ -18,7 +18,6 @@ import { JOB_CH } from '../shared/jobs';
 import { JobLogReader } from './jobs/JobLogReader';
 import { EventStream } from './live/EventStream';
 import { registerLive } from './live/registerLive';
-import { GapReportRefresh } from './gaps/GapReportRefresh';
 import { registerEnv } from './env/registerEnv';
 
 export interface IpcContext {
@@ -44,7 +43,6 @@ export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
   };
 
   registerActions({
-    gapsRefresh: new GapReportRefresh(() => ctx.store.get(), () => ctx.home.dir),
     client: ctx.client, daemonTrusted: () => ctx.manager.trusted, mock: () => ctx.source().kind === 'mock',
   }, handle);
   const stream = new EventStream(() => ctx.manager.port(), e => {

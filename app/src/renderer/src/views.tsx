@@ -6,6 +6,7 @@ import { Gaps } from './screens/Gaps';
 import { IndexScreen } from './screens/IndexScreen';
 import { Jobs } from './screens/Jobs';
 import { Overview } from './screens/Overview';
+import { Runs } from './screens/Runs';
 import { Settings } from './screens/Settings';
 import { Tasks } from './screens/Tasks';
 import { Workspaces } from './screens/Workspaces';
@@ -17,6 +18,7 @@ export const VIEWS: Record<Screen, (route: Route) => ReactNode> = {
   workspaces: route => <Workspaces route={route} />,
   tasks: route => <Tasks route={route} />,
   jobs: route => <Jobs route={route} />,
+  runs: route => <Runs route={route} />,
   index: () => <IndexScreen />,
   gaps: () => <Gaps />,
   environment: route => <Environment route={route} />,

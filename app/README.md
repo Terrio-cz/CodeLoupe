@@ -1,10 +1,12 @@
 # CodeLoupe desktop app
 
-Electron app over the daemon's read-only UI API: token usage and savings, branches and worktrees with their
-changed declarations, YouTrack tasks from the mirror, index health, gaps, environment keys and settings.
-A tray icon shows the daemon state, RSS and queue; the app starts the daemon when it is down, and it
-sends notifications for budget breaches, finished builds, new gaps and daemon outages. It does not monitor
-agent runs; the launcher does that. Spec: [../docs/ui-spec.md](../docs/ui-spec.md).
+Electron app over the daemon: token usage and savings with the daemon's latency, memory and CPU against its budgets,
+branches and worktrees with their changed declarations and callers, workspaces with the Docker resources, ports and cleanup
+they hold, YouTrack tasks from the mirror, jobs with their slots and webhooks, the cost of agent runs from the transcripts,
+index health, gaps, environment keys and settings. A tray icon shows the daemon state, RSS and queue; the app starts the
+daemon when it is down, and it sends notifications for budget breaches, finished builds, new gaps and daemon outages. It reads;
+the only things it changes are a released workspace and a confirmed cleanup, after a native confirmation. It does not follow
+what an agent is doing now; the launcher does that. Spec: [../docs/ui-spec.md](../docs/ui-spec.md).
 
 ## Requirements
 
@@ -60,7 +62,6 @@ Verification modes (development builds only):
 - The Environment screen writes the encrypted store only through main: the page sends a value once from a password field (emptied on submit), main hands it to `<cli> env set` on stdin, and no answer, log or argument carries it. Delete, replacing sources and roll back are confirmed in a native dialog. "Kopírovat" exists only where the OS can ask the user to authenticate again (Touch ID on macOS); elsewhere a value cannot be copied out at all.
 - Workspaces actions (release a worktree, confirm a cleanup) change the real daemon only after main has checked the request against the daemon's own registry and plan and the user said yes in a native dialog that lists what goes; the page never sends a path to delete, only plan keys.
 - Job logs: the page names a job id; main reads only `<home>/jobs/<id>.log` of a finished job, strips terminal codes and masks credential-looking values. The live event stream is opened while the Jobs screen is open and passes on only the event type and job id.
-- The Gaps screen's "Přepočítat report" action runs `<cli> metrics gaps --since <30 days ago> --out <home>/gaps-report.json` with a fixed argument list and no shell; nothing in it comes from the page.
 - Settings → Claude Code runs the `claude` CLI (no shell, fixed argv: `mcp add|remove`, `plugin marketplace add`, `plugin install`) only after a native confirmation that lists the commands; the page cannot click it, and the app never writes Claude Code's files itself. See the root README, section Claude Code.
 - Main opens a folder only if it is an existing git worktree from the daemon. It opens a URL only if it is `https` and its origin matches a configured YouTrack instance.
 - Permissions, navigation, new windows and webviews are denied.
