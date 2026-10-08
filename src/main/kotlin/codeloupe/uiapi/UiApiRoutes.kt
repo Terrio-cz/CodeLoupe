@@ -32,7 +32,7 @@ fun Route.uiApiRoutes(api: UiApi) {
         get("tasks") { call.answer(TaskPage.serializer()) { api.tasks(call.query("project"), call.query("state"), call.query("q"), call.query("limit"), call.query("cursor")) } }
         get("tasks/{id}") { call.answer(TaskDetail.serializer()) { api.task(call.parameters["id"].orEmpty()) } }
         get("index") { call.answer(IndexHealth.serializer()) { api.index() } }
-        get("runs") { call.answer(RunPage.serializer()) { api.runs(call.query("range"), call.query("sort"), call.query("role"), call.query("q"), call.query("limit"), call.query("cursor")) } }
+        get("runs") { call.answer(RunPage.serializer()) { api.runs(call.query("range"), call.query("sort"), call.query("role"), call.query("q"), call.query("ter"), call.query("limit"), call.query("cursor")) } }
         get("runs/{id}") { call.answer(RunDetail.serializer()) { api.run(call.parameters["id"].orEmpty()) } }
         get("runs/{id}/steps") { call.answer(StepPage.serializer()) { api.steps(call.parameters["id"].orEmpty(), call.query("sort"), call.query("limit"), call.query("cursor")) } }
         get("gaps") { call.answer(Gaps.serializer()) { api.gaps(call.query("range"), call.query("tool"), call.query("reason")) } }

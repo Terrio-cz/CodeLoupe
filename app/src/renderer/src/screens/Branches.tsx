@@ -57,7 +57,7 @@ export function Branches({ route }: { route: Route }) {
 function BranchDrawer({ id, onClose }: { id: string; onClose(): void }) {
   const { data: w, error, reload } = useApi('worktrees/:id', id);
   // The costliest runs of the branch's task, from the transcripts: where the cost of the work went.
-  const runs = useApi(w?.taskId ? 'runs' : null, undefined, { q: w?.taskId ?? undefined, range: '30d', sort: 'weighted', limit: 5 });
+  const runs = useApi(w?.taskId ? 'runs' : null, undefined, { ter: w?.taskId ?? undefined, range: '30d', sort: 'weighted', limit: 5 });
   const [opened, setOpened] = useState<boolean | null>(null);
   const LIMIT = 20;
   const [more, setMore] = useState(false);
@@ -107,7 +107,7 @@ function BranchDrawer({ id, onClose }: { id: string; onClose(): void }) {
                   ))}
                 </ul>
               )}
-              {runs.data && runs.data.total > runs.data.items.length && <button className="link" onClick={() => go('runs', null, { q: w.taskId! })}>All runs of the task ({runs.data.total}) →</button>}
+              {runs.data && runs.data.total > runs.data.items.length && <button className="link" onClick={() => go('runs', null, { ter: w.taskId! })}>All runs of the task ({runs.data.total}) →</button>}
             </Section>
           )}
 
