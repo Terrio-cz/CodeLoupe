@@ -28,19 +28,34 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
     private val predictions = ConcurrentHashMap<String, Pair<String, TouchPrediction.Result>>()
     private val mentions = ConcurrentHashMap<String, Pair<Long, List<Mention>>>()
 
-    suspend fun answer(root: String, query: String, limit: Int): String {
+    /** Everything `task_code` knows of one task, before it is rendered; [store] and [repo] let a caller ask the history more. */
+    class Facts(val answer: TaskCodeRender.TaskAnswer, val store: TaskCodeStore, val repo: RepoState, val worktree: Path, val note: String?)
+
+    private class Prelude(val dir: Path, val repo: RepoState, val pattern: TaskPattern, val store: TaskCodeStore, val note: String?)
+
+    private suspend fun prelude(root: String): Prelude {
         val location = registry.locate(root)
         val repo = registry.repo(location.commonDir)
         val pattern = TaskPattern.of(registry.mainWorktree(repo.commonDir), trackers.projects())
         val store = registry.taskCodes.current(repo, pattern)
         // Rows, predictions and open tasks come from the mirror: a first load is waited for, a stale one noted.
         val note = if (trackers.configured) trackers.current(initialWaitMs, staleWaitMs) else null
-        val dir = Path.of(location.worktree)
-        val answer = if (pattern.isId(query)) task(root, dir, repo, store, query.trim(), limit) else code(root, dir, repo, store, query.trim(), limit)
-        return if (note == null) answer else "$answer\n$note"
+        return Prelude(Path.of(location.worktree), repo, pattern, store, note)
     }
 
-    private suspend fun task(root: String, dir: Path, repo: RepoState, store: TaskCodeStore, query: String, limit: Int): String {
+    suspend fun answer(root: String, query: String, limit: Int): String {
+        val p = prelude(root)
+        val answer = if (p.pattern.isId(query)) TaskCodeRender.task(taskAnswer(root, p.dir, p.repo, p.store, query.trim()), limit) else code(root, p.dir, p.repo, p.store, query.trim(), limit)
+        return if (p.note == null) answer else "$answer\n${p.note}"
+    }
+
+    /** The code facts of the task [id]: landed, in a worktree, predicted. */
+    suspend fun facts(root: String, id: String): Facts {
+        val p = prelude(root)
+        return Facts(taskAnswer(root, p.dir, p.repo, p.store, id.trim()), p.store, p.repo, p.dir, p.note)
+    }
+
+    private suspend fun taskAnswer(root: String, dir: Path, repo: RepoState, store: TaskCodeStore, query: String): TaskCodeRender.TaskAnswer {
         val mirrored = trackers.mirror(query)
         val id = mirrored?.second ?: query.uppercase()
         val note = mirrored?.first?.refresh(id)?.takeIf { it.startsWith("(") }
@@ -55,7 +70,7 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
         } else {
             null
         }
-        return TaskCodeRender.task(TaskCodeRender.TaskAnswer(id, row, landed, files, decls, worktree, prediction, note), limit)
+        return TaskCodeRender.TaskAnswer(id, row, landed, files, decls, worktree, prediction, note)
     }
 
     /** The worktree whose branch names [id], with what it changed against the merge-base. */
