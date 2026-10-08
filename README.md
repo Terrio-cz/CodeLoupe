@@ -199,7 +199,7 @@ Every container, image, volume and network that is made through CodeLoupe carrie
 another), found through the registry above.
 
 ```
-codeloupe ws up [-f compose.yaml] [-p project] [--profile x] [-- up-args]   # default: -d
+codeloupe ws up [-f compose.yaml] [-p project] [--profile x] [--env-file f] [--project-directory d] [-- up-args]   # default: -d
 codeloupe ws run [--dir d] <docker run arguments>
 codeloupe ws build [--dir d] <docker build arguments>
 codeloupe ws volume create <name>
