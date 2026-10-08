@@ -848,6 +848,34 @@ rozhoduje launcher.
   popis a chybějící `depends_on :macos`), testy v `tools/`. Neověřeno: instalace přes skutečný winget/Scoop/Homebrew, ta vyžaduje
   publikaci manifestů a vydání; to je krok vlastníka.
 
+### Výsledek aktualizací aplikace a daemona (CL-107, 2026-10-08)
+
+- **Kanál**: Windows (NSIS) a Linux (AppImage) se aktualizují samy přes `electron-updater` z GitHub vydání, integritu drží SHA-512 a
+  velikost z `latest.yml` / `latest-linux.yml` (bez `publisherName` se kontrola podpisu přeskočí, nepodepsaný instalátor by ji
+  neprošel). macOS jen oznámí novou verzi s odkazem (Squirrel.Mac chce Developer ID), stejně `.deb` a kopie ze Scoopu.
+- **Vlastní výběr vydání** (`app/src/main/update/ReleaseFeed.ts`) místo GitHub providera electron-updateru: ten rc posune jen na další
+  rc se stejným prvním identifikátorem (`rc1` → `rc2` nenajde, `rc.1` → `rc.2` ano) a z rc nikdy na finální vydání. Aplikace čte
+  `releases.atom` (jen zveřejněná vydání, draft je neviditelný), vybere nejnovější tag podle semveru a electron-updateru dá jen
+  adresář `releases/download/<tag>/`. Rc se jmenují `rc.N`.
+- **Soukromí**: jediný host je github.com (atom, `latest.yml`, instalátor s přesměrováním na CDN GitHubu); User-Agent `CodeLoupe`,
+  `Accept-Language: en`, žádné cookies; hlavičku `x-user-staging-id` (náhodné ID instalace pro postupné nasazení) electron-updater
+  vždy posílá, proto je přepsaná konstantou. Vypínač v Nastavení (`autoUpdate`) vypne i časovač; ruční „Zkontrolovat teď" zůstává.
+  `CODELOUPE_UPDATE_FEED` pro test přijme jen `http://127.0.0.1|localhost`.
+- **Výměna daemona**: instalátor (`installer.nsh`) zastaví daemon staré instalace a přepíše soubory, nová aplikace daemon spustí z nového
+  bundlu; AppImage daemona zastavit neumí, takže první spuštění nové verze starší daemon restartuje (`UpdateGuard`). Indexy:
+  `Store.FORMAT` se při změně přebuduje (už to dělal `Registry`), update-test to ověřuje podvrženým starším formátem. Nastavení
+  (`userData/settings.json`), vault tajemství a indexy (home daemona) aktualizace nezasáhne.
+- **Rollback**: před instalací se bundle běžící verze zkopíruje do `<userData>/update/previous` (≈ 180 MB, po úspěchu se maže). První běh
+  nové verze hlídá `UpdateGuard`: daemon nového bundlu má 90 s odpovědět, jinak (nebo při selhání startu) se spustí předchozí bundle,
+  zapíše se `rollback.json`, Nastavení to ukáže a upozornění vyskočí; rollback platí, dokud nepřijde další verze.
+- **Měření na Windows** (`tools/update-test.mjs`, rc.1 → rc.2, instalátor 239 MB, lokální feed): od startu aplikace po staženou,
+  ověřenou a zazálohovanou aktualizaci 13,1 s (přes loopback, na internetu rozhoduje rychlost linky), běh instalátoru 22,6 s,
+  nový daemon odpovídá 7,1 s po startu nové aplikace, rozbitý daemon → předchozí odpovídá 4,1 s po startu. Prošlo všech 24 kontrol
+  včetně: podvržený instalátor (stejná velikost, jeden změněný bajt) odmítnut, při vypnutých aktualizacích žádný požadavek,
+  nastavení a tajemství přežily, starší formát indexu přebudován.
+- **Neověřeno**: skutečný feed na GitHubu (vyžaduje zveřejněné vydání), relaunch aplikace po instalaci (`--force-run`: instalátor ji spouští
+  s prostředím uživatele, test ji spouští sám), macOS (jen oznámení, testováno jednotkově).
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
