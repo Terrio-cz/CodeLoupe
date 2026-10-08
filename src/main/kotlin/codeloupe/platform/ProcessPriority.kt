@@ -4,7 +4,7 @@ import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
 
-/** Lowers this process's CPU priority so a background build never competes with interactive work. */
+/** Lowers this process's CPU priority (below normal, nice 10) so background syncs yield to interactive work. */
 object ProcessPriority {
     fun lower() {
         runCatching { if (NativeCalls.isWindows) windows() else posix() }
