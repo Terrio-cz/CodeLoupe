@@ -16,12 +16,18 @@ import java.time.Instant
  * resources are not in the plan at all, so no later step can reach them.
  *
  * - protected by a `protect` rule: `protected`, whatever else holds;
+ * - released by `ws release` (and created before the release): `auto`, whoever owns it and whatever state the workspace is in;
  * - the workspace is active: kept; the repository is not in the registry at all: kept;
  * - the workspace landed and the resource is labelled by CodeLoupe, has no running sibling and is older than the grace
  *   period: `auto`; adopted, running or abandoned/orphan/gone: `confirm`;
  * - an orphan directory under a worktree root: always `confirm`.
  */
-class ReconcilePlanner(private val config: ReconcileConfig, private val now: () -> Instant = Instant::now) {
+class ReconcilePlanner(
+    private val config: ReconcileConfig,
+    /** When a workspace was released (repo, workspace), or null; see [ReleaseStore]. */
+    private val releasedAt: (String, String) -> Instant? = { _, _ -> null },
+    private val now: () -> Instant = Instant::now,
+) {
     fun plan(resources: List<ResourceEntry>, registry: WorkspaceList): List<PlanEntry> {
         val knownRepos = registry.repos.mapTo(HashSet()) { it.name.lowercase() }
         val running = resources.filter { it.kind == ResourceKind.CONTAINER && it.state in RUNNING }
@@ -41,14 +47,19 @@ class ReconcilePlanner(private val config: ReconcileConfig, private val now: () 
         }
         val name = resource.names.firstOrNull() ?: resource.id
         val key = "${kind.name.lowercase()}:${if (kind == TargetKind.VOLUME) name else resource.id}"
-        val (verdict, reason) = decide(resource, repoKnown, running)
+        val protected = config.protect.any { it.covers(resource.kind, resource.names, resource.project) }
+        val release = if (protected) null else releasedAt(resource.repo.orEmpty(), resource.workspace.orEmpty())?.takeIf { at -> created(resource)?.let { it <= at } != false }
+        val (verdict, reason) = when {
+            protected -> Verdict.PROTECTED to "protected by the config"
+            release != null -> Verdict.AUTO to "the workspace was released at $release"
+            else -> decide(resource, repoKnown, running)
+        }
         return PlanEntry(
-            key, kind, name, resource.repo, resource.workspace, resource.ownership, resource.workspaceState, verdict, reason,
+            key, kind, name, resource.repo, resource.workspace, resource.ownership, resource.workspaceState, verdict, reason, released = release != null,
         )
     }
 
     private fun decide(resource: ResourceEntry, repoKnown: Boolean, running: Set<Pair<String, String>>): Pair<Verdict, String> {
-        if (config.protect.any { it.covers(resource.kind, resource.names, resource.project) }) return Verdict.PROTECTED to "protected by the config"
         return when (resource.workspaceState) {
             null -> if (repoKnown) Verdict.CONFIRM to "the workspace is gone from the registry" else Verdict.KEEP to "its repository is not in the registry"
             WorkspaceState.ACTIVE -> Verdict.KEEP to "the workspace is active"
@@ -66,9 +77,11 @@ class ReconcilePlanner(private val config: ReconcileConfig, private val now: () 
     }
 
     private fun young(resource: ResourceEntry): Boolean {
-        val created = resource.created?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return false
+        val created = created(resource) ?: return false
         return Duration.between(created, now()) < Duration.ofMinutes(config.graceMinutes.toLong())
     }
+
+    private fun created(resource: ResourceEntry): Instant? = resource.created?.let { runCatching { Instant.parse(it) }.getOrNull() }
 
     private fun directory(repo: String, directory: Workspace): PlanEntry {
         val protected = config.protect.any { it.covers(null, listOf(directory.path, directory.name), null) }

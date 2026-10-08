@@ -260,6 +260,17 @@ is retried without a second confirmation. With `auto` on the daemon runs the `au
 a job finished, every `intervalMinutes` while a client has called the daemon in the last 15 minutes, and whenever a retry
 falls due. Every attempt is written to `daemon.log` and `<home>/reconcile.jsonl` and emitted as a `reconcile.action` event.
 
+**Release instead of cleanup.** `codeloupe ws release <worktree directory | worktree name | task id> [--repo <path>]`
+(`POST /workspaces/release`) marks a workspace released and returns at once, whatever Docker or a lock is doing: it writes
+one small file (`<home>/releases.json`) and wakes the reconciler in the background. Every resource of that workspace,
+labelled or adopted, whatever state the workspace is in and whether its containers run, becomes an `auto` entry
+(`released` in the plan) and is removed with the usual retries, **also with `auto` off**: the release is the
+confirmation. A protect rule still wins. A mark covers what the workspace had created up to the release, so a new
+workspace of the same name is not cleaned by an old mark, and it goes when nothing of it is left (or after 30 days).
+`ws release --list` (and `releases` in `codeloupe status`) shows what is left of each release and what is retrying.
+The main worktree cannot be released. A close-out step calls `ws release` instead of `docker compose down` and the
+cleanup of leftovers.
+
 ```json
 { "workspaces": { "reconcile": { "auto": true, "intervalMinutes": 30, "graceMinutes": 60, "retryBaseMinutes": 1, "retryMaxMinutes": 360,
   "protect": [ { "match": "^terrio-importer(_|$)" }, { "match": "^terrio-importer_terrio-postgres-data$", "kinds": ["volume"] } ] } } }
@@ -267,6 +278,19 @@ falls due. Every attempt is written to `daemon.log` and `<home>/reconcile.jsonl`
 
 `auto` is off by default. `protect` patterns are regular expressions tried (case-insensitively, anywhere in the name,
 so anchor them) against each name of a resource and its compose project; without `kinds` they also cover directories.
+
+### Ports per workspace
+
+With `"ports": { "range": [19000, 19999] }` under `workspaces`, a workspace asks for a port by name:
+`codeloupe ws ports allocate app` prints the port of `app` in the workspace of the directory (the same name always gets the
+same one; `postgres`, `web`, … get others). A new port is one that nothing listens on (it is bound and connected to), no
+container publishes and no workspace has recorded, so it never collides with a live listener; the allocation is a record
+in `<home>/ports.json`, it holds nothing open. `codeloupe ws ports` (and `GET /ports`, for the app) lists every allocation
+with what holds it now: `free`; `in-use` by the workspace's own container or by a process whose command line names the
+workspace; or `conflict` with the owning container (and its workspace, or none) or the process (pid and command line, from
+`netstat` / `ss` / `lsof`). Ports of the range held by something that is no workspace's are listed as `foreign` (today
+the 19002 / 19003 slots with a foreign container). `ws ports free [name]` forgets a port, and `ws release` frees all of the
+workspace's. `codeloupe status` shows `portAllocations`.
 
 ## Desktop app
 

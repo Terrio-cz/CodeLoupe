@@ -2,6 +2,7 @@ package codeloupe.daemon
 
 import codeloupe.jobs.JobsSnapshot
 import codeloupe.platform.PartTime
+import codeloupe.reconcile.ReleaseStatus
 import codeloupe.repo.RepoSummary
 import codeloupe.tracker.TrackerSummary
 import kotlinx.serialization.Serializable
@@ -27,6 +28,10 @@ data class DaemonStatus(
     val repos: List<RepoSummary>,
     val jobs: JobsSnapshot,
     val trackers: List<TrackerSummary> = emptyList(),
+    /** Released workspaces whose cleanup is not finished (`ws release`). */
+    val releases: List<ReleaseStatus> = emptyList(),
+    /** Ports recorded for workspaces (`ws ports`). */
+    val portAllocations: Int = 0,
     /** git processes started since the daemon started. */
     val gitSpawns: Long = 0,
     /** Time spent per [codeloupe.platform.TimedPart], lower-case names. */

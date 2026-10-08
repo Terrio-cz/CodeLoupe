@@ -10,6 +10,7 @@ import codeloupe.docker.ResourceReport
 import codeloupe.workspace.RepoWorkspaces
 import codeloupe.workspace.Workspace
 import codeloupe.workspace.WorkspaceList
+import codeloupe.workspace.WorkspaceRef
 import codeloupe.workspace.WorkspaceState
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
@@ -167,6 +168,83 @@ class ReconcilerTest {
         ) { _, _ -> }
         assertEquals(emptyList(), down.plan().entries)
         assertEquals(1, ReconcileState(stateFile, config) { clock }.get("volume:data-1")!!.attempts)
+    }
+
+    private fun withReleases(store: ReleaseStore, report: () -> ResourceReport = { ResourceReport("now", "fake", resources = docker.values.toList()) }): Reconciler {
+        val executor = { entry: PlanEntry ->
+            removeCalls += entry.key
+            if (entry.key in stuck) {
+                ActionResult(entry.key, entry.kind, entry.name, entry.workspace, ActionOutcome.BLOCKED, "locked")
+            } else {
+                docker.remove(entry.key)
+                ActionResult(entry.key, entry.kind, entry.name, entry.workspace, ActionOutcome.REMOVED)
+            }
+        }
+        return Reconciler(
+            config, { WorkspaceList("now", listOf(RepoWorkspaces("C:/ws/Terrio", "Terrio", "c", "main", emptyList(), emptyMap(), emptyList()))) }, { report() },
+            ReconcilePlanner(config, store::releasedAt) { clock }, executor, ReconcileState(stateFile, config) { clock }, store,
+        ) { result, trigger -> recorded += result to trigger }
+    }
+
+    @Test
+    fun `a release cleans an active workspace even with auto off, leaves the others alone, and the mark goes when nothing is left`() = runBlocking {
+        val store = ReleaseStore(home.resolve("releases.json")) { clock }
+        add(resource(ResourceKind.CONTAINER, "app-1", "TER-1", WorkspaceState.ACTIVE))
+        add(resource(ResourceKind.VOLUME, "data-1", "TER-1", WorkspaceState.ACTIVE, OwnershipClass.ADOPTED))
+        add(resource(ResourceKind.VOLUME, "data-2", "TER-2", WorkspaceState.LANDED))
+        val reconciler = withReleases(store)
+        clock = clock.plusSeconds(60)
+        assertEquals(emptyList(), reconciler.run("start", auto = false).actions)
+        store.mark(WorkspaceRef("Terrio", "TER-1"))
+        assertTrue(reconciler.hasReleases())
+        clock = clock.plusSeconds(60)
+
+        val run = reconciler.run("release", auto = false)
+        assertEquals(setOf("container:id-app-1", "volume:data-1"), run.actions.map { it.key }.toSet())
+        assertEquals(setOf("volume:data-2"), docker.keys)
+        assertTrue(store.isEmpty(), "nothing of TER-1 is left, so the mark is gone")
+        assertEquals(emptyList(), reconciler.releaseStatus())
+    }
+
+    @Test
+    fun `a blocked resource keeps the release open and shown as retrying, a Docker that does not answer completes nothing`() = runBlocking {
+        val store = ReleaseStore(home.resolve("releases.json")) { clock }
+        add(resource(ResourceKind.VOLUME, "data-1", "TER-1", WorkspaceState.ACTIVE))
+        stuck += "volume:data-1"
+        var dockerUp = true
+        val reconciler = withReleases(store) { if (dockerUp) ResourceReport("now", "fake", resources = docker.values.toList()) else ResourceReport("now", problems = listOf("no Docker")) }
+        clock = clock.plusSeconds(60)
+        store.mark(WorkspaceRef("Terrio", "TER-1"))
+        clock = clock.plusSeconds(60)
+
+        assertEquals(ActionOutcome.BLOCKED, reconciler.run("release", auto = false).actions.single().outcome)
+        val status = reconciler.releaseStatus().single()
+        assertEquals(1, status.pending)
+        assertEquals(1, status.retrying)
+
+        dockerUp = false
+        reconciler.run("retry", auto = false)
+        assertEquals(1, store.all().size, "Docker did not answer: the release is not complete")
+
+        dockerUp = true
+        stuck.clear()
+        clock = clock.plus(Duration.ofMinutes(5))
+        assertEquals(ActionOutcome.REMOVED, reconciler.run("retry", auto = false).actions.single().outcome)
+        assertTrue(store.isEmpty())
+    }
+
+    @Test
+    fun `the release store keeps its marks across a restart, moves a mark on a second release and drops old ones`() {
+        val file = home.resolve("releases.json")
+        val store = ReleaseStore(file) { clock }
+        store.mark(WorkspaceRef("Terrio", "TER-1"))
+        val first = store.releasedAt("terrio", "ter-1")!!
+        clock = clock.plusSeconds(120)
+        store.mark(WorkspaceRef("Terrio", "TER-1"))
+        assertEquals(clock, ReleaseStore(file) { clock }.releasedAt("Terrio", "TER-1"))
+        assertTrue(first < clock)
+        clock = clock.plus(ReleaseStore.MAX_AGE).plusSeconds(1)
+        assertEquals(emptyList(), ReleaseStore(file) { clock }.all())
     }
 
     @Test
