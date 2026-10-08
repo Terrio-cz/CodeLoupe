@@ -13,10 +13,23 @@ object OutputCompressor {
 
     class Result(val text: String, val family: String, val shortened: Boolean)
 
+    private val SHELLS = setOf("bash", "sh", "zsh", "dash", "cmd", "powershell", "pwsh")
+    private val SCRIPT_FLAGS = setOf("-c", "/c", "-command", "-lc")
+
+    /** The command as a family recognises it: the program and its arguments, or a shell's script; a JVM's class path is no command. */
+    private fun headline(command: List<String>): String {
+        val exe = command.firstOrNull()?.replace('\\', '/')?.substringAfterLast('/')?.lowercase()?.removeSuffix(".exe").orEmpty()
+        return when {
+            exe in SHELLS -> command.drop(1).dropWhile { it.lowercase() !in SCRIPT_FLAGS }.drop(1).joinToString(" ")
+            exe == "java" || exe == "javaw" -> ""
+            else -> (listOf(exe) + command.drop(1)).joinToString(" ")
+        }
+    }
+
     fun compress(command: List<String>, output: String, cwd: String = ""): Result {
         val text = Ansi.strip(output).replace("\r\n", "\n").trimEnd()
         if (text.length <= PASSTHROUGH && text.lines().size < PASSTHROUGH_LINES) return Result(text, "passthrough", false)
-        val line = command.joinToString(" ")
+        val line = headline(command)
         val family = FAMILIES.firstOrNull { it.matches(line) }
         val shortened = family?.let { runCatching { it.compress(text, cwd.replace('\\', '/')) }.getOrNull() }?.takeIf { it.isNotBlank() }
             ?: return Result(GenericFamily.compress(text, cwd), "generic", true)

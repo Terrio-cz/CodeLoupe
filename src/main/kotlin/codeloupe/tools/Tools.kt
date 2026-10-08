@@ -1,8 +1,10 @@
 package codeloupe.tools
 
 import codeloupe.doc.DocMemory
+import codeloupe.jobs.JobRunner
 import codeloupe.tracker.Trackers
 import kotlinx.serialization.json.JsonObject
+import java.nio.file.Path
 
 /** The tool catalog. Every tool also takes `root`, the repository or worktree to answer for. */
 object Tools {
@@ -15,11 +17,12 @@ object Tools {
     fun named(name: String): Tool? = ALL.firstOrNull { it.name == name }
 
     /** The daemon's catalog: the code tools, the tracker tools when a tracker is configured, and task_code (history alone without one) and doc (text files). */
-    fun catalog(trackers: Trackers): List<Tool> {
+    fun catalog(trackers: Trackers, jobs: JobRunner? = null): List<Tool> {
         // The document reader's memory is shared: `doc` and `task_context` tell a caller the same "you already have this".
         val docs = DocMemory()
         val tracked = if (trackers.configured) listOf(IssueTool(trackers), TaskContextTool(trackers, docs), DispatchPlanTool(trackers, docs), TasksTool(trackers), SimilarTool(trackers), UpdateTool(trackers)) else emptyList()
-        return ALL + tracked + TaskCodeTool(trackers) + DocTool(docs)
+        val handles = { handle: String -> jobs?.get(handle.removePrefix("job:"))?.log?.let { Path.of(it) } }
+        return ALL + tracked + TaskCodeTool(trackers) + DocTool(docs, handles = handles) + listOfNotNull(jobs?.let { RunTool(it) })
     }
 
     /** Tools that need no repository take `root` only as the caller's identity. */

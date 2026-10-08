@@ -105,7 +105,7 @@ class Daemon private constructor(
     val jobs = JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
     private val trackerSettings = TrackerSettingsLoader.load(config.home)
     private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
-    private val tools = Tools.catalog(trackers)
+    private val tools = Tools.catalog(trackers, jobs)
     private val workspaces = Workspaces(config, registry, trackers)
     private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope)
     private val resources = ResourceInventory(config, workspaces)

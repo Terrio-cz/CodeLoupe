@@ -114,6 +114,15 @@ class OutputCompressorTest {
     }
 
     @Test
+    fun `a command is recognised by its program or a shell script, not by a path in its arguments`() {
+        val status = recorded("git-status.txt")
+        assertEquals("gitstatus", OutputCompressor.compress(listOf("bash", "-c", "git status"), status, cwd).family)
+        assertEquals("gitstatus", OutputCompressor.compress(listOf("C:\\Program Files\\Git\\bin\\git.exe", "status"), status, cwd).family)
+        assertEquals("generic", OutputCompressor.compress(listOf("java", "-cp", "C:/gradle-9.6.0/lib/x.jar:/tools/git status", "Main"), status, cwd).family)
+        assertEquals("generic", OutputCompressor.compress(listOf("echo", "gradle-9.6.0"), recorded("gradle-test-fail.txt"), cwd).family)
+    }
+
+    @Test
     fun `repeated lines are folded and colour codes removed`() {
         val text = "\u001B[31mretrying\u001B[0m\n".repeat(400)
         assertEquals("retrying (×400)", OutputCompressor.compress(listOf("./wait.sh"), text).text)

@@ -42,6 +42,7 @@ build/install/codeloupe/bin/codeloupe task_code ABC-5            # its landed or
 build/install/codeloupe/bin/codeloupe code_tasks OrderService.handle   # the tasks that touched it
 build/install/codeloupe/bin/codeloupe task_context ABC-5         # a planner's whole starting pack; asked again: what changed
 build/install/codeloupe/bin/codeloupe doc plan.md --section goal # a text file by digest, section or line window
+build/install/codeloupe/bin/codeloupe run -- git log -30         # a short command: its summary, the rest by handle (doc path=job:<id>)
 build/install/codeloupe/bin/codeloupe status
 ```
 
@@ -103,6 +104,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `calls` | callers (default) or callees as a tree, depth ≤ 3; below the first level only exact links |
 | `hierarchy` | supertypes and subtypes of a type (object expressions included, and lambdas converted to a `fun interface`), or what a member overrides and what overrides it |
 | `job` | start a long command in the daemon (status, cancel); see [Jobs and events](#jobs-and-events); takes `cwd`, not `root` |
+| `run` | a command that ends soon (`command` = argv, `cwd`; `timeoutSec`, default 120) answered with a summary instead of its output, as a job (same policy hook, log and scrubbing as `job`). Header: `<command> · exit 0 · 8700 → 380 chars (96% less) · full output: doc path=job:<id>`. git status = branch and a count with names per kind; git log = one line per commit (a shared author or day said once); `git diff --stat` = totals and the 12 biggest files, a patch = one line per file with `+added -removed`; Gradle = the `BUILD` line, task counts, failed tasks, every failed test with its exception and first-party frames, every `e:` compiler error (working directory cut off), a few warnings, `What went wrong`; node:test, Jest, pytest, Maven = counts, failures and last lines; anything else = first 5 lines, every error line (more than 20 are counted) and the last 10, repeated lines folded. An output under 600 characters and 20 lines is returned as it is, `raw=true` returns everything. A command still running after the timeout answers with its job id. The recorded outputs behind the claims are in `src/test/resources/outputs` (about 88 % less over the set; git status, git log and a Gradle failure each at least 60 %) |
 | `changes` | what the worktree changed against the merge-base with the default branch (committed and uncommitted), by declaration: `+` added, `~` body changed, `^` signature changed (with the old one), `-` removed; each with its callers and tests; `bodies=true` adds a line diff per declaration |
 | `task_code` | links between tasks and code, from the default branch's history (works without a tracker). `query` = a task id (`TER-5`): its landing commit, files and changed declarations (`+ ~ ^ -`), the worktree whose branch names it, and for an open task the touch set predicted from its text — `=` sure · `~` likely · `?` guess · `+` new file, each with the issue text it comes from. `query` = a declaration (`Type.member`) or a file path: the tasks that changed it, newest first, with landing commits (`code_tasks <symbol\|path>` on the command line), plus open tasks whose text points at it. Task ids follow the tracker projects, or `taskPattern` (a regular expression) in `.codeloupe.json` |
 
@@ -137,6 +139,7 @@ per caller (`root`), what that caller was shown.
 | `doc path` | a digest of at most 1000 characters: size, hash, the sections as `handle(lines)`, the lines that look like errors as `L118-124 "FAILED: …"`, and how to fetch |
 | `doc path --section goal --section L118-124` | those sections (handle or heading prefix, with their sub-sections) or line windows (at most 300 lines, 20 000 characters) |
 | `doc path --view outline` / `--view full` | every section with its line; the whole text |
+| `doc job:<id>` | the full output a `run` or `job` kept, scrubbed of secrets, by the same digest (error windows `L118-124 "FAILED: …"` included), sections and line windows; the newest 8 MB of a larger log |
 | the same call again | one line, `plan.md unchanged since your read at … (#hash, 9 sections)`, under 100 tokens |
 | after the file changed | the digest becomes a delta (`~ steps(12)`, `+ notes(3)`, `- old`); `--view full` sends only the changed sections in full and names the omitted ones; a fetched section that did not change answers `section steps unchanged` |
 | `--since none` | forget what the caller has; read it again |
@@ -456,6 +459,7 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
 | `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
 | `tracker`, `tracker.youtrack`, `tracker.mirror`, `tracker.read` | tracker adapter (YouTrack REST), SQLite mirror and watcher, `issue` / `tasks` / `similar` answers |
+| `compress` | `run`: output families (git status / log / diff, Gradle, test runners, generic) that shorten a command's output and keep every error line |
 | `doc` | documents as sections with handles: digest, outline, section and line-window fetch, hash and the per-caller delta memory behind `doc` and `task_context` |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |

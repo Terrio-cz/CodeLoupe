@@ -5,7 +5,7 @@ package codeloupe.compress
  * `What went wrong` block, a few warnings and the build line stay; framework stack frames and Gradle's chatter go.
  */
 object GradleFamily : Family {
-    private val COMMAND = Regex("""(^|[\s/\\])(gradlew?(\.bat)?)\b""")
+    private val COMMAND = Regex("""(^|[\s;&|/\\])gradlew?(\.bat)?(\s|$)""")
     private val TASK = Regex("""^> Task (\S+)(?: (.*))?$""")
     private val FAILED_TEST = Regex("""^\S.* > .* FAILED$""")
     private val TEST_TOTAL = Regex("""^\d+ tests? completed, \d+ failed.*$""")

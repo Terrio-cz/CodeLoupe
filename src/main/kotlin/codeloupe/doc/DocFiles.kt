@@ -1,5 +1,6 @@
 package codeloupe.doc
 
+import codeloupe.events.Scrubber
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -24,6 +25,17 @@ class DocFiles(private val roots: List<Path>) {
         val bytes = Files.readAllBytes(real)
         require(bytes.take(PROBE).none { it == 0.toByte() }) { "$given is binary" }
         return Doc.parse(display(real, base), String(bytes, Charsets.UTF_8))
+    }
+
+    /** The output of a job, by its handle: read as it is on disk, with secrets masked, its newest [MAX_BYTES] when larger. */
+    fun loadLog(handle: String, log: Path): Doc {
+        require(Files.isRegularFile(log)) { "no output kept for $handle" }
+        val size = Files.size(log)
+        val text = Files.newInputStream(log).use { input ->
+            if (size > MAX_BYTES) input.skipNBytes(size - MAX_BYTES)
+            String(input.readAllBytes(), Charsets.UTF_8)
+        }
+        return Doc.parse(handle, Scrubber.text(text))
     }
 
     /** The path relative to root when under it, else absolute; forward slashes either way. */
