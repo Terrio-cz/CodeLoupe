@@ -251,13 +251,13 @@ function buildQuestions(r, q) {
     const hit = rgRun('-n', '-g', '*.kt', '-w', '-e', `(class|interface|object|typealias) ${t.name}`);
     const whole = withRead(hit, t.file);
     add('declaration', t.name, { text: hit.out + t.slice, calls: 2, ms: hit.ms }, { text: whole.text, calls: 2, ms: whole.ms },
-      { tool: 'symbol', args: { name: t.name } }, { tool: 'context', args: { name: t.name, include_content: true } });
+      { tool: 'symbol', args: { name: t.name } }, { tool: 'context', args: { name: t.name, include_content: true }, file: t.file });
   }
   for (const m of q.memberItems) {
     const hit = rgRun('-n', '-g', '*.kt', '-e', `fun\\s+(?:<[^>]+>\\s*)?(?:[\\w.<>?, ]+\\.)?${m.name}\\b`);
     const whole = withRead(hit, m.file);
     add('member', `${m.container}.${m.name}`, { text: hit.out + m.slice, calls: 2, ms: hit.ms }, { text: whole.text, calls: 2, ms: whole.ms },
-      { tool: 'symbol', args: { name: `${m.container}.${m.name}` } }, { tool: 'context', args: { name: m.name, include_content: true } });
+      { tool: 'symbol', args: { name: `${m.container}.${m.name}` } }, { tool: 'context', args: { name: m.name, include_content: true }, file: m.file });
   }
   for (const f of q.outlineFiles) {
     const hit = timed(() => rg(r.dir, '-n', '-e', DECL_LINE, f));
@@ -269,19 +269,19 @@ function buildQuestions(r, q) {
     const lines = rgRun('-n', '-g', '*.kt', '-w', t.name);
     const ctx = rgRun('-n', '-g', '*.kt', '-w', '-C3', t.name);
     add('usages', t.name, { text: lines.out, calls: 1, ms: lines.ms }, { text: ctx.out, calls: 1, ms: ctx.ms },
-      { tool: 'usages', args: { name: t.name } }, { tool: 'context', args: { name: t.name } });
+      { tool: 'usages', args: { name: t.name } }, { tool: 'context', args: { name: t.name }, file: t.file });
   }
   for (const m of q.memberItems) {
     const lines = rgRun('-n', '-g', '*.kt', '-w', m.name);
     const ctx = rgRun('-n', '-g', '*.kt', '-w', '-C3', m.name);
     add('callers', `${m.container}.${m.name}`, { text: lines.out, calls: 1, ms: lines.ms }, { text: ctx.out, calls: 1, ms: ctx.ms },
-      { tool: 'calls', args: { name: `${m.container}.${m.name}`, direction: 'callers', depth: 1 } }, { tool: 'context', args: { name: m.name } });
+      { tool: 'calls', args: { name: `${m.container}.${m.name}`, direction: 'callers', depth: 1 } }, { tool: 'context', args: { name: m.name }, file: m.file });
   }
   for (const h of q.hierItems) {
     const lines = rgRun('-n', '-g', '*.kt', '-e', q.hierarchyRe(h.name));
     const ctx = rgRun('-n', '-g', '*.kt', '-C3', '-e', q.hierarchyRe(h.name));
     add('hierarchy', h.name, { text: lines.out, calls: 1, ms: lines.ms }, { text: ctx.out, calls: 1, ms: ctx.ms },
-      { tool: 'hierarchy', args: { name: h.name } }, { tool: 'context', args: { name: h.name } });
+      { tool: 'hierarchy', args: { name: h.name } }, { tool: 'context', args: { name: h.name }, file: h.file });
   }
   for (const p of q.grepPatterns) {
     const hit = timed(() => rg(r.dir, '-n', '-g', '*.kt', '-F', '-e', p).split('\n').slice(0, 30).join('\n'));
@@ -338,9 +338,9 @@ class GitNexus {
     this.id = 0; this.waiting = new Map(); this.buf = '';
   }
   /** Nothing of the user's own GitNexus is touched: home, registry and caches live in <work>/gn/home. */
-  env() {
+  env({ pool = true } = {}) {
     return { ...process.env, USERPROFILE: this.home, HOME: this.home, GITNEXUS_HOME: path.join(this.home, '.gitnexus'),
-      GITNEXUS_LBUG_BUFFER_POOL_SIZE: String(GITNEXUS.bufferPool), SCARF_ANALYTICS: 'false', GITNEXUS_NO_UPDATE_CHECK: '1' };
+      ...(pool ? { GITNEXUS_LBUG_BUFFER_POOL_SIZE: String(GITNEXUS.bufferPool) } : {}), SCARF_ANALYTICS: 'false', GITNEXUS_NO_UPDATE_CHECK: '1' };
   }
   install() {
     const npm = IS_WIN ? 'npm.cmd' : 'npm';
@@ -369,7 +369,8 @@ class GitNexus {
     return { ms: performance.now() - t, status: r.status, text: r.stdout || '' };
   }
   async start(cwd) {
-    this.proc = spawn(this.node, [this.cli, 'mcp'], { env: this.env(), cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+    // serving needs no bulk load: the MCP server runs with the database's default buffer pool
+    this.proc = spawn(this.node, [this.cli, 'mcp'], { env: this.env({ pool: false }), cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     this.proc.stdout.on('data', d => {
       this.buf += d; let i;
       while ((i = this.buf.indexOf('\n')) >= 0) {
@@ -525,9 +526,16 @@ async function main() {
         const r = repos.find(y => y.name === x.repo);
         const repoName = nameOf(r);
         if (x.gn.tip) { git(r.gn, 'checkout', '-q', '--detach', r.tip); }
-        const res = await repeat(3, () => gn.call(x.gn.tool, { repo: repoName, ...x.gn.args }));
+        // an ambiguous name is asked again with the file, as an agent would; both answers and both calls are counted
+        const res = await repeat(3, async () => {
+          const a = await gn.call(x.gn.tool, { repo: repoName, ...x.gn.args });
+          if (!/"status": "ambiguous"/.test(a.text) || !x.gn.file) return { ...a, calls: 1, last: a };
+          const b = await gn.call(x.gn.tool, { repo: repoName, ...x.gn.args, file_path: x.gn.file });
+          return { ms: a.ms + b.ms, text: `${a.text}\n${b.text}`, isError: b.isError, calls: 2, last: b };
+        });
         if (x.gn.tip) { git(r.gn, 'checkout', '-q', '--detach', r.base); }
-        x.gnRes = { ...answerOf(res.text), calls: 1, ms: res.ms, answered: answered(res), why: answered(res) ? undefined : res.text.slice(0, 120).replace(/\s+/g, ' ') };
+        const ok = answered(res.last);
+        x.gnRes = { ...answerOf(res.text), calls: res.calls, ms: res.ms, answered: ok, why: ok ? undefined : res.last.text.slice(0, 120).replace(/\s+/g, ' ') };
       }
       resources.gitnexus.rssAfterQueriesMb = mb(treeRss(await snapshot(), gn.pid));
       const sA = await snapshot(); await sleep(30_000); const sB = await snapshot();
@@ -594,7 +602,7 @@ function pooled(results, kind, repo) {
     clBeatsMinimal: rows.filter(r => r.codeloupe.tokens < r.minimal.tokens).length,
     clBeatsTypical: rows.filter(r => r.typical && r.codeloupe.tokens < r.typical.tokens).length,
     typicalRows: rows.filter(r => r.typical).length,
-    callsMinimal: median(rows.map(r => r.minimal.calls)), callsTypical: rows[0]?.typical ? median(rows.map(r => r.typical.calls)) : null,
+    callsGitnexus: gnRows.length ? median(gnRows.map(r => r.gitnexus.calls)) : null, callsMinimal: median(rows.map(r => r.minimal.calls)), callsTypical: rows[0]?.typical ? median(rows.map(r => r.typical.calls)) : null,
   };
 }
 
@@ -609,7 +617,7 @@ function renderMarkdown(d) {
   L.push('## Setup', '',
     `- **Machine**: ${meta.machine.os}, ${meta.machine.cpu} (${meta.machine.cores} threads), ${meta.machine.ramGb} GB RAM, Node ${meta.machine.node}; ${meta.versions.ripgrep}; ${meta.versions.git}.`,
     `- **CodeLoupe**: ${meta.codeloupe.version ?? '?'} built from commit \`${meta.codeloupe.sha.slice(0, 10)}\`${meta.codeloupe.dirty ? ' (working tree had uncommitted changes)' : ''}; a fresh daemon on its own port with a throwaway \`CODELOUPE_HOME\`.`,
-    meta.gitnexusSetup ? `- **GitNexus**: npm package \`gitnexus@${meta.gitnexusSetup.version}\` (${meta.gitnexusSetup.license}), run with Node ${meta.gitnexusSetup.nodeForGitNexus} (it requires Node 22 or newer), its home redirected into the scratch directory, MCP over stdio. \`GITNEXUS_LBUG_BUFFER_POOL_SIZE\` set to ${meta.gitnexusSetup.bufferPoolBytes / 1024 ** 3} GiB: with the default pool (428 MiB here) the first \`analyze\` of the Exposed checkout failed with "Buffer manager exception ... buffer pool is full" and its own message names this setting.` : '- **GitNexus**: not measured, see the end of this page.',
+    meta.gitnexusSetup ? `- **GitNexus**: npm package \`gitnexus@${meta.gitnexusSetup.version}\` (${meta.gitnexusSetup.license}), run with Node ${meta.gitnexusSetup.nodeForGitNexus} (it requires Node 22 or newer), its home redirected into the scratch directory, MCP over stdio. \`GITNEXUS_LBUG_BUFFER_POOL_SIZE\` set to ${meta.gitnexusSetup.bufferPoolBytes / 1024 ** 3} GiB for \`analyze\` (the MCP server runs with the default): with the default pool (428 MiB here) the first \`analyze\` of the Exposed checkout failed with "Buffer manager exception ... buffer pool is full" and its own message names this setting.` : '- **GitNexus**: not measured, see the end of this page.',
     '', '| Repository | Commit indexed (`main`) | Branch tip for "what changed" | Kotlin files / lines (without tests) | Licence |', '|---|---|---|---:|---|',
     ...meta.repos.map(r => `| [${r.name}](${r.url}) | \`${r.base.slice(0, 10)}\` | \`${r.tip.slice(0, 10)}\` | ${num(r.ktFiles)} / ${num(r.ktLines)} | ${r.license} |`), '');
   L.push('## Method', '',
@@ -622,10 +630,10 @@ function renderMarkdown(d) {
     '- Answers differ in content, not only in size: grep returns every textual match including comments and strings, CodeLoupe returns resolved references grouped by enclosing declaration. Smaller is cheaper to read but not automatically better; the table says how many answers a tool gave at all.', '');
 
   L.push('## Tokens read per question', '', 'Median over the questions of each kind, both repositories pooled. Lower is better. "answered" counts questions the tool returned a non-empty, non-error answer for.', '',
-    '| Question | n | grep, minimal | grep + read | CodeLoupe | GitNexus | CodeLoupe vs minimal | CodeLoupe vs grep + read | calls (minimal / read / tool) |', '|---|---:|---:|---:|---:|---:|---:|---:|---|');
+    '| Question | n | grep, minimal | grep + read | CodeLoupe | GitNexus | CodeLoupe vs minimal | CodeLoupe vs grep + read | calls (minimal / read / CodeLoupe / GitNexus) |', '|---|---:|---:|---:|---:|---:|---:|---:|---|');
   for (const [k, label] of KINDS) {
     const p = pooled(results, k);
-    L.push(`| ${label} | ${p.n} | ${num(p.minimal)} | ${p.typical == null ? 'n/a' : num(p.typical)} | ${num(p.codeloupe)}${p.clAnswered === `${p.n}/${p.n}` ? '' : ` (${p.clAnswered} answered)`} | ${p.gitnexus == null ? 'n/a' : `${num(p.gitnexus)} (${p.gnAnswered} answered)`} | ${pct(p.codeloupe, p.minimal)} | ${pct(p.codeloupe, p.typical)} | ${p.callsMinimal} / ${p.callsTypical ?? 'n/a'} / 1 |`);
+    L.push(`| ${label} | ${p.n} | ${num(p.minimal)} | ${p.typical == null ? 'n/a' : num(p.typical)} | ${num(p.codeloupe)}${p.clAnswered === `${p.n}/${p.n}` ? '' : ` (${p.clAnswered} answered)`} | ${p.gitnexus == null ? 'n/a' : `${num(p.gitnexus)} (${p.gnAnswered} answered)`} | ${pct(p.codeloupe, p.minimal)} | ${pct(p.codeloupe, p.typical)} | ${p.callsMinimal} / ${p.callsTypical ?? 'n/a'} / 1 / ${p.callsGitnexus ?? 'n/a'} |`);
   }
   const tot = f => sum(results.filter(f).map(r => r.codeloupe.tokens));
   const totalMin = sum(results.map(r => r.minimal.tokens)), totalTyp = sum(results.filter(r => r.typical).map(r => r.typical.tokens));
@@ -638,14 +646,15 @@ function renderMarkdown(d) {
   }
   L.push('', '![Median tokens per question](benchmarks.svg)', '');
 
-  L.push('### Where CodeLoupe does not win', '');
-  const losses = [];
+  L.push('### CodeLoupe against minimal grep, question by question', '', 'Minimal grep is a best case for grep (the agent never reads a line it does not need). Medians within 10 % of each other count as about the same.', '');
+  const verdicts = [];
   for (const [k, label] of KINDS) {
-    const p = pooled(results, k);
-    if (p.codeloupe > p.minimal) losses.push(`- **${label}**: the median CodeLoupe answer is ${num(p.codeloupe)} tokens against ${num(p.minimal)} for minimal grep (${p.clBeatsMinimal} of ${p.n} answers are smaller). ${k === 'usages' || k === 'callers' ? 'CodeLoupe adds the enclosing declaration of every hit and marks exact against candidate references; rg prints one line per textual match.' : ''}`.trim());
-    else losses.push(`- **${label}**: smaller than minimal grep in ${p.clBeatsMinimal} of ${p.n} answers${p.typicalRows ? `, smaller than grep + read in ${p.clBeatsTypical} of ${p.typicalRows}` : ''}.`);
+    const p = pooled(results, k); const ratio = p.codeloupe / p.minimal;
+    const word = ratio > 1.1 ? '**larger**' : ratio < 0.9 ? '**smaller**' : 'about the same';
+    verdicts.push(`- ${label}: CodeLoupe's median answer is ${word} (${num(p.codeloupe)} against ${num(p.minimal)} tokens); smaller than minimal grep in ${p.clBeatsMinimal} of ${p.n} answers${p.typicalRows ? `, smaller than grep + read in ${p.clBeatsTypical} of ${p.typicalRows}` : ''}.`);
   }
-  L.push(...losses, '');
+  L.push(...verdicts, '');
+  L.push('Where the CodeLoupe answer is larger it carries more than the grep lines: usages and callers name the enclosing declaration of every hit and mark exact against candidate references, `changes` lists the changed declarations with their callers and tests where `git diff --stat` lists files, subtypes include supertypes and transitive links.', '');
   const gnWins = KINDS.map(([k, label]) => [label, pooled(results, k)]).filter(([, p]) => p.gitnexus != null && p.gitnexus < p.codeloupe);
   if (gnWins.length) L.push('GitNexus returned a smaller median answer than CodeLoupe for: ' + gnWins.map(([l, p]) => `${l.toLowerCase()} (${num(p.gitnexus)} against ${num(p.codeloupe)} tokens)`).join('; ') + '.', '');
 
@@ -675,7 +684,7 @@ function renderMarkdown(d) {
     L.push(`| Peak memory while indexing, ${r.name} | ${a ? `${a.peakRssMb} MB (daemon + child JVM)` : 'n/a'} | ${b ? `${b.peakRssMb} MB` : 'not measured'} |`);
   }
   L.push(`| First \`changes\` in a new worktree of each repository | ${rc.perRepo.map(p => `${p.repo} ${secs(p.firstChangesMs)}`).join(', ')} | not measured (GitNexus's README describes worktrees sharing one store, with a copy updated incrementally for uncommitted changes; this script does not exercise it) |`);
-  L.push(`| Resident memory, idle | ${rc.idleRssMb} MB daemon (${rc.idleTreeRssMb} MB with children) | ${rg_.idleTreeRssMb == null ? 'not measured' : `${rg_.idleTreeRssMb} MB MCP server (${rg_.rssAfterQueriesMb} MB right after the queries)`} |`);
+  L.push(`| Resident memory, idle | ${rc.idleRssMb} MB daemon (${rc.idleTreeRssMb} MB with children) | ${rg_.idleTreeRssMb == null ? 'not measured' : `${rg_.idleTreeRssMb} MB MCP server with the default buffer pool (${rg_.rssAfterQueriesMb} MB right after the queries)`} |`);
   L.push(`| CPU while idle, 30 s | ${rc.idleCpuMsPer30s} ms | ${rg_.idleCpuMsPer30s == null ? 'not measured' : `${rg_.idleCpuMsPer30s} ms`} |`);
   L.push(`| Files written into the repository checkout by indexing | ${rc.perRepo.map(p => `${p.repoWrites.files} (${p.repo})`).join(', ')} | ${rg_.perRepo.length ? rg_.perRepo.map(p => `${p.repoWrites.files} (${p.repo}: ${p.repoWrites.top.join(', ')})`).join(', ') : 'not measured'} |`);
   L.push(`| Index on disk | ${mbOf(rc.homeBytes)} (both repositories, whole home) | ${rg_.perRepo.length ? rg_.perRepo.map(p => `${p.repo} ${mbOf(p.homeBytes)}`).join(', ') : 'not measured'} |`);
