@@ -26,7 +26,7 @@ artifactName: CodeLoupe-${version}-${os}-${arch}.${ext}
 
 win:
   target: nsis
-  icon: installer/icon.png
+  icon: stage/icon.png
 nsis:
   # One click, per user: nothing to confirm and no administrator rights, the app starts when the install ends.
   oneClick: true
@@ -39,7 +39,7 @@ nsis:
 mac:
   target: dmg
   category: public.app-category.developer-tools
-  icon: installer/icon.png
+  icon: stage/icon.png
   # No certificate yet (CL-105): without this electron-builder looks for one in the keychain.
   identity: null
 
@@ -48,7 +48,7 @@ linux:
     - AppImage
     - deb
   category: Development
-  icon: installer/icon.png
+  icon: stage/icon.png
   # Not `codeloupe`: that is the CLI, which the bundle ships in resources/codeloupe/bin.
   executableName: codeloupe-desktop
   # A deb needs a maintainer address; this one is a placeholder that goes nowhere until the project has a contact.
