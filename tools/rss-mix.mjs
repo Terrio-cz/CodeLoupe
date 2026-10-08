@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Resident memory of the daemon after a mix of queries (CL-118): starts a throwaway daemon with the JVM flags of
-// `DaemonJvm` (and --jvm-opts on top), runs 50 queries in turn — find, outline, symbol, usages, calls callers and callees
+// `DaemonJvm` (and --jvm-opts on top; the parse worker is on, as in the daemon), runs 50 queries in turn — find, outline, symbol, usages, calls callers and callees
 // depth 3, context, grep, and `changes bodies` in a worktree with edits — and reports /status rssMb and heapMb after
 // the sequence, with the JVM's own accounting (jcmd VM.native_memory) when the JDK has jcmd.
 //
@@ -27,7 +27,7 @@ const java = javaHome ? path.join(javaHome, 'bin', windows ? 'java.exe' : 'java'
 const jcmd = javaHome ? path.join(javaHome, 'bin', windows ? 'jcmd.exe' : 'jcmd') : 'jcmd';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // The flags of DaemonJvm (cli/DaemonJvm.kt); keep in step.
-const DAEMON_JVM = ['-Xms16m', '-Xmx80m', '-Xmn10m', '-Xss512k', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10', '-XX:MaxHeapFreeRatio=30', '-XX:+UseCompactObjectHeaders',
+const DAEMON_JVM = ['-Xms16m', '-Xmx64m', '-Xmn10m', '-Xss512k', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10', '-XX:MaxHeapFreeRatio=30', '-XX:+UseCompactObjectHeaders',
   '-XX:TieredStopAtLevel=1', '-XX:ReservedCodeCacheSize=32m', '-XX:MaxMetaspaceSize=96m'];
 
 function git(cwd, ...a) {
