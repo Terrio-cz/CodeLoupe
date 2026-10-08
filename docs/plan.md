@@ -1034,6 +1034,25 @@ rozhoduje launcher.
   `Terrio` doplní `{"write": {"linkedWorktreesOnly": true}}` do vlastního `.codeloupe.json` (mimo tento repozitář); brána `auto` je bez transkriptů zavřená a výslovně se otevírá
   `write.mode: on`.
 
+### Výsledek CL-132 — jeden sken registru pro čtyři čtení Workspaces (2026-10-08)
+
+- `/workspaces` (bez `repo` a `size`), `/resources`, `/processes`, suchý běh `GET /reconcile` a `/ports` sdílejí jeden sken registru (`Workspaces.recent()`, okno `workspaces.recentScanMs`, výchozích
+  2 s; souběžná čtení čekají na běžící sken, nezačínají vlastní). `POST /reconcile/run`, plánovač a `workspaces/release` čtou registr i Docker vždy znovu; uvolnění a běh, který něco změnil, sdílený
+  sken zahodí (generace: sken, který v tu chvíli běžel, se neuloží). Test: adresář, který přibyl mezi dvěma čteními, je v `reconcile/run` vidět hned, ve sdíleném čtení až po oknu nebo po uvolnění.
+- **Měření** (jednorázový daemon, nový home, skutečné repozitáře: TerrioImporter 13 + CodeLoupe 52 workspaces = 65, Docker Engine běží, stroj zatížený ostatními okny; medián ze 6 kol, dvě nezávislé série
+  před / po, čtení přes `node` fetch se 3 s pauzou, aby každé kolo začalo čerstvým skenem; v době měření měl stroj 65 workspaců místo 40 z karty):
+
+  | | před (série 1 / 2) | po (série 1 / 2) |
+  |---|---|---|
+  | čtyři routy po sobě (součet) | 5,36 s / 4,34 s | 1,62 s / 1,59 s |
+  | `/workspaces`, `/resources`, `/reconcile`, `/ports` po sobě | 1,0 / 1,2 / 1,8 / 1,3 s; 0,96 / 0,93 / 1,39 / 1,03 s | 0,82 / 0,12 / 0,50 / 0,17 s; 0,84 / 0,12 / 0,48 / 0,17 s |
+  | všechny čtyři naráz (stěna) | 2,25 s / 1,64 s | 1,37 s / 1,49 s |
+  | první čtení po startu (čtyři naráz, stěna) | 2,45 s / 3,22 s | 2,26 s / 2,08 s |
+
+  Sken sám stojí ~12 ms na worktree (CodeLoupe 52 worktrees 0,75 s, TerrioImporter 13 worktrees 0,18 s) a zbývá jako nejdelší část; za ním čeká `GET /reconcile` ještě na čtení tabulky procesů
+  (~0,45 s), které na skenu nezávisí. Čtyři čtení tedy stojí jeden sken místo čtyř (součet −70 %), stěna při souběhu klesla o 15–40 %, ale pod 1,2 s se na 65 workspacech nedostala.
+  Dál se nezrychlovalo (paralelní sken worktrees, souběh čtení procesů se skenem) bez dalšího měření; první čtení po startu zůstává o vteřiny delší (zahřívá JGit a historii úkolů).
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

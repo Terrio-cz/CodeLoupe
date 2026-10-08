@@ -448,6 +448,11 @@ no `git` process runs. The first call in a repository waits for the scan of its 
 Repositories also come from a tracker's `repos` and from the repositories the daemon has served; `<repo name>-worktrees`
 beside a repository is always a root.
 
+The read-only routes that need the registry (`/workspaces` without `repo` and `size`, `/resources`, `/processes`, the dry run `GET /reconcile`,
+`/ports`) share one scan for `workspaces.recentScanMs` (default 2000, 0 = every read scans for itself), so the desktop app's Workspaces
+screen, which asks four of them at once, costs one scan. What decides something never uses it: `POST /reconcile/run`, the reconcile
+scheduler and a release read the registry and Docker afresh, and a release or a run that changed something drops the shared scan.
+
 ### Docker resources
 
 Every container, image, volume and network that is made through CodeLoupe carries three labels naming its owner:
