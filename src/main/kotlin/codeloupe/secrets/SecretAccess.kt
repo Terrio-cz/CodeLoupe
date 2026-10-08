@@ -6,10 +6,13 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.security.SecureRandom
 
 /** The daemon's handle on the vault: opened on first use (an OS key store probe is not free), and the reason when it cannot be. */
-class SecretAccess(private val home: Path, private val env: Map<String, String> = System.getenv(), preset: SecretStore? = null) {
+class SecretAccess(private val home: Path, private val env: Map<String, String> = System.getenv(), preset: SecretStore? = null, val rotationDays: Int = 0) {
     private val opened: Result<SecretStore> by lazy { preset?.let { Result.success(it) } ?: runCatching { SecretStore.open(home, env) } }
 
     val vaultFile: Path = home.resolve("secrets").resolve("vault.env")
+
+    /** The audit of reads and changes; it lives beside the vault and holds no value. */
+    val audit = SecretAudit(home.resolve("secrets").resolve("audit.log"))
     private val tokenFile: Path = home.resolve("secrets").resolve("api-token.env")
 
     val store: SecretStore? get() = opened.getOrNull()

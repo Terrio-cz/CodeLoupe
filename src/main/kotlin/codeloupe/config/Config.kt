@@ -19,4 +19,5 @@ data class Config(
     val workspaces: WorkspacesConfig = WorkspacesConfig(),
     val metrics: MetricsConfig = MetricsConfig(),
     val budgets: BudgetsConfig = BudgetsConfig(),
+    val secrets: SecretsConfig = SecretsConfig(),
 )
