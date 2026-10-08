@@ -1,0 +1,59 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file://home/dev/.gradle/wrapper/dists/gradle-9.6.0-bin/42k10rwplmzkhuboz9kdazi7s/gradle-9.6.0/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :compileKotlin UP-TO-DATE
+> Task :compileJava NO-SOURCE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :jar UP-TO-DATE
+> Task :processTestResources
+> Task :compileTestKotlin
+> Task :compileTestJava NO-SOURCE
+> Task :testClasses
+
+> Task :test FAILED
+
+TmpFailTest > names match() FAILED
+    org.opentest4j.AssertionFailedError: expected: <alpha> but was: <beta>
+        at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+        at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+        at app//org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+        at app//org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+        at app//org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1156)
+        at app//kotlin.test.junit5.JUnit5Asserter.assertEquals(JUnitSupport.kt:32)
+        at app//kotlin.test.AssertionsKt__AssertionsKt.assertEquals(Assertions.kt:83)
+        at app//kotlin.test.AssertionsKt.assertEquals(Unknown Source)
+        at app//kotlin.test.AssertionsKt__AssertionsKt.assertEquals$default(Assertions.kt:82)
+        at app//kotlin.test.AssertionsKt.assertEquals$default(Unknown Source)
+        at app//codeloupe.TmpFailTest.names match(TmpFailTest.kt:14)
+
+TmpFailTest > totals add up() FAILED
+    org.opentest4j.AssertionFailedError: expected: <[1, 2, 3]> but was: <[1, 2, 3, 4]>
+        at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+        at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+        at app//org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+        at app//org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+        at app//org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1156)
+        at app//kotlin.test.junit5.JUnit5Asserter.assertEquals(JUnitSupport.kt:32)
+        at app//kotlin.test.AssertionsKt__AssertionsKt.assertEquals(Assertions.kt:83)
+        at app//kotlin.test.AssertionsKt.assertEquals(Unknown Source)
+        at app//kotlin.test.AssertionsKt__AssertionsKt.assertEquals$default(Assertions.kt:82)
+        at app//kotlin.test.AssertionsKt.assertEquals$default(Unknown Source)
+        at app//codeloupe.TmpFailTest.totals add up(TmpFailTest.kt:9)
+
+3 tests completed, 2 failed
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:////home/dev/IdeaProjects/codeloupe-worktrees/CL-92/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 3s
+6 actionable tasks: 3 executed, 3 up-to-date

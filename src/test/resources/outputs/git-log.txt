@@ -1,0 +1,189 @@
+commit 489b6122f76d33bc1a8b33549d5084a6044815c7
+Merge: 3c249da b47383f
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:33:56 2026 +0200
+
+    Merge remote-tracking branch 'origin/main' into CL-92
+
+commit 3c249da172580b8e8ea3a1890bdd05f5dca352a2
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:33:55 2026 +0200
+
+    CL-92 add replay to plan past work from the files it landed
+
+commit b47383fc9e35a8372b01562a8e837913fcde74ef
+Merge: a9f882f 3194702
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:31:59 2026 +0200
+
+    Merge remote-tracking branch 'origin/main' into CL-39
+
+commit 0dfa31a6a55219bac993d0f29c3b322640790bf5
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:31:46 2026 +0200
+
+    CL-92 document dispatch_plan
+
+commit b75714714316b560649fad43f33db3e5309302a7
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:31:35 2026 +0200
+
+    CL-92 add dispatch_plan: touch sets vs live worktrees, windows with the shared code
+
+commit a9f882fbd5c52bebcc12f3a23ae44feebb8605fb
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:23:16 2026 +0200
+
+    CL-39 record the worktree of a call as git spells its path
+
+commit 319470232daf36d714444ddaa3db14d6f970e904
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:19:40 2026 +0200
+
+    CL-93 keep the pack's declarations to the task's own files, without private members
+
+commit 15ecd53dcafeea16eb9ba16fc8ad212fd672789d
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:15:32 2026 +0200
+
+    CL-93 index errors only in outputs, not in markdown prose
+
+commit 88342bd95911f967bd193aafd50502f512ada637
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:12:59 2026 +0200
+
+    CL-39 add the read-only UI API in the daemon: nav, overview, worktrees, tasks, index, gaps, environment, settings, events
+
+commit 8a5d55c025aaf679430dbaa3fe035f287915f34a
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:10:03 2026 +0200
+
+    CL-93 document the doc and task_context tools
+
+commit fe9fc9b4cbab4deaa0913afee2b09c6c5305d999
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 16:09:08 2026 +0200
+
+    CL-93 add the shared document layer and the doc and task_context tools
+
+commit 8ac7015652c8f7181c013978bec80b4678f2bd33
+Merge: f370022 cb1ee5b
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:50:04 2026 +0200
+
+    Merge remote-tracking branch 'origin/main' into CL-106
+
+commit f370022024d544549cd94e4568745d29b90de5cf
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:33:58 2026 +0200
+
+    CL-106 run the tools tests by file name
+
+commit cb1ee5b829d1fee4788f4614ea232b9472d8532b
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:30:52 2026 +0200
+
+    CL-122 let ws up pass compose --env-file and --project-directory
+
+commit 8f8c13b1cc60a1341b8b206fd4a8cf73f972f715
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:23:53 2026 +0200
+
+    CL-94 count a hit only when its title shares the draft's words, filter by project
+
+commit a5f2c08ea7d3efe75ba4368940df6628236cb519
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:21:17 2026 +0200
+
+    CL-106 add the release workflow: tag to installers, checksums, SBOMs, notes and a draft release
+
+commit 89a0b25f360c0da501b0d412b034c307bc43a05f
+Merge: dcaadbe 21ab8e5
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:15:32 2026 +0200
+
+    Merge remote-tracking branch 'origin/main' into CL-94
+
+commit 21ab8e5dc4fcd3e330172c20eedf165afad809bc
+Merge: 199588e da93156
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:15:16 2026 +0200
+
+    Merge remote-tracking branch 'origin/main' into CL-19
+
+commit 199588e91a18f862ab2d8f6f521dd10b82195032
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:15:15 2026 +0200
+
+    CL-19 add the ranked repository map to outline
+
+commit da93156941fd22510acd74c0d5dd944b7963bf46
+Merge: 7ff2622 e6ab2b2
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:12:31 2026 +0200
+
+    Merge remote-tracking branch 'origin/main' into CL-108
+
+commit dcaadbe3c40c071e2acc6cc6445b0834afca24dd
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:12:31 2026 +0200
+
+    CL-94 add similar: tasks of the mirror that match a draft issue, by full text
+
+commit 7ff26227c3704a9e0898484f37fcce936d1ab7bc
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:03:57 2026 +0200
+
+    CL-120 document the macOS x64 installer in the README
+
+commit e53caeb4bad673b82d037c9f03bf85de52d6e7e2
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 15:03:57 2026 +0200
+
+    CL-110 record the CI cost estimate and decisions, drop the electron download cache
+
+commit e6ab2b26c780d1f324c73c8fafaaf3d1cd3cd6b6
+Merge: 2edd4f8 ed9b06e
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 14:56:23 2026 +0200
+
+    Merge remote-tracking branch 'origin/main' into CL-21
+
+commit 2edd4f862aeef240b670a2c27b2ea80deaf5e1f5
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 14:55:48 2026 +0200
+
+    CL-21 document codeloupe metrics, the gap report and the scaffold no-go
+
+commit 1fb84c0831a16a13b323e620ae17b6de471c8c0f
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 14:55:48 2026 +0200
+
+    CL-35 add codeloupe metrics boilerplate to measure the skeleton share of new files
+
+commit 0cff359deef2c4d5dbcbab31a1da68b6fec7055f
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 14:55:48 2026 +0200
+
+    CL-22 add codeloupe metrics gaps, the weekly gap report
+
+commit 7b67597de5cf10647fd9c8577a6aea348d9a3d2a
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 14:55:47 2026 +0200
+
+    CL-21 add codeloupe metrics collect and compare, read from Claude Code transcripts
+
+commit ac52f9c75babe3439b0abc6c2f707369f95e694f
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 14:52:20 2026 +0200
+
+    CL-108 take the Linux screenshot with ImageMagick installed on the runner
+
+commit c5c8d7f85af2b859836936eec5a93595c66b082b
+Author: Dev <dev@example.com>
+Date:   Thu Oct 8 14:41:14 2026 +0200
+
+    CL-108 add installer smoke tests: install, start the app, query through the CLI and MCP, uninstall
+    
+    Also builds the macOS x64 installer on an Intel runner (CL-120) and caches the
+    electron-builder downloads (CL-110).

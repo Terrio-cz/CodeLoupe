@@ -1,0 +1,36 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file://home/dev/.gradle/wrapper/dists/gradle-9.6.0-bin/42k10rwplmzkhuboz9kdazi7s/gradle-9.6.0/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :compileKotlin UP-TO-DATE
+> Task :compileJava NO-SOURCE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :jar UP-TO-DATE
+
+> Task :compileTestKotlin FAILED
+e: file:////home/dev/IdeaProjects/codeloupe-worktrees/CL-92/src/test/kotlin/codeloupe/TmpFailTest.kt:4:25 Unresolved reference 'unknownName'.
+e: file:////home/dev/IdeaProjects/codeloupe-worktrees/CL-92/src/test/kotlin/codeloupe/TmpFailTest.kt:5:27 Unresolved reference 'missing'.
+
+[Incubating] Problems report is available at: file:////home/dev/IdeaProjects/codeloupe-worktrees/CL-92/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileTestKotlin' (registered by plugin 'org.jetbrains.kotlin.jvm').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Kotlin compiler: UNRESOLVED_REFERENCE
+       Kotlin compiler error
+         Unresolved reference 'unknownName'.
+         Location: /home/dev/IdeaProjects/codeloupe-worktrees/CL-92/src/test/kotlin/codeloupe/TmpFailTest.kt line 4
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2s
+4 actionable tasks: 1 executed, 3 up-to-date
