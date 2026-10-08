@@ -526,9 +526,15 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   (pool bez `shrink_memory` 208–234 MB). Teplé dotazy 132–138 MB.
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
-  Globální `core.excludesFile` se neprojeví až do nové báze nebo hromadné změny — za běhu jako dosud, nově i po
-  restartu (snapshot ho nehlídá); `git add -f` / `git rm --cached` za běhu daemonu stejně. Snapshot se přepisuje celý i
-  po každé obnově indexu (IDE), synchronně pod zámkem worktree.
+  Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.
+- CL-111: stav gitu (`ScanSnapshot.gitState`) nově razítkuje globální excludes (`core.excludesFile` z `~/.gitconfig`,
+  `$XDG_CONFIG_HOME/git/config` a configu repozitáře, jinak `$XDG_CONFIG_HOME/git/ignore`; čte se ze souborů, bez
+  procesu) a počet záznamů indexu z jeho 12bajtové hlavičky. Změna jednoho z nich zabije snapshot po restartu i
+  vynutí reconcile za běhu; razítko indexu samotné dál ne (IDE ho přepisuje pořád, počet záznamů se tím nemění).
+  Cena: čtení tří malých configů a hlavičky indexu při každé kontrole, v profilu bez rozdílu (teplý dotaz 5,2 / 60,8 ms
+  před 5,1 / 74,1, nezměněný worktree 48,6 / 52,1 ms před 46,9 / 53,4, 0 git procesů). Mez: `git add` běžného
+  nového souboru počet záznamů mění také, takže stojí jeden reconcile (150–300 ms); přidání a odebrání ve stejné
+  chvíli (stejný počet) a `core.excludesFile` v `include`d configu se neprojeví do dalšího reconcile.
 - Opraveno cestou: `MergeBases` otevíral DB merge-base zapisovatelně jen kvůli čtení — souběžný zápis dával
   `SQLITE_BUSY`, čerstvě založený soubor bez schématu „no such table“ (`ChangesTest` souběh dvou worktree).
 - Testy: 74 (nově `GitLayoutTest`, `GitObjectsTest` — refy, merge-base, bloby jako git, žádný proces, chybějící blob a
