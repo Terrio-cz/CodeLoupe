@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const BOT = { name: 'github-actions[bot]', email: '41898282+github-actions[bot]@users.noreply.github.com' };
-const MISSING = /repository .*not found|does not appear to be a git repository/i;
+const MISSING = /repository .*(not found|does not exist)|does not appear to be a git repository/i;   // wording differs between git versions
 
 export class PublishError extends Error {}
 
