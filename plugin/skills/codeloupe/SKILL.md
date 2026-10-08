@@ -15,6 +15,7 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 |---|---|---|
 | Where is `X` declared | `find` (`q` = name, `Type.member` or glob; `kind`, `module`, `test` narrow) | `grep -r "class X"` |
 | A string literal, SQL, annotation argument or config key written in code | `grep` (`pattern`, literal unless `regex=true`; hits grouped by enclosing declaration) | `rg` and reading around each hit |
+| Orientation in a repository you do not know | `outline` without `target` (ranked map of files and types within `budget` tokens; `focus` = the files or symbols you work on) | `ls`, `find`, reading directory after directory |
 | What is in this file or type | `outline` (`target` = path or type; members with line ranges, no bodies) | reading the file |
 | The source of one declaration | `symbol` (`name`; KDoc, annotations, body; a large type collapses to header + members) | reading the file and scrolling |
 | Before changing `X`: its source, callers and callees | `context` (`name`; one call instead of `symbol` + `calls` twice) | three separate calls |
@@ -25,10 +26,11 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 | Which task touched this code, or which code a task touched | `task_code` (`query` = a task id, a declaration or a path) | `git log --grep` and guessing |
 | Read an issue | `issue` (`id`; `view=brief` first, then `sections=[…]`) | opening the tracker |
 | Find or plan tasks | `tasks` (`mode=list` with a query, `graph`, `ready`, `progress`) | tracker search by hand |
+| Before creating an issue | `similar` (`summary`, `description`: tasks that already talk about it; extend or link one instead of a duplicate) | creating first, finding the duplicate later |
 | Change an issue's state or add a comment | `update` (`id`, `set={State: …}`, `comment`) | the tracker's UI |
 | A test or build that takes a while | `job` (`action=start`, `command` = argv array, `cwd`, `slot` for shared resources; then `action=status`) | a blocking shell call |
 
-`issue`, `tasks` and `update` work only when a tracker is configured for the daemon; `task_code` also works without one
+`issue`, `tasks`, `similar` and `update` work only when a tracker is configured for the daemon; `task_code` also works without one
 (it reads the default branch's history).
 
 ## Working rules

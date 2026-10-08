@@ -19,12 +19,23 @@ class ComposeUp(
 ) {
     /**
      * [files] are compose files (default: `COMPOSE_FILE`, else the usual names in [dir]); [project] defaults to repo and
-     * workspace; [extra] are the arguments of `up` (default `-d`). Answers the exit code, or [UNLABELED].
+     * workspace; [extra] are the arguments of `up` (default `-d`); [envFiles] and [projectDirectory] are compose's own
+     * `--env-file` and `--project-directory`. Answers the exit code, or [UNLABELED].
      */
-    fun up(dir: Path, ownership: Ownership, files: List<String>, project: String?, profiles: List<String>, extra: List<String>): Int {
+    fun up(
+        dir: Path,
+        ownership: Ownership,
+        files: List<String>,
+        project: String?,
+        profiles: List<String>,
+        extra: List<String>,
+        envFiles: List<String> = emptyList(),
+        projectDirectory: String? = null,
+    ): Int {
         val base = baseFiles(dir, files)
         val name = project ?: projectName(ownership)
-        val scope = base.flatMap { listOf("-f", it) } + listOf("-p", name) + profiles.flatMap { listOf("--profile", it) }
+        val global = envFiles.flatMap { listOf("--env-file", it) } + listOfNotNull(projectDirectory?.let { "--project-directory" }, projectDirectory)
+        val scope = global + base.flatMap { listOf("-f", it) } + listOf("-p", name) + profiles.flatMap { listOf("--profile", it) }
         val config = cli.capture(listOf("compose") + scope + listOf("config", "--format", "json"), dir)
         if (config.exit != 0) return config.exit
         val override = ComposeOverride.build(JsonFormat.json.parseToJsonElement(config.stdout).jsonObject, ownership)
@@ -32,7 +43,7 @@ class ComposeUp(
         try {
             // JSON is YAML, and compose reads it as such.
             Files.writeString(overrideFile, override.toString())
-            val exit = cli.run(listOf("compose") + base.flatMap { listOf("-f", it) } + listOf("-f", overrideFile.toString(), "-p", name) +
+            val exit = cli.run(listOf("compose") + global + base.flatMap { listOf("-f", it) } + listOf("-f", overrideFile.toString(), "-p", name) +
                 profiles.flatMap { listOf("--profile", it) } + listOf("up") + extra.ifEmpty { listOf("-d") }, dir)
             return if (exit == 0) verify(name, ownership) else exit
         } finally {
