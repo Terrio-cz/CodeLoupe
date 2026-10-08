@@ -57,6 +57,41 @@ internal object OverlayPlanner {
         return change(state, target, scan, prune, ignored, ignoreFiles, baseCommit, previous, unchanged)
     }
 
+    /** Whether the base indexes more files than a worktree walk should be asked to stamp on every query. */
+    fun isLarge(baseFile: Path, limit: Int): Boolean = BaseFiles(baseFile).use { it.count() } > limit
+
+    /**
+     * The check of a large worktree: git alone says what differs from [baseCommit] (tracked changes and untracked files; it
+     * uses its index stat cache, and the file system monitor when the user enabled `core.fsmonitor`), and only those files
+     * are stamped. Nothing is walked and no stamp of an unchanged file is kept: memory follows the changes, not the repository.
+     */
+    fun viaGit(state: OverlayState, baseCommit: String, baseFile: Path, previous: Path? = null): OverlayChange {
+        val worktree = state.worktree
+        val differing = Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+            val changed = CompletableFuture.supplyAsync({ WorktreeGit.changedSince(worktree, baseCommit) }, executor)
+            val untracked = CompletableFuture.supplyAsync({ WorktreeGit.untracked(worktree) }, executor)
+            (changed.get() + untracked.get()).filterTo(HashSet()) { Languages.languageOf(it) != null }
+        }
+        val target = HashMap<String, Stamp>()
+        val missing = ArrayList<String>()
+        BaseFiles(baseFile).use { base ->
+            for (path in differing) {
+                val stamp = stamp(Path.of(worktree, path))
+                if (stamp != null) target[path] = stamp else if (base.has(path)) missing += path
+            }
+        }
+        val sparse = WorktreeGit.skipWorktree(worktree, missing)
+        for (path in missing) if (path !in sparse) target[path] = Stamp.MISSING
+        return change(state, target, emptyMap(), emptySet(), emptySet(), emptyMap(), baseCommit, previous, emptySet())
+    }
+
+    private fun stamp(file: Path): Stamp? = try {
+        val attrs = Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes::class.java)
+        if (attrs.isRegularFile) Stamp(attrs.lastModifiedTime().to(java.util.concurrent.TimeUnit.MICROSECONDS), attrs.size()) else null
+    } catch (_: IOException) {
+        null
+    }
+
     /** Null when no stamp moved since the last check. [state] must be relative to [baseCommit]. */
     fun incremental(state: OverlayState, baseCommit: String, baseFile: Path): OverlayChange? {
         val walk = WorktreeScan.scan(Path.of(state.worktree), state.prune)

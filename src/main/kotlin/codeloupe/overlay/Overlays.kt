@@ -45,6 +45,8 @@ class Overlays(
     private val launcher: BuildLauncher,
     private val waitMs: Long,
     checkMs: Long,
+    /** Indexed files above which a worktree is checked through git alone. */
+    private val largeFiles: Int = Int.MAX_VALUE,
     /** Called before an overlay file is deleted, so nothing keeps it open. */
     private val release: (Path) -> Unit,
     private val log: (String) -> Unit,
@@ -100,7 +102,7 @@ class Overlays(
         val view = state.view ?: return null
         val (previousCommit, previousFile) = synchronized(repo) { repo.previousCommit to repo.previousFile }
         if (previousFile == null || view.base != previousCommit || view.base == baseCommit || !previousFile.exists()) return null
-        if (state.mustCheck || state.running?.isActive == true) return null
+        if (state.mustCheck || state.running?.isActive == true || state.large) return null
         // The walk costs what a check costs; no lock, so it does not wait for the re-derivation that holds it.
         val walk = Timings.measure(TimedPart.CHECK) { WorktreeScan.scan(Path.of(worktree), state.prune) }
         if (walk.sources != state.scan || walk.ignoreFiles != state.ignoreFiles || state.view !== view) return null
@@ -179,6 +181,14 @@ class Overlays(
         if (state.base == null) {
             load(state)
             restore(state, gitState)
+        }
+        if (state.largeFor != baseCommit) {
+            state.large = OverlayPlanner.isLarge(baseFile, largeFiles)
+            state.largeFor = baseCommit
+        }
+        if (state.large) {
+            val previous = synchronized(repo) { repo.previousFile?.takeIf { state.base != null && repo.previousCommit == state.base } }
+            return OverlayPlanner.viaGit(state, baseCommit, baseFile, previous?.takeIf { it.exists() }).copy(gitState = gitState)
         }
         // A checkout or new exclude rules change what git ignores without touching a source file: git settles that.
         if (state.base == baseCommit && !ScanSnapshot.rulesMoved(state.gitState, gitState)) {

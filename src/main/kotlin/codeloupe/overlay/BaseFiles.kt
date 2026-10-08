@@ -14,6 +14,9 @@ internal class BaseFiles(file: Path) : AutoCloseable {
         s.executeQuery("SELECT path FROM files").use { rs -> buildSet { while (rs.next()) add(rs.getString(1)) } }
     }
 
+    /** How many files the base indexes. */
+    fun count(): Int = db.createStatement().use { s -> s.executeQuery("SELECT count(*) FROM files WHERE deleted = 0").use { it.next(); it.getInt(1) } }
+
     fun has(path: String): Boolean {
         exists.setString(1, path)
         return exists.executeQuery().use { it.next() }

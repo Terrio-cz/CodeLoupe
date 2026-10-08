@@ -576,6 +576,16 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   landu (autorův overlay už soubory naparsoval; `BuildResult.reused`) i při obnově overlaye. Už dřív platilo: sync báze
   parsuje jen změněné bloby (≤ 20 souborů při změně 20 souborů), soubor worktree shodný s bází nevstoupí do overlaye (porovnání
   textu) a soubor nedotčený od předchozí báze se kopíruje z ní. `Extraction.parsed` počítá parsy v procesu (testy, telemetrie).
+- CL-79: repozitář s víc než `largeWorktreeFiles` (40 000) indexovanými soubory se kontroluje jen přes git (`OverlayPlanner.viaGit`):
+  `git diff --name-only <báze>` + `ls-files --others` (stat cache indexu, případně `core.fsmonitor` / `core.untrackedCache`,
+  které si zapne uživatel), razítko se bere jen změněným souborům; worktree se neprochází a `scan` zůstává prázdný, takže paměť
+  roste se změnami, ne s repozitářem (150 B × 200 000 × 2 mapy × až 16 worktrees = přes 600 MB; průchod 200k souborů
+  u staré cesty skončil `Java heap space`). Rozhodnutí se dělá jednou za bázi z počtu souborů báze. Měřeno `tools/large-worktree.mjs`
+  na syntetickém repozitáři 200 000 souborů (`git fast-import`, 24 jader, Git for Windows s `core.fscache`, bez fsmonitoru): dotaz po
+  pauze p50 153 / p95 168 ms, první dotaz v novém worktree 223 ms, editace viditelná v dalším dotazu (481 ms), RSS 137 MB,
+  0 s CPU za 20 s v klidu, build báze 27 s. Malé repozitáře (Terrio, 2 200 zdrojů) jedou po staré cestě beze změny. Ztráta:
+  soubor, který se liší od báze jen konci řádků, se v tomto režimu nepozná porovnáním textu (git ho ale při `autocrlf` většinou
+  za změněný nepovažuje); rychlé čtení z předchozí báze po landu (CL-124) se pro velké repozitáře nepoužije (stál by průchod).
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
   Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.
