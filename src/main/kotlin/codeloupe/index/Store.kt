@@ -12,7 +12,7 @@ object Store {
     const val SCHEMA_VERSION = 2
 
     /** Schema and extractor of an index; bump the extractor part whenever the facts of a file can change. */
-    const val FORMAT = "$SCHEMA_VERSION/kotlin-java-psi-5"
+    const val FORMAT = "$SCHEMA_VERSION/kotlin-java-psi-6"
 
     private val SCHEMA = listOf(
         "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)",
@@ -27,6 +27,8 @@ object Store {
         """CREATE TABLE IF NOT EXISTS refs (
   file_id INTEGER NOT NULL, name TEXT NOT NULL, line INTEGER, col INTEGER, kind TEXT, recv TEXT, decl_id INTEGER,
   bind TEXT, recv_type TEXT, args INTEGER)""",
+        // Words per declaration for `find mode=search` (stems only, no text); rowid = decls.id. Column order: SearchColumns.
+        "CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(name, ctx, sig, doc, path, content = '', contentless_delete = 1, tokenize = 'unicode61')",
         "CREATE INDEX IF NOT EXISTS decls_name ON decls(name)",
         "CREATE INDEX IF NOT EXISTS decls_file ON decls(file_id)",
         "CREATE INDEX IF NOT EXISTS refs_name ON refs(name)",

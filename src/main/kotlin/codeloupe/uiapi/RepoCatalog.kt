@@ -16,7 +16,7 @@ internal data class RepoRef(val id: String, val name: String, val path: String, 
 internal class RepoCatalog(private val registry: Registry, private val workspaces: Workspaces) {
     private val scan = Cached<WorkspaceList>(SCAN_TTL_MS)
 
-    suspend fun scan(): WorkspaceList = scan.get { workspaces.list() }
+    suspend fun scan(): WorkspaceList = scan.get { workspaces.recent() }
 
     suspend fun repos(): List<RepoRef> {
         val seen = LinkedHashMap<String, RepoRef>()

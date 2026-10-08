@@ -71,7 +71,7 @@ class UiApi(
 
     suspend fun index(): IndexHealth = index.health()
 
-    suspend fun runs(range: String?, sort: String?, role: String?, q: String?, limit: String?, cursor: String?): RunPage = runViews.page(range, sort, role, q, limit, cursor)
+    suspend fun runs(range: String?, sort: String?, role: String?, q: String?, ter: String?, limit: String?, cursor: String?): RunPage = runViews.page(range, sort, role, q, ter, limit, cursor)
 
     suspend fun run(id: String): RunDetail = runViews.detail(id)
 

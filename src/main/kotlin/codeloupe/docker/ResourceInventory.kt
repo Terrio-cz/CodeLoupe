@@ -35,7 +35,7 @@ class ResourceInventory(private val config: Config, private val workspaces: Work
         } catch (e: Exception) {
             return@withContext ResourceReport(IsoTime.now(), api.address, problems = listOf("${api.address}: ${e.message.orEmpty().lineSequence().first()}"))
         }
-        val list = registry ?: workspaces.list()
+        val list = registry ?: workspaces.recent()
         problems += list.problems
         val states = HashMap<Pair<String, String>, WorkspaceState>()
         for (repo in list.repos) for (workspace in repo.workspaces) states[repo.name.lowercase() to workspace.name.lowercase()] = workspace.state

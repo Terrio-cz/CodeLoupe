@@ -20,6 +20,17 @@ import kotlin.io.path.name
  * tracker mirror. Nothing is written, deleted or synced; a stray directory is only reported.
  */
 class Workspaces(private val config: Config, private val registry: Registry, private val trackers: Trackers) {
+    private val shared = RecentScan(config.workspaces.recentScanMs)
+
+    /**
+     * [list] of every known repository without sizes, shared for a short window between the reads that come together
+     * (the Workspaces screen asks four routes at once). Only for read-only answers: a decision reads [list].
+     */
+    suspend fun recent(): WorkspaceList = shared.get { list() }
+
+    /** Forgets the shared scan: a workspace changed (released, cleaned up). */
+    fun invalidate() = shared.invalidate()
+
     /** All known repositories, or just the one at [repo] (any path inside it). [withSize] sums every directory's files. */
     suspend fun list(repo: String? = null, withSize: Boolean = false): WorkspaceList = withContext(Dispatchers.IO) {
         val problems = ArrayList<String>()

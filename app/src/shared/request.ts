@@ -37,7 +37,7 @@ const SPECS: Record<Resource, ResourceSpec> = {
   'environment/audit': ui('environment/audit', ['name', 'scope', 'limit']),
   settings: ui('settings'),
   events: ui('events', ['since', 'limit']),
-  runs: ui('runs', ['range', 'sort', 'role', 'q', 'limit', 'cursor']),
+  runs: ui('runs', ['range', 'sort', 'role', 'q', 'ter', 'limit', 'cursor']),
   'runs/:id': ui('runs/:id'),
   'runs/:id/steps': ui('runs/:id/steps', ['sort', 'limit', 'cursor']),
   'status/history': daemon('/status/history'),

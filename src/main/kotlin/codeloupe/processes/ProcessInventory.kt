@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 class ProcessInventory(private val workspaces: Workspaces, private val source: ProcessSource = SystemProcesses()) {
     /** [registry]: the workspace list to join with, when the caller has read it already. */
     suspend fun report(registry: WorkspaceList? = null): ProcessReport = withContext(Dispatchers.IO) {
-        val list = registry ?: workspaces.list()
+        val list = registry ?: workspaces.recent()
         val processes = try {
             source.read()
         } catch (e: Exception) {

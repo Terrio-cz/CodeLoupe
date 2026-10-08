@@ -1063,6 +1063,48 @@ rozhoduje launcher.
   Zbytek (hook typu `http` bez procesu) je v nové kartě.
 - **Rozhodnutí**: výchozí `advise` (nic se neodmítá); soubory nové na větvi, které ještě nejsou v bázi, se berou jako neindexované.
 
+### Výsledek CL-137 — vyhledávání pojmů nad deklaracemi (2026-10-08)
+
+- **Rozhodnutí**: `find mode=search` (nebo `q` s mezerou, bez závorky), nový nástroj nepřibyl (14). Index slov je tabulka `search` ve
+  storu fakt (SQLite FTS5, `content=''`, `contentless_delete=1`, rowid = `decls.id`), plněná v `StoreWriter` i `StoreCopier`, takže se
+  obnovuje s fakty i s overlayi worktree (`Store.FORMAT` → `psi-6`, starý index se přestaví). Do indexu jdou kmeny slov: jméno
+  (camelCase/snake_case), kontejner a jméno souboru, signatura (bez klíčových slov), KDoc/Javadoc (prvních 60 slov), adresáře (jen u typů
+  a top-level deklarací). Nedokumentované členy typu (parametry konstruktoru, pole) a lokální deklarace se nevedou: hledají se jménem.
+- **Pořadí**: FTS5 `bm25` vybere 60 kandidátů z báze a 60 z overlaye, pak je skóruje Kotlin jedním vzorcem a s řídkostí slov z báze
+  (overlay má vlastní statistiku zkreslenou malým počtem řádků): váhy jméno 3, kontejner 1, KDoc 1,3, signatura 0,7, adresář 0,5, bonus za
+  shodu všech slov, typy ×1,15, vlastnosti ×0,85, testy ×0,85, mírný bonus za počet odkazů na jméno. Slovo, které je začátkem druhého
+  (`detect`/`detector`, `config`/`configuration`, ≥ 4 znaky), se počítá za 0,6–0,7. Kmeny: vlastní lehký stemmer (množné číslo, `-ed`,
+  `-ing`, koncové `e`), stejný při indexaci i dotazu; FTS5 `porter` nešel, protože skórování v Kotlinu potřebuje stejné tokeny.
+- **Přesnost@5**: Terrio **20/20 = 100 %** (dotazy napsané z KDoc skutečných tříd, 4× na místě 2–3), CodeLoupe **18/20 = 90 %** (test
+  `SearchPrecisionTest`, otázky v `src/test/resources/search/codeloupe-questions.tsv`). Chybí `ReposAddCommand` („repository“ vs. `repos`)
+  a `Scrubber` („scrub“ vs. KDoc „masks“): shoda slov, ne významu. Otázky psal autor s KDoc po ruce, 100 % je tedy horní odhad.
+  Skript: `node tools/search-eval.mjs --repo <repo> --questions <soubor>`.
+- **Velikost a čas** (TerrioImporter, 2 212 souborů): index báze **61,7 → 63,9 MB (+3,5 %)**; plný build v střídavém A/B po 5 měřeních
+  (medián) **5,57 s → 5,67 s (+2 %)**, vlastní zpracování slov a zápis FTS 0,39–0,49 s (7–8 % buildu; stroj byl vytížený, jednotlivé běhy
+  4,6–8,3 s). První verze, která ukládala texty sloupců, dala +11 % velikosti. `bm25()` u bezobsahové tabulky vrací 0 s `detail=column`,
+  proto výchozí `detail=full`.
+- **Kontext**: definice nástroje `find` v `tools/list` 919 → 1 078 znaků (+159, ≈ 50 tokenů při 3,16 znaku/token; 1,2 % ze 13 047 znaků
+  všech 14 nástrojů). Dotaz přes CLI trvá stejně jako hledání jménem (1,85–1,97 s na vytíženém stroji, téměř vše je start JVM CLI).
+
+### Výsledek CL-132 — jeden sken registru pro čtyři čtení Workspaces (2026-10-08)
+
+- `/workspaces` (bez `repo` a `size`), `/resources`, `/processes`, suchý běh `GET /reconcile` a `/ports` sdílejí jeden sken registru (`Workspaces.recent()`, okno `workspaces.recentScanMs`, výchozích
+  2 s; souběžná čtení čekají na běžící sken, nezačínají vlastní). `POST /reconcile/run`, plánovač a `workspaces/release` čtou registr i Docker vždy znovu; uvolnění a běh, který něco změnil, sdílený
+  sken zahodí (generace: sken, který v tu chvíli běžel, se neuloží). Test: adresář, který přibyl mezi dvěma čteními, je v `reconcile/run` vidět hned, ve sdíleném čtení až po oknu nebo po uvolnění.
+- **Měření** (jednorázový daemon, nový home, skutečné repozitáře: TerrioImporter 13 + CodeLoupe 52 workspaces = 65, Docker Engine běží, stroj zatížený ostatními okny; medián ze 6 kol, dvě nezávislé série
+  před / po, čtení přes `node` fetch se 3 s pauzou, aby každé kolo začalo čerstvým skenem; v době měření měl stroj 65 workspaců místo 40 z karty):
+
+  | | před (série 1 / 2) | po (série 1 / 2) |
+  |---|---|---|
+  | čtyři routy po sobě (součet) | 5,36 s / 4,34 s | 1,62 s / 1,59 s |
+  | `/workspaces`, `/resources`, `/reconcile`, `/ports` po sobě | 1,0 / 1,2 / 1,8 / 1,3 s; 0,96 / 0,93 / 1,39 / 1,03 s | 0,82 / 0,12 / 0,50 / 0,17 s; 0,84 / 0,12 / 0,48 / 0,17 s |
+  | všechny čtyři naráz (stěna) | 2,25 s / 1,64 s | 1,37 s / 1,49 s |
+  | první čtení po startu (čtyři naráz, stěna) | 2,45 s / 3,22 s | 2,26 s / 2,08 s |
+
+  Sken sám stojí ~12 ms na worktree (CodeLoupe 52 worktrees 0,75 s, TerrioImporter 13 worktrees 0,18 s) a zbývá jako nejdelší část; za ním čeká `GET /reconcile` ještě na čtení tabulky procesů
+  (~0,45 s), které na skenu nezávisí. Čtyři čtení tedy stojí jeden sken místo čtyř (součet −70 %), stěna při souběhu klesla o 15–40 %, ale pod 1,2 s se na 65 workspacech nedostala.
+  Dál se nezrychlovalo (paralelní sken worktrees, souběh čtení procesů se skenem) bez dalšího měření; první čtení po startu zůstává o vteřiny delší (zahřívá JGit a historii úkolů).
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
