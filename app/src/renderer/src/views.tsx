@@ -15,6 +15,6 @@ export const VIEWS: Record<Screen, (route: Route) => ReactNode> = {
   tasks: route => <Tasks route={route} />,
   index: () => <IndexScreen />,
   gaps: () => <Gaps />,
-  environment: () => <Environment />,
+  environment: route => <Environment route={route} />,
   settings: () => <Settings />,
 };

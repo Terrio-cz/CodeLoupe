@@ -13,6 +13,7 @@ import type { DaemonManager } from './daemon/DaemonManager';
 import type { SettingsStore } from './settingsStore';
 import { registerActions } from './actions/registerActions';
 import { GapReportRefresh } from './gaps/GapReportRefresh';
+import { registerEnv } from './env/registerEnv';
 
 export interface IpcContext {
   store: SettingsStore;
@@ -35,6 +36,7 @@ export function registerIpc(ctx: IpcContext): void {
   };
 
   registerActions({ gapsRefresh: new GapReportRefresh(() => ctx.store.get(), () => ctx.home.dir) }, handle);
+  registerEnv({ settings: () => ctx.store.get(), homeDir: () => ctx.home.dir, port: () => ctx.manager.port(), source: ctx.source }, handle);
   handle(CH.api, (req: unknown) => callApi(ctx, req));
   handle(CH.daemonState, () => ctx.manager.check());
   handle(CH.daemonStart, () => ctx.manager.start());

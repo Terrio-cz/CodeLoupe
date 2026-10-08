@@ -50,12 +50,14 @@ Overrides that apply to one run only: `CODELOUPE_APP_CLI='["java","-cp","C:/…/
 
 Verification modes (development builds only):
 - `CODELOUPE_APP_SCREENSHOTS=<dir>` captures every screen in light and dark mode, writes `metrics.json` (memory, and the milliseconds each screen took to show its data), then quits. `CODELOUPE_APP_SCREENSHOT_ROUTES='[["name","#/hash"],…]'` replaces the list of screens, e.g. with ids from a real daemon.
+- `CODELOUPE_APP_CONFIRM=accept` answers the native confirmation dialogs of the Environment screen (delete, replace sources, roll back) so a scripted run can drive them; an installed app ignores it.
 - `CODELOUPE_APP_TOUR=1|close` visits every screen so memory can be measured from the OS. With `close`, the run ends in the tray.
 
 ## Security
 
 - The renderer is sandboxed: `contextIsolation`, no `nodeIntegration`, a strict CSP with `connect-src 'none'`, and the bundle is served from `app://codeloupe`.
 - All data goes through preload IPC. Main validates every request (resource, id and query allow-list) and calls only `http://127.0.0.1:<port>`, without an `Origin` header and with `x-codeloupe: 1`.
+- The Environment screen writes the encrypted store only through main: the page sends a value once from a password field (emptied on submit), main hands it to `<cli> env set` on stdin, and no answer, log or argument carries it. Delete, replacing sources and roll back are confirmed in a native dialog. "Kopírovat" exists only where the OS can ask the user to authenticate again (Touch ID on macOS); elsewhere a value cannot be copied out at all.
 - The Gaps screen's "Přepočítat report" action runs `<cli> metrics gaps --since <30 days ago> --out <home>/gaps-report.json` with a fixed argument list and no shell; nothing in it comes from the page.
 - Settings → Claude Code runs the `claude` CLI (no shell, fixed argv: `mcp add|remove`, `plugin marketplace add`, `plugin install`) only after a native confirmation that lists the commands; the page cannot click it, and the app never writes Claude Code's files itself. See the root README, section Claude Code.
 - Main opens a folder only if it is an existing git worktree from the daemon. It opens a URL only if it is `https` and its origin matches a configured YouTrack instance.

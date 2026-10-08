@@ -764,6 +764,18 @@ rozhoduje launcher.
 - Stáří klíče = od rotace, jinak od vytvoření; `secrets.rotationDays` (výchozí 90, 0 = vypnuto) označí klíč `ROTATE` v `env list`, v nástroji `env` a ve sloupci Stáří obrazovky Prostředí.
 - `GET /ui-api/v1/environment` vrací klíče z metadat vaultu (bez dešifrování) se spotřebiteli z auditu a stářím, `GET /ui-api/v1/environment/audit` posledních až 500 událostí.
 
+### Výsledek CL-54 — obrazovka Prostředí v aplikaci (2026-10-08)
+
+- Zápisy jdou jen přes main proces: stránka pošle hodnotu jednou z pole `type=password` (pole se vyprázdní při odeslání, hodnota není ve stavu Reactu), main ji
+  zvaliduje (jméno, rozsah, ≤ 16 KB) a předá CLI `env set` na stdin; do argumentu, logu ani odpovědi se nedostane a chybová hláška se od ní čistí. Store tak zapisuje jediný
+  kód (formát, ochrana klíče OS, audit), aplikace žádnou kryptografii nemá.
+- Průvodce importem spouští tok CL-52 (inventář → výběr zdroje u konfliktů → import → volitelné nahrazení zdrojů odkazem → vrácení) a okno vidí jen jména, cesty a počty.
+  Mazání, nahrazení zdrojů a návrat potvrzuje nativní dialog main procesu se jménem klíče a jeho spotřebiteli.
+- „Kopírovat“ je jen s OS re-autentizací (macOS Touch ID); na Windows a Linuxu Electron žádný dotaz na uživatele nemá, takže tlačítko tam není. Hodnota jde do schránky,
+  nikdy do okna, čtení je v auditu jako „CodeLoupe app (kopie do schránky)“ a schránka se po 60 s vyčistí, jen když ji nikdo mezitím nepřepsal.
+- Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu a fixture stromu: přidání, rotace, import s nahrazením zdrojů,
+  návrat bajt po bajtu a smazání; po každém kroku se hledá každá z testovacích hodnot v DOM stránky i v odpovědích daemona (nenašla se).
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

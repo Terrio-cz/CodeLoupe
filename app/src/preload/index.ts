@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { ACTION_CH } from '../shared/actions';
+import { ENV_CH } from '../shared/envActions';
 import { CH, type CodeLoupeBridge, type DaemonState } from '../shared/ipc';
 
 // The renderer's only access to anything outside the page; every call is validated again in main.
@@ -28,6 +29,15 @@ const bridge: CodeLoupeBridge = {
   },
   actions: {
     gapsRefresh: () => ipcRenderer.invoke(ACTION_CH.gapsRefresh),
+  },
+  env: {
+    capabilities: () => ipcRenderer.invoke(ENV_CH.capabilities),
+    set: input => ipcRenderer.invoke(ENV_CH.set, input),
+    remove: key => ipcRenderer.invoke(ENV_CH.remove, key),
+    scan: includeExcluded => ipcRenderer.invoke(ENV_CH.scan, includeExcluded),
+    importRun: input => ipcRenderer.invoke(ENV_CH.importRun, input),
+    rollback: id => ipcRenderer.invoke(ENV_CH.rollback, id),
+    reveal: key => ipcRenderer.invoke(ENV_CH.reveal, key),
   },
   metrics: () => ipcRenderer.invoke(CH.metrics),
   open: {
