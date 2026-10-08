@@ -47,7 +47,7 @@ export function UpdateCard() {
       <p className="t2">
         Aplikace se ptá jen na stránce vydání na GitHubu (Terrio-cz/CodeLoupe), nic o vás neposílá a bez zapnutého přepínače se sama neptá vůbec. Stažený instalátor se ověří podle SHA-512 z vydání.
       </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="actions">
         {state.phase === 'ready' && <button className="btn primary" onClick={() => void bridge().update.install()}>Restartovat a aktualizovat</button>}
         {state.phase === 'available' && <button className="btn primary" onClick={() => void bridge().update.openRelease()}>Otevřít stránku vydání</button>}
         <button className="btn" disabled={busy || state.mode === 'unavailable' || state.phase === 'ready'} onClick={() => void bridge().update.check().then(setState)}>Zkontrolovat teď</button>

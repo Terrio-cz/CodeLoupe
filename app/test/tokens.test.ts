@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// docs/ui-spec.md § 6: text tokens ≥ 4.5:1 and control borders ≥ 3:1 on every background, both modes.
+// docs/design-revamp.md § Tokeny: text tokens ≥ 4.5:1 and control borders ≥ 3:1 on every background, both modes.
 const css = fs.readFileSync(path.join(__dirname, '../src/renderer/src/styles.css'), 'utf8');
 
 function block(selector: string): Record<string, string> {
@@ -23,7 +23,7 @@ const ratio = (a: string, b: string) => {
   return (x + 0.05) / (y + 0.05);
 };
 
-const BACKGROUNDS = ['bg', 'surface', 'surface-2', 'accent-weak'];
+const BACKGROUNDS = ['bg', 'surface', 'surface-2', 'accent-weak', 'sidebar'];
 const TEXT = ['text', 'text-2', 'text-muted', 'accent-text', 'ok-text', 'warning-text', 'serious-text', 'critical-text'];
 
 describe.each([['light', light], ['dark', dark]] as const)('%s tokens', (_mode, t) => {
@@ -33,6 +33,10 @@ describe.each([['light', light], ['dark', dark]] as const)('%s tokens', (_mode, 
 
   it('control borders reach 3:1 on every background', () => {
     for (const bg of BACKGROUNDS) expect(ratio(t['border-control'], t[bg]), `border-control on ${bg}`).toBeGreaterThanOrEqual(3);
+  });
+
+  it.each(['ok', 'warning', 'serious', 'critical'])('--%s-text reads at 4.5:1 on its badge background', tone => {
+    expect(ratio(t[`${tone}-text`], t[`${tone}-weak`])).toBeGreaterThanOrEqual(4.5);
   });
 
   it('primary button text reads at 4.5:1', () => {

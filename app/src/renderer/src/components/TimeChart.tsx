@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { time } from '../format';
 import { niceStep } from './Charts';
+import { Icon } from './Icon';
+import { Empty } from './Parts';
 
 export interface TimePoint {
   /** ISO time of the reading. */
@@ -28,6 +30,7 @@ export function TimeChart({ label, points, format, limit, gapMs = 5 * 60_000 }: 
   const box = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const [W, setW] = useState(420);
+  const fill = `time-fill-${useId().replace(/:/g, '')}`;
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -45,14 +48,26 @@ export function TimeChart({ label, points, format, limit, gapMs = 5 * 60_000 }: 
     const top = Math.ceil((max * 1.05) / step) * step;
     const x = (i: number) => PAD.l + ((times[i] - t0) / span) * (W - PAD.l - PAD.r);
     const y = (v: number) => PAD.t + (1 - v / top) * (H - PAD.t - PAD.b);
+    // The line breaks over pauses; the area under it is one closed shape per unbroken run.
     let d = '';
+    let area = '';
+    let runStart = 0;
+    let run = '';
+    const closeRun = (end: number) => {
+      if (end > runStart) area += `${run}L${x(end).toFixed(1)},${y(0)}L${x(runStart).toFixed(1)},${y(0)}Z`;
+    };
     points.forEach((p, i) => {
       const connected = i > 0 && times[i] - times[i - 1] <= gapMs;
-      d += `${connected ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`;
+      if (i > 0 && !connected) closeRun(i - 1);
+      const seg = `${connected ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`;
+      if (!connected) { runStart = i; run = ''; }
+      run += seg;
+      d += seg;
     });
+    if (points.length) closeRun(points.length - 1);
     const ticks = Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step);
     const xTicks = points.length < 2 ? [] : [0, 1, 2, 3, 4].map(k => Math.round((k / 4) * (points.length - 1)));
-    return { x, y, ticks, xTicks, line: d, top };
+    return { x, y, ticks, xTicks, line: d, area, top };
   }, [points, W, limit?.value, gapMs]);
 
   const last = points[points.length - 1];
@@ -71,15 +86,15 @@ export function TimeChart({ label, points, format, limit, gapMs = 5 * 60_000 }: 
   };
   const h = hover !== null ? points[hover] : null;
 
-  if (points.length === 0) return <div className="state">Daemon zatím nezaznamenal žádné odečty (měří se jen při používání).</div>;
+  if (points.length === 0) return <Empty icon="chart">Daemon zatím nezaznamenal žádné odečty (měří se jen při používání).</Empty>;
 
   return (
     <div>
       <div className="legend" style={{ marginBottom: 6 }}>
-        <span><span className="sw" aria-hidden="true" />{label} {format(last.v)}</span>
-        {limit && <span><span className="sw base" aria-hidden="true" />{limit.label} {format(limit.value)}{over && <strong> · překročeno</strong>}</span>}
+        <span><span className="sw" aria-hidden="true" />{label} <strong>{format(last.v)}</strong></span>
+        {limit && <span><span className="sw base" aria-hidden="true" />{limit.label} {format(limit.value)}{over && <> · <span className="badge critical"><strong>překročeno</strong></span></>}</span>}
         <span style={{ flex: 1 }} />
-        <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}>{asTable ? 'Graf' : 'Tabulka'}</button>
+        <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}><Icon name={asTable ? 'chart' : 'table'} size={14} />{asTable ? 'Graf' : 'Tabulka'}</button>
       </div>
       {asTable ? (
         <div className="table-wrap" style={{ maxHeight: H }}>
@@ -91,21 +106,28 @@ export function TimeChart({ label, points, format, limit, gapMs = 5 * 60_000 }: 
       ) : (
         <div className="chart" ref={box}>
           <svg ref={svg} viewBox={`0 0 ${W} ${H}`} style={{ height: H }} role="img" aria-label={summary} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+            <defs>
+              <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="var(--series-1)" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="var(--series-1)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
             {geo.ticks.map(t => (
               <g key={t}>
-                <line x1={PAD.l} x2={W - PAD.r} y1={geo.y(t)} y2={geo.y(t)} stroke={t === 0 ? 'var(--axis)' : 'var(--grid)'} strokeWidth={1} />
+                <line x1={PAD.l} x2={W - PAD.r} y1={geo.y(t)} y2={geo.y(t)} stroke={t === 0 ? 'var(--axis)' : 'var(--grid)'} strokeWidth={1} strokeDasharray={t === 0 ? undefined : '2 4'} />
                 <text x={PAD.l - 6} y={geo.y(t) + 4} textAnchor="end" fontSize="11" fill="var(--text-muted)">{format(t)}</text>
               </g>
             ))}
             {geo.xTicks.map(i => (
               <text key={i} x={geo.x(i)} y={H - 6} textAnchor="middle" fontSize="11" fill="var(--text-muted)">{time(points[i].t)}</text>
             ))}
-            {limit && <line x1={PAD.l} x2={W - PAD.r} y1={geo.y(limit.value)} y2={geo.y(limit.value)} stroke="var(--series-baseline)" strokeWidth={2} strokeDasharray="5 4" />}
-            <path d={geo.line} fill="none" stroke="var(--series-1)" strokeWidth={2} strokeLinejoin="round" />
+            <path className="reveal" d={geo.area} fill={`url(#${fill})`} />
+            {limit && <line className="reveal" x1={PAD.l} x2={W - PAD.r} y1={geo.y(limit.value)} y2={geo.y(limit.value)} stroke="var(--series-baseline)" strokeWidth={1.5} strokeDasharray="5 4" />}
+            <path className="draw" pathLength={1} d={geo.line} fill="none" stroke="var(--series-1)" strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
             {hover !== null && h && (
               <g>
-                <line x1={geo.x(hover)} x2={geo.x(hover)} y1={PAD.t} y2={H - PAD.b} stroke="var(--axis)" />
-                <circle cx={geo.x(hover)} cy={geo.y(h.v)} r={4} fill="var(--series-1)" stroke="var(--surface)" strokeWidth={2} />
+                <line className="crosshair" x1={geo.x(hover)} x2={geo.x(hover)} y1={PAD.t} y2={H - PAD.b} />
+                <circle className="hover-dot" cx={geo.x(hover)} cy={geo.y(h.v)} r={4} fill="var(--series-1)" stroke="var(--surface)" strokeWidth={2} />
               </g>
             )}
           </svg>

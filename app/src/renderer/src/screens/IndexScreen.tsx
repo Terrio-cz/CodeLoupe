@@ -1,16 +1,17 @@
 import type { IndexHealth } from '../../../shared/contract';
 import { useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
-import { Card, ErrorState, Loading } from '../components/Parts';
+import { CountUp } from '../components/CountUp';
+import { Card, ErrorState, KpiTile, Loading } from '../components/Parts';
 import { RepoBadge, StatusBadge } from '../components/StatusBadge';
-import { ago, bytes, dateTime, ms, num } from '../format';
+import { ago, bytes, dateTime, ms, num, tokens } from '../format';
 
 type Repo = IndexHealth['repos'][number];
 type Build = IndexHealth['builds'][number];
 
 export function IndexScreen() {
   const { data, error, loading, reload } = useApi('index');
-  if (!data) return <Card>{loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst index.'} onRetry={reload} />}</Card>;
+  if (!data) return <Card title="Repozitáře" bodyClass="">{loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Nelze načíst index.'} onRetry={reload} />}</Card>;
   const names = new Map(data.repos.map(r => [r.id, r.name]));
   const budget = data.budgets.buildPeakRssMb;
 
@@ -32,13 +33,24 @@ export function IndexScreen() {
     { key: 'kind', header: 'Druh', render: b => b.kind },
     { key: 'repo', header: 'Repo', render: b => names.get(b.repoId) ?? b.repoId },
     { key: 'dur', header: 'Délka', render: b => ms(b.durationMs), numeric: true },
-    { key: 'rss', header: 'Peak RSS', render: b => (b.peakRssMb === null ? '—' : <>{num(b.peakRssMb)} MB{b.peakRssMb > budget && <span className="chip warn" style={{ marginLeft: 6 }}>⚠ nad {budget} MB</span>}</>), numeric: true },
+    { key: 'rss', header: 'Peak RSS', render: b => (b.peakRssMb === null ? '—' : <>{num(b.peakRssMb)} MB{b.peakRssMb > budget && <span className="chip warn" style={{ marginLeft: 6 }}>nad {budget} MB</span>}</>), numeric: true },
     { key: 'files', header: 'Soubory', render: b => num(b.files), numeric: true },
     { key: 'status', header: 'Stav', render: b => b.status === 'failed' ? <span title={b.error ?? ''}><StatusBadge tone="critical">selhal</StatusBadge></span> : b.status === 'running' ? <StatusBadge tone="running">běží</StatusBadge> : <StatusBadge tone="ok">ok</StatusBadge> },
   ];
 
+  const sum = (f: (r: Repo) => number) => data.repos.reduce((a, r) => a + f(r), 0);
+  const ready = data.repos.filter(r => r.state === 'ready').length;
+
   return (
     <>
+      <section aria-label="Souhrn indexu">
+        <div className="kpis">
+          <KpiTile label="Repozitáře" value={<CountUp value={data.repos.length} format={num} />} ctx={`${num(ready)} připraveno`} />
+          <KpiTile label="Deklarace" value={<CountUp value={sum(r => r.decls)} format={tokens} />} ctx={`${num(sum(r => r.files))} souborů`} />
+          <KpiTile label="Reference" value={<CountUp value={sum(r => r.refs)} format={tokens} />} ctx={`${num(sum(r => r.layers))} vrstev`} />
+          <KpiTile label="Velikost DB" value={<CountUp value={sum(r => r.dbBytes)} format={bytes} />} ctx={`${num(data.errorFiles.length)} souborů s chybou parseru`} />
+        </div>
+      </section>
       <Card title="Repozitáře" bodyClass="">
         <DataTable label="Repozitáře" rows={data.repos} columns={repoCols} rowKey={r => r.id} />
       </Card>

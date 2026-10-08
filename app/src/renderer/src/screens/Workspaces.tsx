@@ -4,7 +4,8 @@ import type { PlanEntry } from '../../../shared/workspaces';
 import { bridge, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
 import { Drawer } from '../components/Drawer';
-import { Card, ErrorState, KpiTile, Loading, Search, Section, Select } from '../components/Parts';
+import { CountUp } from '../components/CountUp';
+import { Banner, Card, ErrorState, KpiTile, Loading, Search, Section, Select } from '../components/Parts';
 import { StatusBadge, VerdictBadge, WorkspaceBadge } from '../components/StatusBadge';
 import { ago, bytes, num } from '../format';
 import { useSettings } from '../hooks';
@@ -82,7 +83,7 @@ export function Workspaces({ route }: { route: Route }) {
     return () => clearInterval(t);
   }, [pendingRelease]);
 
-  if (!list.data) return <Card>{list.loading ? <Loading /> : <ErrorState message={list.error?.message ?? 'Nelze načíst workspaces.'} onRetry={list.reload} />}</Card>;
+  if (!list.data) return <Card bodyClass="">{list.loading ? <Loading variant="table" /> : <ErrorState message={list.error?.message ?? 'Nelze načíst workspaces.'} onRetry={list.reload} />}</Card>;
 
   const repos = list.data.repos.map(r => r.name);
   const shown = rows.filter(r => matches(r, { repo, state, q }));
@@ -103,16 +104,16 @@ export function Workspaces({ route }: { route: Route }) {
         <label className="check"><input type="checkbox" checked={sizes} onChange={e => setSizes(e.target.checked)} />Zjistit disk a paměť <span className="muted">(projde soubory a ptá se Dockeru, trvá vteřiny)</span></label>
         {sizes && (list.loading || resources.loading) && <span className="muted" role="status">Zjišťuji…</span>}
       </div>
-      {problems.length > 0 && <div className="banner" role="status"><strong>⚠ Něco se nepodařilo přečíst</strong><ul className="plain">{problems.map(p => <li key={p}>{p}</li>)}</ul></div>}
+      {problems.length > 0 && <Banner><strong>Něco se nepodařilo přečíst</strong><ul className="plain">{problems.map(p => <li key={p}>{p}</li>)}</ul></Banner>}
 
-      <section className="card" aria-label="Počty podle stavu">
+      <section aria-label="Počty podle stavu">
         <div className="kpis">
-          <KpiTile label="Aktivní" value={num(counts.active)} ctx="práce běží" />
-          <KpiTile label="Dokončené" value={num(counts.landed)} ctx="práce je na hlavní větvi" />
-          <KpiTile label="Opuštěné" value={num(counts.abandoned)} ctx="bez aktivity, nesloučené" />
-          <KpiTile label="Sirotci" value={num(counts.orphan)} ctx="adresář bez worktree" />
-          <KpiTile label="Čeká na potvrzení" value={num(toConfirm.length)} ctx="prostředky k úklidu" />
-          <KpiTile label="Uvolněné" value={num(released.length)} ctx={`zbývá ${num(released.reduce((a, r) => a + (r.pending ?? 0), 0))} prostředků`} />
+          <KpiTile label="Aktivní" value={<CountUp value={counts.active} format={num} />} ctx="práce běží" />
+          <KpiTile label="Dokončené" value={<CountUp value={counts.landed} format={num} />} ctx="práce je na hlavní větvi" />
+          <KpiTile label="Opuštěné" value={<CountUp value={counts.abandoned} format={num} />} ctx="bez aktivity, nesloučené" />
+          <KpiTile label="Sirotci" value={<CountUp value={counts.orphan} format={num} />} ctx="adresář bez worktree" />
+          <KpiTile label="Čeká na potvrzení" value={<CountUp value={toConfirm.length} format={num} />} ctx="prostředky k úklidu" />
+          <KpiTile label="Uvolněné" value={<CountUp value={released.length} format={num} />} ctx={`zbývá ${num(released.reduce((a, r) => a + (r.pending ?? 0), 0))} prostředků`} />
         </div>
       </section>
 
@@ -201,7 +202,7 @@ function WorkspaceDrawer({ row, onClose, onChanged }: { row: WorkspaceRow; onClo
         {row.release && <span className="chip">uvolněný {ago(row.release.at)}</span>}
         <span className="muted">{row.repoName}</span>
       </div>
-      {ws?.note && <div className="banner info" role="note">{ws.note}</div>}
+      {ws?.note && <Banner tone="info" role="note">{ws.note}</Banner>}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {canRelease && <button className="btn" disabled={release.busy} onClick={() => void doRelease()}>{release.busy ? 'Uvolňuji…' : 'Uvolnit workspace…'}</button>}

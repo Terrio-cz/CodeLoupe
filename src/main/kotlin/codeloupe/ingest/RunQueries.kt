@@ -69,10 +69,14 @@ class RunQueries(private val db: TranscriptDb) {
     }
 
     /** Weighted tokens used per hour (epoch hour -> tokens) in the hours [fromHour, toHour). */
-    fun hours(fromHour: Long, toHour: Long): Map<Long, Double> = synchronized(db.reader) {
-        db.reader.prepareStatement("SELECT hour, sum(cost) FROM usage_hours WHERE hour >= ? AND hour < ? GROUP BY hour").use { s ->
+    /** Cost per hour bucket; with [transcriptPrefix] only the runs whose transcript lies under it (one account's `projects` folder). */
+    fun hours(fromHour: Long, toHour: Long, transcriptPrefix: String? = null): Map<Long, Double> = synchronized(db.reader) {
+        val from = if (transcriptPrefix == null) "usage_hours h" else "usage_hours h JOIN runs r ON r.id = h.run_id"
+        val filter = if (transcriptPrefix == null) "" else " AND r.path LIKE ? ESCAPE '\\'"
+        db.reader.prepareStatement("SELECT h.hour, sum(h.cost) FROM $from WHERE h.hour >= ? AND h.hour < ?$filter GROUP BY h.hour").use { s ->
             s.setLong(1, fromHour)
             s.setLong(2, toHour)
+            if (transcriptPrefix != null) s.setString(3, likePrefix(transcriptPrefix))
             s.executeQuery().use { r -> HashMap<Long, Double>().also { while (r.next()) it[r.getLong(1)] = r.getDouble(2) } }
         }
     }
@@ -132,9 +136,25 @@ class RunQueries(private val db: TranscriptDb) {
         runs to calls
     }
 
-    fun gapCount(fromMs: Long): Int = synchronized(db.reader) {
-        db.reader.prepareStatement("SELECT count(*) FROM gaps WHERE at_ms >= ? AND kind != 'busy'").use { s -> s.setLong(1, fromMs); s.executeQuery().use { it.next(); it.getInt(1) } }
+    fun gapCount(fromMs: Long, transcriptPrefix: String? = null): Int = synchronized(db.reader) {
+        val from = if (transcriptPrefix == null) "gaps g" else "gaps g JOIN runs r ON r.id = g.run_id"
+        val filter = if (transcriptPrefix == null) "" else " AND r.path LIKE ? ESCAPE '\\'"
+        db.reader.prepareStatement("SELECT count(*) FROM $from WHERE g.at_ms >= ? AND g.kind != 'busy'$filter").use { s ->
+            s.setLong(1, fromMs)
+            if (transcriptPrefix != null) s.setString(2, likePrefix(transcriptPrefix))
+            s.executeQuery().use { it.next(); it.getInt(1) }
+        }
     }
+
+    /** The end of the newest run under [transcriptPrefix], or null when there is none. */
+    fun lastEndMs(transcriptPrefix: String): Long? = synchronized(db.reader) {
+        db.reader.prepareStatement("SELECT max(end_ms) FROM runs WHERE path LIKE ? ESCAPE '\\'").use { s ->
+            s.setString(1, likePrefix(transcriptPrefix))
+            s.executeQuery().use { r -> r.next(); r.getLong(1).takeIf { !r.wasNull() } }
+        }
+    }
+
+    private fun likePrefix(prefix: String) = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
     private fun bind(s: PreparedStatement, args: List<Any>): PreparedStatement {
         args.forEachIndexed { i, a -> if (a is Long) s.setLong(i + 1, a) else if (a is Int) s.setInt(i + 1, a) else s.setString(i + 1, a.toString()) }

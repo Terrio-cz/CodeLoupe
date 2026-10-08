@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { ACTION_CH } from '../shared/actions';
 import { ENV_CH } from '../shared/envActions';
+import { ACCOUNT_CH } from '../shared/accountActions';
 import { JOB_CH, type LiveEvent } from '../shared/jobs';
 import { CH, type CodeLoupeBridge, type DaemonState, type UpdateState } from '../shared/ipc';
 
@@ -65,6 +66,16 @@ const bridge: CodeLoupeBridge = {
     importRun: input => ipcRenderer.invoke(ENV_CH.importRun, input),
     rollback: id => ipcRenderer.invoke(ENV_CH.rollback, id),
     reveal: key => ipcRenderer.invoke(ENV_CH.reveal, key),
+  },
+  accounts: {
+    claudeAdd: input => ipcRenderer.invoke(ACCOUNT_CH.claudeAdd, input),
+    claudeRename: (id, label) => ipcRenderer.invoke(ACCOUNT_CH.claudeRename, id, label),
+    claudeSetDefault: id => ipcRenderer.invoke(ACCOUNT_CH.claudeDefault, id),
+    claudeRemove: id => ipcRenderer.invoke(ACCOUNT_CH.claudeRemove, id),
+    youtrackAdd: input => ipcRenderer.invoke(ACCOUNT_CH.youtrackAdd, input),
+    youtrackTest: id => ipcRenderer.invoke(ACCOUNT_CH.youtrackTest, id),
+    youtrackRotate: (id, token) => ipcRenderer.invoke(ACCOUNT_CH.youtrackRotate, id, token),
+    youtrackRemove: id => ipcRenderer.invoke(ACCOUNT_CH.youtrackRemove, id),
   },
   metrics: () => ipcRenderer.invoke(CH.metrics),
   open: {

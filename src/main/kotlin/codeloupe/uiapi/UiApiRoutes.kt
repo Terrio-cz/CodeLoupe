@@ -25,7 +25,8 @@ private const val BASE = "/ui-api/v1"
 fun Route.uiApiRoutes(api: UiApi) {
     route(BASE) {
         get("nav") { call.answer(Nav.serializer()) { api.nav(call.query("gapsSince")) } }
-        get("overview") { call.answer(Overview.serializer()) { api.overview(call.query("range")) } }
+        get("overview") { call.answer(Overview.serializer()) { api.overview(call.query("range"), call.query("account")) } }
+        get("accounts") { call.answer(AccountsView.serializer()) { api.accounts() } }
         get("worktrees") { call.answer(WorktreeList.serializer()) { api.worktrees(call.query("repo"), call.query("layer"), call.query("q")) } }
         get("worktrees/{id}") { call.answer(WorktreeDetail.serializer()) { api.worktree(call.parameters["id"].orEmpty()) } }
         get("tasks") { call.answer(TaskPage.serializer()) { api.tasks(call.query("project"), call.query("state"), call.query("q"), call.query("limit"), call.query("cursor")) } }

@@ -4,6 +4,7 @@ import type { ActionsBridge } from './actions';
 import type { JobsBridge, LiveBridge } from './jobs';
 import type { ApiRequest } from './request';
 import type { EnvBridge } from './envActions';
+import type { AccountsBridge } from './accountActions';
 
 export type DaemonPhase = 'unknown' | 'starting' | 'running' | 'stopping' | 'stopped' | 'down' | 'error';
 
@@ -108,6 +109,7 @@ export interface CodeLoupeBridge {
   jobs: JobsBridge;
   live: LiveBridge;
   env: EnvBridge;
+  accounts: AccountsBridge;
   metrics(): Promise<AppMetrics>;
   open: {
     worktree(id: string): Promise<boolean>;
