@@ -340,6 +340,7 @@ read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-s
 | Job slots | any name, one job each | `config.json` `slots` `{ "gradle-test": 2, "vps-test": 1 }` |
 | Policy for jobs | none (every command allowed) | `config.json` `policyHook` — argv of a PreToolUse hook, e.g. `["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/ws/.claude/hooks/guard.ps1"]`; `policyTimeoutMs` (30 s) |
 | Remote webhook targets | none (local only) | `config.json` `remoteWebhooks` `["https://hooks.example.com"]` |
+| Index reads at once | 2 (the rest wait their turn: ten windows asking together would hold ten reads' memory) | `config.json` `maxParallelQueries` |
 | Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
@@ -447,6 +448,13 @@ the release pipeline (CL-106), auto-update (CL-107). CI cost and runners: [docs/
 `node tools/profile.mjs --cli build/install/codeloupe/bin/codeloupe --home <tmp> --root <repo> --worktree <worktree>`
 profiles a warm query, the first query in a worktree and (with `--clone`) an overlay refresh: client latency split
 by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktree walk, SQL, the rest of the tool and HTTP.
+
+`node tools/load-test.mjs --install build/install/codeloupe --source <repo>` clones the repository into a scratch directory, adds
+eight worktrees and runs ten client loops against a throwaway daemon; midway it commits a change to the default branch (a base
+sync) and edits files in four worktrees. It prints p95 latency before and during the sync, busy and failed calls, and RSS (steady,
+peak, series) against the budgets of `docs/plan.md` § 2. `node tools/rss-mix.mjs --install … --source <repo>` runs 50 mixed
+queries (`changes bodies`, `calls … callees depth 3`, `usages` included) and reports the resident memory with the JVM's own
+accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram` for the live heap).
 
 | Package | Role |
 |---|---|
