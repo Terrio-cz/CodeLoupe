@@ -24,6 +24,7 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 | Who calls `f`, or what `f` calls | `calls` (`name`, `direction` = `callers` or `callees`, `depth` ≤ 3) | chains of greps |
 | Supertypes, subtypes, overrides | `hierarchy` (`name`) | grepping `: Type` |
 | What did my branch change | `changes` (by declaration against the merge-base, with callers and tests; `bodies=true` for line diffs) | `git diff` of whole files |
+| Which tests to run for my change | `changes` with `tests=true` (the Gradle `--tests` command per module for the test classes that use the changed declarations; says when it widens to a module or the full suite) | running the whole suite |
 | Which task touched this code, or which code a task touched | `task_code` (`query` = a task id, a declaration or a path) | `git log --grep` and guessing |
 | Read an issue | `issue` (`id`; `view=brief` first, then `sections=[…]`) | opening the tracker |
 | Start planning a task: issue, linked tasks, open criteria, touched code, earlier tasks on the same files | `task_context` (`id`; one call instead of `issue` + `tasks` + `task_code` + search; `sections=[…]` to pick) | four calls and a search |
@@ -53,6 +54,16 @@ Code tools take `root`: the absolute path of the repository or worktree you work
   `since=none` sends it again (do that after the context was cleared). Read a large file with `doc` digest first, then only the sections you need.
 - Long commands go to `job`: start it, end the turn when there is nothing else to do, and read `status` when you
   continue. Do not hold a turn open on a slow build.
+
+## Hooks of the plugin
+
+After a shell search (`rg`, `grep`, `find -name`, `git grep`) or a read of a whole indexed source file (`cat`, `head`, `sed -n`, `Read`
+without `offset`/`limit`, 150 lines or more) a `PreToolUse` hook may add one line naming the CodeLoupe call that answers the same
+question (`usages`, `find`, `grep`, `outline`). Use it instead of reading the output you were about to get. In `redirect` mode the
+first attempt is refused with that line: run the same command again when the index cannot answer. The hook speaks once per command,
+never for documents, short files, builds, git or a repository the daemon has not indexed. It is switched off with
+`"hooks": { "enabled": false }` in the daemon's `config.json` (`"steer": { "mode": "off" }` for this hook alone) or
+`CODELOUPE_HOOKS=off` in Claude Code's environment; `codeloupe metrics hooks` counts what it said and what was followed.
 
 ## If the tools fail
 

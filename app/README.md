@@ -24,7 +24,7 @@ npm run dev        # dev server with hot reload
 npm test           # vitest: request validation, settings, mock API, token contrast, daemon manager
 npm run typecheck
 npm run lint       # eslint; CI runs npm ci, lint, typecheck, test and build on every OS
-npm run dist       # installer for this OS in dist/ (run ./gradlew bundle first); see the root README, Installers
+npm run dist       # installer for this OS in dist/ (run ./gradlew bundle first); see the wiki, https://github.com/Terrio-cz/CodeLoupe/wiki/Installers-and-updates
 ```
 
 ## Adding a screen
@@ -65,7 +65,7 @@ Verification modes (development builds only):
 - The first-run onboarding writes through main only: the folder dialog is native, the chosen paths go to `<cli> repos add`, the YouTrack step is the Accounts flow (token on stdin into the store), and the trial query is `<cli> outline` on a repository the daemon lists.
 - Job logs: the page names a job id; main reads only `<home>/jobs/<id>.log` of a finished job, strips terminal codes and masks credential-looking values. The live event stream is opened while the Jobs screen is open and passes on only the event type and job id.
 - The Accounts screen changes `<home>/accounts.json` (names, folders, URLs) and puts a YouTrack token into the store through `<cli> env set` on stdin; the connection test reads the token back from the daemon in main, sends it only to the instance's own URL (redirects are not followed) and answers with a sentence. Removing an entry, adding or removing a YouTrack account (the daemon restarts) are confirmed in a native dialog.
-- Settings → Claude Code runs the `claude` CLI (no shell, fixed argv: `mcp add|remove`, `plugin marketplace add`, `plugin install`) only after a native confirmation that lists the commands; the page cannot click it, and the app never writes Claude Code's files itself. See the root README, section Claude Code.
+- Settings → Claude Code runs the `claude` CLI (no shell, fixed argv: `mcp add|remove`, `plugin marketplace add`, `plugin install`) only after a native confirmation that lists the commands; the page cannot click it, and the app never writes Claude Code's files itself. See the wiki, https://github.com/Terrio-cz/CodeLoupe/wiki/Claude-Code-integration.
 - Main opens a folder only if it is an existing git worktree from the daemon. It opens a URL only if it is `https` and its origin matches a configured YouTrack instance.
 - Permissions, navigation, new windows and webviews are denied.
 

@@ -12,6 +12,9 @@ internal class FileScope(val path: String, val packageName: String, val imports:
 
     fun decl(id: Long?): DeclRow? = id?.let(byId::get)
 
+    /** Every declaration of the file. */
+    fun all(): Collection<DeclRow> = byId.values
+
     fun children(d: DeclRow): List<DeclRow> = childrenOf[d.id].orEmpty()
 
     /** [d] and the declarations around it, innermost first. */

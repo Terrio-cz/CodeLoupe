@@ -35,6 +35,19 @@ describe('Claude Code plugin files', () => {
     expect(script.trimEnd().endsWith('exit 0')).toBe(true);
   });
 
+  it('steers shell searches and whole-file reads through a PreToolUse hook that forwards to the daemon and never fails a call', () => {
+    const pre = JSON.parse(fs.readFileSync(path.join(pluginDir, 'hooks', 'hooks.json'), 'utf8')).hooks.PreToolUse[0];
+    expect(pre.matcher).toBe('Bash|PowerShell|Read');
+    expect(pre.hooks[0].type).toBe('command');
+    expect(pre.hooks[0].command).toContain('${CLAUDE_PLUGIN_ROOT}/hooks/hook.sh');
+    expect(pre.hooks[0].timeout).toBeLessThanOrEqual(10);
+    const script = fs.readFileSync(path.join(pluginDir, 'hooks', 'hook.sh'), 'utf8');
+    expect(script).toContain('CODELOUPE_HOOKS');
+    expect(script).toContain('/hook');
+    expect(script.trimEnd().endsWith('exit 0')).toBe(true);
+    expect(script).not.toContain('set -e');
+  });
+
   it('has a skill that names every tool of the daemon', () => {
     const skill = fs.readFileSync(path.join(pluginDir, 'skills', 'codeloupe', 'SKILL.md'), 'utf8');
     expect(skill).toMatch(/^---\nname: codeloupe\ndescription: .+\n---/);

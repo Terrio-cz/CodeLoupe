@@ -115,7 +115,7 @@ Technické budgety: daemon ustáleně ≤ 200 MB (JVM), špička ≤ 300 MB; bui
   Python, Go) později bez změny jádra.
 - Cache: `<home>/repos/<repo-id>/` (repo-id = hash git common dir) → víc repozitářů, víc workspaců,
   jedna instance.
-- Licence: **PolyForm Noncommercial 1.0.0** (uživatel 2026-10-08, CL-100: lidé to nesmějí prodávat ani komerčně využívat; nejsilnější ochrana při veřejném repu). README, konfigurační reference, CHANGELOG — součást v1.
+- Licence: **PolyForm Noncommercial 1.0.0** (uživatel 2026-10-08, CL-100: lidé to nesmějí prodávat ani komerčně využívat; nejsilnější ochrana při veřejném repu). README (úvod) + wiki (příručka, konfigurační reference), CHANGELOG — součást v1.
 
 ## 5. Architektura
 
@@ -1067,6 +1067,35 @@ rozhoduje launcher.
   `Terrio` doplní `{"write": {"linkedWorktreesOnly": true}}` do vlastního `.codeloupe.json` (mimo tento repozitář); brána `auto` je bez transkriptů zavřená a výslovně se otevírá
   `write.mode: on`.
 
+### Výsledek CL-135 — háčky vedou od shellu a celých čtení k CodeLoupe (2026-10-08)
+
+- **Mechanismus**: pluginový `PreToolUse` na `Bash|PowerShell|Read` volá jediný skript `plugin/hooks/hook.sh` (stdin → `curl` na `POST /hook` lokálního daemona, vždy `exit 0`).
+  Celé rozhodnutí je v daemonu (`codeloupe.hooks`): `ShellWords` → `ShellIntents` (rg/grep/git grep/find/cat/head/tail/sed/Get-Content/Select-String, `cd`, `timeout`,
+  `bash -c`, here-dokumenty, Windows i Git Bash cesty) → `Steering` (rozpoznání vzoru: deklarace → `find`, jméno → `usages`, řetězec/regex → `grep`, výpis souborů → `find`/`outline`,
+  celé čtení ≥ 150 řádků → `outline`) → `Hooks` (režim, ochrana proti opakování, limity, log). Odpověď `advise` je `additionalContext` bez `permissionDecision`
+  (oprávnění se nemění); `redirect` vrací `deny` jen pro příkaz, který jasně míří na zdrojáky (glob `*.kt`, `--type kotlin`, zdrojový soubor), podruhé stejný příkaz projde.
+  Vypínač na jednom místě: `config.json` `hooks.enabled=false` (čte se při každém volání, bez restartu) nebo `CODELOUPE_HOOKS=off`. Formáty vstupu a výstupu hooků jsou podle
+  dokumentace Claude Code; živé ověření nebylo možné (účet narazil na týdenní limit), `claude plugin validate --strict` prošel.
+- **Nezasahuje**: daemon neběží (skript končí bez čekání, když chybí `daemon.json`; zastaralý `daemon.json` stojí nejvýš `--connect-timeout 0.3`), repozitář nebyl indexován (hook nikdy nespouští build),
+  soubor není v bázi nebo je kratší než `minLines`, `Read` s `offset`/`limit`, příkaz není hledání/čtení zdrojáku (build, git, `.md`/`.json`, hledání ve výstupu roury, čtení useknuté `head`/`grep`),
+  stejný příkaz podruhé v relaci, relace po `maxPerSession` (40) radách a relace, která `giveUpAfter` (4) rad za sebou nepoužila žádné volání CodeLoupe na tom repozitáři
+  (agent bez nástrojů, např. `terrio-coder`, tak dostane nejvýš čtyři rady). Rada má kolem 260 znaků (≈ 65 tokenů při 4 znacích na token).
+- **Tabulka rozhodnutí**: `SteeringTest` (tvary příkazů: hledání, čtení, roury, uvozovky, here-dokument, Windows `C:\`, `/c/`, PowerShell, a vše, čeho se nesmí dotknout), `ShellWordsTest`,
+  `PatternShapeTest`, `HooksTest` (režimy, opakování, limity, výpadek indexu a konfigurace), `HooksDaemonTest` (skutečný daemon a repozitář, nezaindexovaný repozitář = 204, hlavička, skript
+  `hook.sh` včetně mrtvého portu, chybějícího `daemon.json`, `CODELOUPE_HOOKS=off`, nesmyslného vstupu), `HookUsageTest`, `HookReplayTest`.
+- **Měření nad skutečnými daty** (`codeloupe metrics hooks --replay --since 2026-10-01`, transkripty Terrio, 2 416 běhů, 61 861 volání Bash/PowerShell/Read; velikosti souborů podle výsledků v transkriptech,
+  zmizelé worktree se berou jako indexované, je-li v jejich okolí git repozitář se zdrojáky = horní odhad toho, co by řekl daemon, který ty repozitáře zná):
+  **11 003 volání (17,8 %) by dostalo radu**, kdyby se každá rada brala: `grep` 8 017, `usages` 1 142, celé čtení → `outline` 1 128 (ze 7 992 `Read`), `find` 563, výpis souborů → `outline`/`find` 112 + 41.
+  Nechané být: nejde o hledání/čtení kódu 29 090, jiné než zdrojové soubory 13 420, krátké/částečné čtení 7 258, neindexováno 849, opakování 241.
+  Podle programu (rada / rozpoznaná volání): `rg` 5 429 / 10 333, `grep` 1 736 / 7 741, `sed` 1 581 / 6 823, `cat` 1 038 / 4 934, `head` 278 / 4 072, `find` 99 / 314.
+  V týchž transkriptech nebylo **žádné** volání CodeLoupe; s výchozím `giveUpAfter` 4 by hook při neuposlechnutí promluvil jen **948×** (1,5 %), tj. ≈ 62 tisíc tokenů rad za týden.
+  Kolik z těch 17,8 % agenti uposlechnou, nevíme; ukáže to `codeloupe metrics hooks` (rady z `hooks.jsonl`, následované voláním kódového nástroje na témže worktree do 180 s podle `calls.jsonl`).
+- **Latence** (stroj s desítkou paralelních oken, Git Bash, `spawnSync` jako Claude Code): rozhodnutí v daemonu **medián 3,5 ms, p95 6,8 ms** (při souběhu 9 / 18 ms; `/status` `hooks`);
+  celý skript (start bash ≈ 32–36 ms + `curl` + daemon) **medián 62–87 ms při zátěži, 45 ms naprázdno** (měřeno proti pahýlu trasy). Kritérium „< 50 ms“ je tedy splněno jen naprázdno; čas
+  dominuje start procesu bash, ne daemon. `bash /dev/tcp` místo `curl` ušetří ≈ 20 ms, ale na Windows nemá časový limit a na mrtvý port čeká ≈ 2 s (měřeno), proto zůstává `curl --connect-timeout 0.3`.
+  Zbytek (hook typu `http` bez procesu) je v nové kartě.
+- **Rozhodnutí**: výchozí `advise` (nic se neodmítá); soubory nové na větvi, které ještě nejsou v bázi, se berou jako neindexované.
+
 ### Výsledek CL-137 — vyhledávání pojmů nad deklaracemi (2026-10-08)
 
 - **Rozhodnutí**: `find mode=search` (nebo `q` s mezerou, bez závorky), nový nástroj nepřibyl (14). Index slov je tabulka `search` ve
@@ -1090,6 +1119,29 @@ rozhoduje launcher.
 - **Kontext**: definice nástroje `find` v `tools/list` 919 → 1 078 znaků (+159, ≈ 50 tokenů při 3,16 znaku/token; 1,2 % ze 13 047 znaků
   všech 14 nástrojů). Dotaz přes CLI trvá stejně jako hledání jménem (1,85–1,97 s na vytíženém stroji, téměř vše je start JVM CLI).
 
+### Výsledek CL-138 — výběr testů ze změn (2026-10-09)
+
+- **Rozhodnutí**: `changes tests=true` (CLI `changes --tests`), nový nástroj nepřibyl. Z každé změněné deklarace (bez členů přidaného či odebraného
+  typu, ty patří typu) se jdou po odkazech nejvýš 3 kroky: test najde-li se přímo, vybere se jeho třída; jinak se pokračuje deklarací, která
+  odkaz drží (soukromý pomocník → veřejná funkce → její test). Třída v testovacích zdrojích bez metody s `@Test` (pomocná třída) se nikdy
+  nejmenuje, jde se dál k jejím uživatelům. `hashCode`/`equals`/`toString`/`compareTo`, konstruktory a `init` se berou za testy svého typu.
+  Nejisté (`?`) odkazy se používají jen tehdy, když žádný není jistý (jinak by obecné jméno jako `normalize` přitáhlo nesouvisející testy).
+- **Filtr**: `./gradlew :modul:test --tests 'pkg.Třída' …` po modulech; cesta modulu = adresář (`importers/chmi` → `:importers:chmi`), zdrojová
+  sada jiná než `test` je vlastní úloha. Úroveň třídy, ne metody: test, který používá změnu přes pomocnou metodu své třídy, by metodový filtr minul.
+  Třída s vnořeným testem dostane `*`. Metody se ukazují jen v řádku „proč“ (`Třída <- Deklarace`).
+- **Rozšíření (vždy s důvodem)**: změna build souboru (`*.gradle(.kts)`, `gradle.properties`, `*.versions.toml`, `buildSrc/`, `gradle/`) → plný
+  `./gradlew test`; změněný nekódový soubor pod `src` → úloha modulu; deklarace, na kterou žádný test nedosáhne („no test uses it“) nebo
+  jejíž jméno je příliš časté na sledování → úloha celého modulu. Mimo `src` (docs, CI, skripty) se ignoruje. Odkazy přes reflexi, DI a
+  generovaný kód nejsou vidět (věta v odpovědi).
+- **Měření** (klon TerrioImporter v `%TEMP%`, `gradlew --no-daemon`, Docker běží): (a) čtyři drobné úpravy v `accounts` a `domain` →
+  18 tříd v 5 úlohách; z toho část `accounts`+`domain` s filtrem **30 s**, celé `:accounts:test :domain:test` **112 s**; (b) záměrně rozbitá
+  regulární hodnota v `PhoneNumber` → filtr (3 třídy, 28 testů) selhal na `PhoneNumberTest`, **33 s** proti **74 s** pro celý `:accounts:test`
+  (256 testů), stejný jediný pád; (c) úprava `PublishedMd5Verifier` v `common` → 9 tříd, z nich 8 integračních v `:app` (Testcontainers):
+  **224 s** (včetně kompilace `:app`) proti **80 s** pro `:common:test`, který testy z `:app` vůbec neviděl; celý `gradlew test` (1 817 testů,
+  Docker) jsem nespouštěl. Logy: 4 kB proti 3 kB u úspěšných běhů (log úspěšného běhu je malý v obou případech, rozdíl je v čase).
+- **Pokyn testerovi**: místo celé sady spustit příkaz z `changes tests=true`; při „full suite“ nebo „whole module“ v odpovědi spustit právě to;
+  před landem jednou celou sadu (kandidát na land). Výstup ≤ 40 řádků (test se 20 deklaracemi).
+
 ### Výsledek CL-132 — jeden sken registru pro čtyři čtení Workspaces (2026-10-08)
 
 - `/workspaces` (bez `repo` a `size`), `/resources`, `/processes`, suchý běh `GET /reconcile` a `/ports` sdílejí jeden sken registru (`Workspaces.recent()`, okno `workspaces.recentScanMs`, výchozích
@@ -1108,6 +1160,21 @@ rozhoduje launcher.
   Sken sám stojí ~12 ms na worktree (CodeLoupe 52 worktrees 0,75 s, TerrioImporter 13 worktrees 0,18 s) a zbývá jako nejdelší část; za ním čeká `GET /reconcile` ještě na čtení tabulky procesů
   (~0,45 s), které na skenu nezávisí. Čtyři čtení tedy stojí jeden sken místo čtyř (součet −70 %), stěna při souběhu klesla o 15–40 %, ale pod 1,2 s se na 65 workspacech nedostala.
   Dál se nezrychlovalo (paralelní sken worktrees, souběh čtení procesů se skenem) bez dalšího měření; první čtení po startu zůstává o vteřiny delší (zahřívá JGit a historii úkolů).
+
+### Výsledek CL-145 — README jako úvodní stránka, detail ve wiki (2026-10-09)
+
+- README (827 → ~130 řádků) je úvod: co a proč s grafem benchmarku, rychlý start (CLI, plugin), tabulka nástrojů, odkazy na
+  wiki, instalace, licence. Uživatelská a vývojářská příručka je **GitHub wiki v angličtině**; zdrojem je `docs/wiki/`
+  (jedna stránka = jeden soubor, `Home.md`, `_Sidebar.md`, `_Footer.md`), takže se mění s kódem a prochází review.
+  `docs/plan.md` a `docs/ui-spec.md` zůstávají v repozitáři (pracovní dokumenty, česky), stejně `docs/ci.md`,
+  `docs/code-signing.md` (záznamy rozhodnutí s čísly), `docs/benchmarks.md` (generovaný report) a `app/README.md`;
+  `docs/release.md` se stal stránkou wiki *Packaging and releasing*.
+- Publikace: `tools/publish-wiki.mjs` zrcadlí `docs/wiki` do `Terrio-cz/CodeLoupe.wiki.git` (idempotentní, mazání stránek se
+  zrcadlí, bez `Home.md` odmítne), workflow `wiki.yml` běží při pushi na `main`, který sáhne na `docs/wiki/**`
+  (`GITHUB_TOKEN`, `contents: write` jen v tom jobu, token jde do gitu jen přes proměnné prostředí). Odkazy kontroluje
+  `tools/check-wiki-links.mjs` (stránky, nadpisy, soubory repozitáře, obrázky, README → wiki, sidebar) v CI i před publikací.
+- Pravidla psaní: odkaz na stránku je `[text](Page-Name#nadpis)`, na soubor repozitáře plná adresa `github.com/.../blob/main/...`
+  (relativní cesty ve wiki nefungují). Nová funkce = nový řádek v README jen u nástroje; popis patří na stránku wiki.
 
 ## 10. Rizika
 

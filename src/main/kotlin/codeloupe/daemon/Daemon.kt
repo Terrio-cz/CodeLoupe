@@ -10,6 +10,8 @@ import codeloupe.docker.ResourceInventory
 import codeloupe.docker.resourceRoutes
 import codeloupe.events.EventBus
 import codeloupe.events.EventStore
+import codeloupe.hooks.Hooks
+import codeloupe.hooks.hookRoutes
 import codeloupe.index.Extraction
 import codeloupe.index.ParseWorkerClient
 import codeloupe.events.WebhookKey
@@ -155,6 +157,7 @@ class Daemon private constructor(
     @Volatile private var lastClientCall: Instant? = null
     private val history = ResourceHistory()
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = { trackers.touch(); history.sample() })
+    private val hooks = Hooks.create(config, registry, runner::callsOn)
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
     private val pid = ProcessHandle.current().pid()
@@ -174,6 +177,7 @@ class Daemon private constructor(
             calls = runner.stats(), latency = latency, budgets = BudgetState.check(config.budgets, latency, rss, queueSnapshot.waitMsMax),
             queue = queueSnapshot, repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
             gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(), portAllocations = ports.allocated,
+            hooks = hooks.stats(),
         )
     }
 
@@ -277,6 +281,7 @@ class Daemon private constructor(
                 val args = readBody(call) ?: return@post call.respondJson(HttpStatusCode.InternalServerError, error("body too large"))
                 call.respondJson(HttpStatusCode.OK, ToolOutcome.serializer(), runner.run(tool, ToolArgs(args), "api"))
             }
+            hookRoutes(hooks)
             jobRoutes(jobs)
             workspaceRoutes(workspaces, processes)
             resourceRoutes(resources)

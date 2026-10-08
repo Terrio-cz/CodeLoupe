@@ -8,7 +8,7 @@ the app without a manual override, and macOS cannot update itself silently (CL-1
 ## The free path (what the project does)
 
 - **Release assets**: installers, bundle zips, `SHA256SUMS.txt`, CycloneDX SBOMs and the notes, published by hand from
-  the draft release ([release.md](release.md)). The build runs in public CI from a tag.
+  the draft release ([Packaging and releasing](https://github.com/Terrio-cz/CodeLoupe/wiki/Packaging-and-releasing)). The build runs in public CI from a tag.
 - **Windows**: SmartScreen judges files that carry the Mark of the Web, which a browser download has and a download by a
   package manager does not. The release pipeline generates a **winget manifest** and a **Scoop manifest** from the
   published files and their SHA-256; installing through them avoids the warning. Browser downloads: "More info → Run
@@ -21,7 +21,7 @@ the app without a manual override, and macOS cannot update itself silently (CL-1
 - **Linux**: nothing needed; AppImage and `.deb` with checksums.
 - **Updates**: Windows (NSIS) and Linux (AppImage) update themselves with `electron-updater`, which checks the SHA-512 in
   the release feed over HTTPS (the app config sets no `publisherName`, so the publisher check, which an unsigned installer
-  could not pass, is skipped and the SHA-512 is what counts); macOS only notifies (CL-107, README → Updates).
+  could not pass, is skipped and the SHA-512 is what counts); macOS only notifies (CL-107, wiki → [Installers and updates](https://github.com/Terrio-cz/CodeLoupe/wiki/Installers-and-updates)).
 - Publishing the manifests to winget-pkgs, a Scoop bucket or a Homebrew tap is an outward-facing step the owner takes;
   the repository only generates the files.
 - **No free certificate fits**: SignPath Foundation signs open-source projects with an OSI-approved licence for free;
@@ -33,7 +33,7 @@ the app without a manual override, and macOS cannot update itself silently (CL-1
 |---|---|---|
 | Windows | An Authenticode signature on the installer and the executables. Reputation builds per file hash, so every new build starts with a SmartScreen warning that fades with downloads; an EV certificate no longer skips it (Microsoft removed the EV special case in 2024). | "Windows protected your PC", install possible through "More info → Run anyway". Auto-update by `electron-updater` refuses an unsigned update (it verifies the publisher). |
 | macOS | A Developer ID Application certificate, the hardened runtime, notarisation by Apple and stapling. Only a paid Apple Developer Program membership can issue it. | Gatekeeper refuses the app; the user must remove the quarantine flag by hand. Auto-update on macOS needs a signed, notarised app. |
-| Linux | Nothing required. AppImage and `.deb` ship with `SHA256SUMS.txt` from the release pipeline, see [release.md](release.md). | — |
+| Linux | Nothing required. AppImage and `.deb` ship with `SHA256SUMS.txt` from the release pipeline, see [Packaging and releasing](https://github.com/Terrio-cz/CodeLoupe/wiki/Packaging-and-releasing). | — |
 
 ## Options that cost money, not chosen (prices from vendor pages, checked 2026-10-08; they vary by reseller and date)
 

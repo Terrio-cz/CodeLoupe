@@ -66,7 +66,7 @@ export class ClaudeConnector {
     const marketplace = this.marketplace();
     const manual = commandLines(kind, port, marketplace);
     if (kind === 'plugin' && !marketplace) {
-      return { ok: false, message: 'The plugin folder (marketplace) was not found; install the plugin manually as described in the README.', manual };
+      return { ok: false, message: 'The plugin folder (marketplace) was not found; install the plugin manually as described at https://github.com/Terrio-cz/CodeLoupe/wiki/Claude-Code-integration.', manual };
     }
     const version = await this.run(['--version']).catch(() => null);
     if (!version || version.code !== 0) {
