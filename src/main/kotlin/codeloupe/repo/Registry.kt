@@ -13,6 +13,7 @@ import codeloupe.overlay.Overlays
 import codeloupe.platform.Sha1
 import codeloupe.query.View
 import codeloupe.query.ViewPool
+import codeloupe.query.usages.BaseCaches
 import codeloupe.taskcode.TaskCodes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -41,7 +42,7 @@ class Registry(
     private val repos = ConcurrentHashMap<String, RepoState>()
     private val views = ViewPool()
     private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, views::release, log, emit)
-    private val builds = BaseBuilds(queue, launcher, log, release = views::release, swapped = ::collectOverlays, emit = emit)
+    private val builds = BaseBuilds(queue, launcher, log, release = ::releaseBase, swapped = ::collectOverlays, emit = emit)
     private val mergeBases = MergeBases(queue, launcher, config.queryTimeoutMs)
 
     /** Commits of the default branch by task, for `task_code`. */
@@ -174,6 +175,12 @@ class Registry(
     }
 
     fun snapshot(): List<RepoSummary> = repos.values.map { it.summary(overlays.count(it.id)) }
+
+    // Before a base file is deleted or replaced: no view keeps it open and nothing derived from it is served again.
+    private fun releaseBase(file: Path) {
+        views.release(file)
+        BaseCaches.evict(file)
+    }
 
     private fun collectOverlays(repo: RepoState) {
         queue.run(JobQueue.Lane.FAST, "gc:${repo.id}") {

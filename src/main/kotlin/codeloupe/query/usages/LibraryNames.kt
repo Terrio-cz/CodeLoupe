@@ -6,13 +6,8 @@ package codeloupe.query.usages
  * index declares the name only once.
  */
 internal class LibraryNames(private val cache: IndexCache) {
-    /** Simple (or alias) name -> fully qualified names files import under it, read in one pass when first needed. */
-    private val imported: Map<String, List<String>> by lazy {
-        cache.view.imports("i.star = 0").groupBy({ it.alias ?: it.fqn.substringAfterLast('.') }, { it.fqn })
-    }
-
     fun contains(name: String): Boolean =
-        name in CORE || imported[name].orEmpty().any { fqn -> cache.named(fqn.substringAfterLast('.')).none { it.fqn == fqn } }
+        name in CORE || cache.importsAs(name).any { cache.named(it.fqn.substringAfterLast('.')).none { d -> d.fqn == it.fqn } }
 
     private companion object {
         val CORE = setOf(

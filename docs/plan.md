@@ -115,7 +115,7 @@ Technické budgety: daemon ustáleně ≤ 200 MB (JVM), špička ≤ 300 MB; bui
   Python, Go) později bez změny jádra.
 - Cache: `<home>/repos/<repo-id>/` (repo-id = hash git common dir) → víc repozitářů, víc workspaců,
   jedna instance.
-- Licence a README, konfigurační reference, CHANGELOG — součást v1.
+- Licence: **PolyForm Noncommercial 1.0.0** (uživatel 2026-10-08, CL-100: lidé to nesmějí prodávat ani komerčně využívat; nejsilnější ochrana při veřejném repu). README, konfigurační reference, CHANGELOG — součást v1.
 
 ## 5. Architektura
 
@@ -524,6 +524,15 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   (224 MB) bez měřitelného zrychlení → ne; `cache_size` 8 MB a `soft_heap_limit` v šumu → výchozí.
 - **RSS** (zátěž: 4 TER worktree poprvé + 8× `changes` + 4× `usages ApiKey.id`): main 190–194 MB, CL-96 **195–198 MB**
   (pool bez `shrink_memory` 208–234 MB). Teplé dotazy 132–138 MB.
+- CL-78: odvozené mapy nad neměnnou bází se drží per base generaci a sdílejí mezi requesty (`BaseCaches`/`BaseCache`,
+  max 2 generace, LRU omezené počtem řádků): `bySupertype`, explicitní importy, dotazy podle jména (decls, refs),
+  `FileScope` a refs podle řádku. Overlay zůstává per request: jeho řádky se přidají a řádky báze souborů, které overlay
+  drží (i smazaných), se skryjí; nic z overlaye se do sdílené cache nedostane. Cache se zahodí před smazáním/nahrazením
+  souboru báze (`Registry.releaseBase`) a při změně velikosti či času souboru. Opakované řetězce řádků (cesta, druh,
+  modul…) se internují, jinak sdílená cache zabírá ~58 MB heapu místo ~33 MB. Daemon `-Xmx80m` (bylo 96): RSS neurčuje
+  velikost cache, ale to, kam heap dorostl. Měřeno na TerrioImporter (50 dotazů: `usages`, `find`, `outline`, `symbol`,
+  `hierarchy`, `calls`, z toho 5× `usages ApiKey.id`, třetina v task worktree): RSS 190 → **178–180 MB**, `usages ApiKey.id`
+  teplé 1,0–1,3 s → **134–223 ms**; čerstvý home (vč. prvního buildu a parsu overlaye) 212 → 201 MB.
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
   Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.

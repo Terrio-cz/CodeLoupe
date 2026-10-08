@@ -181,6 +181,84 @@ no `git` process runs. The first call in a repository waits for the scan of its 
 Repositories also come from a tracker's `repos` and from the repositories the daemon has served; `<repo name>-worktrees`
 beside a repository is always a root.
 
+### Docker resources
+
+Every container, image, volume and network that is made through CodeLoupe carries three labels naming its owner:
+`codeloupe.repo` (the repository's main worktree), `codeloupe.workspace` (the worktree directory) and `codeloupe.task`
+(the workspace's task id, empty for one without). The workspace is the one of the directory you run in (`--dir` names
+another), found through the registry above.
+
+```
+codeloupe ws up [-f compose.yaml] [-p project] [--profile x] [-- up-args]   # default: -d
+codeloupe ws run [--dir d] <docker run arguments>
+codeloupe ws build [--dir d] <docker build arguments>
+codeloupe ws volume create <name>
+codeloupe ws resources [--class owned|adopted|unowned] [--json]     # GET /resources
+```
+
+`ws volume create` and the inventory use the Docker Engine API (named pipe `\\.\pipe\dockerDesktopLinuxEngine` /
+`docker_engine`, or a unix socket; `DOCKER_HOST` with `npipe://` or `unix://` is honoured): no `docker` process, no
+output parsing. Compose, build and the full `docker run` command line are client side, so those three call `docker`
+with the labels added and check the result through the API: `ws up` reads `docker compose config --format json` and adds
+the labels through a generated override file to every service (containers), to `build` (images the project builds),
+and to the project's own volumes and networks (not to `external` ones); `ws build` passes `--label` and verifies the
+image; `ws run` passes `--label` and first creates the named volumes it mounts, labelled (Docker would create them
+without). A `codeloupe.*` label given by the caller is refused, a volume that exists and is not the workspace's is
+never relabelled. Exit code 3: something the command made came out without the labels. Images a project only pulls
+are not created by CodeLoupe and carry no labels.
+
+`ws resources` lists what exists, by owner: **owned** (the labels), **adopted** (an adoption rule of the config maps its
+name to a workspace, for resources made before the labels existed) and **unowned**, which is only reported — nothing
+in CodeLoupe changes a resource it does not own, and adoption itself changes nothing in Docker: it is this mapping.
+Owned and adopted rows show the workspace's state in the registry (`not in registry` when its worktree is gone).
+
+```json
+{ "workspaces": { "adoption": [
+  { "repo": "TerrioImporter", "match": "^terrio-ter-(\\d+)(?:[-_].*)?$", "workspace": "TER-$1", "task": "TER-$1" },
+  { "repo": "TerrioImporter", "match": "^(?:terrio-)?importer-app:ter-(\\d+)(?:-.*)?$", "kinds": ["image"], "workspace": "TER-$1", "task": "TER-$1" }
+] } }
+```
+
+`match` is a case-insensitive regular expression tried against each name of the resource (container name, image
+`repo:tag`, volume or network name) and against the compose project it belongs to; `$1`… stand for its groups. Rules are
+tried in order, the first one wins, labels beat rules. Containers, volumes and networks are also matched by their compose
+project. Images are not, by default: compose labels an image with the project that built it, but images get re-tagged and
+shared between tasks (`aot`, `jdk25`), so the project alone does not make one a task's leftover. A rule with
+`"matchProject": true` (and `"kinds": ["image"]`) adopts the untagged and re-tagged images a stack built; the `via`
+column says which name matched.
+
+### Cleanup of released workspaces (reconciler)
+
+`codeloupe ws reconcile` is the dry run (`GET /reconcile`): for every owned or adopted resource and every orphan
+directory it says what the policy does and why. Unowned resources are not in it at all.
+
+| verdict | when | what happens |
+|---|---|---|
+| `auto` | labelled by CodeLoupe, its workspace has **landed**, no container of the workspace runs, older than `graceMinutes` | removed without asking, if `auto` is on |
+| `confirm` | adopted by a rule; or the workspace is abandoned, an orphan, or gone from the registry; or landed but still running; or an orphan directory under a worktree root | removed only when named: `ws reconcile --confirm <key>` or `--workspace TER-420` |
+| `keep` | the workspace is active; its repository is not in the registry; younger than the grace period | stays |
+| `protected` | a `protect` rule of the config matches | never touched, whatever else holds |
+
+`--run` (or `POST /reconcile/run` with `{"confirm": [keys], "workspaces": [names]}`) does it now: the `auto` entries plus
+what is named. A named `keep` or `protected` entry is refused. The plan is re-read from the registry and Docker for every
+run, so a stale key removes nothing it should not. Removal goes through the Engine API, containers first (stopped, removed
+with their anonymous volumes), then networks, volumes, images, never forced: a resource that is in use is *blocked*, not
+killed. An orphan directory is deleted without following links; a file that is still locked (Windows) leaves it blocked.
+
+Blocked and failed targets are retried with a growing wait (`retryBaseMinutes`, doubling up to `retryMaxMinutes`), kept
+in `<home>/reconcile-state.json`, so the backoff survives a restart of the daemon or the PC. A removal someone confirmed
+is retried without a second confirmation. With `auto` on the daemon runs the `auto` entries shortly after it starts, after
+a job finished, every `intervalMinutes` while a client has called the daemon in the last 15 minutes, and whenever a retry
+falls due. Every attempt is written to `daemon.log` and `<home>/reconcile.jsonl` and emitted as a `reconcile.action` event.
+
+```json
+{ "workspaces": { "reconcile": { "auto": true, "intervalMinutes": 30, "graceMinutes": 60, "retryBaseMinutes": 1, "retryMaxMinutes": 360,
+  "protect": [ { "match": "^terrio-importer(_|$)" }, { "match": "^terrio-importer_terrio-postgres-data$", "kinds": ["volume"] } ] } } }
+```
+
+`auto` is off by default. `protect` patterns are regular expressions tried (case-insensitively, anywhere in the name,
+so anchor them) against each name of a resource and its compose project; without `kinds` they also cover directories.
+
 ## Desktop app
 
 `app/` holds the Electron desktop app (tray, notifications, daemon start/stop, screens over the daemon's
@@ -292,6 +370,8 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |
 | `jobs` | commands run for agents: policy hook, slots, processes, summaries, completion actions, `job` tool |
 | `workspace` | `GET /workspaces`: worktrees, branches, tasks, merge and tracker state, orphan directories |
+| `reconcile` | `GET /reconcile`, `POST /reconcile/run`: policy, executor, backoff state, scheduler, journal |
+| `docker` | Docker Engine API client (named pipe / unix socket), ownership labels, compose override, `GET /resources`: owned / adopted / unowned |
 | `events` | event log, server-sent-events stream, webhook subscriptions and deliveries |
 | `cli` | `codeloupe` commands and the daemon client |
 
@@ -299,3 +379,10 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 TerrioImporter part runs where that repository is checked out (`CODELOUPE_TERRIO`). `UsagesGoldenTest` checks
 `usages` on 44 TerrioImporter symbols against a manually verified oracle (`src/test/resources/golden`) and writes
 `build/reports/codeloupe/golden-usages.md`: superset of `rg -w`, precision of `exact` (≥ 95 %), candidate share.
+
+## Licence
+
+CodeLoupe is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE): you may use, study, modify
+and share it for any noncommercial purpose (personal use, research, education, charities, public institutions), but
+not sell it, offer it as a paid product or service, or use it for commercial purposes. This is not an open-source
+licence in the OSI sense. For commercial use, contact the licensor (Terrio-cz).

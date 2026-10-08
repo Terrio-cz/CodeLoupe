@@ -9,7 +9,7 @@
   },
   "homepage": "https://github.com/Terrio-cz/CodeLoupe",
   "main": "out/main/index.js",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "node": ">=22.12"
   },

@@ -4,6 +4,9 @@ import codeloupe.CodeLoupe
 import codeloupe.JsonFormat
 import codeloupe.config.Config
 import codeloupe.config.PortPolicy
+import codeloupe.docker.DockerApi
+import codeloupe.docker.ResourceInventory
+import codeloupe.docker.resourceRoutes
 import codeloupe.events.EventBus
 import codeloupe.events.EventStore
 import codeloupe.events.WebhookKey
@@ -13,6 +16,13 @@ import codeloupe.events.eventRoutes
 import codeloupe.jobs.JobRunner
 import codeloupe.jobs.JobTool
 import codeloupe.jobs.jobRoutes
+import codeloupe.reconcile.ReconcileExecutor
+import codeloupe.reconcile.ReconcilePlanner
+import codeloupe.reconcile.ReconcileRecorder
+import codeloupe.reconcile.ReconcileScheduler
+import codeloupe.reconcile.ReconcileState
+import codeloupe.reconcile.Reconciler
+import codeloupe.reconcile.reconcileRoutes
 import codeloupe.platform.IsoTime
 import codeloupe.platform.ProcessMemory
 import codeloupe.platform.Timings
@@ -85,6 +95,14 @@ class Daemon private constructor(
     private val trackers = Trackers.open(TrackerSettingsLoader.load(config.home), config.home, scope, ::log)
     private val tools = Tools.catalog(trackers)
     private val workspaces = Workspaces(config, registry, trackers)
+    private val resources = ResourceInventory(config, workspaces)
+    private val reconcileConfig = config.workspaces.reconcile
+    private val reconciler = Reconciler(
+        reconcileConfig, { workspaces.list() }, { resources.report(it) }, ReconcilePlanner(reconcileConfig),
+        ReconcileExecutor({ DockerApi.connect() })::execute, ReconcileState(config.home.resolve("reconcile-state.json"), reconcileConfig),
+        ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
+    )
+    @Volatile private var lastClientCall: Instant? = null
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = trackers::touch)
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
@@ -146,6 +164,7 @@ class Daemon private constructor(
         // Only once the port is ours: a second daemon that fails to bind must not touch the first one's jobs.
         jobs.recover()
         webhooks.resume()
+        ReconcileScheduler(scope, reconcileConfig, reconciler, events.live, { lastClientCall }, ::log).start()
         val info = DaemonInfo(pid, config.port, CodeLoupe.VERSION, IsoTime.of(started))
         Files.writeString(infoFile, JsonFormat.json.encodeToString(DaemonInfo.serializer(), info))
         log("daemon ${CodeLoupe.VERSION} pid $pid listening on 127.0.0.1:${config.port}")
@@ -155,6 +174,7 @@ class Daemon private constructor(
         intercept(ApplicationCallPipeline.Plugins) {
             // No keep-alive: a pooled socket would outlive a daemon restart and fail the client's next call.
             val call = context
+            lastClientCall = Instant.now()
             call.response.header(HttpHeaders.Connection, "close")
             guard.refusal(call)?.let {
                 call.respondJson(RequestGuard.STATUS, error(it))
@@ -184,6 +204,8 @@ class Daemon private constructor(
             }
             jobRoutes(jobs)
             workspaceRoutes(workspaces)
+            resourceRoutes(resources)
+            reconcileRoutes(reconciler)
             eventRoutes(events, webhooks, webhookKey)
             post("/shutdown") {
                 val pending = jobs.pending()

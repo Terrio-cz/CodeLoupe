@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Smoke test and measurement of a bundle (CL-103): runs a query with the bundle's own launcher on a PATH without any
+// Smoke test and measurement of a bundle (CL-103): runs a query with the bundle's own launcher (on Windows: its runtime) on a PATH without any
 // Java (JAVA_HOME and friends removed, every PATH directory holding a java executable dropped), then records the bundle
 // size and the daemon's RSS. Uses its own CODELOUPE_HOME and port and stops its daemon at the end.
 //
@@ -53,11 +53,18 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codeloupe-smoke-'));
 const port = await new Promise(resolve => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); }); });
 Object.assign(env, { CODELOUPE_HOME: path.join(tmp, 'home'), CODELOUPE_PORT: String(port) });
 
-const launcher = path.resolve(bundle, 'bin', windows ? 'codeloupe.bat' : 'codeloupe');
+// Node refuses to start a .bat without a shell (CVE-2024-27980) and a shell command built from a path is what we avoid,
+// so on Windows the bundled java runs the jar with the launcher's own flags (minus the class-data archive, which only
+// speeds up repeated starts). The unix launcher is a plain executable and runs as shipped.
+const launcher = path.resolve(bundle, 'bin', 'codeloupe');
+const bundledJava = path.resolve(bundle, 'runtime', 'bin', javaName);
+const jar = windows ? fs.readdirSync(path.join(bundle, 'lib')).find(f => /^codeloupe-.*\.jar$/.test(f)) : null;
+if (windows && !jar) throw new Error('no codeloupe jar in the bundle lib directory');
+const windowsJvmFlags = ['-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-Xshare:auto', '-Xss512k', '-Xmx128m', '-XX:-UsePerfData', '-Xlog:disable'];
 function cli(args, cwd) {
   const started = performance.now();
   const run = windows
-    ? spawnSync('cmd.exe', ['/d', '/c', launcher, ...args], { env, cwd, encoding: 'utf8' })
+    ? spawnSync(bundledJava, [...windowsJvmFlags, '-jar', path.resolve(bundle, 'lib', jar), ...args], { env, cwd, encoding: 'utf8' })
     : spawnSync(launcher, args, { env, cwd, encoding: 'utf8' });
   return { code: run.status, out: `${run.stdout ?? ''}${run.stderr ?? ''}`, ms: Math.round(performance.now() - started) };
 }
@@ -88,7 +95,7 @@ try {
   report.daemonRssMb = status.rssMb;
   report.daemonHeapMb = status.heapMb;
   report.version = status.version;
-  const runtimeJava = path.join(bundle, 'runtime', 'bin', javaName);
+  const runtimeJava = bundledJava;
   report.runtime = (spawnSync(runtimeJava, ['-version'], { encoding: 'utf8' }).stderr ?? '').split('\n')[0];
 } catch (e) {
   failure = e;

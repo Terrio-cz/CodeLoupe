@@ -7,7 +7,7 @@ package codeloupe.cli
  */
 object DaemonJvm {
     fun args(): List<String> = listOf(
-        "-Xms16m", "-Xmx96m", "-Xss512k",
+        "-Xms16m", "-Xmx80m", "-Xss512k",
         "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-XX:ReservedCodeCacheSize=32m", "-XX:MaxMetaspaceSize=96m",
     )
 }
