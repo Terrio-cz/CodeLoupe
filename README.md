@@ -249,6 +249,17 @@ is retried without a second confirmation. With `auto` on the daemon runs the `au
 a job finished, every `intervalMinutes` while a client has called the daemon in the last 15 minutes, and whenever a retry
 falls due. Every attempt is written to `daemon.log` and `<home>/reconcile.jsonl` and emitted as a `reconcile.action` event.
 
+**Release instead of cleanup.** `codeloupe ws release <worktree directory | worktree name | task id> [--repo <path>]`
+(`POST /workspaces/release`) marks a workspace released and returns at once, whatever Docker or a lock is doing: it writes
+one small file (`<home>/releases.json`) and wakes the reconciler in the background. Every resource of that workspace,
+labelled or adopted, whatever state the workspace is in and whether its containers run, becomes an `auto` entry
+(`released` in the plan) and is removed with the usual retries, **also with `auto` off**: the release is the
+confirmation. A protect rule still wins. A mark covers what the workspace had created up to the release, so a new
+workspace of the same name is not cleaned by an old mark, and it goes when nothing of it is left (or after 30 days).
+`ws release --list` (and `releases` in `codeloupe status`) shows what is left of each release and what is retrying.
+The main worktree cannot be released. A close-out step calls `ws release` instead of `docker compose down` and the
+cleanup of leftovers.
+
 ```json
 { "workspaces": { "reconcile": { "auto": true, "intervalMinutes": 30, "graceMinutes": 60, "retryBaseMinutes": 1, "retryMaxMinutes": 360,
   "protect": [ { "match": "^terrio-importer(_|$)" }, { "match": "^terrio-importer_terrio-postgres-data$", "kinds": ["volume"] } ] } } }

@@ -14,9 +14,11 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * Runs the `auto` entries of the plan without anybody asking, when `workspaces.reconcile.auto` is on: once shortly after
- * the daemon starts (so a PC restart is followed by the cleanup it interrupted), after a job finished (a close-out ran),
- * every `intervalMinutes` while a client has talked to the daemon recently, and whenever a backed-off retry falls due.
+ * Runs the plan without anybody asking, when `workspaces.reconcile.auto` is on: once shortly after the daemon starts
+ * (so a PC restart is followed by the cleanup it interrupted), after a job finished (a close-out ran), every
+ * `intervalMinutes` while a client has talked to the daemon recently, and whenever a backed-off retry falls due.
+ * With `auto` off it still finishes the cleanup of released workspaces (`ws release`), at the start, after a job and
+ * on retries, never on the interval; the `auto` entries of other workspaces wait for a person then.
  */
 class ReconcileScheduler(
     private val scope: CoroutineScope,
@@ -33,11 +35,13 @@ class ReconcileScheduler(
 ) {
     private var lastRun: Instant = now()
 
+    // Work to do on its own: everything with `auto`, otherwise only what somebody released.
+    private fun wanted(): Boolean = config.auto || reconciler.hasReleases()
+
     fun start() {
-        if (!config.auto) return
         scope.launch {
             delay(startDelayMs)
-            attempt("start")
+            if (wanted()) attempt("start")
         }
         scope.launch {
             while (true) {
@@ -45,8 +49,8 @@ class ReconcileScheduler(
                 val interval = Duration.ofMinutes(config.intervalMinutes.toLong())
                 val active = lastClientCall()?.let { Duration.between(it, now()) < ACTIVE_WINDOW } == true
                 when {
-                    reconciler.retryDue() -> attempt("retry")
-                    active && Duration.between(lastRun, now()) >= interval -> attempt("interval")
+                    wanted() && reconciler.retryDue() -> attempt("retry")
+                    config.auto && active && Duration.between(lastRun, now()) >= interval -> attempt("interval")
                 }
             }
         }
@@ -55,7 +59,7 @@ class ReconcileScheduler(
             events.filter { it.type == EventTypes.JOB_FINISHED }.collect {
                 if (pending?.isActive != true) pending = scope.launch {
                     delay(jobDebounceMs)
-                    attempt("job")
+                    if (wanted()) attempt("job")
                 }
             }
         }
@@ -64,7 +68,7 @@ class ReconcileScheduler(
     private suspend fun attempt(trigger: String) {
         lastRun = now()
         try {
-            reconciler.run(trigger, auto = true)
+            reconciler.run(trigger, auto = config.auto)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

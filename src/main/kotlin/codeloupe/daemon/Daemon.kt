@@ -21,6 +21,8 @@ import codeloupe.reconcile.ReconcilePlanner
 import codeloupe.reconcile.ReconcileRecorder
 import codeloupe.reconcile.ReconcileScheduler
 import codeloupe.reconcile.ReconcileState
+import codeloupe.reconcile.ReleaseStore
+import codeloupe.reconcile.releaseRoutes
 import codeloupe.reconcile.Reconciler
 import codeloupe.reconcile.reconcileRoutes
 import codeloupe.platform.IsoTime
@@ -31,6 +33,7 @@ import codeloupe.tracker.TrackerSettingsLoader
 import codeloupe.tracker.Trackers
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
+import codeloupe.workspace.WorkspaceRef
 import codeloupe.workspace.Workspaces
 import codeloupe.workspace.workspaceRoutes
 import io.ktor.http.ContentType
@@ -97,9 +100,10 @@ class Daemon private constructor(
     private val workspaces = Workspaces(config, registry, trackers)
     private val resources = ResourceInventory(config, workspaces)
     private val reconcileConfig = config.workspaces.reconcile
+    private val releases = ReleaseStore(config.home.resolve("releases.json"))
     private val reconciler = Reconciler(
-        reconcileConfig, { workspaces.list() }, { resources.report(it) }, ReconcilePlanner(reconcileConfig),
-        ReconcileExecutor({ DockerApi.connect() })::execute, ReconcileState(config.home.resolve("reconcile-state.json"), reconcileConfig),
+        reconcileConfig, { workspaces.list() }, { resources.report(it) }, ReconcilePlanner(reconcileConfig, releases::releasedAt),
+        ReconcileExecutor({ DockerApi.connect() })::execute, ReconcileState(config.home.resolve("reconcile-state.json"), reconcileConfig), releases, ::log,
         ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
     )
     @Volatile private var lastClientCall: Instant? = null
@@ -117,7 +121,7 @@ class Daemon private constructor(
             uptimeSec = Instant.now().epochSecond - started.epochSecond, rssMb = ProcessMemory.rssMb(),
             heapMb = (runtime.totalMemory() - runtime.freeMemory()) / MB, cpuSec = cpu,
             calls = runner.stats(), queue = queue.snapshot(), repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
-            gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(),
+            gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(),
         )
     }
 
@@ -133,6 +137,12 @@ class Daemon private constructor(
             val info = JsonFormat.json.decodeFromString(DaemonInfo.serializer(), Files.readString(infoFile))
             if (info.pid == pid) Files.deleteIfExists(infoFile)
         }
+    }
+
+    // A workspace was released: its cleanup starts at once, in the background, whatever the request is waiting for.
+    private fun released(ref: WorkspaceRef) {
+        log("workspace ${ref.workspace} of ${ref.repo} released")
+        scope.launch { runCatching { reconciler.run("release", auto = reconcileConfig.auto) } }
     }
 
     private fun log(message: String) = log.append("${IsoTime.now()} $message")
@@ -206,6 +216,7 @@ class Daemon private constructor(
             workspaceRoutes(workspaces)
             resourceRoutes(resources)
             reconcileRoutes(reconciler)
+            releaseRoutes(workspaces, releases, reconciler, ::released)
             eventRoutes(events, webhooks, webhookKey)
             post("/shutdown") {
                 val pending = jobs.pending()

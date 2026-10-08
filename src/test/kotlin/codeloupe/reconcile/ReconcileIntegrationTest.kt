@@ -124,6 +124,45 @@ class ReconcileIntegrationTest {
     }
 
     @Test
+    fun `releasing an active workspace cleans it in the background with auto off, and nothing else`() = runBlocking {
+        val f = fixture()
+        val docker = DockerTestSupport.open("CODELOUPE_DOCKER_TESTS", repo = f.repoName, workspace = "CL-2") ?: return@runBlocking
+        val name = "cltest-" + java.util.UUID.randomUUID().toString().take(8)
+        val other = Ownership(f.repoName, "CL-1", "CL-1")
+        try {
+            docker.createContainer("$name-c2", image, docker.ownership)
+            docker.createNetwork("$name-n2", docker.ownership)
+            docker.createVolume("$name-v2", docker.ownership)
+            docker.createVolume("$name-v1", other)
+            docker.createUnlabelledVolume("$name-unowned")
+            val config = config(f, name, auto = false)
+            val daemon = Daemon.start(config)
+            try {
+                val started = System.nanoTime()
+                val released = http(config, "POST", "/workspaces/release", """{"target":"CL-2"}""")
+                val elapsedMs = (System.nanoTime() - started) / 1_000_000
+                assertEquals(200, released.statusCode(), released.body())
+                assertTrue(elapsedMs < 1_000, "release took $elapsedMs ms")
+
+                val until = System.currentTimeMillis() + 60_000
+                while (names(docker, name).any { it.endsWith("2") } && System.currentTimeMillis() < until) delay(500)
+                assertEquals(setOf("$name-v1", "$name-unowned"), names(docker, name))
+                // Nothing is left, so the mark is gone.
+                val gone = System.currentTimeMillis() + 30_000
+                while (!http(config, "GET", "/workspaces/releases").body().contains("\"items\":[]") && System.currentTimeMillis() < gone) delay(500)
+                assertTrue(http(config, "GET", "/workspaces/releases").body().contains("\"items\":[]"))
+            } finally {
+                daemon.stop()
+            }
+        } finally {
+            docker.cleanUp()
+            listOf("v1", "v2", "unowned").forEach { docker.removeVolume("$name-$it") }
+            docker.removeContainer("$name-c2")
+            docker.removeNetwork("$name-n2")
+        }
+    }
+
+    @Test
     fun `with auto on the daemon cleans the landed workspace by itself shortly after it starts`() = runBlocking {
         val f = fixture()
         val docker = DockerTestSupport.open("CODELOUPE_DOCKER_TESTS", repo = f.repoName, workspace = "CL-1") ?: return@runBlocking
