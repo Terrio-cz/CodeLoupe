@@ -795,6 +795,24 @@ rozhoduje launcher.
   nejsou mezera pro UI (je to zátěž daemonu). Seznam běhů a kroky vystavuje API, i když obrazovka Běhy z UI vypadla (§ 3.3):
   data jsou potřeba pro Přehled a pro případnou obrazovku v aplikaci.
 
+### Výsledek distribuce zdarma (CL-105, CL-130, 2026-10-08)
+
+- **Rozhodnutí vlastníka**: nic se neplatí, instalátory zůstávají nepodepsané ([docs/code-signing.md](code-signing.md)). Co to
+  zlevňuje: Windows nese SmartScreen jen soubor s Mark of the Web, takže winget a Scoop (stahují bez něj) varování nemají;
+  macOS potřebuje na Apple Silicon aspoň ad hoc podpis; Homebrew cask po instalaci smaže karanténní atribut.
+- **macOS ad hoc podpis**: `afterPack` hook `app/scripts/ad-hoc-sign.mjs` (s `identity: null` electron-builder `afterSign` vůbec
+  nevolá). Nejdřív podepíše volné Mach-O soubory v `Resources` (java z jlinku a její knihovny, `codesign --deep` na ně nedosáhne),
+  pak celou aplikaci. Cizí `cafebabe` (třídy Javy) od univerzálních binárek rozliší počet architektur. CI: `codesign -dv` ukazuje
+  `Signature=adhoc` a `--verify --deep --strict` prochází na obou macOS runnerech (arm64, Intel), instalační smoke test totéž
+  ověří na nainstalované kopii, takže aplikace po podpisu i naběhne.
+- **Manifesty** (`tools/packaging-manifests.mjs`, výstup `packaging-manifests.zip` u draft release): winget (3 YAML, schéma 1.6.0,
+  `nullsoft`, `/S`), Scoop (NSIS instalátor se rozbalí jako archiv `#/dl.7z`, aplikace je pak přenosná a aktualizuje ji jen Scoop),
+  Homebrew cask (`arch arm:/intel:`, `postflight` s `xattr -dr com.apple.quarantine`, `binary` na CLI). URL a hashe z
+  `SHA256SUMS.txt`; přítomný instalátor se proti sumě ještě ověří. Ověřeno: `winget validate` prošel na vygenerovaných souborech
+  (první verze spadla na dvojtečce v popisu, proto se popis cituje), `brew style --cask` v CI proti lokálnímu tapu (našel dlouhý
+  popis a chybějící `depends_on :macos`), testy v `tools/`. Neověřeno: instalace přes skutečný winget/Scoop/Homebrew, ta vyžaduje
+  publikaci manifestů a vydání; to je krok vlastníka.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
