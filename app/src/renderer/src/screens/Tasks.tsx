@@ -3,6 +3,7 @@ import type { TaskSummary } from '../../../shared/contract';
 import { bridge, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
 import { allowedOrigins, MarkdownView } from '../components/MarkdownView';
+import { Icon } from '../components/Icon';
 import { Card, ErrorState, Loading, Search, Section, Select } from '../components/Parts';
 import { LayerBadge, StatusBadge, taskTone } from '../components/StatusBadge';
 import { ago, dateTime, num } from '../format';
@@ -46,7 +47,7 @@ function TaskList() {
         <Select label="Stav" value={state} onChange={setState} options={['', 'To do', 'In Progress', 'Ready for testing', 'Done'].map(s => ({ value: s, label: s || 'Všechny stavy' }))} />
         <Search label="Hledat úkol" value={q} onChange={setQ} />
         <span style={{ flex: 1 }} />
-        {data && <span className="muted">mirror synchronizován {ago(data.mirrorSyncedAt)}</span>}
+        {data && <span className="chip">mirror synchronizován {ago(data.mirrorSyncedAt)}</span>}
       </div>
       <Card bodyClass="">
         {data ? (
@@ -55,11 +56,11 @@ function TaskList() {
             <div className="table-foot">
               <span>{num(data.items.length ? first + 1 : 0)}–{num(first + data.items.length)} z {num(data.total)}</span>
               <span style={{ flex: 1 }} />
-              <button className="btn" disabled={stack.length === 0} onClick={() => setPages({ key: filterKey, stack: stack.slice(0, -1) })}>← Předchozí</button>
-              <button className="btn" disabled={!data.nextCursor} onClick={() => data.nextCursor && setPages({ key: filterKey, stack: [...stack, data.nextCursor] })}>Další →</button>
+              <button className="btn" disabled={stack.length === 0} onClick={() => setPages({ key: filterKey, stack: stack.slice(0, -1) })}><Icon name="arrowLeft" size={14} />Předchozí</button>
+              <button className="btn" disabled={!data.nextCursor} onClick={() => data.nextCursor && setPages({ key: filterKey, stack: [...stack, data.nextCursor] })}>Další<Icon name="arrowRight" size={14} /></button>
             </div>
           </>
-        ) : loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst úkoly.'} onRetry={reload} />}
+        ) : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Nelze načíst úkoly.'} onRetry={reload} />}
       </Card>
     </>
   );
@@ -70,26 +71,31 @@ function TaskDetailView({ id }: { id: string }) {
   const settings = useApi('settings');
   const allowed = allowedOrigins((settings.data?.youtrack ?? []).map(y => y.url));
   const [openFailed, setOpenFailed] = useState(false);
-  if (!t) return <Card>{error ? <ErrorState message={error.message} onRetry={reload} /> : <Loading />}</Card>;
+  if (!t) return <Card>{error ? <ErrorState title={`Úkol ${id} se nepodařilo načíst`} message={error.message} onRetry={reload} action={<button className="btn ghost" onClick={() => go('tasks')}>Zpět na úkoly</button>} /> : <Loading />}</Card>;
   const done = t.criteria.filter(c => c.checked).length;
   return (
     <>
-      <nav aria-label="Drobečková navigace" className="muted">
-        <button className="link" onClick={() => go('tasks')}>← Úkoly</button> / <span className="mono">{t.id}</span>
+      <nav aria-label="Drobečková navigace" className="crumbs muted">
+        <button className="link" onClick={() => go('tasks')}>Úkoly</button>
+        <Icon name="chevron" size={12} />
+        <span className="mono">{t.id}</span>
       </nav>
       <div className="task-layout">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           <Card>
-            <h1 style={{ fontSize: 18, marginBottom: 6 }}>{t.summary}</h1>
-            <button className="link" onClick={() => void bridge().open.external(t.url).then(ok => setOpenFailed(!ok))}>Otevřít v YouTracku ↗</button>
+            <h1 className="task-title">{t.summary}</h1>
+            <button className="link" onClick={() => void bridge().open.external(t.url).then(ok => setOpenFailed(!ok))} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>Otevřít v YouTracku<Icon name="external" size={13} /></button>
             {openFailed && <span className="t2" role="status" style={{ marginLeft: 8 }}>Odkaz nevede na nastavenou YouTrack instanci, neotevřen.</span>}
             <div style={{ marginTop: 12 }}><MarkdownView source={t.description} allowed={allowed} /></div>
           </Card>
           <Card title={`Akceptační kritéria ${done}/${t.criteria.length}`}>
+            {t.criteria.length > 0 && (
+              <div className="progress" aria-hidden="true"><span style={{ width: `${(done / t.criteria.length) * 100}%` }} /></div>
+            )}
             <ul className="rows">
               {t.criteria.map((c, i) => (
                 <li key={i}>
-                  <span role="img" aria-label={c.checked ? 'splněno' : 'nesplněno'}>{c.checked ? '☑' : '☐'}</span>
+                  <span role="img" aria-label={c.checked ? 'splněno' : 'nesplněno'} className={`criterion${c.checked ? ' done' : ''}`}>{c.checked && <Icon name="check" size={12} />}</span>
                   <span className="grow">{c.text}</span>
                 </li>
               ))}

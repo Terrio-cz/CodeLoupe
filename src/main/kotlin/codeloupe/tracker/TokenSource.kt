@@ -1,5 +1,6 @@
 package codeloupe.tracker
 
+import codeloupe.secrets.SecretStore
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -30,6 +31,25 @@ sealed interface TokenSource {
         }
 
         override fun toString() = "dotenv $file $key"
+    }
+
+    /**
+     * A name in the encrypted store (global scope), as the desktop app's accounts keep their tokens. The store is asked at most every
+     * [cacheMs], so a mirror that syncs often does not touch the vault on each request, and a rotated token applies within that time.
+     */
+    class Stored(val name: String, private val store: () -> SecretStore?, private val usedBy: String, private val cacheMs: Long = 30_000, private val now: () -> Long = System::currentTimeMillis) : TokenSource {
+        private var cached: Pair<Long, String>? = null
+
+        @Synchronized
+        override fun read(): String {
+            cached?.let { (at, token) -> if (now() - at < cacheMs) return token }
+            val secrets = store() ?: throw TrackerException("no secret store to read $name from")
+            val value = secrets.resolve(SecretStore.chain(), usedBy, setOf(name))[name]?.value?.trim()?.takeIf { it.isNotEmpty() }
+                ?: throw TrackerException("token $name is not in the secret store")
+            return checked(value).also { cached = now() to it }
+        }
+
+        override fun toString() = "store $name"
     }
 
     companion object {

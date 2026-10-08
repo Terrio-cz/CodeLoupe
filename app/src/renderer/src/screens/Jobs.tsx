@@ -3,7 +3,8 @@ import type { Delivery, JobLogText, JobRecord, SlotSnapshot, Webhook } from '../
 import { bridge, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
 import { Drawer } from '../components/Drawer';
-import { Card, ErrorState, KpiTile, Loading, Search, Section, Select } from '../components/Parts';
+import { CountUp } from '../components/CountUp';
+import { Card, Empty, ErrorState, KpiTile, Loading, Search, Section, Select } from '../components/Parts';
 import { StatusBadge } from '../components/StatusBadge';
 import { ago, dateTime, ms, num } from '../format';
 import { useSettings } from '../hooks';
@@ -21,7 +22,7 @@ const elapsed = (j: JobRecord, now: number): number | null =>
 function columns(now: number): Column<JobRecord>[] {
   return [
     { key: 'id', header: 'Job', render: j => <span className="mono">{j.id}</span> },
-    { key: 'status', header: 'Stav', render: j => { const s = jobStatus(j); return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>; } },
+    { key: 'status', header: 'Stav', render: j => { const s = jobStatus(j); return <StatusBadge tone={s.tone} live={j.status === 'running'}>{s.label}</StatusBadge>; } },
     { key: 'command', header: 'Příkaz', render: j => <span className="mono" title={j.command}>{shorten(j.command, 70)}</span>, className: 'ellipsis' },
     { key: 'slot', header: 'Slot', render: j => j.slot ?? '—' },
     { key: 'tag', header: 'Štítek', render: j => j.tag ?? '—' },
@@ -64,7 +65,7 @@ export function Jobs({ route }: { route: Route }) {
     return () => clearInterval(t);
   }, [active]);
 
-  if (!jobs.data) return <Card>{jobs.loading ? <Loading /> : <ErrorState message={jobs.error?.message ?? 'Nelze načíst joby.'} onRetry={jobs.reload} />}</Card>;
+  if (!jobs.data) return <Card bodyClass="">{jobs.loading ? <Loading variant="table" /> : <ErrorState message={jobs.error?.message ?? 'Nelze načíst joby.'} onRetry={jobs.reload} />}</Card>;
 
   const counts = jobCounts(items);
   const shown = items.filter(j => matches(j, { filter, q }));
@@ -80,18 +81,18 @@ export function Jobs({ route }: { route: Route }) {
         <span className="muted">Posledních {num(items.length)} jobů{settings?.apiSource === 'daemon' ? ' · živě z proudu událostí daemonu' : ' · mock data, bez živého proudu'}{status.data?.jobs?.policyHook ? ' · politika hlídá příkazy' : ''}</span>
       </div>
 
-      <section className="card" aria-label="Počty jobů">
+      <section aria-label="Počty jobů">
         <div className="kpis">
-          <KpiTile label="Běží" value={num(counts.running)} ctx="právě teď" />
-          <KpiTile label="Ve frontě" value={num(counts.queued)} ctx="čekají na slot" />
-          <KpiTile label="Hotové" value={num(counts.passed)} ctx="exit 0" />
-          <KpiTile label="Selhané" value={num(counts.failed)} ctx="exit ≠ 0, chyba, ztracené" />
-          <KpiTile label="Zamítnuté a zrušené" value={num(counts.stopped)} ctx="nespuštěné nebo přerušené" />
+          <KpiTile label="Běží" value={<CountUp value={counts.running} format={num} />} ctx="právě teď" />
+          <KpiTile label="Ve frontě" value={<CountUp value={counts.queued} format={num} />} ctx="čekají na slot" />
+          <KpiTile label="Hotové" value={<CountUp value={counts.passed} format={num} />} ctx="exit 0" />
+          <KpiTile label="Selhané" value={<CountUp value={counts.failed} format={num} />} ctx="exit ≠ 0, chyba, ztracené" />
+          <KpiTile label="Zamítnuté a zrušené" value={<CountUp value={counts.stopped} format={num} />} ctx="nespuštěné nebo přerušené" />
         </div>
       </section>
 
       <Card title="Sloty a kdo je drží" bodyClass="">
-        {slots.length === 0 ? <div className="state">Daemon nemá žádný slot (každý job běží hned).</div> : (
+        {slots.length === 0 ? <Empty icon="jobs">Daemon nemá žádný slot (každý job běží hned).</Empty> : (
           <ul className="slots" aria-label="Sloty">
             {slots.map(s => <SlotRow key={s.name} slot={s} byId={byId} />)}
           </ul>
@@ -165,14 +166,14 @@ function JobDrawerBody({ id, now }: { id: string; now: number }) {
   }, [reload]);
   if (!data) return error ? <ErrorState message={error.message} onRetry={reload} /> : <Loading />;
   const job = data.chain.find(j => j.id === id) ?? data.chain[0];
-  if (!job) return <ErrorState message="Job už daemon nezná." />;
+  if (!job) return <ErrorState title="Job nenalezen" message="Job už daemon nezná." />;
   const st = jobStatus(job);
   const d = elapsed(job, now);
 
   return (
     <>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
+        <StatusBadge tone={st.tone} live={job.status === 'running'}>{st.label}</StatusBadge>
         {d !== null && <span>{ms(d)}</span>}
         {job.tag && <span className="chip">{job.tag}</span>}
         {job.failureBranch && <span className="chip warn">větev po selhání</span>}
@@ -241,13 +242,13 @@ function LogSummary({ job }: { job: JobRecord }) {
       {counts && <div style={{ marginBottom: 8 }}><strong>{counts}</strong></div>}
       {s && s.failures.length > 0 && (
         <>
-          <div className="muted">Chyby</div>
+          <div className="sublabel">Chyby</div>
           <pre className="mono log failures">{s.failures.join('\n')}</pre>
         </>
       )}
       {s && s.tail.length > 0 && (
         <>
-          <div className="muted">Poslední řádky</div>
+          <div className="sublabel">Poslední řádky</div>
           <pre className="mono log">{s.tail.join('\n')}</pre>
         </>
       )}

@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Empty } from './Parts';
 
 export interface Column<T> {
   key: string;
@@ -61,7 +62,7 @@ export function DataTable<T>({ label, rows, columns, rowKey, onOpen, selected, s
             onClick={() => onSort({ key: c.sortKey!, order: sorted && sort.order === 'desc' ? 'asc' : 'desc' })}
           >
             {c.header}
-            <span aria-hidden="true">{sorted ? (sort.order === 'desc' ? '▼' : '▲') : ''}</span>
+            <span aria-hidden="true" className="sort-mark">{sorted ? (sort.order === 'desc' ? '↓' : '↑') : ''}</span>
           </button>
         ) : (
           c.header
@@ -79,7 +80,7 @@ export function DataTable<T>({ label, rows, columns, rowKey, onOpen, selected, s
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="muted">{empty ?? 'Žádná data.'}</td>
+              <td colSpan={columns.length} className="empty-cell"><Empty>{empty ?? 'Žádná data.'}</Empty></td>
             </tr>
           ) : (
             rows.map(row => {

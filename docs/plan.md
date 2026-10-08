@@ -285,23 +285,51 @@ tracker v konfiguraci) + `job` (start/status/cancel jedním nástrojem, CL-84).
 | `modules()` | moduly a jejich závislosti |
 | `check(file)` | syntaktické chyby (ERROR uzly) — rychlá náhrada IDEA `get_file_problems`; typy dál ověřuje build |
 
-### Zápis
+### Zápis (CL-37 ✅)
 
-| Nástroj | Dělá |
-|---|---|
-| `replace_symbol(name, code, hash)` | nahradí deklaraci |
-| `insert_after` / `insert_before(name, code, hash)` | vloží vedle symbolu |
-| `insert_member(type, code, position, hash)` | `start`, `end`, `after_properties` |
-| `delete_symbol(name, hash)` | smaže deklaraci i s KDocem a anotacemi |
-| `add_imports(file, [fqn])` | přidá, seřadí, bez duplicit |
-| `create_file(path, code)` | jen nový soubor; package = složka |
-| `rename_symbol(name, newName, hash)` | přejmenuje deklaraci a všechny `exact` výskyty; `candidate` výskyty vrátí k ručnímu rozhodnutí; náhrada IDEA `rename_refactoring` |
+Jeden nástroj `edit(op, …)` místo sedmi (strop 14 platí: výchozí katalog má dál 14 nástrojů; `edit` je 15. a nabízí se jen, když to dovolí
+brána níže — nástroj navíc by stál tokeny v každém okně i těm, kdo nepíšou). Samostatný nástroj, ne `op` u `symbol`: klient povoluje nástroje po
+jménech a čtecí `symbol` by pak povoloval i zápis.
 
-Pojistky: hash zámek; zápisová politika z `.codeloupe.json` (Terrio: jen linked worktree, nikdy hlavní
-checkout; všude deny `.env`, klíče, soubory s konfliktními značkami); po zápisu přeparsovat — ERROR uzly
-nesmí přibýt a symbol musí jít najít, jinak rollback; zachovat EOL/BOM/koncový newline; přeindentovat;
-atomický zápis s retry; journal zápisů; synchronní obnova vrstvy. Po zápisu přes codeloupe chce Claude Code
-před `Edit` stejného souboru nové `Read` — v skillu.
+| `op` | Argumenty | Dělá |
+|---|---|---|
+| `replace` | `name`, `code`, `hash` | nahradí deklaraci (s KDocem a anotacemi); `code` shodný s textem = beze změny |
+| `insert_after` / `insert_before` | `name`, `code`, `hash` | vloží vedle symbolu (prázdný řádek jako sousedé; jednořádkové vlastnosti těsně) |
+| `insert_member` | `name` = typ, `code`, `position` `start`/`end`/`after_properties`, `hash` | člen do těla typu; typ bez těla dostane tělo, enum dostane `;` za konstanty |
+| `delete` | `name`, `hash` | smaže deklaraci i s KDocem a anotacemi a jeden sousední prázdný řádek (insert → delete vrátí soubor beze změny bajtu) |
+| `add_imports` | `file`, `imports` | přidá, seřadí do skupiny (Java: statické zvlášť), bez duplicit a bez toho, co jazyk importuje sám |
+| `create_file` | `path`, `code` | jen nový soubor; package = složka (`src/<set>/kotlin|java/…`), veřejný typ Javy = jméno souboru; EOL podle sousedů |
+| `rename` | `name`, `to`, `hash`, `dry_run` | deklarace + co přepisuje a co ji přepisuje + třída s konstruktory + každý `exact` výskyt + importy + soubor veřejného typu Javy; `candidate` vrátí k ručnímu rozhodnutí |
+
+Pojistky (všechny v kódu a pod testem):
+- **hash zámek**: `hash` z `symbol` musí sedět na deklaraci, jak je v souboru na disku (dotaz do indexu jen najde místo; deklarace se znovu najde ve
+  faktech čerstvě načteného souboru, takže zaostalý overlay nevadí); zastaralý hash = odmítnutí s novým hashem.
+- **offsety místo řádků**: extraktory dávají `DeclFact.startOffset/endOffset/nameOffset/bodyOpen/bodyClose` (jen v paměti, do indexu nejdou, formát
+  se nemění); edit mění jen rozsah deklarace, zbytek souboru zůstává bajt po bajtu (BOM, smíšené konce řádků, chybějící koncový newline, tabulátory).
+- **validace**: po úpravě se soubor znovu rozparsuje — ERROR uzlů nesmí přibýt, deklarace mimo upravený rozsah musí být přesně tytéž (druh, kontejner,
+  jméno, typy parametrů), rozsah musí obsahovat deklaraci a žádnou nesmí mít dvakrát. Jinak se nezapíše nic (rollback = soubor se nikdy nedotkl).
+- **atomický zápis**: dočasný soubor vedle cíle a jedno přejmenování, retry 10–600 ms při zablokování editorem/antivirem; více souborů (rename) se zamkne v
+  pořadí cest, porovná s tím, z čeho se edit dělal, a při chybě v půlce se vrátí zapsané soubory.
+- **zápisová politika** (`WritePolicy`): jen `.kt`/`.java` uvnitř worktree (odkaz ven se odmítne), nikdy `.git`, `.codeloupe.json`, `.env`/klíče, soubor s
+  konfliktními značkami; `config.json` `write.linkedWorktreesOnly`, `write.deny` (globy); `.codeloupe.json` repozitáře smí totéž **jen přidat** (Terrio:
+  `{"write": {"linkedWorktreesOnly": true}}`), nikdy zápis povolit.
+- **journal** `<home>/writes.jsonl`: čas, `op`, root, soubory se SHA-1 před/po. **Synchronní obnova vrstvy**: zápis označí overlay worktree k povinné kontrole
+  (`Overlays.invalidate`), takže další dotaz vidí změnu i při `overlayCheckMs`.
+- Po zápisu přes codeloupe chce Claude Code před `Edit` stejného souboru nové `Read` — v skillu.
+
+**Rename** (bez IDE a překladače): plán z indexu (`RenamePlanner`) → texty ze souborů na disku (`RenameEdits`: kontrola, že na každé pozici je ve skutečnosti
+staré jméno) → **kontrola, která nahrazuje překladač** (`RenameCheck`): worktree po přejmenování se naindexuje do dočasného overlaye vedle ostatního a každé
+přejmenované místo musí podle týchž pravidel jako `usages` vést na přejmenovanou deklaraci (zachycení jiným symbolem téhož jména, ztráta deklarace) → teprve pak
+se zapíše. Odmítne: jméno, které už existuje (člen téhož kontejneru, top-level téhož balíčku), lokál/parametr téhož jména u přejmenovaného nekvalifikovaného
+použití, `override` člena mimo index, operátory a konvence čtené podle jména (`toString`, `compareTo`, `main`, `invoke`, …). Upozorní na serializační anotace a
+na typy s nadtypy mimo index. Neřeší (vypíše jako `candidate`): getter Javy ↔ vlastnost Kotlinu, Java `XyzKt.f()` na top-level funkci Kotlinu; řetězce, komentáře a
+generovaný kód se nemění. Pojmenované argumenty konstruktoru (`Owner(x = 1)`) se přepíšou, je-li jméno majitele v indexu jediné.
+
+**Brána (`WriteGate`)** — titulek karty „gated by gap detector“: `write.mode` `off` | `on` | `auto` (výchozí). `auto` = pravidlo karty: nástroj se nabídne,
+jen když detektor mezer v transkriptech posledních `windowDays` (30) ukáže, že koderi dál čtou celé soubory kvůli `Edit` (≥ 20 čtení celého kódového souboru, po kterém
+do 3 tahů následuje `Edit`/`MultiEdit` téhož souboru) nebo chybí rename (≥ 3 běhy, v nichž se jeden identifikátor ručně vyměnil za jiný ve ≥ 3 souborech; `ManualEdits`).
+Prahy v `write.gate`. Verdikt se počítá mimo požadavek 60 s po startu daemonu, drží 6 h v `<home>/write-gate.json`, do prvního výpočtu je brána zavřená;
+`codeloupe metrics gaps` ho tiskne. Data k rozhodnutí existují jen tam, kde se sbírají transkripty — bez nich platí `mode: on` jako výslovné rozhodnutí.
 
 ## 7. Konstrukce, které musí projít testy
 
@@ -590,6 +618,12 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   0 s CPU za 20 s v klidu, build báze 27 s. Malé repozitáře (Terrio, 2 200 zdrojů) jedou po staré cestě beze změny. Ztráta:
   soubor, který se liší od báze jen konci řádků, se v tomto režimu nepozná porovnáním textu (git ho ale při `autocrlf` většinou
   za změněný nepovažuje); rychlé čtení z předchozí báze po landu (CL-124) se pro velké repozitáře nepoužije (stál by průchod).
+- CL-117 (2026-10-08): toolchain aplikace na Vite 8.3, plugin-react 6, vitest 5 a `electron-vite` 6.0.0-beta.7 (první řada
+  s peer `vite ^8`; stabilní 5.0.0 končí u Vite 7, proto beta, přibitá přesně, Dependabot ji povýší na stabilní). Vite 8 přináší
+  `lightningcss` (MPL-2.0, 12 balíčků pro platformy): povolen úzkým pravidlem v `tools/npm-licenses.mjs`, protože jde o
+  nezměněnou build-time závislost, která se do instalátorů nedostává (renderer se builduje). `@types/node` zůstává na 24
+  (Node v Electronu 44), proto jeden `ignore` v dependabot.yml. Lockfile je z npm 10 (jako v CI): npm 9 ani `--legacy-peer-deps`
+  nezapisují licenční pole a peer záznamy, se kterými `npm ci` počítá.
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
   Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.
@@ -807,7 +841,7 @@ rozhoduje launcher.
 - Průvodce importem spouští tok CL-52 (inventář → výběr zdroje u konfliktů → import → volitelné nahrazení zdrojů odkazem → vrácení) a okno vidí jen jména, cesty a počty.
   Mazání, nahrazení zdrojů a návrat potvrzuje nativní dialog main procesu se jménem klíče a jeho spotřebiteli.
 - „Kopírovat“ je jen s OS re-autentizací (macOS Touch ID); na Windows a Linuxu Electron žádný dotaz na uživatele nemá, takže tlačítko tam není. Hodnota jde do schránky,
-  nikdy do okna, čtení je v auditu jako „CodeLoupe app (kopie do schránky)“ a schránka se po 60 s vyčistí, jen když ji nikdo mezitím nepřepsal.
+  nikdy do okna, čtení je v auditu jako „CodeLoupe app (clipboard copy)“ a schránka se po 60 s vyčistí, jen když ji nikdo mezitím nepřepsal.
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu a fixture stromu: přidání, rotace, import s nahrazením zdrojů,
   návrat bajt po bajtu a smazání; po každém kroku se hledá každá z testovacích hodnot v DOM stránky i v odpovědích daemona (nenašla se).
 
@@ -916,6 +950,89 @@ rozhoduje launcher.
   (první verze spadla na dvojtečce v popisu, proto se popis cituje), `brew style --cask` v CI proti lokálnímu tapu (našel dlouhý
   popis a chybějící `depends_on :macos`), testy v `tools/`. Neověřeno: instalace přes skutečný winget/Scoop/Homebrew, ta vyžaduje
   publikaci manifestů a vydání; to je krok vlastníka.
+
+### Výsledek aktualizací aplikace a daemona (CL-107, 2026-10-08)
+
+- **Kanál**: Windows (NSIS) a Linux (AppImage) se aktualizují samy přes `electron-updater` z GitHub vydání, integritu drží SHA-512 a
+  velikost z `latest.yml` / `latest-linux.yml` (bez `publisherName` se kontrola podpisu přeskočí, nepodepsaný instalátor by ji
+  neprošel). macOS jen oznámí novou verzi s odkazem (Squirrel.Mac chce Developer ID), stejně `.deb` a kopie ze Scoopu.
+- **Vlastní výběr vydání** (`app/src/main/update/ReleaseFeed.ts`) místo GitHub providera electron-updateru: ten rc posune jen na další
+  rc se stejným prvním identifikátorem (`rc1` → `rc2` nenajde, `rc.1` → `rc.2` ano) a z rc nikdy na finální vydání. Aplikace čte
+  `releases.atom` (jen zveřejněná vydání, draft je neviditelný), vybere nejnovější tag podle semveru a electron-updateru dá jen
+  adresář `releases/download/<tag>/`. Rc se jmenují `rc.N`.
+- **Soukromí**: jediný host je github.com (atom, `latest.yml`, instalátor s přesměrováním na CDN GitHubu); User-Agent `CodeLoupe`,
+  `Accept-Language: en`, žádné cookies; hlavičku `x-user-staging-id` (náhodné ID instalace pro postupné nasazení) electron-updater
+  vždy posílá, proto je přepsaná konstantou. Vypínač v Nastavení (`autoUpdate`) vypne i časovač; ruční „Zkontrolovat teď" zůstává.
+  `CODELOUPE_UPDATE_FEED` pro test přijme jen `http://127.0.0.1|localhost`.
+- **Výměna daemona**: instalátor (`installer.nsh`) zastaví daemon staré instalace a přepíše soubory, nová aplikace daemon spustí z nového
+  bundlu; AppImage daemona zastavit neumí, takže první spuštění nové verze starší daemon restartuje (`UpdateGuard`). Indexy:
+  `Store.FORMAT` se při změně přebuduje (už to dělal `Registry`), update-test to ověřuje podvrženým starším formátem. Nastavení
+  (`userData/settings.json`), vault tajemství a indexy (home daemona) aktualizace nezasáhne.
+- **Rollback**: před instalací se bundle běžící verze zkopíruje do `<userData>/update/previous` (≈ 180 MB, po úspěchu se maže). První běh
+  nové verze hlídá `UpdateGuard`: daemon nového bundlu má 90 s odpovědět, jinak (nebo při selhání startu) se spustí předchozí bundle,
+  zapíše se `rollback.json`, Nastavení to ukáže a upozornění vyskočí; rollback platí, dokud nepřijde další verze.
+- **Měření na Windows** (`tools/update-test.mjs`, rc.1 → rc.2, instalátor 239 MB, lokální feed): od startu aplikace po staženou,
+  ověřenou a zazálohovanou aktualizaci 13,1 s (přes loopback, na internetu rozhoduje rychlost linky), běh instalátoru 22,6 s,
+  nový daemon odpovídá 7,1 s po startu nové aplikace, rozbitý daemon → předchozí odpovídá 4,1 s po startu. Prošlo všech 24 kontrol
+  včetně: podvržený instalátor (stejná velikost, jeden změněný bajt) odmítnut, při vypnutých aktualizacích žádný požadavek,
+  nastavení a tajemství přežily, starší formát indexu přebudován. CI (`update-test` job, tři sestavení + test, ≈ 12 minut na OS,
+  rc.1 → rc.2 → rozbité rc.3): Windows runner (instalátor 231 MB) stažení a záloha 6 s, instalátor 25,9 s, nový daemon 3 s po startu,
+  návrat na předchozí 4 s; Ubuntu (AppImage 261 MB) 7,1 s, výměna souboru 0,3 s, nový daemon 5 s (starý daemon AppImage nezastaví,
+  nová aplikace ho restartuje), návrat z rozbitého rc.3 16 s. macOS se neaktualizuje samo: instalační smoke test na obou macOS
+  runnerech i na `.deb` ověří jen oznámení (falešný seznam vydání na 127.0.0.1 nabídne v99.0.0).
+- **Neověřeno**: skutečný feed na GitHubu (vyžaduje zveřejněné vydání), relaunch aplikace po instalaci (`--force-run`: instalátor ji spouští
+  s prostředím uživatele, test ji spouští sám), macOS (jen oznámení, testováno jednotkově).
+
+### Výsledek CL-63 — účty Claude a YouTrack (2026-10-08)
+
+- `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`, `default`) a YouTrack instance (`url`, `projects`, `token` = jméno
+  globálního tajemství `YOUTRACK_TOKEN_<ID>` ve storu). Bez souboru je jediným účtem `~/.claude`. Ingest čte `projects` každého vypsaného účtu a přiřazuje transcripty podle cesty
+  (`runs.path LIKE <configDir>/projects/%`), takže cena 7 d na účet je jeden SQL přes `usage_hours`; filtr Přehledu (`overview?account=`) používá stejný předpona v `hours` a `gapCount`.
+- Okna účtu: pracovní složka, která za 15 min volala CodeLoupe, patří účtu, jehož `projects/<ProjectDirName>` existuje (u dvou účtů tomu s novější změnou). E-mail účtu je jediné, co se čte z `.claude.json`.
+- YouTrack účty se k trackeru přidávají v `TrackerSettingsLoader` (token `TokenSource.Stored`, cache 30 s, spotřebitel „tracker mirror: <id>“ v auditu); mirror se staví při startu, proto přidání a odebrání
+  účtu restartuje daemon. Tracker z `config.json` je v tabulce jen ke čtení.
+- Souběh: aplikace (CLI), daemon (poznamenání použití) i test zapisují do téhož vaultu; `SecretStore` teď čte-mění-zapisuje pod zámkem `vault.env.lock` (zámek souboru + zámek JVM),
+  test se čtyřmi zapisovateli a dvěma čtenáři na samostatných instancích neztratil žádný záznam.
+- Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu, fixture složkám dvou účtů a lokálnímu fake YouTrack: přidání účtu, přejmenování, výchozí,
+  filtr Přehledu (390 → 130), přidání YouTrack účtu s tokenem, test spojení (fake instance dostala uložený token), rotace (dostala nový), odebrání (token ze storu pryč); token se nikdy neobjevil v DOM ani v odpovědích daemona.
+
+### Výsledek CL-119 — úvodní průvodce v aplikaci (2026-10-08)
+
+- `codeloupe repos add|list` (`RepoConfig`): zápis jen `workspaces.repos` do `config.json`, ostatní klíče a objektové položky s `roots` zůstanou, neplatný JSON se nepřepíše; složka bez `.git` se odmítne,
+  přidané repozitáře dostanou první dotaz, takže je daemon pozná a začne stavět index bez restartu. Průvodce volá toto CLI s cestami z nativního dialogu; stránka žádnou cestu nepíše.
+- Průvodce (čtyři kroky: repozitáře, YouTrack, Claude Code, skutečný dotaz `outline`) se ukáže, když v nastavení aplikace není `onboardingDone` a soubor před tím neexistoval (starší instalace ho nezačínají);
+  jde přeskočit po krocích i celý a z Nastavení otevřít znovu. Token YouTrack jde přes tok účtů do šifrovaného storu (klíč chrání stejný OS jako `safeStorage`, daemon ho čte podle jména).
+- Dotaz zkoušky je `outline` bez cíle (mapa repozitáře), ne `find *`: Java launcher ve Windows rozbaluje `*` v argumentech na soubory aktuální složky, takže glob v argv se do CLI nedostane.
+- Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools) na čistém profilu: první start ukáže průvodce, přidání repozitáře (jedna složka přijata, jedna odmítnuta) a zachování klíče v `config.json`,
+  účet YouTrack s tokenem (token jen ve storu, fake instance ho dostala), skutečný dotaz vrátil mapu fixture repozitáře, dokončení se zapamatovalo, z Nastavení se otevřel znovu, druhý start jde rovnou do aplikace.
+
+### Výsledek CL-37 — zápisové nástroje a rename (2026-10-08)
+
+- **Nástroj**: `edit(op, …)`, kód v `codeloupe.write` (`WriteService` orchestruje, `SymbolEditor` / `ImportEditor` / `NewSource` dělají textové úpravy, `EditVerifier` ověřuje,
+  `WriteApplier` zapisuje, `WritePolicy` + `WriteGate` rozhodují, `Rename*` plánují a kontrolují přejmenování), `EditTool` jen mapuje argumenty. CLI `codeloupe edit <op> …`
+  (`--code-file`, `--dry-run`), `metrics gaps` tiskne verdikt brány. Katalog: výchozí 14 nástrojů (`DaemonTest`), s `edit` 15 (`EditToolDaemonTest`).
+- **Testy a harness** (`src/test/kotlin/codeloupe/write`, fixtury `fixtures/write/{kotlin,java}`, oba projekty se překládají skutečným `kotlinc` a `javac` v procesu):
+  `RoundTripTest` — *každá* deklarace obou projektů přepsaná vlastním textem nechá soubor beze změny bajtu v šesti rozloženích (LF, CRLF, BOM+CRLF, smíšené konce
+  řádků, bez koncového newline, tabulátory) a změna → zpětná změna vrátí soubor s jednotnými konci řádků; `WriteFuzzTest` — **200 zápisů** (replace, insert_member/after/before
+  na všech druzích typů, delete, add_imports, create_file, rename) × 4 (Kotlin LF, Java LF, Kotlin BOM+CRLF, Java CRLF), překlad po každých 50 zápisech a na konci zelený, žádné
+  neočekávané odmítnutí; `RenameTest` — 13 symbolů Kotlinu a 12 Javy po sobě (třída s konstruktory a soubor, rozhraní + implementace + anonymní třída, vlastnost
+  v konstruktoru, enum konstanta, top-level funkce s importy a aliasem, vnořená třída, statický import, přetížení, record, import sdílený víc funkcemi téhož jména, labely
+  `this@f`/`return@f`), po nich překlad zelený; dále `WriteServiceTest` (hash zámek, rollback, politika, journal, souběh, čerstvost vrstvy), `SymbolEditorTest`, `SmallPartsTest`,
+  `WriteGateTest`, `EditToolDaemonTest`, `FixturesCompileTest`.
+- **Rename na TerrioImporter** (scratch klon `git clone --local` v %TEMP%, zdroj jen čten; `TerrioWriteCheck` s `CODELOUPE_WRITE_CLONE` + soubor jmen z golden testu, pak
+  `gradlew compileKotlin compileTestKotlin` = hlavní i testovací zdroje všech modulů; commit `32f82d92`): **3 dávky, 34 přejmenování** (10 + 10 + 14; 37 deklarací, 307 použití,
+  66 importů, 192 úprav souborů), po každé dávce překlad zelený. Dávka 2 a 3 našly čtyři chyby, všechny opravené a pod testem: (1) `import pkg.toResponse` slouží všem extension funkcím
+  téhož jména — import zůstane a přibude nový; (2) labely `this@toVersion` / `return@loop` nejsou reference indexu; (3) kandidát, který jde číst jen jako použití přejmenované
+  rodiny (jméno nic jiného v indexu nedeklaruje a žádná knihovna ho nezná), se přejmenuje také (`UsageFinder.denotesOnly`, stejná heuristika jako `promoted`, golden test beze změny);
+  (4) kontrola po přejmenování hlídá i použití *jiných* deklarací téhož jména. Co nástroj nechá na volajícím, vypíše: `AcceptStep.Done.accepted` (3 místa přes smart cast, jméno
+  má v repu víc deklarací) a `RuianVfrElement.text` (22 míst) bez ručního zásahu nepřeloží — nástroj je vypsal řádek po řádku. Přejmenování, které by změnilo význam jiného místa, odmítla
+  kontrola (`LocationSearchKindVersion.rowCount`: použití by po přejmenování nevedlo na deklaraci).
+- **Brána na skutečných datech** (`codeloupe metrics gaps`, transkripty tohoto stroje, 3 066 běhů za posledních 30 dní, 1 min 8 s): **46** čtení celého kódového souboru následovaných
+  `Edit` téhož souboru (práh 20) → brána `auto` by se otevřela; **0** běhů s ruční výměnou identifikátoru ve 3 souborech (práh 3) — rename je tu pokrytý IDEA `rename_refactoring`, nástroj ho
+  nepotřebuje kvůli datům, ale kvůli worktree bez IDE.
+- **Mezery a rozhodnutí**: rename nenahrazuje IDE pro odkazy mimo index (reflexe, řetězce, generovaný kód, `getX()` Javy ↔ vlastnost Kotlinu — vypsané jako kandidáti);
+  `Terrio` doplní `{"write": {"linkedWorktreesOnly": true}}` do vlastního `.codeloupe.json` (mimo tento repozitář); brána `auto` je bez transkriptů zavřená a výslovně se otevírá
+  `write.mode: on`.
 
 ## 10. Rizika
 

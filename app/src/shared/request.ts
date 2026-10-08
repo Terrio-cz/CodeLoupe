@@ -25,7 +25,7 @@ const daemon = (path: string, query: readonly string[] = []): ResourceSpec => ({
 // Every GET the renderer may ask for, with the query keys each accepts (docs/ui-spec.md § 9). Anything else is refused, not dropped.
 const SPECS: Record<Resource, ResourceSpec> = {
   nav: ui('nav', ['gapsSince']),
-  overview: ui('overview', ['range']),
+  overview: ui('overview', ['range', 'account']),
   worktrees: ui('worktrees', ['repo', 'layer', 'q']),
   'worktrees/:id': ui('worktrees/:id'),
   tasks: ui('tasks', ['project', 'state', 'q', 'limit', 'cursor']),
@@ -33,6 +33,7 @@ const SPECS: Record<Resource, ResourceSpec> = {
   index: ui('index'),
   gaps: ui('gaps', ['range', 'tool', 'reason']),
   environment: ui('environment'),
+  accounts: ui('accounts'),
   'environment/audit': ui('environment/audit', ['name', 'scope', 'limit']),
   settings: ui('settings'),
   events: ui('events', ['since', 'limit']),

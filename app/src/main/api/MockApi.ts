@@ -47,7 +47,8 @@ export class MockApi implements ApiSource {
     const d = this.data;
     switch (req.resource) {
       case 'nav': return this.nav(q);
-      case 'overview': return this.overview(range(q));
+      case 'overview': return scaleFor(this.overview(range(q)), typeof q.account === 'string' ? q.account : null);
+      case 'accounts': return d.accounts();
       case 'worktrees': return { items: this.worktrees(q) };
       case 'worktrees/:id': return found(d.worktreeDetail(req.id!));
       case 'tasks': return { ...this.tasks(q), mirrorSyncedAt: new Date(d.now - 120_000).toISOString() };
@@ -152,6 +153,20 @@ export class MockApi implements ApiSource {
       && (!text || `${t.id} ${t.summary}`.toLowerCase().includes(text)));
     return page(xs, q);
   }
+}
+
+/** The mock Overview narrowed to one account: its share of the cost, in the same shape. */
+function scaleFor(o: Overview, account: string | null): Overview {
+  if (account === null) return o;
+  const f = account === 'b' ? 0.36 : 0.64;
+  const k = o.kpis;
+  const r = (n: number) => Math.round(n * f);
+  return {
+    ...o,
+    kpis: { ...k, weightedToday: r(k.weightedToday), weightedYesterdaySameTime: r(k.weightedYesterdaySameTime), weightedRange: r(k.weightedRange), baselineRange: r(k.baselineRange), savedTokens: r(k.savedTokens), activeWindows: Math.round(k.activeWindows * f) },
+    budget: { ...o.budget, usedToday: r(o.budget.usedToday) },
+    costSeries: o.costSeries.map(p => ({ ...p, weighted: r(p.weighted), baseline: r(p.baseline) })),
+  };
 }
 
 /** A resource the switch above does not answer is a compile error here. */

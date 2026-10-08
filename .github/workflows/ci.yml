@@ -63,7 +63,7 @@ jobs:
   test:
     name: test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -260,11 +260,17 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: installer-${{ matrix.os }}
+          # latest.yml and latest-linux.yml are the update feed (CL-107): the SHA-512 and size of each installer, read by
+          # electron-updater. macOS has no feed (it only notifies), so latest-mac.yml stays out; both Macs would write it.
           path: |
             app/dist/*.exe
+            app/dist/*.exe.blockmap
             app/dist/*.dmg
             app/dist/*.AppImage
+            app/dist/*.AppImage.blockmap
             app/dist/*.deb
+            app/dist/latest.yml
+            app/dist/latest-linux.yml
           if-no-files-found: error
           retention-days: 7
 
@@ -318,5 +324,84 @@ jobs:
           path: |
             shots/
             installer-smoke.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # The app updates itself from one build to the next (CL-107), on a real installation and against a local feed: three
+  # builds (N, N+1 and one whose daemon cannot start), install N, let it download, verify and install N+1, check that
+  # settings, a secret and the daemon's data survive and the daemon runs the new bundle, that a tampered installer is
+  # refused and that the failing build falls back to the previous daemon (tools/update-test.mjs). No release, no tag.
+  update-test:
+    name: update test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-read-only: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build the installers of two versions and one with a broken daemon
+        shell: bash
+        run: |
+          targets=
+          [ "${{ runner.os }}" = Linux ] && targets="--linux AppImage"
+          (cd app && npm ci --ignore-scripts)
+          mkdir updates
+          for v in 0.0.1-rc.1 0.0.1-rc.2; do
+            rm -rf build/bundle
+            ./gradlew bundle --console=plain --no-daemon -PreleaseVersion=$v
+            (cd app && npm run dist -- -c.extraMetadata.version=$v $targets)
+            mkdir "updates/$v"
+            cp app/dist/CodeLoupe-$v-* app/dist/latest*.yml "updates/$v/"
+            node tools/feed-check.mjs "updates/$v" --version "$v" --feed "$([ "${{ runner.os }}" = Linux ] && echo latest-linux.yml || echo latest.yml)"
+          done
+          # The third build is the second with a daemon jar that cannot start.
+          (cd app && node ../tools/break-bundle.mjs stage/codeloupe 0.0.1-rc.3 && npx electron-builder --publish never -c.extraMetadata.version=0.0.1-rc.3 $targets)
+          mkdir updates/0.0.1-rc.3
+          cp app/dist/CodeLoupe-0.0.1-rc.3-* app/dist/latest*.yml updates/0.0.1-rc.3/
+
+      - name: Install a virtual display
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends xvfb
+
+      - name: Update from rc.1 to rc.2, refuse a tampered file, roll back from rc.3
+        shell: bash
+        run: |
+          ext=exe; [ "${{ runner.os }}" = Linux ] && ext=AppImage
+          os=win-x64; [ "${{ runner.os }}" = Linux ] && os=linux-x86_64
+          run=; [ "${{ runner.os }}" = Linux ] && run="xvfb-run -a"
+          $run node tools/update-test.mjs \
+            --old "updates/0.0.1-rc.1/CodeLoupe-0.0.1-rc.1-$os.$ext" --new "updates/0.0.1-rc.2/CodeLoupe-0.0.1-rc.2-$os.$ext" \
+            --bad "updates/0.0.1-rc.3/CodeLoupe-0.0.1-rc.3-$os.$ext" --out update-test.json
+          {
+            echo "### Update test ${{ matrix.os }}"
+            echo '```json'
+            node -e "const r=JSON.parse(require('fs').readFileSync('update-test.json','utf8')); delete r.requests; console.log(JSON.stringify(r,null,2))"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: update-test-${{ matrix.os }}
+          path: update-test.json
           if-no-files-found: ignore
           retention-days: 14

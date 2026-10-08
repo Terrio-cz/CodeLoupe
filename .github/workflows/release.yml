@@ -94,6 +94,12 @@ jobs:
           cp build/reports/cyclonedx-direct/bom.json "assets/codeloupe-$VERSION-daemon-sbom.cdx.json"
           (cd app && npm ci --ignore-scripts && npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --omit dev --output-format JSON --output-file "../assets/codeloupe-$VERSION-app-sbom.cdx.json")
 
+      # electron-updater trusts the SHA-512 and size in these two files (CL-107): they must match the installers beside them.
+      - name: Check the update feed
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: node tools/feed-check.mjs assets --version "$VERSION"
+
       - name: Checksums
         run: (cd assets && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt)
 

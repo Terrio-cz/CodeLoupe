@@ -58,6 +58,26 @@ export function useRange(): [Range, (r: Range) => void] {
   return [r, set];
 }
 
+/** The account the Overview is narrowed to ('' = all), remembered per viewer like the range. */
+let currentAccount = (() => {
+  try { return localStorage.getItem('codeloupe.account') ?? ''; } catch { return ''; }
+})();
+const accountListeners = new Set<(a: string) => void>();
+
+export function useAccount(): [string, (a: string) => void] {
+  const [a, setA] = useState(currentAccount);
+  useEffect(() => {
+    accountListeners.add(setA);
+    return () => { accountListeners.delete(setA); };
+  }, []);
+  const set = (v: string) => {
+    currentAccount = v;
+    try { localStorage.setItem('codeloupe.account', v); } catch { /* storage blocked */ }
+    for (const l of accountListeners) l(v);
+  };
+  return [a, set];
+}
+
 /** The value after it stopped changing for `ms` (search fields: one request per pause, not per key). */
 export function useDebounced<T>(value: T, ms = 250): T {
   const [v, setV] = useState(value);

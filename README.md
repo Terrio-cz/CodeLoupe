@@ -270,6 +270,31 @@ With a tracker configured (see Configuration) more tools work on a local mirror 
 | `tasks` | one line per task (`id state · type · priority ‹epic› title ⛔blockers`). `mode=list` with a YouTrack-like `query` (`project: TER state: -Done #unresolved epic: TER-1 type: Bug {Fix versions}: 1.0 sort: id` plus full-text words), `graph` (an issue's epic, dependencies, subtasks, relations; `depth` ≤ 3), `ready` (open tasks without open subtasks whose dependencies are resolved and that no git worktree branch holds), `progress` (an epic: counts by state, criteria, blockers, open tasks) |
 | `update` | writes to the tracker: `set={Field: value}` (State, Assignee, Priority, Type, `summary`, `description` or any custom field; comma-separated for multi-value fields; an empty value clears) and/or `comment=<text>`. Answers one line of at most 300 characters — the fields that changed (`State: To do→Done`), `+comment <id>`, and the state when it did not change — instead of the issue. The mirror stores the tracker's own answer to the write, so the next `issue` read needs no request |
 
+### Editing by declaration (`edit`)
+
+`edit` changes source by declaration instead of by text, one tool for every write (the tool count is capped, so it is one tool with an
+`op`): `replace` (the whole declaration, its KDoc and annotations, becomes `code`), `insert_after` / `insert_before` (beside the anchor), `insert_member`
+(into a type: `position` `start`, `end` or `after_properties`), `delete`, `add_imports` (`file`, `imports`: sorted into their group, none twice),
+`create_file` (`path`, `code`: new files only; the package must be the folder's, a public Java type the file's name) and `rename` (`name`, `to`; `dry_run`
+plans only). The name is the one `symbol` takes and the `hash` is the `hash=` it printed: a declaration changed since is refused. Behind
+every write: the declaration is looked up again in the file as it is on disk; the code is re-indented and gets the file's line ends (a byte order mark, mixed
+line ends, a missing final newline and tabs are kept - writing a declaration back as it was changes no byte); the result is parsed again and nothing is
+written unless the file has no more syntax errors than before, declares exactly what it declared outside the edited range, and declares what the code
+declares; the file is replaced atomically (retried when an editor holds it); every write goes to `<home>/writes.jsonl` (operation, files, SHA-1
+before and after); the next query sees the change at once.
+
+`rename` carries the declaration, what it overrides and what overrides it, a class with its constructors, every usage the index is sure of (`exact`),
+the imports of it, and the file of a public Java type; what the index only suspects (`candidate`) is listed for you, not changed (unless it can only be a use of the renamed declarations: nothing else of that name is declared in the index and no library is known to declare it). It refuses a name that exists
+already or would be captured by a local, a member that overrides something outside the index, operators and conventions read by name
+(`toString`, `compareTo`, `main`, ...). Before writing, the renamed worktree is indexed beside the rest and every place that is renamed must resolve to the renamed
+declaration: that check stands in for a compiler. Strings, comments and generated code are not changed.
+
+The write policy: only `.kt` and `.java` files inside the worktree, never `.git`, `.codeloupe.json`, secrets and keys (`.env`, `*.pem`, `*.key`...), or a file with merge-conflict markers.
+`config.json` `write` adds `linkedWorktreesOnly` (no writes in the main checkout) and `deny` globs; a repository's own `.codeloupe.json` `write` can add the
+same two and cannot enable anything. `write.mode` is `off`, `on` or `auto` (the default): `auto` offers `edit` only when the transcripts of the last 30 days show the gaps it closes - at
+least 20 reads of a whole code file followed by an edit of it, or 3 runs that renamed one identifier by hand in three files or more (`codeloupe metrics gaps` prints the verdict; thresholds under `write.gate`).
+Without the tool on offer the catalog stays at 14 tools; with it, 15.
+
 Usages are resolved without an IDE or compiler: the scopes, imports and aliases a file sees, the receiver's
 type where syntax tells it (declared types, `Type(…)`, what a call returns, collection elements in lambdas), and
 overloads by argument count. Unsure hits are marked, never dropped. One heuristic: on a receiver of unknown type,
@@ -313,6 +338,21 @@ values replaced by `***`, byte exact otherwise. Masking is by value: a program t
 split over lines) is not covered. A value on a command line is visible to this user's other processes while the command runs; use `env run`
 or the API instead. The Terrio workspace guard (`.claude/hooks/guard.ps1`) should deny reads of `…/codeloupe/secrets/` (add it to its
 `SecretFiles` pattern); until then only the `Read(**/*.env)` rule of `settings.json` covers the Read tool.
+
+## Repositories
+
+`codeloupe repos add <folder>...` writes the folders (each must hold a `.git`) to `config.json` `workspaces.repos` without touching the rest of the file (a file that is not valid JSON is refused,
+not rewritten) and asks the daemon a first question per repository so that it is known and its base index starts building; `repos list` prints what is configured, `--json` gives the report the
+desktop app's first-run onboarding reads. The running daemon already knows a repository after that first question; the configuration keeps it across restarts.
+
+## Accounts
+
+`<home>/accounts.json` lists the Claude Code accounts of this machine (each a config directory, `CLAUDE_CONFIG_DIR`) and the YouTrack instances to mirror; the
+desktop app writes it, the daemon reads it afresh on every call. Without it the one account is `~/.claude`. The transcripts of every listed account are ingested
+(`<configDir>/projects/*`) and attributed to it by the folder they lie in, so `GET /ui-api/v1/accounts` shows each account's cost for 7 days, last use and working directories
+that called CodeLoupe in the last 15 minutes, and `GET /ui-api/v1/overview?account=<id>` narrows the Overview to one. A YouTrack account is `{ id, label, url, projects, token }` where
+`token` is the name of a global secret in the store (`YOUTRACK_TOKEN_<ID>`); the daemon mirrors it like a tracker of `config.json` (a tracker of that file wins a name clash), reading the
+token from the store at most every 30 seconds. The API never returns a token, only whether one is stored.
 
 ## Documents
 
@@ -562,6 +602,7 @@ and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
 | Parse worker: seconds it lives without a file to parse (0 = the daemon parses in its own process, with an 80 MB heap instead of 64) | 300 | `config.json` `{ "parseWorkerIdleSeconds": 300 }` |
 | Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
 | Weighted-token budgets of a day and of one agent run (events for the desktop app) | none | `config.json` `budgets` `{ "dailyWeighted": 150000000, "runWeighted": 20000000 }` |
+| Writing by declaration (`edit`) | `auto`: offered when the gap detector shows the need; no write in `.git`, secrets, conflicted files | `config.json` `write` `{ "mode": "on", "linkedWorktreesOnly": true, "deny": ["**/generated/**"], "gate": { "wholeFileReads": 20, "manualRenames": 3, "windowDays": 30 } }` |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
 
@@ -657,7 +698,7 @@ on, because the runtime is. CI builds them in the `bundle` job and keeps them fo
 |---|---|---|
 | Windows x64 | `CodeLoupe-<v>-win-x64.exe` (NSIS, per user, one click) | Starts the app when it ends. An update or uninstall first stops the installation's own daemon. The uninstaller asks whether to delete the data (`%LOCALAPPDATA%\codeloupe`, `%APPDATA%\codeloupe-desktop`); `/S` and updates keep it. |
 | macOS arm64, x64 | `CodeLoupe-<v>-mac-arm64.dmg`, `CodeLoupe-<v>-mac-x64.dmg` | Drag to Applications. Removing the app leaves the data in `~/Library/Caches/codeloupe` and `~/Library/Application Support/codeloupe-desktop` until it is deleted by hand. |
-| Linux x64 | `CodeLoupe-<v>-linux-x64.AppImage`, `.deb` | The AppImage copies the bundle to `<userData>/daemon/<version>` once, because the daemon outlives its mount. Removing the app leaves the data in `~/.cache/codeloupe` and `~/.config/codeloupe-desktop`. |
+| Linux x64 | `CodeLoupe-<v>-linux-x86_64.AppImage`, `-linux-amd64.deb` | The AppImage copies the bundle to `<userData>/daemon/<version>` once, because the daemon outlives its mount. Removing the app leaves the data in `~/.cache/codeloupe` and `~/.config/codeloupe-desktop`. |
 
 An installed app reads real data (`apiSource: daemon`) and starts the daemon from its own runtime; the CLI command in
 Settings stays on its default and is resolved at start-up, so an update never leaves a stale path.
@@ -679,7 +720,7 @@ public CI run of the tag.
 |---|---|---|
 | Windows | `winget install Terrio.CodeLoupe` or `scoop install codeloupe` (once the owner has submitted the manifests) | A package manager downloads the file without the Mark of the Web, which is what SmartScreen judges. |
 | macOS | `brew install --cask codeloupe` | The cask removes the quarantine flag after installing. |
-| Linux | the `.AppImage` (`chmod +x`) or `sudo apt install ./CodeLoupe-<v>-linux-x64.deb` | Nothing to allow. |
+| Linux | the `.AppImage` (`chmod +x`) or `sudo apt install ./CodeLoupe-<v>-linux-amd64.deb` | Nothing to allow. |
 
 A download from the browser needs one manual allow, once:
 
@@ -690,6 +731,27 @@ A download from the browser needs one manual allow, once:
 The manifests (`packaging-manifests.zip` on each release) are generated by `node tools/packaging-manifests.mjs --dir
 <release files> --version <v> --out <dir>` from the release's URLs and checksums; publishing them to winget-pkgs, a
 Scoop bucket or a Homebrew tap is a separate, manual step ([docs/release.md](docs/release.md)).
+
+### Updates
+
+The installed app looks for a newer release on GitHub 30 seconds after it starts and every six hours (Settings →
+Aktualizace; **Hledat novou verzi automaticky** switches the check off, and with it off the app never contacts anything
+by itself). What happens next depends on the installation:
+
+| Installation | A newer release |
+|---|---|
+| Windows installer (NSIS), Linux AppImage | Downloaded in the background, the SHA-512 and size from the release's `latest.yml` / `latest-linux.yml` checked, then **Restartovat a aktualizovat** in Settings (or the next quit) installs it. The installer stops the daemon of the old installation and replaces its files; settings (`%APPDATA%\codeloupe-desktop`), secrets, task mirror and indexes (the daemon's home) are not touched, and the new app starts the daemon from the new bundle. An index written in an older format is rebuilt, never served. |
+| macOS, Linux `.deb`, a Windows copy unpacked by Scoop | Only a notification and **Otevřít stránku vydání** in Settings: macOS cannot update an app that has no Developer ID signature (nothing is paid for, [docs/code-signing.md](docs/code-signing.md)), the package manager owns the other two. Install the new version the way you installed this one. |
+
+The first run of a new version is watched: the daemon of the new bundle has 90 seconds to answer. If it does not, the
+previous bundle (kept in `<app data>/update/previous` while the update was pending, about 190 MB, deleted once the new
+daemon has answered) runs instead, Settings says so, and the next update tries again. Privacy: the app asks only
+`github.com/Terrio-cz/CodeLoupe` (the releases feed and the files of one release), with the User-Agent `CodeLoupe`, English as
+the language, no cookies, no account and no identifier; the installer is verified against the SHA-512 in the release before it
+runs. Pre-release versions follow each other only when the number after the dot grows (`v1.0.0-rc.1`, `rc.2`, `rc.10`); an rc
+is offered the next rc and the final release, a final release only final releases. `node tools/update-test.mjs --old <installer>
+--new <installer> [--bad <installer>]` proves an update between two builds on this machine against a local feed
+([docs/release.md](docs/release.md)).
 
 ## Develop
 
@@ -724,6 +786,7 @@ the worker runs it holds about 100 MB of its own; a worker that cannot start or 
 
 | Package | Role |
 |---|---|
+| `write` | the `edit` tool: text edits of declarations, rename, verification, atomic writes, journal, policy and gate |
 | `lang`, `lang.kotlin`, `lang.java` | file → facts (declarations, imports, references) via the Kotlin compiler's PSI (Kotlin and Java) |
 | `index` | SQLite store, base build from git objects, build worker entry point, parse worker (`ParseWorker`) and its client |
 | `repo` | repositories and worktrees → base index, base syncs, child-process builds |

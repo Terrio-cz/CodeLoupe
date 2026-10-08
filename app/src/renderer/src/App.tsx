@@ -1,21 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { bridge, refreshAll, useApi } from './api';
+import { Icon } from './components/Icon';
 import { RANGE_OPTIONS, Segmented } from './components/Parts';
 import { Sidebar, sidebarCounts } from './components/Sidebar';
+import { Titlebar } from './components/Titlebar';
 import { useDaemon, useRange, useSettings } from './hooks';
 import { href, useRoute } from './router';
 import { SCREEN_DEFS, screenDef } from './screenList';
+import { Onboarding } from './screens/Onboarding';
 import { VIEWS } from './views';
 
 export function App() {
   const route = useRoute();
   const daemon = useDaemon();
-  const [settings] = useSettings();
+  const [settings, updateSettings] = useSettings();
   const [range, setRange] = useRange();
   const [gapsSince] = useState(() => lastVisit());
   const [appVersion, setAppVersion] = useState('');
   const nav = useApi('nav', undefined, { gapsSince });
   const main = useRef<HTMLElement>(null);
+  const [spin, setSpin] = useState(0);
 
   // Theme mirror for CSS; main also sets nativeTheme so the OS chrome follows.
   useEffect(() => {
@@ -83,21 +87,42 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [settings?.shortcuts]);
 
+  // First run, or reopened from Settings (`?welcome=1`): the onboarding instead of the shell.
+  if (settings && (!settings.onboardingDone || route.params.has('welcome'))) {
+    // The title bar stays: without it a window with a hidden system title bar could not be moved.
+    return (
+      <div className="app">
+        <Titlebar version={appVersion} />
+        <div className="onboarding-scroll">
+          <Onboarding onFinish={() => void updateSettings({ onboardingDone: true }).then(() => { location.hash = href('overview'); })} />
+        </div>
+      </div>
+    );
+  }
   const def = screenDef(route.screen);
   return (
-    <div className="shell">
-      <Sidebar current={route.screen} counts={sidebarCounts(nav.data)} daemon={daemon} settings={settings} version={appVersion} />
-      <main className="main" ref={main}>
-        <header className="topbar">
-          <h1>{def.title}</h1>
-          <span className="spacer" />
-          {def.range && <Segmented label="Časový rozsah" value={range} onChange={setRange} options={RANGE_OPTIONS} />}
-          <button className="btn ghost" onClick={refreshAll} aria-label="Obnovit data (Ctrl+R)" title="Obnovit (Ctrl+R)">⟳</button>
-        </header>
-        <div className="content">
-          {VIEWS[route.screen](route)}
-        </div>
-      </main>
+    <div className="app">
+      <Titlebar version={appVersion} />
+      <div className="shell">
+        <Sidebar current={route.screen} counts={sidebarCounts(nav.data)} daemon={daemon} settings={settings} />
+        <main className="main" ref={main}>
+          <header className="topbar">
+            <div className="title" key={route.screen}>
+              <span className="title-icon" aria-hidden="true"><Icon name={def.icon} /></span>
+              <h1>{def.title}</h1>
+            </div>
+            <span className="spacer" />
+            {def.range && <Segmented label="Časový rozsah" value={range} onChange={setRange} options={RANGE_OPTIONS} />}
+            <button className="btn ghost icon-only" onClick={() => { setSpin(n => n + 1); refreshAll(); }} aria-label="Obnovit data (Ctrl+R)" title="Obnovit (Ctrl+R)">
+              <Icon name="refresh" key={spin} className={spin ? 'spin' : undefined} />
+            </button>
+          </header>
+          {/* Re-keyed per screen (and per task detail), so the new screen's veil fades out over it (styles.css, Motion). */}
+          <div className="content" key={route.screen === 'tasks' ? `tasks/${route.id ?? ''}` : route.screen}>
+            {VIEWS[route.screen](route)}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

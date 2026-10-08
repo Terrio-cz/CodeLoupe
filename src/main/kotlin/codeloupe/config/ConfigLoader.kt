@@ -34,6 +34,7 @@ object ConfigLoader {
             budgets = BudgetsConfig.parse(file),
             parseWorkerIdleSeconds = (file["parseWorkerIdleSeconds"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it >= 0 } ?: 300,
             secrets = SecretsConfig.parse(file),
+            write = WriteConfig.parse(file),
         )
     }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Environment, EnvironmentAudit, Gaps, Overview, Page, TaskSummary, WorktreeDetail, WorktreeSummary } from '../src/shared/contract';
+import type { Accounts, Environment, EnvironmentAudit, Gaps, Overview, Page, TaskSummary, WorktreeDetail, WorktreeSummary } from '../src/shared/contract';
 import { validateRequest, type ApiRequest } from '../src/shared/request';
 import { MockApi } from '../src/main/api/MockApi';
 
@@ -17,7 +17,7 @@ describe('MockApi follows the read-only contract', () => {
     const all: ApiRequest[] = [
       { resource: 'nav' }, { resource: 'overview' }, { resource: 'worktrees' },
       { resource: 'worktrees/:id', id: wt.items[0].id }, { resource: 'tasks' }, { resource: 'tasks/:id', id: task.items[0].id },
-      { resource: 'index' }, { resource: 'gaps' }, { resource: 'environment' }, { resource: 'environment/audit' }, { resource: 'settings' }, { resource: 'events' }, { resource: 'status/history' },
+      { resource: 'index' }, { resource: 'gaps' }, { resource: 'environment' }, { resource: 'environment/audit' }, { resource: 'accounts' }, { resource: 'settings' }, { resource: 'events' }, { resource: 'status/history' },
     ];
     for (const r of all) expect(await get(r)).toBeTruthy();
   });
@@ -31,6 +31,20 @@ describe('MockApi follows the read-only contract', () => {
     expect(audit.events).toHaveLength(1);
     expect(audit.events[0].name).toBe('YOUTRACK_TOKEN');
     expect(validateRequest({ resource: 'environment/audit', query: { secret: 'x' } }).ok).toBe(false);
+  });
+
+  it('accounts carry usage per Claude account and no token, and the overview can be narrowed to one', async () => {
+    const a = await get<Accounts>({ resource: 'accounts' });
+    expect(a.claude.map(c => c.id)).toEqual(['default', 'b']);
+    expect(a.claude.filter(c => c.isDefault)).toHaveLength(1);
+    expect(a.youtrack.find(y => y.id === 'terrio')).toMatchObject({ tokenConfigured: true, editable: true });
+    expect(JSON.stringify(a)).not.toMatch(/"token"|secret|password/i);
+    const all = await get<Overview>({ resource: 'overview', query: { range: '7d' } });
+    const first = await get<Overview>({ resource: 'overview', query: { range: '7d', account: 'default' } });
+    const second = await get<Overview>({ resource: 'overview', query: { range: '7d', account: 'b' } });
+    expect(first.kpis.weightedRange + second.kpis.weightedRange).toBeLessThanOrEqual(all.kpis.weightedRange + 2);
+    expect(second.kpis.weightedRange).toBeLessThan(first.kpis.weightedRange);
+    expect(validateRequest({ resource: 'overview', query: { account: 'b' } }).ok).toBe(true);
   });
 
   it('overview series and KPIs are consistent', async () => {

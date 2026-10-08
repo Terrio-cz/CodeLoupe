@@ -14,7 +14,8 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
   nákladů hotových běhů z transkriptů (kolik stály a kde), ne sledování toho, co agent právě dělá. Je tu od CL-40
   (2026-10-08) nad API z CL-62 a odebere se jedním řádkem v `screenList.ts`.
 - **Hustý developer-tool styl** (Browserbase, Mintlify, Vercel, Linear): levý sidebar, tabulky s 32px řádky,
-  postranní detail panely, žádné dekorace, ilustrace ani gradienty. Čísla tabulková (`tabular-nums`).
+  postranní detail panely, žádné ilustrace; jediný gradient je výplň plochy pod čarou grafu. Čísla tabulková
+  (`tabular-nums`). Vizuální směr a pohyb: [design-revamp.md](design-revamp.md).
 - **Světlý i tmavý režim** ze stejných tokenů (§ 6), výchozí = systém.
 - **Bezpečnost**: renderer nemá Node ani síť; data jdou jen přes preload IPC do main procesu, který volá
   výhradně `127.0.0.1:<port>` (§ 10).
@@ -397,6 +398,9 @@ Nastavení
 │ Vzhled           (•) Systém ( ) Světlý ( ) Tmavý    ☑ Klávesové zkratky               │
 │ Notifikace       ☑ rozpočty  ☑ dokončené buildy  ☑ nové mezery  ☑ daemon spadl        │
 │                                                                    [Uložit]           │
+├ Aktualizace (CL-107) ───────────────────────────────────────────────────────────────┤
+│ Verze 0.9.0-rc.1 · Stav: Verze 0.9.0-rc.2 je stažená a ověřená…                       │
+│ ☑ Hledat novou verzi automaticky     [Restartovat a aktualizovat] [Zkontrolovat teď]  │
 ├ Daemon (jen čtení, z GET settings) ─────────────────────────────────────────────────┤
 │ Home %LOCALAPPDATA%\codeloupe · config.json [Otevřít]                                 │
 │ Repozitáře, YouTrack instance (token: nastaven ✓), rozpočty (denní 25M)               │
@@ -412,6 +416,11 @@ Nastavení
   uživatelem; přepsání také proměnnou `CODELOUPE_APP_CLI` (JSON pole) při spuštění aplikace.
 - Port: výchozí z `<home>/daemon.json` (zapisuje daemon), jinak `CODELOUPE_PORT` / `config.json` / 47391;
   ruční přepsání je explicitní a předá se spouštěnému daemonu jako `CODELOUPE_PORT`.
+- **Aktualizace** (CL-107): karta ukazuje verzi, stav poslední kontroly a přepínač `autoUpdate` (vypnutý = aplikace se sama na nic
+  neptá; ruční „Zkontrolovat teď“ funguje vždy). Instalace, které se aktualizují samy (Windows NSIS, Linux AppImage), nabídnou po
+  stažení a ověření SHA-512 „Restartovat a aktualizovat“; macOS, `.deb` a kopie ze Scoopu ukážou „Otevřít stránku vydání“ (jen
+  odkaz na GitHub vydání tohoto repozitáře, cestu skládá main ze stavu). Když se daemon nové verze nespustil, karta řekne, že běží
+  předchozí. Totéž přijde jako notifikace (nejde vypnout: stává se zřídka a týká se aplikace samotné).
 
 ### 3.9 Účty (CL-63, plán)
 
@@ -432,12 +441,36 @@ main procesu jako v § 3.7.1 — nikdy přes daemon HTTP.
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Claude účet = config dir Claude Code (`CLAUDE_CONFIG_DIR`); spotřeba a úspora se přiřazují podle adresáře,
-  ve kterém transcript leží (ingest CL-62). Přehled půjde filtrovat podle účtu.
-- YouTrack účet nahrazuje jedinou instanci z CL-29: URL, projekty, token (jen „nastaven ✓“), stav mirroru,
-  test spojení.
-- API: `GET /ui-api/v1/accounts` (§ 9.13a) — jen metadata, nikdy tokeny. „Okna“ = MCP klienti účtu, kteří
-  volali CodeLoupe za posledních 15 min (stejně jako „Aktivní okna“ v § 3.1), ne sledování agentů.
+- Claude účet = config dir Claude Code (`CLAUDE_CONFIG_DIR`); spotřeba se přiřazuje podle adresáře, ve kterém
+  transcript leží (ingest CL-62: `<configDir>/projects/…`). Přehled se filtruje podle účtu (`overview?account=<id>`,
+  výběr nad kartami; cena, rozpočet, mezery a volání dotazů z pracovních složek účtu).
+- Bez uloženého seznamu je jediným účtem implicitní `~/.claude` (v tabulce „implicitní“, nejde přejmenovat ani odebrat);
+  první přidaný účet ho uloží jako řádek `default`. Odebrání účtu maže jen záznam, nikdy složku s přihlášením.
+- YouTrack účet nahrazuje jedinou instanci z CL-29: URL, projekty, token (jen „nastaven“), stav mirroru, test spojení.
+  Tracker z `config.json` se v tabulce ukáže jen ke čtení („z config.json“). Přidání a odebrání účtu restartuje daemon
+  (mirror se staví při startu; dialog to řekne předem), rotace tokenu ani test ne.
+- Zápisy dělá main: `<home>/accounts.json` (jména, cesty, URL, jméno tokenu ve storu; nic tajného) a token přes
+  CLI `env set YOUTRACK_TOKEN_<ID>` na stdin, `env unset` při odebrání. Daemon `accounts.json` jen čte.
+- „Okna“ účtu = pracovní složky, které za posledních 15 min volaly CodeLoupe a mají u účtu transcript složku (`ProjectDirName`:
+  každý nealfanumerický znak cesty → `-`); složka v obou účtech patří tomu, kdo v ní psal naposledy. Úspora zatím 0 jako v Přehledu.
+- API: `GET /ui-api/v1/accounts` (§ 9.13a) — jen metadata, nikdy tokeny.
+
+### 3.10 Úvodní průvodce (CL-119)
+
+První spuštění (nastavení aplikace nemá `onboardingDone`, a soubor před tím nebyl) ukáže místo okna s postranním panelem
+průvodce o čtyřech krocích; každý jde přeskočit, „Přeskočit vše“ ho ukončí, „Hotovo“ taky. Z Nastavení se otevře znovu
+(`#/settings?welcome=1`). Aplikace, která nastavení už měla (starší verze), průvodce nezačíná.
+
+| Krok | Co dělá | Kdo zapisuje |
+|---|---|---|
+| 1 Repozitáře | „Přidat repozitáře…“ otevře nativní dialog výběru složek (main); vybrané cesty jdou do CLI `repos add --json`, které je zapíše do `config.json` `workspaces.repos` (ostatní klíče zůstanou, neplatný JSON se nepřepíše), složky bez `.git` odmítne a daemonu zadá první dotaz, aby repozitář poznal a začal ho indexovat | CLI (cesta z dialogu, ne ze stránky) |
+| 2 YouTrack | Účet YouTrack z obrazovky Účty (§ 3.9): URL, projekty, token z pole `password`; token jde na stdin `env set` do šifrovaného storu (klíč chrání OS), účet nese jen jméno tokenu; „Test“ ověří spojení | main + CLI, daemon se restartuje |
+| 3 Claude Code | Stávající karta z Nastavení (MCP server / plugin přes `claude` CLI po nativním potvrzení) | `claude` CLI |
+| 4 Zkouška | Skutečný dotaz `outline` (mapa repozitáře) na vybraný repozitář daemona; odpověď se ukáže jako text, při stavěném indexu to řekne | CLI čte, nic nepíše |
+
+Token se nikde neukáže ani nezaloguje a stránka žádnou cestu k zápisu neposílá. Poznámka k původnímu zadání (token přes
+`safeStorage`): token jde do šifrovaného storu CL-50, jehož klíč chrání stejný OS (DPAPI, Keychain, libsecret) jako
+`safeStorage`, a daemon ho čte podle jména (`TokenSource.Stored`); blob `safeStorage` by daemon otevřít neuměl.
 
 ## 4. Tray a notifikace
 
@@ -490,41 +523,13 @@ Notifikace se slučují (max 1 za typ za minutu), každá se dá vypnout v Nasta
 
 ## 6. Design tokeny
 
-Písmo: `system-ui, "Segoe UI Variable", "Segoe UI", -apple-system, sans-serif`; mono: `"Cascadia Mono",
-"JetBrains Mono", ui-monospace, monospace`. Velikosti: 12 / 13 (základ) / 15 / 18 / 22 px. Mřížka 4 px.
-Radius 6 (prvky), 8 (karty). Řádek tabulky 32 px, topbar 48 px, sidebar 216 px.
+Tokeny, typografie, mřížka, elevace a pohyb: [design-revamp.md](design-revamp.md) § Tokeny (CL-design-revamp
+nahradil původní tabulku). Platí dál:
 
-| Token | Světlý | Tmavý | Účel |
-|---|---|---|---|
-| `--bg` | `#f9f9f7` | `#0d0d0d` | plocha aplikace |
-| `--surface` | `#ffffff` | `#161615` | karty, tabulky |
-| `--surface-2` | `#f3f3f0` | `#1f1f1d` | hlavička tabulky, hover |
-| `--sidebar` | `#f3f3f0` | `#121211` | sidebar |
-| `--border` | `#e4e3dd` | `#2c2c2a` | hairline mezi oblastmi (dekorativní) |
-| `--border-control` | `#82817c` | `#787772` | okraj inputů, selectů, checkboxů (≥ 3:1 na všech pozadích, WCAG 1.4.11) |
-| `--text` | `#0b0b0b` | `#f5f5f3` | primární text |
-| `--text-2` | `#52514e` | `#c3c2b7` | sekundární |
-| `--text-muted` | `#65645f` | `#9a9993` | popisky, osy |
-| `--accent` | `#2a78d6` | `#3987e5` | výplně (pruhy, indikátor výběru), fokus |
-| `--accent-text` | `#1f66c2` | `#5b9cec` | odkazy a text v barvě akcentu |
-| `--accent-weak` | `#e8f1fc` | `#16263a` | vybraný řádek |
-| `--btn-primary-bg` / `-fg` | `#1f66c2` / `#ffffff` | `#3987e5` / `#0d0d0d` | primární tlačítko |
-| `--focus` | `#2a78d6` | `#6da7ec` | 2 px focus ring + 2 px offset |
-| `--ok` | `#0ca30c` (text `#006300`) | `#0ca30c` | stav ok |
-| `--warning` | `#fab219` (text `#8a5a00`) | `#fab219` | varování |
-| `--serious` | `#ec835a` (text `#a8431a`) | `#ec835a` | vážné |
-| `--critical` | `#d03b3b` (text `#b83232`) | `#e66767` | chyba |
-
-| `--series-1` | `#2a78d6` | `#3987e5` | graf: skutečnost |
-| `--series-baseline` | `#898781` | `#898781` | graf: baseline (přerušovaná) |
-| `--grid` | `#e1e0d9` | `#2c2c2a` | mřížka grafu |
-| `--axis` | `#c3c2b7` | `#383835` | osa |
-
-Kontrast textových tokenů (`--text*`, `--accent-text`, stavové `text`) je ≥ 4,5:1 a `--border-control` ≥ 3:1 proti **všem čtyřem**
-pozadím (`--bg`, `--surface`, `--surface-2`, `--accent-weak`) v obou režimech; kontroluje to test
-`app/test/tokens.test.ts`. Stavové tečky v světlém režimu (warning, serious) jsou pod 3:1, proto vždy
-s ikonou a textem.
-
+- Kontrast textových tokenů (`--text*`, `--accent-text`, stavové `-text`) je ≥ 4,5:1 a `--border-control` ≥ 3:1
+  proti všem pozadím (`--bg`, `--surface`, `--surface-2`, `--accent-weak`, `--sidebar`) v obou režimech a stavový
+  text i na pozadí své pilulky (`--*-weak`); kontroluje to test `app/test/tokens.test.ts`. Stavové tečky jsou vždy
+  s textem.
 - Grafové barvy podle validované referenční palety (dataviz skill); stavové barvy se nikdy nepoužijí pro
   sérii a vždy jdou s ikonou + textem. Text nikdy nemá barvu série.
 - Tmavý režim je vlastní sada kroků, ne inverze. `prefers-color-scheme` + přepínač v Nastavení
@@ -543,7 +548,8 @@ s ikonou a textem.
 - Reflow (1.4.10): pod ~900 CSS px (200 % zoom) je drawer přes celou šířku a sidebar sbalený.
 - Grafy: `role="img"` + `aria-label` se shrnutím, tabulkový pohled, legenda pro ≥ 2 série.
 - Stav nikdy jen barvou (StatusBadge, ChangeMark).
-- `prefers-reduced-motion`: bez animací draweru; jinak max 150 ms.
+- `prefers-reduced-motion`: žádné animace ani odpočet čísel; jinak interakce ≤ 180 ms, vstupy ≤ 360 ms, kreslení grafu
+  ≤ 900 ms (design-revamp.md § Pohyb v aplikaci).
 - Měřítko textu: layout snese 200 % zoom (`Ctrl +`), tabulky se horizontálně posouvají uvnitř karty.
 
 ## 8. Správa daemonu (main proces)
@@ -793,15 +799,19 @@ Audit je append-only soubor `<home>/secrets/audit.log` (řádek JSON na událost
 ### 9.13a `GET /ui-api/v1/accounts` (CL-63; jen metadata, nikdy tokeny)
 ```ts
 interface Accounts {
-  claude: { id: string; label: string; configDir: string; isDefault: boolean;
-            windows: number;          // MCP klienti tohoto účtu, kteří volali CodeLoupe za posledních 15 min (jako „Aktivní okna“)
+  claude: { id: string; label: string; email: string | null;      // e-mail z oauthAccount `.claude.json` účtu, nic jiného se nečte
+            configDir: string; isDefault: boolean; implicit: boolean; exists: boolean;
+            windows: number;          // pracovní složky tohoto účtu, které volaly CodeLoupe za posledních 15 min
             weighted7d: number; savedPct7d: number; lastUsedAt: Iso | null }[];
-  youtrack: { id: string; url: string; projects: string[]; tokenConfigured: boolean;
+  youtrack: { id: string; label: string; url: string; projects: string[]; tokenConfigured: boolean;
+              editable: boolean;      // false = tracker z config.json
               mirror: { state: 'synced' | 'syncing' | 'error' | 'off'; syncedAt: Iso | null } }[];
 }
 ```
-Test spojení YouTrack účtu dělá main proces (IPC `accounts.testYoutrack(id)`, token ze storu CL-50,
-`GET /api/users/me`), ne daemon — read-only API zůstává bez zápisů a bez síťových akcí na povel.
+Test spojení YouTrack účtu dělá main proces (IPC `accounts.youtrackTest(id)`, token z daemonu `/env/values` jako
+spotřebitel „CodeLoupe app (connection test)“ zapsaný do auditu, `GET <url>/api/users/me` bez následování přesměrování),
+ne daemon — read-only API zůstává bez zápisů a bez síťových akcí na povel. `overview` bere navíc `account=<id>`
+(neznámý účet = 400).
 
 ### 9.14 `GET /ui-api/v1/settings` (efektivní konfigurace daemonu, bez tajemství)
 ```ts

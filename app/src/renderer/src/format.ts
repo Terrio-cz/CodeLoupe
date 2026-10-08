@@ -2,6 +2,14 @@
 
 const nf = new Intl.NumberFormat('cs-CZ');
 const nf1 = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 1 });
+// One formatter per precision: each Intl.NumberFormat holds native ICU memory the GC does not see, and the
+// animated KPI numbers format every frame.
+const byDigits = new Map<number, Intl.NumberFormat>();
+const nfd = (digits: number) => {
+  let f = byDigits.get(digits);
+  if (!f) byDigits.set(digits, (f = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: digits })));
+  return f;
+};
 
 export function num(n: number | null | undefined): string {
   return n === null || n === undefined ? '—' : nf.format(n);
@@ -12,14 +20,14 @@ export function tokens(n: number | null | undefined): string {
   if (n === null || n === undefined) return '—';
   const a = Math.abs(n);
   if (a >= 1e9) return `${nf1.format(n / 1e9)} mld.`;
-  if (a >= 1e6) return `${new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 }).format(n / 1e6)}M`;
+  if (a >= 1e6) return `${nfd(2).format(n / 1e6)}M`;
   if (a >= 1e4) return `${nf.format(Math.round(n / 1e3))}k`;
   if (a >= 1e3) return `${nf1.format(n / 1e3)}k`;
   return nf.format(n);
 }
 
 export function pct(x: number, digits = 0): string {
-  return `${new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: digits }).format(x)} %`;
+  return `${nfd(digits).format(x)} %`;
 }
 
 export function bytes(b: number): string {

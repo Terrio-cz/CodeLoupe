@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import type { Environment as Env, EnvironmentAudit } from '../../../shared/contract';
 import { bridge, refreshAll, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
+import { Icon } from '../components/Icon';
 import { ImportWizard } from '../components/ImportWizard';
 import { KeyDrawer, type KeyTarget } from '../components/KeyDrawer';
-import { Card, ErrorState, Loading, Search, Select } from '../components/Parts';
+import { Banner, Card, ErrorState, Loading, Search, Select } from '../components/Parts';
 import { StatusBadge } from '../components/StatusBadge';
 import { ago, dateTime } from '../format';
 import type { Route } from '../router';
@@ -86,20 +87,20 @@ export function Environment({ route }: { route?: Route }) {
         <Search label="Hledat klíč" value={q} onChange={setQ} />
         <span style={{ flex: 1 }} />
         <button className="btn" onClick={() => setPanel({ kind: 'import' })} disabled={data?.storeReady === false}>Importovat…</button>
-        <button className="btn primary" onClick={() => setPanel({ kind: 'add' })} disabled={data?.storeReady === false}>+ Přidat</button>
+        <button className="btn primary" onClick={() => setPanel({ kind: 'add' })} disabled={data?.storeReady === false}><Icon name="plus" size={14} />Přidat</button>
       </div>
       {data && !data.storeReady && (
-        <div className="banner info" role="note">Šifrované úložiště zatím není připravené (chybí úložiště klíčů systému i heslo v CODELOUPE_PASSPHRASE), proto nejde nic přidat. Hodnota se po uložení nikdy nezobrazí.</div>
+        <Banner tone="info" role="note">Šifrované úložiště zatím není připravené (chybí úložiště klíčů systému i heslo v CODELOUPE_PASSPHRASE), proto nejde nic přidat. Hodnota se po uložení nikdy nezobrazí.</Banner>
       )}
-      {notice && <div className={`banner${notice.ok ? ' info' : ''}`} role={notice.ok ? 'status' : 'alert'}>{notice.message}</div>}
+      {notice && <Banner tone={notice.ok ? 'info' : 'warning'} role={notice.ok ? 'status' : 'alert'}>{notice.message}</Banner>}
       {due > 0 && data && (
-        <div className="banner warning" role="status">{due === 1 ? '1 klíč je' : `${due} klíčů je`} starších než {data.rotationDays} dní: čas je rotovat.</div>
+        <Banner>{due === 1 ? '1 klíč je' : `${due} klíčů je`} starších než {data.rotationDays} dní: čas je rotovat.</Banner>
       )}
-      <Card bodyClass="">
+      <Card title={data ? `Klíče (${rows.length})` : 'Klíče'} bodyClass="">
         {data ? <DataTable label="Klíče prostředí" rows={rows} columns={columns(data.rotationDays, actions)} rowKey={k => `${k.scope}:${k.scopeRef}:${k.name}`} empty="Žádné klíče. Přidejte první nebo importujte existující proměnné." />
-          : loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst prostředí.'} onRetry={reload} />}
+          : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Nelze načíst prostředí.'} onRetry={reload} />}
       </Card>
-      <Card title="Audit">
+      <Card title="Audit" bodyClass="">
         {audit.data ? (
           <DataTable
             label="Audit klíčů"
@@ -108,7 +109,7 @@ export function Environment({ route }: { route?: Route }) {
             rowKey={e => `${e.at}:${e.scope}:${e.scopeRef}:${e.name}:${e.action}:${e.consumer}`}
             empty="Zatím nikdo žádný klíč nečetl."
           />
-        ) : audit.loading ? <Loading /> : <ErrorState message={audit.error?.message ?? 'Nelze načíst audit.'} onRetry={audit.reload} />}
+        ) : audit.loading ? <Loading variant="table" /> : <ErrorState message={audit.error?.message ?? 'Nelze načíst audit.'} onRetry={audit.reload} />}
       </Card>
       {(panel?.kind === 'add' || panel?.kind === 'rotate') && (
         <KeyDrawer rotate={panel.kind === 'rotate' ? panel.key : undefined} onClose={() => setPanel(null)} onSaved={message => { setPanel(null); outcome({ ok: true, message }); }} />

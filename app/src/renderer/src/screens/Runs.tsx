@@ -5,7 +5,8 @@ import { bridge, useApi } from '../api';
 import { BarList } from '../components/Charts';
 import { DataTable, type Column } from '../components/DataTable';
 import { Drawer } from '../components/Drawer';
-import { Card, ErrorState, KpiTile, Loading, Search, Section, Select } from '../components/Parts';
+import { CountUp } from '../components/CountUp';
+import { Banner, Card, ErrorState, KpiTile, Loading, Search, Section, Select } from '../components/Parts';
 import { StatusBadge } from '../components/StatusBadge';
 import { dateTime, ms, num, pct, tokens } from '../format';
 import { useDebounced, useRange, useSettings } from '../hooks';
@@ -18,13 +19,13 @@ function columns(): Column<RunItem>[] {
   return [
     { key: 'start', header: 'Začátek', sortKey: 'start', render: r => dateTime(r.startedAt) },
     { key: 'role', header: 'Role', render: r => <span className="mono">{r.role}</span> },
-    { key: 'title', header: 'Zadání', render: r => <span title={r.title}>{r.title}</span>, className: 'ellipsis' },
+    { key: 'title', header: 'Zadání', render: r => <span title={r.title}>{r.title}</span>, className: 'ellipsis narrow' },
     { key: 'ter', header: 'Úkol', render: r => r.ter ?? '—' },
     { key: 'duration', header: 'Délka', sortKey: 'duration', render: r => span(r.durationSec), numeric: true },
     { key: 'turns', header: 'Tahy', sortKey: 'turns', render: r => num(r.turns), numeric: true },
     { key: 'weighted', header: 'Cena', sortKey: 'weighted', render: r => tokens(r.weighted), numeric: true },
-    { key: 'peak', header: 'Peak kontext', sortKey: 'peak', render: r => tokens(r.peakContext), numeric: true },
-    { key: 'share', header: 'Podíl výsledků', sortKey: 'share', render: r => pct(r.toolResultShare * 100), numeric: true },
+    { key: 'peak', header: 'Peak', sortKey: 'peak', render: r => tokens(r.peakContext), numeric: true },
+    { key: 'share', header: 'Výsledky', sortKey: 'share', render: r => pct(r.toolResultShare * 100), numeric: true },
     { key: 'calls', header: 'Volání', render: r => `${num(r.toolCalls)}${r.toolErrors ? ` · ${r.toolErrors} chyb` : ''}`, numeric: true },
     { key: 'budget', header: 'Rozpočet', render: r => (r.overBudget ? <StatusBadge tone="warning">nad rozpočet</StatusBadge> : <span className="muted">—</span>) },
   ];
@@ -68,7 +69,7 @@ export function Runs({ route }: { route: Route }) {
     return () => clearInterval(t);
   }, [reading, page.reload]);
 
-  if (!page.data) return <Card>{page.loading ? <Loading /> : <ErrorState message={page.error?.message ?? 'Nelze načíst běhy.'} onRetry={page.reload} />}</Card>;
+  if (!page.data) return <Card bodyClass="">{page.loading ? <Loading variant="table" /> : <ErrorState message={page.error?.message ?? 'Nelze načíst běhy.'} onRetry={page.reload} />}</Card>;
   const data: RunPage = page.data;
   const shownCost = rows.items.reduce((a, r) => a + r.weighted, 0);
   const over = rows.items.filter(r => r.overBudget).length;
@@ -81,13 +82,13 @@ export function Runs({ route }: { route: Route }) {
         <Search label="Hledat zadání, úkol, roli" value={q} onChange={setQ} />
         <span className="muted">Běhy agentů z transkriptů Claude Code: kolik stály a kde; aplikace je nesleduje za běhu.</span>
       </div>
-      {reading && <div className="banner info" role="status">Daemon čte transkripty ({num(data.ingest.filesDone)} z {num(data.ingest.filesTotal)} souborů), seznam se doplňuje.</div>}
+      {reading && <Banner tone="info">Daemon čte transkripty ({num(data.ingest.filesDone)} z {num(data.ingest.filesTotal)} souborů), seznam se doplňuje.</Banner>}
 
-      <section className="card" aria-label="Souhrn běhů">
+      <section aria-label="Souhrn běhů">
         <div className="kpis">
-          <KpiTile label="Běhy v rozsahu" value={num(data.total)} ctx={`${num(rows.items.length)} zobrazeno`} />
-          <KpiTile label="Cena zobrazených" value={tokens(shownCost)} ctx="vážené tokeny" />
-          <KpiTile label="Nad rozpočet běhu" value={num(over)} ctx="mezi zobrazenými" />
+          <KpiTile label="Běhy v rozsahu" value={<CountUp value={data.total} format={num} />} ctx={`${num(rows.items.length)} zobrazeno`} />
+          <KpiTile label="Cena zobrazených" value={<CountUp value={shownCost} format={tokens} />} ctx="vážené tokeny" />
+          <KpiTile label="Nad rozpočet běhu" value={<CountUp value={over} format={num} />} ctx="mezi zobrazenými" />
         </div>
       </section>
 
@@ -143,7 +144,7 @@ function RunDrawer({ id, onClose }: { id: string; onClose(): void }) {
           </Section>
 
           <Section title="Podle kategorie nástroje" count={data.categories.length}>
-            <div className="table-wrap" style={{ maxHeight: 260 }}>
+            <div className="table-wrap">
               <table className="data" aria-label="Kategorie nástrojů">
                 <thead><tr><th scope="col">Kategorie</th><th scope="col" className="num">Volání</th><th scope="col" className="num">Výsledky</th><th scope="col" className="num">Držení × tahy</th><th scope="col" className="num">Cena</th><th scope="col" className="num">Chyby</th></tr></thead>
                 <tbody>
@@ -162,7 +163,7 @@ function RunDrawer({ id, onClose }: { id: string; onClose(): void }) {
             </div>
             {!steps.data ? (steps.error ? <ErrorState message={steps.error.message} onRetry={steps.reload} /> : <Loading />) : (
               <>
-                <div className="table-wrap" style={{ maxHeight: 420 }}>
+                <div className="table-wrap">
                   <table className="data" aria-label="Kroky běhu">
                     <thead><tr><th scope="col" className="num">#</th><th scope="col" className="num">Tah</th><th scope="col">Nástroj</th><th scope="col">Kategorie</th><th scope="col">O čem</th><th scope="col" className="num">Výsledek</th><th scope="col" className="num">Doba</th><th scope="col" className="num">Cena</th><th scope="col">Stav</th></tr></thead>
                     <tbody>

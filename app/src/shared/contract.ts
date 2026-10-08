@@ -322,6 +322,36 @@ export interface Events {
   items: DaemonEvent[];
 }
 
+// § 9.13a — metadata only, never a token.
+export interface Accounts {
+  claude: {
+    id: string;
+    label: string;
+    /** The e-mail the account is signed in with, when its `.claude.json` says. */
+    email: string | null;
+    configDir: string;
+    isDefault: boolean;
+    /** Nobody listed it: it is the default config directory, shown until the first account is saved. */
+    implicit: boolean;
+    exists: boolean;
+    /** Working directories of this account that called CodeLoupe in the last 15 minutes. */
+    windows: number;
+    weighted7d: number;
+    savedPct7d: number;
+    lastUsedAt: Iso | null;
+  }[];
+  youtrack: {
+    id: string;
+    label: string;
+    url: string;
+    projects: string[];
+    tokenConfigured: boolean;
+    /** Added in the app; false for a tracker of the daemon's config.json. */
+    editable: boolean;
+    mirror: { state: 'synced' | 'syncing' | 'error' | 'off'; syncedAt: Iso | null };
+  }[];
+}
+
 /** Resource name → response type, for the typed client in the renderer. */
 export interface ResourceMap {
   nav: Nav;
@@ -333,6 +363,7 @@ export interface ResourceMap {
   index: IndexHealth;
   gaps: Gaps;
   environment: Environment;
+  accounts: Accounts;
   'environment/audit': EnvironmentAudit;
   settings: DaemonSettings;
   events: Events;

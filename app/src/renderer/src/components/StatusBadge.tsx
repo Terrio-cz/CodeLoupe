@@ -5,9 +5,9 @@ import type { Verdict, WorkspaceState } from '../../../shared/workspaces';
 export type Tone = 'ok' | 'warning' | 'serious' | 'critical' | 'neutral' | 'running';
 
 /** State is always a dot plus a word; colour never carries it alone. */
-export function StatusBadge({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+export function StatusBadge({ tone, live, children }: { tone: Tone; live?: boolean; children: React.ReactNode }) {
   return (
-    <span className={`badge ${tone}`}>
+    <span className={`badge ${tone}${live ? ' live' : ''}`}>
       <span className="dot" aria-hidden="true" />
       {children}
     </span>
@@ -21,7 +21,7 @@ const LAYER: Record<LayerState, [Tone, string]> = {
   error: ['critical', 'chyba'],
   none: ['neutral', 'bez vrstvy'],
 };
-export const LayerBadge = ({ state }: { state: LayerState }) => <StatusBadge tone={LAYER[state][0]}>{LAYER[state][1]}</StatusBadge>;
+export const LayerBadge = ({ state }: { state: LayerState }) => <StatusBadge tone={LAYER[state][0]} live={state === 'building'}>{LAYER[state][1]}</StatusBadge>;
 
 const REPO: Record<RepoIndexState, [Tone, string]> = {
   ready: ['ok', 'připraven'],
@@ -30,7 +30,7 @@ const REPO: Record<RepoIndexState, [Tone, string]> = {
   error: ['critical', 'chyba'],
   none: ['neutral', 'bez indexu'],
 };
-export const RepoBadge = ({ state }: { state: RepoIndexState }) => <StatusBadge tone={REPO[state][0]}>{REPO[state][1]}</StatusBadge>;
+export const RepoBadge = ({ state }: { state: RepoIndexState }) => <StatusBadge tone={REPO[state][0]} live={state === 'building'}>{REPO[state][1]}</StatusBadge>;
 
 const PHASE: Record<DaemonPhase, [Tone, string]> = {
   unknown: ['neutral', 'zjišťuji'],
@@ -41,7 +41,7 @@ const PHASE: Record<DaemonPhase, [Tone, string]> = {
   down: ['critical', 'neodpovídá'],
   error: ['critical', 'chyba'],
 };
-export const PhaseBadge = ({ phase }: { phase: DaemonPhase }) => <StatusBadge tone={PHASE[phase][0]}>Daemon {PHASE[phase][1]}</StatusBadge>;
+export const PhaseBadge = ({ phase }: { phase: DaemonPhase }) => <StatusBadge tone={PHASE[phase][0]} live={phase === 'running' || phase === 'starting' || phase === 'stopping'}>Daemon {PHASE[phase][1]}</StatusBadge>;
 
 export function taskTone(state: string): Tone {
   if (state === 'Done') return 'ok';

@@ -3,6 +3,7 @@
 import {
   type DaemonEvent,
   type DaemonSettings,
+  type Accounts,
   type Environment,
   type EnvironmentAction,
   type EnvironmentAudit,
@@ -349,6 +350,19 @@ export class MockData {
       const rss = Math.round(88 + i * 0.22 + wave + r() * 6);
       return { t: iso(this.now - (239 - i) * 60_000), rssMb: rss, heapMb: Math.round(rss * 0.55), cpuSec: Math.round(cpu) };
     });
+  }
+
+  accounts(): Accounts {
+    return {
+      claude: [
+        { id: 'default', label: 'Účet A', email: 'a@example.test', configDir: 'C:/Users/dev/.claude', isDefault: true, implicit: false, exists: true, windows: 4, weighted7d: 12_100_000, savedPct7d: 14, lastUsedAt: iso(this.now - 2 * 60_000) },
+        { id: 'b', label: 'Účet B', email: 'b@example.test', configDir: 'C:/Users/dev/.claude-b', isDefault: false, implicit: false, exists: true, windows: 2, weighted7d: 6_800_000, savedPct7d: 11, lastUsedAt: iso(this.now - HOUR) },
+      ],
+      youtrack: [
+        { id: 'terrio', label: 'Terrio', url: 'https://terrio.youtrack.cloud', projects: ['TER', 'CL'], tokenConfigured: true, editable: true, mirror: { state: 'synced', syncedAt: iso(this.now - 2 * 60_000) } },
+        { id: 'legacy', label: 'legacy', url: 'https://legacy.youtrack.cloud', projects: ['LEG'], tokenConfigured: false, editable: false, mirror: { state: 'error', syncedAt: null } },
+      ],
+    };
   }
 
   environment(): Environment {

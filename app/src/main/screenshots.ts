@@ -18,7 +18,9 @@ const MOCK_ROUTES: [string, string][] = [
   ['index', '#/index'],
   ['gaps', '#/gaps'],
   ['environment', '#/environment'],
+  ['accounts', '#/accounts'],
   ['settings', '#/settings'],
+  ['onboarding', '#/settings?welcome=1'],
 ];
 
 // CODELOUPE_APP_SCREENSHOT_ROUTES='[["name","#/hash"], …]' replaces the list, e.g. with ids of a real daemon.

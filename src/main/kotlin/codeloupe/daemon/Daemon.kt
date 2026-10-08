@@ -49,8 +49,16 @@ import codeloupe.tracker.TrackerSettingsLoader
 import codeloupe.tracker.Trackers
 import codeloupe.uiapi.UiApi
 import codeloupe.uiapi.uiApiRoutes
+import codeloupe.tools.EditTool
+import codeloupe.tools.Tool
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
+import codeloupe.write.WriteGate
+import codeloupe.write.WriteJournal
+import codeloupe.write.WritePolicy
+import codeloupe.write.WriteService
+import codeloupe.metrics.MetricsCollector
+import codeloupe.metrics.MetricsSetup
 import codeloupe.workspace.WorkspaceRef
 import codeloupe.workspace.Workspaces
 import codeloupe.workspace.workspaceRoutes
@@ -80,6 +88,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.io.readByteArray
 import kotlinx.serialization.KSerializer
@@ -115,10 +124,18 @@ class Daemon private constructor(
     val events = EventBus(eventStore, webhooks)
     val registry = Registry(config, queue, log = ::log, emit = events::emit)
     val jobs = JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
-    private val trackerSettings = TrackerSettingsLoader.load(config.home)
-    private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
     private val secrets = SecretAccess(config.home, preset = secretStore, rotationDays = config.secrets.rotationDays)
-    private val tools = Tools.catalog(trackers, jobs, secrets)
+    private val trackerSettings = TrackerSettingsLoader.load(config.home, store = { secrets.store })
+    private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
+    private val baseTools = Tools.catalog(trackers, jobs, secrets)
+    private val writeGate = WriteGate(config.write, config.home.resolve("write-gate.json")) { since ->
+        val setup = MetricsSetup(config)
+        MetricsCollector(setup.categorizer()).runs(setup.projectDirs(emptyList()), since, null)
+    }
+    private val editTool = EditTool(WriteService(registry, WritePolicy(config.write), WriteJournal(config.home.resolve("writes.jsonl"))))
+
+    /** The tools on offer now: the catalog, and `edit` while the write gate is open. */
+    private fun tools(): List<Tool> = if (writeGate.open()) baseTools + editTool else baseTools
     private val workspaces = Workspaces(config, registry, trackers)
     private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets, ::log)
     private val resources = ResourceInventory(config, workspaces)
@@ -182,6 +199,8 @@ class Daemon private constructor(
         log("workspace ${ref.workspace} of ${ref.repo} released")
         ports.free(ref)
         scope.launch { runCatching { reconciler.run("release", auto = reconcileConfig.auto) } }
+        // The verdict comes from transcripts: worked out once the daemon has settled, and only when the cached one is old.
+        if (writeGate.stale()) scope.launch(Dispatchers.IO) { delay(GATE_DELAY_MS); runCatching { writeGate.refresh() } }
     }
 
     private fun log(message: String) = log.append("${IsoTime.now()} $message")
@@ -245,15 +264,15 @@ class Daemon private constructor(
                 if (!call.response.isCommitted) call.respondJson(HttpStatusCode.InternalServerError, error(reason))
             }
         }
-        val mcp = McpTools(runner, tools, JobTool(jobs))
+        val mcp = McpTools(runner, ::tools, JobTool(jobs))
         mcpStatelessStreamableHttp(path = "/mcp") { mcp.server() }
         routing {
             get("/status") { call.respondJson(HttpStatusCode.OK, DaemonStatus.serializer(), status()) }
             get("/status/history") { call.respondJson(HttpStatusCode.OK, ListSerializer(ResourceSample.serializer()), history.list()) }
             post("/api/{tool}") {
                 val name = call.parameters["tool"].orEmpty()
-                val tool = tools.firstOrNull { it.name == name }
-                    ?: return@post call.respondJson(HttpStatusCode.NotFound, error("unknown tool"))
+                val tool = tools().firstOrNull { it.name == name }
+                    ?: return@post call.respondJson(HttpStatusCode.NotFound, error(if (name == editTool.name) EDIT_OFF else "unknown tool"))
                 val args = readBody(call) ?: return@post call.respondJson(HttpStatusCode.InternalServerError, error("body too large"))
                 call.respondJson(HttpStatusCode.OK, ToolOutcome.serializer(), runner.run(tool, ToolArgs(args), "api"))
             }
@@ -302,6 +321,8 @@ class Daemon private constructor(
         private const val MB = 1024L * 1024
         private const val MAX_BODY = 4L * 1024 * 1024
         private const val IDLE_SECONDS = 2
+        private const val GATE_DELAY_MS = 60_000L
+        private const val EDIT_OFF = "edit is not on offer: write.mode is off, or auto with the gate closed (codeloupe metrics gaps shows why); set write.mode to on in config.json to use it"
 
         /**
          * Binds 127.0.0.1:<port>; fails with a BindException while another daemon holds the port, and with an

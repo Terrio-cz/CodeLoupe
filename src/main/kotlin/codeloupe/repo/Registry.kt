@@ -124,6 +124,11 @@ class Registry(
         return mergeBases.changes(repo(location.commonDir), location.worktree, withBefore = false)
     }
 
+    /** A file of [root]'s worktree was written: its next query checks the worktree at once instead of trusting a recent check. */
+    fun touched(root: String) {
+        overlays.invalidate(locate(root).worktree)
+    }
+
     /** The state of [worktree]'s overlay layer on [repo]'s base (see [Overlays.layer]); reads state only, starts nothing. */
     fun layer(worktree: String, repo: RepoState): String = overlays.layer(worktree, synchronized(repo) { repo.baseCommit })
 
