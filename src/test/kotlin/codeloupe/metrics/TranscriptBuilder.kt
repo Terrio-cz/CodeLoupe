@@ -11,7 +11,7 @@ import java.nio.file.Path
 import java.time.Instant
 
 /** A transcript written line by line the way Claude Code does: assistant turns that call tools, user lines that answer them. */
-class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T10:00:00Z")) {
+class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T10:00:00Z"), private val model: String = "claude-test") {
     private val lines = ArrayList<String>()
     private var turn = 0
     private var tick = 0L
@@ -34,7 +34,7 @@ class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T1
             put("timestamp", stamp())
             putJsonObject("message") {
                 put("id", "m$turn")
-                put("model", "claude-test")
+                put("model", model)
                 putJsonObject("usage") {
                     put("input_tokens", input)
                     put("output_tokens", output)

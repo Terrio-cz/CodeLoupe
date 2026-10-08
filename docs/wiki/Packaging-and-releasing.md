@@ -8,7 +8,9 @@ and updates](Installers-and-updates).
 ```
 
 The zip holds `bin/` (launchers), `lib/` (jars) and `runtime/`, a jlink runtime with only the modules the jars use
-(found by `jdeps`) plus the ones needed at run time. The launchers prefer `runtime/` to any JDK on the machine, so the
+(found by `jdeps`) plus the ones needed at run time, minus `jdk.compiler` (the parser never runs javac) and without the
+files jlink leaves that nothing uses: the class-data archive for heaps over 32 GB (`classes_nocoops.jsa`) and `jvm.lib`
+(`java.desktop` has to stay: without it the parser worker returns no facts, which `tools/bundle-smoke.mjs` would show). The launchers prefer `runtime/` to any JDK on the machine, so the
 bundle runs without Java. jlink output runs only on the OS it was built on, so CI builds one bundle per OS
 (`bundle` job in [ci.yml](https://github.com/Terrio-cz/CodeLoupe/blob/main/.github/workflows/ci.yml)); the Electron installer takes the same directory (see [Installers](#installers)).
 `node tools/bundle-smoke.mjs <bundle dir>` runs a query on a PATH without any Java and prints the sizes and the

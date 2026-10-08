@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { noJavaEnv } from './no-java-env.mjs';
 
 const [bundle, ...rest] = process.argv.slice(2);
-const opt = name => rest[rest.indexOf(`--${name}`) + 1];
+const opt = name => { const at = rest.indexOf(`--${name}`); return at < 0 ? undefined : rest[at + 1]; };
 if (!bundle || !fs.existsSync(path.join(bundle, 'bin'))) { console.error('usage: bundle-smoke.mjs <bundle dir> [--zip file] [--out file]'); process.exit(2); }
 const windows = process.platform === 'win32';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -58,6 +58,24 @@ function git(cwd, ...args) {
 const repo = path.join(tmp, 'repo');
 fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
 fs.writeFileSync(path.join(repo, 'src', 'Greeter.kt'), 'package demo\n\nclass Greeter {\n    fun greet(name: String): String = "Hello, $name"\n}\n');
+// What the parser meets besides a plain class: generics, lambdas, annotations, string templates, KDoc, a data class, and a Java file.
+// A runtime trimmed of a module the Kotlin compiler's parser still loads fails here (CL-143).
+fs.writeFileSync(path.join(repo, 'src', 'Orders.kt'), [
+  'package demo', '', 'import kotlinx.serialization.Serializable', '',
+  '/** An order line. */', '@Serializable', 'data class Line<T : Comparable<T>>(val sku: String, val qty: Int, val tags: List<T> = emptyList())', '',
+  'sealed interface Result { object Ok : Result; data class Failed(val why: String) : Result }', '',
+  'class Orders(private val lines: MutableList<Line<String>> = mutableListOf()) {',
+  '    /** Totals the quantities, `"${lines.size}"` lines. */',
+  '    fun total(): Int = lines.sumOf { it.qty } + lines.count { l -> l.tags.any { t -> t.startsWith("x") } }',
+  '    suspend fun add(line: Line<String>): Result = if (line.qty > 0) { lines += line; Result.Ok } else Result.Failed("empty $line")',
+  '}', '',
+].join('\n'));
+fs.writeFileSync(path.join(repo, 'src', 'Mailer.java'), [
+  'package demo;', '', 'import java.util.List;', '',
+  '/** Sends mail. */', 'public class Mailer<T extends CharSequence> {',
+  '    public <R> R send(List<? extends T> to, java.util.function.Function<T, R> each) { return each.apply(to.get(0)); }',
+  '    public record Sent(String to, int bytes) {}', '}', '',
+].join('\n'));
 git(repo, 'init', '-q', '-b', 'main');
 git(repo, 'add', '-A');
 git(repo, 'commit', '-q', '-m', 'init');
@@ -71,6 +89,11 @@ try {
   const second = cli(['find', 'greet'], repo);
   report.warmQueryMs = second.ms;
   if (second.code !== 0 || !second.out.includes('Greeter')) throw new Error(`find failed (exit ${second.code}): ${second.out}`);
+  // The second file of each language went through the same parser worker as the first.
+  const mixed = [['find', 'total'], ['find', 'send'], ['find', 'Sent']].map(args => cli(args, repo));
+  for (const [i, needle] of ['Orders', 'Mailer', 'record Sent'].entries()) {
+    if (mixed[i].code !== 0 || !mixed[i].out.includes(needle)) throw new Error(`find ${['total', 'send', 'Sent'][i]} failed (exit ${mixed[i].code}): ${mixed[i].out}`);
+  }
   // Let the daemon settle after the index build before reading its memory.
   await sleep(2000);
   const status = await (await fetch(`http://127.0.0.1:${port}/status`)).json();
