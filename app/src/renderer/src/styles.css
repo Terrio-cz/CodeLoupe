@@ -488,6 +488,8 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 .drawer-head .titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .drawer-head .titles .muted { font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .drawer-body { flex: 1; overflow: auto; padding: 16px 20px 28px; display: flex; flex-direction: column; gap: 18px; }
+/* Flex columns that scroll: a child with its own overflow must not be squeezed to fit. */
+.content > *, .drawer-body > * { flex-shrink: 0; }
 .drawer-summary { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 14px; background: var(--surface-2); border-radius: var(--r-md); }
 
 @media (max-width: 900px) {

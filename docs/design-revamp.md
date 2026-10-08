@@ -1,7 +1,8 @@
 # CodeLoupe Desktop — design revamp
 
-Stav 2026-10-08 · větev `CL-design-revamp`. Vizuální vrstva aplikace (`app/src/renderer`); data, IPC, kontrakt
-a chování se nemění. Nahrazuje § 6 (tokeny) a doplňuje § 1, § 5 a § 7 v [ui-spec.md](ui-spec.md).
+Stav 2026-10-08 · větev `CL-design-revamp`. Vizuální vrstva aplikace (`app/src/renderer`) pro všech deset obrazovek
+(Přehled, Větve, Workspaces, Úkoly, Joby, Běhy, Index, Mezery, Prostředí, Nastavení); data, IPC, kontrakt a chování
+se nemění. Nahrazuje § 6 (tokeny) a doplňuje § 1, § 5 a § 7 v [ui-spec.md](ui-spec.md).
 Před/po: [design-revamp/](design-revamp/).
 
 ## Směr
@@ -27,6 +28,9 @@ vypne všechny animace i odpočet čísel.
 | Nastavení | řádky s popiskem vlevo, segmentové přepínače a spínače vpravo | [Arcade editor](https://mobbin.com/screens/ff1ed1ba-7cde-4463-bab0-c72b1155f7f4) |
 
 Starší reference z původní specifikace (ui-spec § 12) platí dál pro rozvržení obrazovek.
+
+Screenshoty (720 px, mock data): `design-revamp/before-<režim>-<obrazovka>.png` (původní vzhled) a
+`design-revamp/after-<režim>-<obrazovka>.png` (revamp), režim `dark` / `light`.
 
 ## Tokeny
 
@@ -69,17 +73,33 @@ akcelerace (ui-spec § 11), rozmazání by se počítalo softwarově.
 
 | Kde | Co |
 |---|---|
-| Přechod obrazovek | obsah se při změně obrazovky vymění a jeho bloky vyjedou po sobě (6 px, fade) |
+| Přechod obrazovek | obsah se při změně obrazovky vymění a jeho bloky vyjedou po sobě (6 px, fade); titul a ikona v topbaru se vymění |
 | Sidebar | aktivní pilulka se přesune na novou položku (transform), ikony reagují na hover |
 | KPI | dlaždice vyjedou po sobě, čísla se dopočítají od nuly (600 ms, ease-out) |
 | Grafy | čára se vykreslí zleva (`stroke-dashoffset`), plocha a baseline se rozsvítí, pruhy vyrostou zleva |
-| Tabulky | nové řádky se jemně objeví (prvních 16), hover celého řádku, vybraný řádek s akcentovou linkou |
+| Tabulky | hover celého řádku, vybraný řádek s akcentovou linkou; řádky samy neanimují (viz Paměť) |
 | Drawer | vyjede zprava a zase odjede, pozadí ztmavne; fokus a `Esc` beze změny |
 | Stavy | „běží“ tečka pulzuje, skeleton dýchá (opacity), refresh ikona se otočí |
 | Tlačítka | hover o tón, stisk o 1 px dolů |
 
-Vše jen `transform` a `opacity` (kompozitor, bez layoutu). `prefers-reduced-motion: reduce` nastaví délky na
-0 a odpočet čísel ukáže rovnou konečnou hodnotu.
+Vstupy animují registrované CSS proměnné (`@property --enter/--grow/--pulse`), ne přímo `opacity`/`transform`:
+běží na hlavním vlákně a překreslí se na místě, takže žádná karta ani řádek nedostane vlastní vrstvu kompozitoru.
+Jako vrstva se posouvá jen drawer. `prefers-reduced-motion: reduce` nastaví délky na 0 a odpočet čísel ukáže
+rovnou konečnou hodnotu.
+
+## Paměť
+
+Aplikace běží bez GPU akcelerace, takže každý animovaný snímek je softwarové překreslení a Chromium si rastrové
+buffery chvíli drží. Měřeno screenshot během (`CODELOUPE_APP_SCREENSHOTS`, mock data, Windows 11, součet working setů):
+
+| | Po průchodu všemi obrazovkami | 30 s v klidu |
+|---|---|---|
+| `main` před revampem | ~315 MB | ~284 MB |
+| revamp | ~400–430 MB | ~308 MB |
+
+Špička je přechodná (rychlé přepínání obrazovek, každá s animací vstupu) a po pár sekundách klidu se vrací;
+trvale revamp přidá ~20–25 MB. Kvůli tomu neanimují řádky tabulek ani nadpisy, KPI se dopočítávají jen při
+zobrazení a změně hodnoty a `Intl.NumberFormat` se znovu používá místo vytváření v každém snímku.
 
 ## Zásady
 
