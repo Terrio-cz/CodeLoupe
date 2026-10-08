@@ -7,10 +7,10 @@ import com.github.ajalt.clikt.core.subcommands
 /** `codeloupe metrics …` — token and speed figures of agent runs, read from Claude Code transcripts. */
 class MetricsCommand : CliktCommand(name = "metrics") {
     init {
-        subcommands(MetricsCollectCommand(), MetricsCompareCommand(), MetricsGapsCommand())
+        subcommands(MetricsCollectCommand(), MetricsCompareCommand(), MetricsGapsCommand(), MetricsBoilerplateCommand())
     }
 
-    override fun help(context: Context) = "Measure agent runs from Claude Code transcripts: collect, compare, gaps."
+    override fun help(context: Context) = "Measure agent runs from Claude Code transcripts: collect, compare, gaps, boilerplate."
 
     override fun run() = Unit
 }
