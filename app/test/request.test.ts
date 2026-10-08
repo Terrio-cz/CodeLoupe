@@ -18,6 +18,11 @@ describe('validateRequest', () => {
     expect(validateRequest({ resource: 'events/stream' }).ok).toBe(false);
   });
 
+  it('lets the runs list filter by the exact task of a branch', () => {
+    const r = validateRequest({ resource: 'runs', query: { ter: 'TER-1', range: '30d', sort: 'weighted', limit: 5 } });
+    expect(r).toMatchObject({ ok: true, path: '/ui-api/v1/runs?ter=TER-1&range=30d&sort=weighted&limit=5' });
+  });
+
   it('drops empty and undefined query values', () => {
     const r = validateRequest({ resource: 'tasks', query: { q: '', state: undefined, limit: 200 } });
     expect(r).toMatchObject({ ok: true, path: '/ui-api/v1/tasks?limit=200' });

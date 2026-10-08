@@ -10,13 +10,13 @@ import java.time.Instant
 
 /** The Runs screen from the ingested transcripts: the list, one run and its steps. Every answer is an indexed read of the daemon's SQLite. */
 internal class RunViews(private val transcripts: Transcripts, private val clock: () -> Instant = Instant::now) {
-    suspend fun page(range: String?, sort: String?, role: String?, q: String?, limit: String?, cursor: String?): RunPage {
+    suspend fun page(range: String?, sort: String?, role: String?, q: String?, ter: String?, limit: String?, cursor: String?): RunPage {
         val from = clock().minusSeconds(Ranges.days(range ?: "7d") * 86_400)
         val order = sort?.let { RunSort.of(it) ?: throw UiApiException.badRequest("sort must be one of ${RunSort.entries.joinToString { it.param }}") } ?: RunSort.START
         val size = OffsetCursor.limit(limit, DEFAULT_RUNS, MAX_RUNS)
         val offset = OffsetCursor.offset(cursor)
         transcripts.fresh()
-        val page = transcripts.queries.runs(from.toEpochMilli(), role, q?.trim()?.takeIf { it.isNotEmpty() }, order, offset, size)
+        val page = transcripts.queries.runs(from.toEpochMilli(), role, q?.trim()?.takeIf { it.isNotEmpty() }, order, offset, size, ter?.trim()?.takeIf { it.isNotEmpty() })
         val next = (offset + size).takeIf { it < page.total }?.let(OffsetCursor::of)
         return RunPage(page.items.map(::item), page.total, next, transcripts.queries.roles(), transcripts.ingest.status())
     }
