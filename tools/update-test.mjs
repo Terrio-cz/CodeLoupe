@@ -111,8 +111,13 @@ function run(command, cmdArgs, options = {}) {
 }
 function appEnv(extra = {}) {
   const env = { ...baseEnv, CODELOUPE_HOME: dirs.home, CODELOUPE_PORT: String(daemonPort), ...extra };
-  if (platform === 'win32') env.LOCALAPPDATA = dirs.local;
-  else env.XDG_CACHE_HOME = dirs.local;
+  if (platform === 'win32') {
+    env.LOCALAPPDATA = dirs.local;
+  } else {
+    env.XDG_CACHE_HOME = dirs.local;
+    // A CI runner has no libsecret: the vault is protected by a passphrase, which the CLI and the daemon both get.
+    env.CODELOUPE_PASSPHRASE ??= 'update-test-passphrase';
+  }
   return env;
 }
 function install(installer) {
@@ -313,7 +318,8 @@ try {
   }
   clock = performance.now();
   startApp();
-  const statusNew = await waitFor('the daemon of N+1', async () => { const s = await status(); return s?.name === 'codeloupe' && s; }, 120);
+  // An AppImage cannot stop the daemon it replaces: the old one answers until the new app has restarted it.
+  const statusNew = await waitFor('the daemon of N+1', async () => { const s = await status(); return s?.name === 'codeloupe' && s.version === vNew && s; }, 120);
   lap('newAppStartToDaemonUp');
   check('daemon runs the new version', statusNew.version === vNew, `/status says ${statusNew.version}`);
   const cmdline = daemonCommandLine(statusNew.pid);
@@ -343,12 +349,12 @@ try {
     await sleep(1500);
     clock = performance.now();
     startApp({ CODELOUPE_UPDATE_FEED: '' });
-    const rolled = await waitFor('the previous daemon', async () => { const s = await status(); return s?.name === 'codeloupe' && s; }, 180);
+    const record = await waitFor('the rollback record', () => fs.existsSync(updateFile('rollback.json')) && JSON.parse(fs.readFileSync(updateFile('rollback.json'), 'utf8')), 180);
+    const rolled = await waitFor('the previous daemon', async () => { const s = await status(); return s?.name === 'codeloupe' && s.version === vNew && s; }, 90);
     lap('brokenBuildStartToPreviousDaemonUp');
     check('failed start rolled back to the previous daemon', rolled.version === vNew, `/status says ${rolled.version}`);
     const cl = daemonCommandLine(rolled.pid);
     check('the previous bundle runs', cl.includes(`codeloupe-${vNew}.jar`) && cl.replaceAll('\\', '/').includes('/update/previous/'), cl);
-    const record = await waitFor('the rollback record', () => fs.existsSync(updateFile('rollback.json')) && JSON.parse(fs.readFileSync(updateFile('rollback.json'), 'utf8')), 60);
     check('rollback recorded', record.failedVersion === vBad && record.usingVersion === vNew, JSON.stringify(record));
     check('the secret is still readable after the rollback', cli(path.join(dirs.userData, 'update', 'previous', 'codeloupe'), ['env', 'run', '--', process.execPath, '-e', secretProbe]).status === 0);
   }
