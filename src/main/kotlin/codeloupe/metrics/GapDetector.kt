@@ -16,21 +16,35 @@ object GapDetector {
     private val CANDIDATES_ONLY = Regex("\\n0 exact, [1-9]\\d* candidate")
     private val CLI_TOOL = Regex("""codeloupe(?:\.bat)?\s+(?:--\S+\s+\S+\s+)*([a-z_]+)(.*)""")
     private val SUBJECT_ARGS = listOf("name", "q", "target", "pattern", "query", "id")
+    private val LEADING_CD = Regex("""^cd\s+\S+\s*(&&|;)\s*""")
+    private val SHELL_PROGRAMS = setOf("rg", "grep", "sed", "cat")
 
-    fun detect(run: Run): List<Gap> {
+    fun detect(run: Run): List<Gap> = locate(run).map { it.gap }
+
+    fun locate(run: Run): List<LocatedGap> {
         val week = week(run.start)
         val calls = run.tools.filter { it.category == "codeloupe" }
         return calls.flatMap { call ->
             val (tool, subject) = identify(call) ?: return@flatMap emptyList()
             val shape = "$tool:${shape(subject)}"
             val token = token(subject)
+            fun at(kind: String, fallback: String? = null) = LocatedGap(Gap(week, tool, shape, kind, token), call.seq, call.turn, fallback)
             buildList {
-                if (call.head.startsWith("busy:")) add(Gap(week, tool, shape, "busy", token))
-                if (EMPTY.containsMatchIn(call.head)) add(Gap(week, tool, shape, "empty", token))
-                if (CANDIDATES_ONLY.containsMatchIn(call.head)) add(Gap(week, tool, shape, "candidates", token))
-                if (token != null && run.tools.any { follows(call, it, token) }) add(Gap(week, tool, shape, "fallback", token))
+                if (call.head.startsWith("busy:")) add(at("busy"))
+                if (EMPTY.containsMatchIn(call.head)) add(at("empty"))
+                if (CANDIDATES_ONLY.containsMatchIn(call.head)) add(at("candidates"))
+                val next = token?.let { t -> run.tools.firstOrNull { follows(call, it, t) } }
+                if (next != null) add(at("fallback", fallbackOf(next)))
             }
         }
+    }
+
+    /** What the agent used instead: `Read`, or the program of a shell search. */
+    private fun fallbackOf(next: ToolCall): String = when {
+        next.name == "Read" -> "Read"
+        next.name == "Grep" -> "rg"
+        else -> ((next.input["command"] as? JsonPrimitive)?.content?.trim()?.replaceFirst(LEADING_CD, "")?.substringBefore(' ')).orEmpty()
+            .let { if (it in SHELL_PROGRAMS) it else "other" }
     }
 
     private fun follows(call: ToolCall, next: ToolCall, token: String): Boolean =

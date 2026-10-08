@@ -3,8 +3,9 @@ package codeloupe.uiapi
 import kotlinx.serialization.Serializable
 
 /**
- * Where an agent fell back to `rg`/`sed`/`cat` after a CodeLoupe call. The daemon has no occurrences of its own until the
- * transcript ingest (CL-62); the weekly [report] is what `codeloupe metrics gaps --out <home>/gaps-report.json` wrote.
+ * Where an agent fell back to `rg`/`sed`/`cat` after a CodeLoupe call, or got no usable answer: [summary] and [items] come from
+ * the transcript ingest (docs/ui-spec.md § 9.12). The weekly [report] is computed from the same data; before anything is
+ * ingested it is what `codeloupe metrics gaps --out <home>/gaps-report.json` wrote, if that file exists.
  */
 @Serializable
 data class Gaps(val summary: List<Summary>, val items: List<Item>, val report: Report? = null) {

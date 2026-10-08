@@ -164,8 +164,9 @@ Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hle
 ### 3.3 (zrušeno) Běhy agentů
 
 Obrazovka běhů a detail s časovou osou kroků (původně CL-42) byly vyřazeny rozhodnutím uživatele 2026-10-07:
-monitorování agentů patří launcheru, ne CodeLoupe. Data z transcriptů daemon dál používá jen agregovaně —
-pro spotřebu a úsporu na Přehledu a pro detektor mezer.
+monitorování agentů patří launcheru, ne CodeLoupe. Data z transcriptů daemon dál používá pro spotřebu a úsporu na
+Přehledu a pro detektor mezer. Seznam běhů a jejich kroky nově vystavuje i API (§ 9.7–9.8, CL-62), aby na něm šla
+postavit obrazovka Běhy (CL-40); samotná obrazovka je práce aplikace.
 
 ### 3.4 Úkoly (YouTrack mirror) + detail
 
@@ -497,8 +498,8 @@ s ikonou a textem.
   notifikace a stav `error`.
 - **Stop / restart**: `… stop` (CLI posílá `POST /shutdown`), restart = stop + start. Ruční stop vypne
   autostart do dalšího ručního startu, i přes restart aplikace: aplikace při stopu zapíše `<home>/stopped`,
-  při startu a restartu ho smaže. Stejný marker zapíše `codeloupe stop` a smaže `codeloupe start` (požadavek
-  na CLI v CL-62; Node prototyp ho zatím nepíše, takže stop z terminálu aplikace bere jako výpadek). Když
+  při startu a restartu ho smaže. Stejný marker zapíše `codeloupe stop` (před zastavením daemonu; zapíše ho
+  i když daemon neběží) a smaže `codeloupe start` (CL-62). Když
   odpovídá daemon spuštěný **po** zapsání markeru (`daemon.json.startedAt` > mtime markeru), někdo ho spustil
   znovu a aplikace marker smaže; daemon spuštěný před markerem se teprve vypíná a stop platí dál.
 - **Přežije restart daemonu**: HTTP bez keep-alive, každé volání nové spojení; renderer jen zobrazí stav
@@ -571,7 +572,7 @@ interface Lane { running: string | null; waiting: string[] }
 interface LastBuild { at: Iso; ok: true; files: number; errors: number; ms: number; peakRssMb?: number }
 ```
 
-### 9.4a `GET /ui-api/v1/nav?gapsSince=<Iso>` (počty sidebaru)
+### 9.4a `GET /ui-api/v1/nav?gapsSince=<Iso>` (počty sidebaru; `newGaps` = mezery od `gapsSince`, bez parametru 0)
 ```ts
 interface Nav { activeWorktrees: number; openTasks: number; newGaps: number; indexState: RepoIndexState }
 ```
@@ -589,7 +590,7 @@ interface Overview {
     codeloupeCalls: number; callP50Ms: number;
     gaps: number; newGaps: number;
   };
-  budget: { dailyWeighted: number | null; usedToday: number };
+  budget: { dailyWeighted: number | null; usedToday: number };   // dailyWeighted z config.json budgets; usedToday od místní půlnoci
   costSeries: { t: Iso; weighted: number; baseline: number }[];  // 24h: hodinové, jinak denní buckety
   savingsByTool: { tool: string; calls: number; savedTokens: number }[];
   toolCalls: { tool: string; calls: number; p50Ms: number; p95Ms: number; avgResultChars: number;
@@ -612,9 +613,51 @@ interface WorktreeDetail extends WorktreeSummary {
 }
 ```
 
-### 9.7–9.8 (zrušeno)
+### 9.7 `GET /ui-api/v1/runs?range=&sort=&role=&q=&limit=&cursor=` (CL-62)
 
-API běhů agentů a jejich kroků (`runs`, `runs/{id}`, `runs/{id}/steps`) vypadlo s obrazovkou Běhy (§ 3.3).
+Běhy agentů z inkrementálního ingestu transcriptů (§ 9.17). `range` (výchozí `7d`) filtruje podle začátku běhu,
+`sort` je `start` (výchozí) | `weighted` | `turns` | `peak` | `share` | `duration`, vždy sestupně; `role` je přesná role
+(`main`, `terrio-coder`, …), `q` podřetězec názvu, TER, role nebo souboru; `limit` 1–200 (výchozí 50), `cursor` neprůhledný.
+```ts
+interface RunItem {
+  id: string;                 // stabilní, dokud existuje <home>/transcripts.db
+  file: string; session: string; project: string;   // file = název souboru bez .jsonl; session = sezení (u subagenta rodičovské)
+  kind: 'session' | 'subagent'; role: string; ter: string | null; model: string | null;
+  title: string;              // první řádek zadání, maskovaný, ≤ 120 znaků
+  startedAt: Iso; endedAt: Iso; durationSec: number;
+  turns: number; weighted: number; peakContext: number;
+  toolResultShare: number;    // 0..1, část váženého nákladu, kterou nese udržování výsledků nástrojů v kontextu
+  toolCalls: number; toolErrors: number;
+  overBudget: boolean;        // weighted > budgets.runWeighted
+}
+interface RunPage extends Page<RunItem> {
+  roles: string[];            // role, které daemon zná (pro filtr)
+  ingest: { running: boolean; filesDone: number; filesTotal: number; at: Iso | null };   // běží-li čtení transcriptů
+}
+```
+`ingest.running` je `true` během prvního průchodu přes gigabajty transcriptů (≈ minuta): odpověď je z toho, co už je
+uložené (nejnovější transcripty první), a klient volá znovu. Další volání čtou jen nové řádky a odpovídají v jednotkách ms.
+
+### 9.8 `GET /ui-api/v1/runs/{id}` a `GET /ui-api/v1/runs/{id}/steps?sort=&limit=&cursor=` (CL-62)
+```ts
+interface RunDetail {
+  run: RunItem;
+  usage: { input: number; cacheWrite5m: number; cacheWrite1h: number; cacheRead: number; output: number };  // tokeny podle ceny
+  categories: { category: string; calls: number; chars: number; carried: number; weighted: number; errors: number }[];  // podle carried
+}
+interface StepItem {
+  seq: number; turn: number; at: Iso | null;
+  tool: string; category: string;       // kategorie CL-21 (code_read, build_test, codeloupe, …)
+  summary: string;                      // o čem volání bylo (příkaz, soubor, vzor); maskované, ≤ 200 znaků, nikdy obsah
+  chars: number; durationMs: number;
+  error: boolean; errorText: string | null;
+  carried: number;                      // znaky výsledku × tahy, které po něm následovaly
+  weighted: number;                     // relativní cena držení výsledku v kontextu (carried cost per step)
+  gap: 'fallback' | 'empty' | 'candidates' | 'busy' | null;   // mezera, kterou volání CodeLoupe skončilo
+}
+type StepPage = Page<StepItem>;         // `sort`: seq (výchozí, vzestupně) | weighted | chars (sestupně); limit 1–500, výchozí 200
+```
+Nečíselné nebo neznámé `id` → `404 not_found`. `carried` a `weighted` rostou s dalšími tahy běžícího běhu.
 
 ### 9.9 `GET /ui-api/v1/tasks?project=&state=&q=&limit=&cursor=` → `Page<TaskSummary> & { mirrorSyncedAt: Iso | null }`
 
@@ -644,15 +687,16 @@ interface IndexHealth {
 }
 ```
 
-### 9.12 `GET /ui-api/v1/gaps?range=&tool=&reason=`
+### 9.12 `GET /ui-api/v1/gaps?range=&tool=&reason=` (CL-62; výchozí `range` 7d; volání odpovězená „busy“ se nepočítají)
 ```ts
 interface Gaps {
   summary: { tool: string; shape: string; fallback: string; count: number; lastAt: Iso }[];
   items: { id: string; at: Iso; tool: string; shape: string;
            fallback: 'rg' | 'grep' | 'sed' | 'cat' | 'Read' | 'other';
            reason: 'followup_read' | 'empty' | 'candidate_manual' | 'rollback';
-           session: string; turn: number | null; target: string }[];   // session a tah jen jako text
-  report: {                              // týdenní report `codeloupe metrics gaps --out <home>/gaps-report.json`; null, dokud ho nikdo nespustil
+           session: string; turn: number | null; target: string }[];   // session a tah jen jako text; nejvýš 200 nejnovějších
+  report: {                              // týdenní report jako `codeloupe metrics gaps`, posledních 30 dní (včetně „busy“); z ingestu, před prvním
+                                         // ingestem ze souboru `<home>/gaps-report.json` (`metrics gaps --out`); null, když není ani jedno
     generatedAt: Iso | null; since: string | null; runs: number; calls: number;
     rows: { week: string; tool: string; shape: string; kind: 'fallback' | 'empty' | 'busy' | 'candidates'; count: number; examples: string[] }[];
   } | null;
@@ -716,13 +760,20 @@ interface Events {
   lastSeq: number;
   items: { seq: number; at: Iso; kind: 'budget_breach' | 'build_finished' | 'build_failed' | 'gap_new';
            severity: 'info' | 'warning' | 'critical'; title: string; body: string;
-           ref: { screen: 'overview' | 'index' | 'gaps'; id: string | null } }[];
+           ref: { screen: 'overview' | 'index' | 'gaps' | 'runs'; id: string | null } }[];   // 'runs' (id = RunItem.id): překročený rozpočet běhu
 }
 ```
 `since` chybí → jen `epoch`, `lastSeq` a prázdné `items` (aplikace po startu nenotifikuje historii). Události
 se ukládají v SQLite, takže restart daemonu číslování nezmění; když se `epoch` přesto změní (smazaný home),
 aplikace se znovu zarovná bez notifikací. Události vznikají líně při dotazu (`events`, ingest), daemon kvůli
 nim nemá časovač (plan.md § 5.1).
+
+Události z ingestu transcriptů (CL-62): `budget_breach` — **jedna** událost na den (`budgets.dailyWeighted`, titulek „Daily
+budget exceeded“, `ref: overview`) a jedna na běh (`budgets.runWeighted`, „Run budget exceeded“, `ref: runs/<id>`); klíč
+(`day:YYYY-MM-DD`, `run:<id>`) je uložený, takže se událost neopakuje ani po restartu. `gap_new` — jedna událost na
+průchod, nástroj, tvar dotazu a druh mezery („3× fallback for find:name“). Součty dne jsou po hodinách (dny jsou místní).
+První průchod (historie) žádnou událost nevysílá, jen si zapamatuje, co už je přes rozpočet. Stejné události jdou do
+webhooků (`budget.breach`, `gap.new`).
 
 ### 9.16 Mapování obrazovka → endpoint
 
@@ -762,8 +813,11 @@ Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevol
   metodika `codeloupe metrics` CL-21, detektor mezer CL-22), spouštěný líně voláním UI API — bez časovače.
 - Telemetrie volání CodeLoupe (CL-24), úkoly z mirroru (CL-26), změny z `changes()` (CL-17) a vrstev (CL-16).
 - Dokud zdroj chybí, endpoint vrací prázdná data (ne 404), aby obrazovky fungovaly.
-- Rozpočet < 1 s na obrazovku (CL-40) se měří na ingestovaném baseline (2 651 sessions). Daemon neposkytuje
-  žádné API běhů ani kroků agentů.
+- Rozpočet < 1 s na obrazovku (CL-40) se měří na ingestovaném baseline (2 651 sessions).
+- **Ingest transcriptů (CL-62)**: `<home>/transcripts.db` (tabulky `runs`, `steps`, `usage_hours`, `gaps`, `breaches`, `files`
+  s offsetem a stavem parseru). Spouští ho volání UI API (`runs`, `overview`, `gaps`, `nav`, `events`), nejvýš jednou za
+  `metrics.ingestTtlMs` (10 s), v pozadí; volání čeká nejvýš 100 ms a odpoví z uloženého. Bez volání neběží nic (CPU v klidu 0).
+  Čte jen nové řádky od uloženého offsetu; adresáře z `metrics.transcriptDirs` (jinak všechny pod `~/.claude/projects`).
 
 **Stav implementace (CL-39, balíček `codeloupe.uiapi`, `GET /ui-api/v1/<zdroj>`):** všechny zdroje výše odpovídají, jen
 `GET` (jinak 405), `Cache-Control: no-store`, chyby `{ error: { code, message } }`; kontrakt aplikace
@@ -771,16 +825,17 @@ Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevol
 
 | Zdroj | Z čeho | Zatím prázdné nebo nepřesné |
 |---|---|---|
-| `nav` | workspace scan, mirror, stav indexu | `newGaps` 0 |
-| `overview` | `calls.jsonl` (nově s `root` volání): `toolCalls`, p50, `activeWindows` (různé rooty za 15 min), `queriedWorktrees` | cena, baseline, úspory, `costSeries`, `savingsByTool`, `gaps`: 0/prázdné do ingestu transcriptů (CL-62) |
+| `nav` | workspace scan, mirror, stav indexu, mezery od `gapsSince` | – |
+| `overview` | `calls.jsonl` (nově s `root` volání): `toolCalls`, p50, `activeWindows` (různé rooty za 15 min), `queriedWorktrees`; z ingestu (CL-62) vážená cena dnes / včera do stejné hodiny / v rozsahu, `costSeries` (24h hodinové, jinak denní), `budget`, `gaps`, `newGaps` (posledních 24 h) | `baselineRange`, `savedTokens`, `savedPct`, `savingsByTool`, `costSeries[].baseline`: 0/prázdné (daemon nemá baseline po rolích) |
+| `runs`, `runs/{id}`, `runs/{id}/steps` | ingest transcriptů (CL-62), indexy pro každé řazení | – |
 | `worktrees` | workspace scan, `ahead`/`behind` z gitu, změněné soubory proti merge-base, stav vrstvy (`Overlays.layer`), počet volání za 24 h | `changedDecls` se počítá na pozadí (první odpověď ho může mít 0); první odpověď po startu u desítek worktrees trvá vteřiny, další jsou okamžité (poslední stav + obnova na pozadí) |
 | `worktrees/{id}` | `changes` ve strukturované podobě: deklarace, volající, testy | `index.layerFiles` = změněné indexované soubory, `parsedAt` null |
 | `tasks`, `tasks/{id}` | jen mirror (nikdy dotaz na tracker), kurzor = offset | `reads` 0, `mirror.lastReadAt` null (žádný čítač čtení) |
 | `index` | registr repozitářů, velikost a počty z indexu, sestavení z `build.done`/`overlay.refreshed` v `events.db` | `firstLine` chyb parseru 0, `kind` plného a inkrementálního buildu se neliší |
-| `gaps` | `report`: soubor `<home>/gaps-report.json` z `codeloupe metrics gaps --out` (příklady projdou scrubberem) | `summary` a `items` prázdné do ingestu (CL-62) |
+| `gaps` | ingest transcriptů, detektor CL-22 s místem (tah, volání) a tím, po čem agent sáhl; `report` z téhož (30 dní), než je co ingestovat, ze souboru `<home>/gaps-report.json` (příklady projdou scrubberem) | volání „busy“ jsou jen v `report`, ne v `summary`/`items` |
 | `environment` | metadata vaultu + audit (CL-50, CL-55); nikdy hodnota | `keys: []`, `storeReady: false`, dokud nefunguje žádný ochránce klíče |
-| `settings` | konfigurace daemonu, mirror, `tokenConfigured` (hodnota se nikdy nečte ven) | `budgets.dailyWeighted` null |
-| `events` | `events.db` + `epoch` (nová tabulka `meta`): `build_finished`, `build_failed` | `budget_breach`, `gap_new` se zatím nevysílají |
+| `settings` | konfigurace daemonu, mirror, `tokenConfigured` (hodnota se nikdy nečte ven), `budgets.dailyWeighted` | – |
+| `events` | `events.db` + `epoch` (tabulka `meta`): `build_finished`, `build_failed`, `budget_breach`, `gap_new` | – |
 
 ## 10. Bezpečnost aplikace
 

@@ -24,14 +24,17 @@ private const val BASE = "/ui-api/v1"
 /** `GET /ui-api/v1/<resource>`; anything but GET is 405. The request guard (Host, Origin, `x-codeloupe`) has already run. */
 fun Route.uiApiRoutes(api: UiApi) {
     route(BASE) {
-        get("nav") { call.answer(Nav.serializer()) { api.nav() } }
+        get("nav") { call.answer(Nav.serializer()) { api.nav(call.query("gapsSince")) } }
         get("overview") { call.answer(Overview.serializer()) { api.overview(call.query("range")) } }
         get("worktrees") { call.answer(WorktreeList.serializer()) { api.worktrees(call.query("repo"), call.query("layer"), call.query("q")) } }
         get("worktrees/{id}") { call.answer(WorktreeDetail.serializer()) { api.worktree(call.parameters["id"].orEmpty()) } }
         get("tasks") { call.answer(TaskPage.serializer()) { api.tasks(call.query("project"), call.query("state"), call.query("q"), call.query("limit"), call.query("cursor")) } }
         get("tasks/{id}") { call.answer(TaskDetail.serializer()) { api.task(call.parameters["id"].orEmpty()) } }
         get("index") { call.answer(IndexHealth.serializer()) { api.index() } }
-        get("gaps") { call.answer(Gaps.serializer()) { api.gaps() } }
+        get("runs") { call.answer(RunPage.serializer()) { api.runs(call.query("range"), call.query("sort"), call.query("role"), call.query("q"), call.query("limit"), call.query("cursor")) } }
+        get("runs/{id}") { call.answer(RunDetail.serializer()) { api.run(call.parameters["id"].orEmpty()) } }
+        get("runs/{id}/steps") { call.answer(StepPage.serializer()) { api.steps(call.parameters["id"].orEmpty(), call.query("sort"), call.query("limit"), call.query("cursor")) } }
+        get("gaps") { call.answer(Gaps.serializer()) { api.gaps(call.query("range"), call.query("tool"), call.query("reason")) } }
         get("environment") { call.answer(EnvironmentView.serializer()) { api.environment() } }
         get("environment/audit") { call.answer(EnvironmentAuditView.serializer()) { api.environmentAudit(call.query("name"), call.query("scope"), call.query("limit")) } }
         get("settings") { call.answer(SettingsView.serializer()) { api.settings() } }
