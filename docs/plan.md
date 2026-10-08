@@ -256,7 +256,7 @@ overloady a třída s konstruktory jsou jeden symbol.
 `root` = cesta do repozitáře nebo worktree (výchozí: výchozí větev repozitáře z `cwd` klienta). Výstup:
 kompaktní text, řádky 1-based, `limit` + `… +N dalších`. Strop: **≤ 14 nástrojů** celkem (popisy stojí tokeny
 v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`, `tasks mode=…`); dnes 7 kódových (`find`,
-`outline`, `symbol`, `usages`, `calls`, `hierarchy`, `changes`) + 3 trackerové (`issue`, `tasks`, `update`, jen když je
+`outline`, `symbol`, `usages`, `calls`, `hierarchy`, `changes`) + `task_code` (historie větve, funguje i bez trackeru) + 3 trackerové (`issue`, `tasks`, `update`, jen když je
 tracker v konfiguraci) + `job` (start/status/cancel jedním nástrojem, CL-84).
 
 ### Tracker (CL-26, CL-27, CL-29, CL-90)
@@ -633,6 +633,50 @@ rozhoduje launcher.
 - Měřeno: odpověď `yt_update_fields` (youtrack MCP) je `{updated, verified: <celé issue>}` = 4,6–8,5 tis. zn. (TER-672 4 561, TER-660
   5 628, TER-114 8 450; `yt_get_issue` stejného tvaru); `update` 31–52 zn. na živém CL (stav, komentář, stav + komentář),
   po každém zápisu mirror shodný s čerstvým čtením (stav, `updated`, komentáře, pole).
+
+### Výsledek startu CLI (CL-64, 2026-10-08)
+
+- `codeloupe find <q>` proti běžícímu daemonu, medián z 10 (throwaway daemon, bez zátěže nad běžný stroj):
+
+  | | před | po |
+  |---|---|---|
+  | Windows 11, `codeloupe.bat find` | 792 ms | **195 ms** |
+  | Windows 11, `codeloupe.bat status` | 791 ms | 218 ms |
+  | Linux (WSL2 Ubuntu, JDK 25), `codeloupe find` | 731 ms | **126 ms** |
+  | Linux (WSL2 Ubuntu, JDK 25), `codeloupe status` | 748 ms | 163 ms |
+
+- Kde se čas vzal (Windows): samotný AppCDS archiv na starém kódu 885 → 637 ms (přímý `java`); zbytek do 195 ms dalo
+  `HttpURLConnection` místo `java.net.http` (~250 tříd, `LocalHttp`), sestavení jen volaného subpříkazu clikt
+  (`CodeLoupeCommand(requested)`) a `-XX:-UsePerfData`; jednotlivě neměřeno.
+- Archiv: `-XX:+AutoCreateSharedArchive` v `bin/codeloupe[.bat]` (vlastní skripty v `gradle/start/`), soubor
+  `<home>/cds/<instalační adresář>-<otisk buildu>.jsa` (~8 MB), tedy pod CodeLoupe home, ne v install adresáři. První
+  volání po instalaci ho vytvoří (~1,4 s), další ho jen mapují. JVM archiv se změněnými jary **nepřestaví**, jen ho
+  přestane používat, proto má každý build vlastní soubor a starší skript maže. JVM, který archiv nemůže zapsat, končí
+  s exit kódem 127, proto se bez zapisovatelného `cds/` spustí bez archivu (ověřeno: `status` bez daemonu vrací 3).
+- `Enable-Native-Access` je v manifestu jaru (CLI se spouští `java -jar`, `Class-Path` v manifestu): příznak
+  `--enable-native-access` v příkazové řádce se s dynamickým archivem nesnese (hláška o neshodě modulové vlastnosti na
+  stdout). Příkazová řádka je krátká bez ohledu na cestu (classpath už není v ní). Daemon a build worker se
+  dál spouštějí `-cp <jar>`, bez archivu (CL-56: archiv po parseru jen přidal RSS).
+- Beze změny výstupu a exit kódů: 18 příkazů (find / outline / symbol / usages, chyby použití, `--help`, neznámý
+  příkaz, `status` bez daemonu, `job`, `webhook`, `mcp-config`, `stop`) dává na `base` i na novém buildu shodný
+  stdout, stderr i exit kód; 6 souběžných prvních volání bez archivu (3 kola) skončila 18× exit 0.
+
+### Výsledek CL-91 — vazby task ↔ kód (2026-10-08)
+
+- Nástroj `task_code(query, limit)` (CLI `task_code <id>` i `code_tasks <symbol|cesta>`; jeden MCP nástroj kvůli stropu 14, `code_tasks` je jen
+  alias v CLI). Funguje i bez trackeru (pak jen historie a vzor `ABC-12`); id podle `tracker.projects`, nebo `taskPattern` v `.codeloupe.json`.
+- **Přistání**: historie výchozí větve po první rodiči, jeden záznam na task. Merge commit = přistání, jeho větev (bez `merge origin/master`
+  v ní) určuje soubory a deklarace; prostý commit na větvi je přistání sám. Deklarace z `changes()`: blob před/po jen u změněných
+  souborů (JGit), parsování v daemonu, výsledek v SQLite (`<home>/…/taskcode`), přírůstkově od posledního skenu; přepsaná historie → sken znovu.
+- **Predikce otevřeného tasku**: texty `## Context/Scope/AC/Verification/API contract` → zmínky (cesty, `Type.member`, slova, trasy, moduly)
+  rozřešené proti indexu; značky `=` jisté (cesta/symbol na jednom místě), `~` pravděpodobné (slovo nebo `soubor:řádek` — řádky stárnou),
+  `?` odhad (víc kandidátů, řetězec trasy), `+` nový soubor (jen když existuje jeho složka). U každé řádky citace zdroje (sekce, kód).
+  Nejednoznačná jména (deklarovaná ve > 6 souborech) se jen vyjmenují.
+- `code_tasks`: dřívější tasky k deklaraci/souboru s merge SHA, značky změn té deklarace (jinak „soubor změněn, deklarace ne“),
+  a otevřené tasky, jejichž text míří na stejnou cestu (porovnává se na jedné cestě, ne přes celý repozitář).
+- **Ověření (TerrioImporter, jen čtení, 10 přistálých + 10 otevřených TER):** viz příloha CL-91. Přistání 9/9 shodné s `git` (SHA prvního rodiče,
+  počet commitů bez `merge origin/master`, počet souborů); TER-496 je Done bez jediného commitu → bez přistání, jen predikce. Nalezeno a opraveno:
+  `+` pro cesty cizího repa (`src/views/Admin.jsx`), pro dvojici `a.md/b.md`, a `=` pro deklaraci podle zastaralého čísla řádku.
 
 ## 10. Rizika
 

@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
@@ -44,15 +46,37 @@ kotlin {
 application {
     mainClass.set("codeloupe.MainKt")
     applicationName = "codeloupe"
-    // The CLI is short-lived: small heap, no C2, class data sharing.
-    applicationDefaultJvmArgs = listOf(
-        "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-Xshare:auto", "-Xss512k", "-Xmx128m",
-        "--enable-native-access=ALL-UNNAMED",
-    )
 }
 
+// The jar is the whole launch command (`java -jar lib/codeloupe-<v>.jar`): a short command line whatever the install
+// path, and `Enable-Native-Access` in the manifest instead of a JVM flag, which a class-data archive cannot be combined with.
 tasks.jar {
-    manifest { attributes("Implementation-Version" to project.version) }
+    manifest {
+        attributes(
+            "Implementation-Version" to project.version,
+            "Main-Class" to application.mainClass,
+            "Class-Path" to provider { configurations.runtimeClasspath.get().files.joinToString(" ") { it.name } },
+            "Enable-Native-Access" to "ALL-UNNAMED",
+        )
+    }
+}
+
+// Our own start scripts (gradle/start): JVM flags for a short-lived CLI plus a class-data archive under the CodeLoupe home.
+tasks.startScripts {
+    val jarName = tasks.jar.flatMap { it.archiveFileName }
+    val unixSource = layout.projectDirectory.file("gradle/start/codeloupe")
+    val windowsSource = layout.projectDirectory.file("gradle/start/codeloupe.bat")
+    inputs.files(unixSource, windowsSource)
+    inputs.property("jarName", jarName)
+    doLast {
+        // The scripts name the class-data archive after the build: a JVM never rebuilds one whose jars changed.
+        val buildId = MessageDigest.getInstance("SHA-256").digest(tasks.jar.get().archiveFile.get().asFile.readBytes())
+            .take(6).joinToString("") { "%02x".format(it) }
+        fun script(source: RegularFile) =
+            source.asFile.readText().replace("@JAR@", jarName.get()).replace("@BUILD@", buildId).replace("\r\n", "\n")
+        unixScript.writeText(script(unixSource))
+        windowsScript.writeText(script(windowsSource).replace("\n", "\r\n"))
+    }
 }
 
 tasks.test {

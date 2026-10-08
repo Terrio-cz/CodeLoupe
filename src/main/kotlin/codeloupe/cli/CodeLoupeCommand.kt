@@ -4,18 +4,31 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.subcommands
 
-/** `codeloupe` — on-demand code index for AI coding agents. Root defaults to the current directory. */
-class CodeLoupeCommand : CliktCommand(name = "codeloupe") {
+/**
+ * `codeloupe` — on-demand code index for AI coding agents. Root defaults to the current directory.
+ *
+ * [requested] is the first command-line word: when it names a subcommand only that one is built, because building
+ * all of them (each with its options) costs start-up time a one-shot CLI call does not have. Anything else (help,
+ * a typo, a global option) builds them all, so usage and error texts do not change.
+ */
+class CodeLoupeCommand(requested: String? = null) : CliktCommand(name = "codeloupe") {
     init {
-        subcommands(
-            DaemonCommand(), StartCommand(), StopCommand(), StatusCommand(),
-            FindCommand(), OutlineCommand(), SymbolCommand(), UsagesCommand(), CallsCommand(), HierarchyCommand(), ChangesCommand(),
-            IssueCommand(), TasksCommand(), UpdateCommand(), JobCommand(), WebhookCommand(),
-            McpConfigCommand(),
-        )
+        subcommands(COMMANDS.filter { it.first == requested }.ifEmpty { COMMANDS }.map { it.second() })
     }
 
     override fun help(context: Context) = "On-demand code index for AI coding agents. Tools take --root (default: the current directory)."
 
     override fun run() = Unit
+
+    companion object {
+        /** Each subcommand under its own name; `CodeLoupeCommandTest` keeps the names honest. */
+        val COMMANDS: List<Pair<String, () -> CliktCommand>> = listOf(
+            "daemon" to ::DaemonCommand, "start" to ::StartCommand, "stop" to ::StopCommand, "status" to ::StatusCommand,
+            "find" to ::FindCommand, "outline" to ::OutlineCommand, "symbol" to ::SymbolCommand, "usages" to ::UsagesCommand,
+            "calls" to ::CallsCommand, "hierarchy" to ::HierarchyCommand, "changes" to ::ChangesCommand,
+            "issue" to ::IssueCommand, "tasks" to ::TasksCommand, "task_code" to ::TaskCodeCommand, "code_tasks" to ::CodeTasksCommand,
+            "update" to ::UpdateCommand, "job" to ::JobCommand, "webhook" to ::WebhookCommand,
+            "mcp-config" to ::McpConfigCommand,
+        )
+    }
 }

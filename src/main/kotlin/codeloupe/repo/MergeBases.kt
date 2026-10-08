@@ -33,7 +33,8 @@ import kotlin.io.path.name
  * later call asks for, parsed in the daemon when few, in a build worker in the heavy lane when many.
  */
 internal class MergeBases(private val queue: JobQueue, private val launcher: BuildLauncher, private val waitMs: Long) {
-    suspend fun changes(repo: RepoState, worktree: String): ChangeSet = withContext(Dispatchers.IO) {
+    /** [withBefore] false skips the merge-base index: the caller wants the changed paths only. */
+    suspend fun changes(repo: RepoState, worktree: String, withBefore: Boolean = true): ChangeSet = withContext(Dispatchers.IO) {
         val mergeBase = mergeBase(repo, worktree)
         val diff = DiffEntry.parse(Git.run(worktree, "diff", "--raw", "-z", "--no-renames", "--no-abbrev", mergeBase, "--")!!)
         val untracked = WorktreeGit.untracked(worktree).toSet()
@@ -41,7 +42,7 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
         val status = diff.associate { it.path to it.status }
         val files = indexed.map { ChangedFile(it, statusOf(status[it], it in untracked)) }
         val old = diff.filter { it.oldBlob != null && Languages.languageOf(it.path) != null }
-        val beforeFile = if (old.isEmpty()) null else facts(repo, mergeBase, old)
+        val beforeFile = if (old.isEmpty() || !withBefore) null else facts(repo, mergeBase, old)
         ChangeSet(worktree, repo.defaultRef, mergeBase, files, other, beforeFile)
     }
 

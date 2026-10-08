@@ -30,11 +30,17 @@ build/install/codeloupe/bin/codeloupe calls OrderService.handle --depth 2      #
 build/install/codeloupe/bin/codeloupe hierarchy Repository
 build/install/codeloupe/bin/codeloupe issue ABC-5 --section scope   # with a tracker configured
 build/install/codeloupe/bin/codeloupe tasks "epic: ABC-1" --mode ready
+build/install/codeloupe/bin/codeloupe task_code ABC-5            # its landed or predicted code
+build/install/codeloupe/bin/codeloupe code_tasks OrderService.handle   # the tasks that touched it
 build/install/codeloupe/bin/codeloupe status
 ```
 
 The first query in a repository builds its index (seconds); later queries take milliseconds. The
 daemon starts on the first CLI call; `codeloupe start` / `stop` manage it explicitly.
+
+A CLI call against a running daemon takes ~0.2 s. The start script keeps a JVM class-data archive in
+`<home>/cds/` (about 8 MB per install and build); the first call after an install creates it (~1.5 s), and it is
+simply not used when that directory is not writable. `JAVA_OPTS` / `CODELOUPE_OPTS` add JVM flags.
 
 ### Claude Code
 
@@ -56,6 +62,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `hierarchy` | supertypes and subtypes of a type (object expressions included, and lambdas converted to a `fun interface`), or what a member overrides and what overrides it |
 | `job` | start a long command in the daemon (status, cancel); see [Jobs and events](#jobs-and-events); takes `cwd`, not `root` |
 | `changes` | what the worktree changed against the merge-base with the default branch (committed and uncommitted), by declaration: `+` added, `~` body changed, `^` signature changed (with the old one), `-` removed; each with its callers and tests; `bodies=true` adds a line diff per declaration |
+| `task_code` | links between tasks and code, from the default branch's history (works without a tracker). `query` = a task id (`TER-5`): its landing commit, files and changed declarations (`+ ~ ^ -`), the worktree whose branch names it, and for an open task the touch set predicted from its text — `=` sure · `~` likely · `?` guess · `+` new file, each with the issue text it comes from. `query` = a declaration (`Type.member`) or a file path: the tasks that changed it, newest first, with landing commits (`code_tasks <symbol\|path>` on the command line), plus open tasks whose text points at it. Task ids follow the tracker projects, or `taskPattern` (a regular expression) in `.codeloupe.json` |
 
 With a tracker configured (see Configuration) three more tools work on a local mirror of its projects:
 
@@ -186,6 +193,7 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 | `repo` | repositories and worktrees → base index, base syncs, child-process builds |
 | `overlay` | per-worktree overlays: change checks, refreshes, cleanup of removed worktrees |
 | `changes` | a worktree's declarations compared with the merge-base: matching, line diffs, callers and tests |
+| `taskcode` | `task_code`: history of the default branch by task id, changed declarations per landing, touch-set prediction from issue text |
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
 | `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
 | `tracker`, `tracker.youtrack`, `tracker.mirror`, `tracker.read` | tracker adapter (YouTrack REST), SQLite mirror and watcher, `issue` / `tasks` answers |
