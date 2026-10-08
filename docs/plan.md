@@ -811,6 +811,32 @@ rozhoduje launcher.
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu a fixture stromu: přidání, rotace, import s nahrazením zdrojů,
   návrat bajt po bajtu a smazání; po každém kroku se hledá každá z testovacích hodnot v DOM stránky i v odpovědích daemona (nenašla se).
 
+### Výsledek CL-125 — daemon po prvním parsu pod 200 MB (2026-10-08)
+
+- **Rozklad skoku při prvním parsu** (`jcmd VM.native_memory`, `PerfCounter`, `-Xlog:class+load`; daemon s flagy `DaemonJvm`, TerrioImporter):
+  RSS 134 → 156 MB; načteno +2 061 tříd (6 025 → 8 086; z nich 1 104 `com.intellij`, 281 `psi`, 85 `cli`), Metaspace +10 MB, Symbol +4,
+  Code +2, Class +2, heap +1. Menší `CoreApplicationEnvironment` místo `KotlinCoreEnvironment` ušetří nanejvýš stovky tříd ze dvou tisíc
+  (platforma IntelliJ a PSI jsou nutné pro samotný parser), takže se na tom nestavělo. Statický CDS archiv daemonu včetně tříd parseru
+  (`-Xshare:dump` ze seznamu tříd, 74 MB, `-XX:ArchiveRelocationMode=0`; s compact headers JDK archiv nenabízí) dal po parsu jen −4 MB
+  (154 vs 158 po 13 parsech, +9 MB před parsem při relokaci 1) a první obnova trvala 6,9 s při studené mapě: zamítnuto.
+- **Skutečná velikost problému** (zátěž `tools/load-test.mjs`, 8 worktrees, 10 klientů, `--sync-files 12`, 200–300 s, daemon s NMT): plateau je
+  heap (82 MB committed při `-Xmx80m`, živých ~35–40), Metaspace 33–43, Code 20, Symbol 10, vlákna 5, a ~40–50 MB mimo NMT (SQLite, JGit,
+  `jvm.dll`). Parser v procesu přidává ~20 MB (třídy) a hlavně nechá heap dorůst k limitu (stromy PSI). Matice (steady / peak MB):
+  parser v procesu, heap 80: 226 / 232 (původních 225 / 232); v procesu, heap 64: 208 / 214; worker, heap 80: 206 / 215; **worker, heap 64: 183–194 / 189–198**.
+  Obě opatření se sčítají (~−18 MB každé).
+- **Řešení**: soubory k parsování (`Extraction.extract`: obnova overlaye, malý sync báze, `task_code`) jdou do **parse workeru** (`ParseWorker`,
+  podproces: JSON řádek dovnitř, JSON řádek ven, `FileFacts` serializovatelné; heap 96 MB, C1, CDS ne). Daemon ho spustí při prvním souboru a
+  worker skončí sám po `parseWorkerIdleSeconds` (300) bez práce nebo s daemonem; spadl-li nebo neodpověděl do 120 s, klient ho nahradí a zkusí
+  znovu, pak parsuje daemon sám (pomaleji na paměť, ne nesprávně). Daemon bez parseru v procesu dostal `-Xmx64m` (`DaemonJvm.args(parsesHere)`:
+  80 MB zůstává pro `parseWorkerIdleSeconds` 0). Načtené třídy v daemonu po zátěži 6 143 (předtím 8 112).
+- **Měření** (`tools/load-test.mjs --seconds 300 --sync-files 12`, skutečný `codeloupe start`): steady **190 MB**, peak **196 MB**, p95 110 ms (during
+  sync 104 ms), 0 busy, 0 failed; 8 běhů s různými konfiguracemi 183–194 steady. `tools/rss-mix.mjs` (50 dotazů): **138 MB** (bylo 195–198).
+  Ingest transcriptů (CL-62, 2,2 GB) pod `-Xmx64m`: špička RSS 155 MB, bez OOM.
+- **Obnova overlaye** (`tools/profile.mjs`, Windows, stroj zatížený ostatními okny): editace souboru p50 130 ms (v procesu 122), vrácení editace 104 ms (98); první
+  obnova po startu workeru ~0,7 s (v procesu ~0,6 s). Parsování samo (`refresh`) je ~10–35 ms, zbytek jde na kontrolu worktree (průchod ~70 ms), která
+  byla stejná i před změnou. Worker přidá ~8 ms na obnovu; hranice 100 ms ovšem neplatí pro celý p50 (založeno na průchodu worktree, ne na parsu), viz nová karta.
+- Cena: dokud worker žije (5 min po poslední editaci) drží ~100 MB RSS vedle daemonu; pak zmizí. Celková paměť stroje při editaci tedy roste, jen ne trvale.
+
 ### Výsledek CL-71 — build daemony a procesy po workspacech (2026-10-08)
 
 - **Procesy po workspacech** (`codeloupe.processes`, `GET /processes`, `ws processes`, `workspaces --ram`): proces patří workspace,

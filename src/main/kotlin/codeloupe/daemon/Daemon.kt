@@ -10,6 +10,8 @@ import codeloupe.docker.ResourceInventory
 import codeloupe.docker.resourceRoutes
 import codeloupe.events.EventBus
 import codeloupe.events.EventStore
+import codeloupe.index.Extraction
+import codeloupe.index.ParseWorkerClient
 import codeloupe.events.WebhookKey
 import codeloupe.events.WebhookUrls
 import codeloupe.events.Webhooks
@@ -159,6 +161,7 @@ class Daemon private constructor(
     }
 
     fun stop() {
+        if (config.parseWorkerIdleSeconds > 0) Extraction.useThisProcess()
         Scrubber.knownValues = { emptyList() }
         server.stop(gracePeriodMillis = 100, timeoutMillis = 2_000)
         jobs.shutdown()
@@ -185,6 +188,8 @@ class Daemon private constructor(
 
     private fun start() {
         Files.createDirectories(config.home)
+        // The compiler's parser lives in a child process that ends when it has had nothing to parse for a while.
+        if (config.parseWorkerIdleSeconds > 0) Extraction.useWorker(ParseWorkerClient(config.parseWorkerIdleSeconds.toLong(), log = ::log))
         // Class-data archives of earlier versions; the daemon no longer writes one.
         config.home.listDirectoryEntries("daemon-*.jsa").forEach { runCatching { Files.deleteIfExists(it) } }
         // CIO keeps a connection open until the client closes it or it idles; clients drop it on `Connection: close`.

@@ -559,6 +559,7 @@ and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
 | Remote webhook targets | none (local only) | `config.json` `remoteWebhooks` `["https://hooks.example.com"]` |
 | Repositories too large to walk | more than 40 000 indexed files: a worktree is checked through git alone (changed and untracked files; the stat cache and, if you enabled it, `core.fsmonitor` and `core.untrackedCache` make that fast) | `config.json` `largeWorktreeFiles` |
 | Index reads at once | 2 (the rest wait their turn: ten windows asking together would hold ten reads' memory) | `config.json` `maxParallelQueries` |
+| Parse worker: seconds it lives without a file to parse (0 = the daemon parses in its own process, with an 80 MB heap instead of 64) | 300 | `config.json` `{ "parseWorkerIdleSeconds": 300 }` |
 | Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
 | Weighted-token budgets of a day and of one agent run (events for the desktop app) | none | `config.json` `budgets` `{ "dailyWeighted": 150000000, "runWeighted": 20000000 }` |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
@@ -714,10 +715,17 @@ peak, series) against the budgets of `docs/plan.md` § 2. `node tools/rss-mix.mj
 queries (`changes bodies`, `calls … callees depth 3`, `usages` included) and reports the resident memory with the JVM's own
 accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram` for the live heap).
 
+The daemon does not parse in its own process: edited files (an overlay refresh, a small base sync, `task_code`) go to a **parse
+worker**, a small child JVM (`index.ParseWorker`, one JSON line in, one out) that the daemon starts on the first file to parse and
+that exits after `parseWorkerIdleSeconds` (default 300) without one, or when the daemon ends. The compiler's parser is some 20 MB of
+classes, symbols and code plus the heap its syntax trees fill; held in the daemon it is resident for as long as the daemon lives. While
+the worker runs it holds about 100 MB of its own; a worker that cannot start or dies is replaced once, and then the daemon parses itself
+(slower on memory, never wrong). With the worker the daemon's heap limit is 64 MB (`DaemonJvm`), with `parseWorkerIdleSeconds` 0 it is 80.
+
 | Package | Role |
 |---|---|
 | `lang`, `lang.kotlin`, `lang.java` | file → facts (declarations, imports, references) via the Kotlin compiler's PSI (Kotlin and Java) |
-| `index` | SQLite store, base build from git objects, build worker entry point |
+| `index` | SQLite store, base build from git objects, build worker entry point, parse worker (`ParseWorker`) and its client |
 | `repo` | repositories and worktrees → base index, base syncs, child-process builds |
 | `overlay` | per-worktree overlays: change checks, refreshes, cleanup of removed worktrees |
 | `changes` | a worktree's declarations compared with the merge-base: matching, line diffs, callers and tests |

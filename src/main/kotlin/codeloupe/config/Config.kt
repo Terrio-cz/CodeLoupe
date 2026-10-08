@@ -19,5 +19,7 @@ data class Config(
     val workspaces: WorkspacesConfig = WorkspacesConfig(),
     val metrics: MetricsConfig = MetricsConfig(),
     val budgets: BudgetsConfig = BudgetsConfig(),
+    /** Seconds a parse worker lives without a file to parse; 0 parses in the daemon's own process. */
+    val parseWorkerIdleSeconds: Int = 0,
     val secrets: SecretsConfig = SecretsConfig(),
 )

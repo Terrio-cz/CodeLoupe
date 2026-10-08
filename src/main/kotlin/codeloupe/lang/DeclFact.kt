@@ -1,10 +1,13 @@
 package codeloupe.lang
 
+import kotlinx.serialization.Serializable
+
 /**
  * One declaration; [returns] is the declared type, or the [TypeSpec] of the initializer or expression body when
  * there is none. Lines are 1-based: [start] includes the KDoc above, [declStart] is the declaration itself.
  * [parent] and the container chain refer to enclosing declarations of the same file (-1 = none).
  */
+@Serializable
 data class DeclFact(
     val kind: String,
     val name: String,
