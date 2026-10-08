@@ -64,6 +64,9 @@ never for documents, short files, builds, git or a repository the daemon has not
 `"hooks": { "enabled": false }` in the daemon's `config.json` (`"steer": { "mode": "off" }` for this hook alone) or
 `CODELOUPE_HOOKS=off` in Claude Code's environment; `codeloupe metrics hooks` counts what it said and what was followed.
 
+A session in an indexed repository may begin with a line `CodeLoupe orientation for …` (branch, task, what the worktree changed, and with
+`sessionStart.map` the ranked repository map): start from it instead of `ls`, `find` or `git status`, and ask `outline`/`find`/`symbol` for the rest.
+
 ## If the tools fail
 
 - `connection refused` / the server shows as failed: the daemon is not running. Run `codeloupe start` (the plugin

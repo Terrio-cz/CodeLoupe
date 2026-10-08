@@ -613,7 +613,7 @@ and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
 | Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
 | Weighted-token budgets of a day and of one agent run (events for the desktop app) | none | `config.json` `budgets` `{ "dailyWeighted": 150000000, "runWeighted": 20000000 }` |
 | Writing by declaration (`edit`) | `auto`: offered when the gap detector shows the need; no write in `.git`, secrets, conflicted files | `config.json` `write` `{ "mode": "on", "linkedWorktreesOnly": true, "deny": ["**/generated/**"], "gate": { "wholeFileReads": 20, "manualRenames": 3, "windowDays": 30 } }` |
-| Hooks of the plugin | on; steering in `advise` mode, large from 150 lines, at most 40 pieces of advice a session, none after 4 unheeded in a row | `config.json` `hooks` (see [Hooks of the plugin](#hooks-of-the-plugin)); `CODELOUPE_HOOKS=off` in Claude Code's environment |
+| Hooks of the plugin | on; steering in `advise` mode, large from 150 lines, at most 40 pieces of advice a session, none after 4 unheeded in a row; session start: worktree state, map off (`map`, `budget` 1200 tokens) | `config.json` `hooks` (see [Hooks of the plugin](#hooks-of-the-plugin)); `CODELOUPE_HOOKS=off` in Claude Code's environment |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
 
@@ -654,6 +654,7 @@ codeloupe metrics compare baseline-2026-10-08.json after-2026-10-20.json
 codeloupe metrics gaps --since 2026-10-01               # where CodeLoupe calls fell short, by week and query shape
 codeloupe metrics boilerplate --since 2026-09-23         # skeleton share of the new code files agents write
 codeloupe metrics hooks --since 2026-10-01               # how often the plugin's steering hook spoke and was followed
+codeloupe metrics orientation --since 2026-10-01         # ls/find/Glob in the first turns, with and without the session-start context
 ```
 
 `collect` writes one JSON report with, per role, median / p75 / sum of cost (relative price units: input 1, 5 min cache

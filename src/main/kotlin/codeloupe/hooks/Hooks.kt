@@ -23,6 +23,7 @@ class Hooks(
     private val log: (String) -> Unit,
     private val rootOf: (String) -> String?,
     private val callsOn: (String) -> Int = { 0 },
+    private val session: SessionContext? = null,
 ) {
     private class Session {
         var given = 0
@@ -38,6 +39,29 @@ class Hooks(
     }
 
     fun stats(): HookStats = counters.snapshot()
+
+    /** [handle] for every event, the ones that wait for the index included. */
+    suspend fun reply(json: JsonObject): JsonObject? {
+        if (HookInput(json).event != "SessionStart") return handle(json)
+        val started = System.nanoTime()
+        val input = HookInput(json)
+        val settings = runCatching(config).getOrDefault(HooksConfig())
+        val context = session?.takeIf { settings.enabled && settings.sessionStart.enabled } ?: return pass("off", started)
+        val cwd = input.cwd ?: return pass("ignored", started)
+        val text = runCatching { context.build(cwd, input.source, settings.sessionStart) }.getOrNull() ?: return pass("no-context", started)
+        val nanos = System.nanoTime() - started
+        counters.sessionStarted(nanos)
+        runCatching {
+            val short = !settings.sessionStart.map || input.source == "resume" || input.source == "compact"
+            log(
+                JsonFormat.json.encodeToString(
+                    HookRecord.serializer(),
+                    HookRecord(IsoTime.now(), "session-start", "SessionStart", "context", if (short) "short" else "full", "outline", input.session.take(8), runCatching { rootOf(cwd) }.getOrNull(), nanos / 1_000 / 1000.0, tokens = Math.ceil(text.length / SessionContext.CHARS_PER_TOKEN).toInt()),
+                ),
+            )
+        }
+        return HookOutput.context("SessionStart", text)
+    }
 
     fun handle(json: JsonObject): JsonObject? {
         val started = System.nanoTime()
@@ -112,12 +136,13 @@ class Hooks(
         private fun directoryOf(path: String): String = java.nio.file.Path.of(path).let { if (java.nio.file.Files.isDirectory(it)) it else it.parent ?: it }.toString()
 
         /** The hooks of a daemon: the index of [registry], the settings of the home's `config.json` read per call, and `hooks.jsonl`. */
-        fun create(config: Config, registry: Registry, callsOn: (String) -> Int): Hooks {
+        fun create(config: Config, registry: Registry, callsOn: (String) -> Int, projects: () -> Collection<String> = { emptyList() }): Hooks {
             val windows = System.getProperty("os.name").lowercase().startsWith("windows")
             val paths = ShellPaths(System.getProperty("user.home").replace('\\', '/'), windows)
             return Hooks(
                 Steering(IndexedSources(registry, windows), paths), { ConfigLoader.hooks(config.home) },
                 AppendLog(config.home.resolve("hooks.jsonl"))::append, { path -> runCatching { registry.locate(directoryOf(path)).worktree }.getOrNull() }, callsOn,
+                SessionContext(registry, projects),
             )
         }
     }

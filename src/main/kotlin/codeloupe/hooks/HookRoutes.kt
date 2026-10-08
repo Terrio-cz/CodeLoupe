@@ -21,7 +21,7 @@ fun Route.hookRoutes(hooks: Hooks) {
     post("/hook") {
         val bytes = call.receiveChannel().readRemaining(MAX_HOOK_BODY + 1).readByteArray()
         val body = if (bytes.size > MAX_HOOK_BODY) null else runCatching { Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject }.getOrNull()
-        val reply: JsonObject? = body?.let(hooks::handle)
+        val reply: JsonObject? = body?.let { hooks.reply(it) }
         if (reply == null) call.respond(HttpStatusCode.NoContent) else call.respondText(reply.toString(), ContentType.Application.Json)
     }
 }
