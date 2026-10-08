@@ -1,10 +1,6 @@
 package codeloupe.index
 
 import codeloupe.lang.FileFacts
-import codeloupe.lang.ParamFact
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.Statement
@@ -66,7 +62,7 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
                 setLong(1, id); setString(2, d.kind); setString(3, d.name); setString(4, d.container)
                 setString(5, listOf(facts.packageName, d.container, d.name).filter { it.isNotEmpty() }.joinToString("."))
                 setNullableString(6, d.receiver)
-                setString(7, paramsJson(d.params))
+                setString(7, ParamsJson.of(d.params))
                 setInt(8, d.params.size); setNullableString(9, d.returns)
                 setString(10, d.modifiers.joinToString(" ")); setString(11, d.supertypes.joinToString(" "))
                 setInt(12, d.start); setInt(13, d.declStart); setInt(14, d.end); setString(15, d.sig); setString(16, d.hash)
@@ -89,18 +85,6 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
     override fun close() {
         listOf(fileId, deleteFile, deleteImports, deleteDecls, deleteRefs, insertFile, insertImport, insertDecl, insertRef).forEach { it.close() }
     }
-
-    // Flags only when set: most parameters have neither.
-    private fun paramsJson(params: List<ParamFact>): String = JsonArray(
-        params.map { p ->
-            buildJsonObject {
-                put("name", JsonPrimitive(p.name))
-                put("type", JsonPrimitive(p.type))
-                if (p.default) put("default", JsonPrimitive(true))
-                if (p.vararg) put("vararg", JsonPrimitive(true))
-            }
-        },
-    ).toString()
 
     private fun PreparedStatement.insertReturningId(): Long {
         executeUpdate()

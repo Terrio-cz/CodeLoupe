@@ -116,6 +116,24 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
         return LinkedHashSet(rows.filter { it !in gone } + ov.filter { !it.second }.map { it.first }).toList()
     }
 
+    /** Paths of files whose content holds [literal], at most [limit], overlay copies masking base ones. */
+    fun filesContaining(literal: String, limit: Int): List<String> {
+        val params = mapOf("lit" to literal, "limit" to limit)
+        val base = "SELECT path FROM main.files WHERE deleted = 0 AND content IS NOT NULL AND instr(content, :lit) > 0"
+        if (!overlay) return query("$base ORDER BY path LIMIT :limit", params) { it.getString(1) }
+        val ov = query("SELECT path, deleted, content IS NOT NULL AND instr(content, :lit) > 0 FROM ov.files", params) { Triple(it.getString(1), it.getInt(2) != 0, it.getInt(3) != 0) }
+        val masked = ov.map { it.first }.toSet()
+        val hits = query("$base ORDER BY path", params) { it.getString(1) }.filter { it !in masked } + ov.filter { !it.second && it.third }.map { it.first }
+        return hits.sortedWith(PathOrder).take(limit)
+    }
+
+    /** Every module of the index (`importers/ruian`), the root module as an empty string. */
+    fun modules(): List<String> {
+        val base = query("SELECT DISTINCT module FROM main.files WHERE deleted = 0 AND module IS NOT NULL", emptyMap()) { it.getString(1) }
+        if (!overlay) return base
+        return (base + query("SELECT DISTINCT module FROM ov.files WHERE deleted = 0 AND module IS NOT NULL", emptyMap()) { it.getString(1) }).distinct()
+    }
+
     override fun close() = Timings.measure(TimedPart.OPEN) {
         statements.values.forEach { it.first.close() }
         db.close()
