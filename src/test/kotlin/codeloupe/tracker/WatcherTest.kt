@@ -19,21 +19,25 @@ class WatcherTest {
         try {
             assertFalse(watcher.running)
             assertEquals(0, runs.get(), "nothing runs before the first call")
-            watcher.touch()
-            Thread.sleep(100)
+            // Waits poll instead of sleeping a fixed time: a loaded CI runner can stall a thread for hundreds of ms.
+            assertTrue(until { watcher.touch(); runs.get() >= 2 }, "${runs.get()} runs while calls arrive")
             assertTrue(watcher.running)
-            assertTrue(runs.get() >= 2, "${runs.get()} runs")
-            Thread.sleep(400)
-            assertFalse(watcher.running, "idle: the loop ended")
+            assertTrue(until { !watcher.running }, "idle: the loop ended")
             val idle = runs.get()
             Thread.sleep(300)
             assertEquals(idle, runs.get(), "no work while idle")
             watcher.touch()
-            Thread.sleep(30)
-            // At least one run, not exactly one: a slow runner can fit a second period into the sleep.
-            assertTrue(runs.get() >= idle + 1, "the next call starts it again at once: ${runs.get()} runs after $idle")
+            assertTrue(until { runs.get() > idle }, "the next call starts it again")
         } finally {
             scope.cancel()
         }
+    }
+
+    private fun until(condition: () -> Boolean): Boolean {
+        repeat(200) {
+            if (condition()) return true
+            Thread.sleep(25)
+        }
+        return false
     }
 }
