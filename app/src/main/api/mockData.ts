@@ -4,9 +4,13 @@ import {
   type DaemonEvent,
   type DaemonSettings,
   type Environment,
+  type EnvironmentAction,
+  type EnvironmentAudit,
   type Events,
+  type GapReport,
   type Gaps,
   type IndexHealth,
+  type ResourceSample,
   type TaskDetail,
   type TaskSummary,
   type WorktreeDetail,
@@ -29,6 +33,7 @@ function weighted(t: Tokens): number {
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
+const ROTATION_DAYS = 90;
 
 /** Small seeded PRNG so every launch shows the same data. */
 export function rng(seed: number): () => number {
@@ -300,22 +305,85 @@ export class MockData {
       if (g.at > e.lastAt) e.lastAt = g.at;
       groups.set(key, e);
     }
-    return { summary: [...groups.values()].sort((a, b) => b.count - a.count), items: inRange };
+    return { summary: [...groups.values()].sort((a, b) => b.count - a.count), items: inRange, report: null };
+  }
+
+  /** The weekly report of `codeloupe metrics gaps` over four weeks (the shape of its JSON, plus when it was computed). */
+  gapReport(): GapReport {
+    const r = rng(31);
+    const week = (offset: number) => {
+      // ISO 8601 week of the Thursday of that week.
+      const d = new Date(this.now - offset * 7 * DAY);
+      d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3);
+      const first = Date.UTC(d.getUTCFullYear(), 0, 4);
+      const n = 1 + Math.round(((d.getTime() - first) / DAY - 3 + ((new Date(first).getUTCDay() + 6) % 7)) / 7);
+      return `${d.getUTCFullYear()}-W${String(n).padStart(2, '0')}`;
+    };
+    const shapes: [string, string, GapReport['rows'][number]['kind'], string[]][] = [
+      ['symbol', 'symbol:qualified', 'fallback', ['OrderStatistics.handle', 'RevisionRepository.find']],
+      ['find', 'find:glob', 'fallback', ['*Repository', '*Routes']],
+      ['symbol', 'symbol:overload', 'candidates', ['render', 'apply']],
+      ['outline', 'outline:path', 'fallback', ['ParcelRoutes.kt']],
+      ['find', 'find:name', 'empty', ['TokenMeter', 'RateLimit']],
+      ['usages', 'usages:name', 'busy', []],
+      ['symbol', 'symbol:name', 'fallback', ['PriceRule']],
+    ];
+    const rows: GapReport['rows'] = [];
+    for (let w = 3; w >= 0; w--) {
+      for (const [tool, shape, kind, examples] of shapes) {
+        if (r() < 0.25) continue;
+        rows.push({ week: week(w), tool, shape, kind, count: 1 + Math.floor(r() ** 2 * 14), examples });
+      }
+    }
+    rows.sort((a, b) => a.week.localeCompare(b.week) || b.count - a.count || a.shape.localeCompare(b.shape));
+    return { generatedAt: iso(this.now - 2 * HOUR), since: iso(this.now - 30 * DAY).slice(0, 10), runs: 612, calls: 3_412, rows };
+  }
+
+  /** Four hours of one reading a minute: RSS climbs while the daemon is used, drops after a build, CPU time only grows. */
+  statusHistory(): ResourceSample[] {
+    const r = rng(23);
+    let cpu = 40;
+    return Array.from({ length: 240 }, (_, i) => {
+      const wave = 18 * Math.sin(i / 17) + (i % 60 === 45 ? 55 : 0);
+      cpu += 0.2 + r() * (i % 40 > 30 ? 3 : 0.8);
+      const rss = Math.round(88 + i * 0.22 + wave + r() * 6);
+      return { t: iso(this.now - (239 - i) * 60_000), rssMb: rss, heapMb: Math.round(rss * 0.55), cpuSec: Math.round(cpu) };
+    });
   }
 
   environment(): Environment {
-    const k = (name: string, scope: Environment['keys'][number]['scope'], scopeRef: string | null, source: Environment['keys'][number]['source'], consumers: string[], usedH: number | null, updatedD: number) =>
-      ({ name, scope, scopeRef, source, consumers, lastUsedAt: usedH === null ? null : iso(this.now - usedH * HOUR), updatedAt: iso(this.now - updatedD * DAY) });
+    const k = (name: string, scope: Environment['keys'][number]['scope'], scopeRef: string | null, source: Environment['keys'][number]['source'], consumers: string[], usedH: number | null, updatedD: number): Environment['keys'][number] =>
+      ({
+        name, scope, scopeRef, source, sourceRef: source === 'file' ? 'C:/Users/dev/IdeaProjects/TerrioImporter/.env' : null, consumers, reads: consumers.length * 7,
+        lastUsedAt: usedH === null ? null : iso(this.now - usedH * HOUR), createdAt: iso(this.now - (updatedD + 3) * DAY), updatedAt: iso(this.now - updatedD * DAY),
+        ageDays: updatedD, rotationDue: updatedD >= ROTATION_DAYS,
+      });
     return {
-      storeReady: false,
+      storeReady: true,
+      rotationDays: ROTATION_DAYS,
       keys: [
-        k('YOUTRACK_TOKEN', 'global', null, 'env', ['youtrack MCP', 'codeloupe mirror'], 0.05, 9),
+        k('YOUTRACK_TOKEN', 'global', null, 'store', ['youtrack MCP', 'codeloupe mirror'], 0.05, 9),
         k('TERRIO_API_KEY', 'repo', 'TerrioImporter', 'file', ['run/terrio.mjs api'], 20, 14),
-        k('GITHUB_TOKEN', 'global', null, 'env', ['gh'], 3, 30),
-        k('POSTGRES_PASSWORD', 'repo', 'TerrioImporter', 'file', ['docker compose'], 1, 60),
-        k('MOBBIN_API_KEY', 'workspace', 'terrio', 'env', [], null, 2),
+        k('GITHUB_TOKEN', 'global', null, 'store', ['gh'], 3, 120),
+        k('POSTGRES_PASSWORD', 'repo', 'TerrioImporter', 'file', ['docker compose'], 1, 95),
+        k('MOBBIN_API_KEY', 'workspace', 'terrio', 'store', [], null, 2),
       ],
     };
+  }
+
+  environmentAudit(name: string | null, limit: number): EnvironmentAudit {
+    const e = (hoursAgo: number, n: string, scope: EnvironmentAudit['events'][number]['scope'], scopeRef: string | null, action: EnvironmentAction, consumer: string) =>
+      ({ at: iso(this.now - hoursAgo * HOUR), name: n, scope, scopeRef, action, consumer });
+    const all = [
+      e(0.05, 'YOUTRACK_TOKEN', 'global', null, 'read', 'youtrack MCP'),
+      e(0.4, 'YOUTRACK_TOKEN', 'global', null, 'read', 'codeloupe mirror'),
+      e(1, 'POSTGRES_PASSWORD', 'repo', 'TerrioImporter', 'read', 'docker compose'),
+      e(3, 'GITHUB_TOKEN', 'global', null, 'read', 'gh'),
+      e(20, 'TERRIO_API_KEY', 'repo', 'TerrioImporter', 'read', 'run/terrio.mjs api'),
+      e(48, 'MOBBIN_API_KEY', 'workspace', 'terrio', 'created', 'app'),
+      e(216, 'YOUTRACK_TOKEN', 'global', null, 'rotated', 'app'),
+    ];
+    return { events: all.filter(x => name === null || x.name === name).slice(0, limit) };
   }
 
   settings(): DaemonSettings {
@@ -326,7 +394,7 @@ export class MockData {
         { id: REPOS.codeloupe.id, path: REPOS.codeloupe.main, baseRef: 'origin/main' },
       ],
       youtrack: [{ url: 'https://terrio.youtrack.cloud', projects: ['TER', 'CL'], tokenConfigured: true, pollSec: 180 }],
-      budgets: { dailyWeighted: 25_000_000, daemonRssMb: 200, buildPeakRssMb: 600 },
+      budgets: { dailyWeighted: 25_000_000, daemonRssMb: 200, buildPeakRssMb: 600, p95Ms: 1000, queueWaitMs: 30_000, busyRate: 0.1 },
     };
   }
 

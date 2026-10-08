@@ -47,11 +47,14 @@ export class MockApi implements ApiSource {
       case 'gaps': {
         const g = d.gaps(range(q));
         const items = g.items.filter(x => (!q.tool || x.tool === q.tool) && (!q.reason || x.reason === q.reason));
-        return { summary: g.summary.filter(x => !q.tool || x.tool === q.tool), items };
+        return { summary: g.summary.filter(x => !q.tool || x.tool === q.tool), items, report: d.gapReport() };
       }
       case 'environment': return d.environment();
+      case 'environment/audit': return d.environmentAudit(q.name === undefined ? null : String(q.name), q.limit === undefined ? 100 : Number(q.limit));
       case 'settings': return d.settings();
       case 'events': return d.events(q.since === undefined ? null : Number(q.since));
+      case 'status/history': return d.statusHistory();
+      default: return unreachable(req.resource);
     }
   }
 
@@ -127,6 +130,11 @@ export class MockApi implements ApiSource {
       && (!text || `${t.id} ${t.summary}`.toLowerCase().includes(text)));
     return page(xs, q);
   }
+}
+
+/** A resource the switch above does not answer is a compile error here. */
+function unreachable(resource: never): never {
+  throw new HttpError(404, 'not_found', `no mock for ${String(resource)}`);
 }
 
 function range(q: Query): Range {

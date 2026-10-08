@@ -1,5 +1,6 @@
 import type { DaemonStatus } from './contract';
 import type { AppSettings, RendererSettings } from './settings';
+import type { ActionsBridge } from './actions';
 import type { ApiRequest } from './request';
 
 export type DaemonPhase = 'unknown' | 'starting' | 'running' | 'stopping' | 'stopped' | 'down' | 'error';
@@ -69,6 +70,7 @@ export interface CodeLoupeBridge {
     /** The commands for doing it by hand. */
     manual(kind: ClaudeConnectKind): Promise<string[]>;
   };
+  actions: ActionsBridge;
   metrics(): Promise<AppMetrics>;
   open: {
     worktree(id: string): Promise<boolean>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Gaps, Overview, Page, TaskSummary, WorktreeDetail, WorktreeSummary } from '../src/shared/contract';
+import type { Environment, EnvironmentAudit, Gaps, Overview, Page, TaskSummary, WorktreeDetail, WorktreeSummary } from '../src/shared/contract';
 import { validateRequest, type ApiRequest } from '../src/shared/request';
 import { MockApi } from '../src/main/api/MockApi';
 
@@ -17,9 +17,20 @@ describe('MockApi follows the read-only contract', () => {
     const all: ApiRequest[] = [
       { resource: 'nav' }, { resource: 'overview' }, { resource: 'worktrees' },
       { resource: 'worktrees/:id', id: wt.items[0].id }, { resource: 'tasks' }, { resource: 'tasks/:id', id: task.items[0].id },
-      { resource: 'index' }, { resource: 'gaps' }, { resource: 'environment' }, { resource: 'settings' }, { resource: 'events' },
+      { resource: 'index' }, { resource: 'gaps' }, { resource: 'environment' }, { resource: 'environment/audit' }, { resource: 'settings' }, { resource: 'events' }, { resource: 'status/history' },
     ];
     for (const r of all) expect(await get(r)).toBeTruthy();
+  });
+
+  it('environment keys carry the rotation flag and never a value', async () => {
+    const env = await get<Environment>({ resource: 'environment' });
+    expect(env.keys.filter(k => k.rotationDue).map(k => k.name).sort()).toEqual(['GITHUB_TOKEN', 'POSTGRES_PASSWORD']);
+    expect(env.keys.every(k => k.rotationDue === (env.rotationDays > 0 && k.ageDays >= env.rotationDays))).toBe(true);
+    expect(JSON.stringify(env)).not.toMatch(/value/i);
+    const audit = await get<EnvironmentAudit>({ resource: 'environment/audit', query: { name: 'YOUTRACK_TOKEN', limit: 1 } });
+    expect(audit.events).toHaveLength(1);
+    expect(audit.events[0].name).toBe('YOUTRACK_TOKEN');
+    expect(validateRequest({ resource: 'environment/audit', query: { secret: 'x' } }).ok).toBe(false);
   });
 
   it('overview series and KPIs are consistent', async () => {

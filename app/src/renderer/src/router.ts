@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
+import { isScreen, type Screen } from './screenList';
 
-export type Screen = 'overview' | 'branches' | 'tasks' | 'index' | 'gaps' | 'environment' | 'settings';
-export const SCREENS: Screen[] = ['overview', 'branches', 'tasks', 'index', 'gaps', 'environment', 'settings'];
+export type { Screen };
 
 export interface Route {
   screen: Screen;
@@ -14,7 +14,7 @@ export function parseHash(hash: string): Route {
   const raw = hash.replace(/^#\/?/, '');
   const [path, qs = ''] = raw.split('?');
   const [screen, id] = path.split('/');
-  const s = (SCREENS as string[]).includes(screen) ? (screen as Screen) : 'overview';
+  const s = isScreen(screen) ? screen : 'overview';
   return { screen: s, id: id ? decodeURIComponent(id) : null, params: new URLSearchParams(qs) };
 }
 
