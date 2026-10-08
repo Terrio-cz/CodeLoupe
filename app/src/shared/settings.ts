@@ -19,6 +19,8 @@ export interface AppSettings {
   /** Single-key shortcuts can be turned off (WCAG 2.1.4). */
   shortcuts: boolean;
   notify: { budget: boolean; builds: boolean; gaps: boolean; daemon: boolean };
+  /** The first-run onboarding was finished or skipped; Settings reopens it. */
+  onboardingDone: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -32,6 +34,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   shortcuts: true,
   notify: { budget: true, builds: true, gaps: true, daemon: true },
+  onboardingDone: false,
 };
 
 const bool = (v: unknown, d: boolean) => (typeof v === 'boolean' ? v : d);
@@ -57,6 +60,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     autoUpdate: bool(s.autoUpdate, base.autoUpdate),
     theme: s.theme === 'system' || s.theme === 'light' || s.theme === 'dark' ? s.theme : base.theme,
     shortcuts: bool(s.shortcuts, base.shortcuts),
+    onboardingDone: bool(s.onboardingDone, base.onboardingDone),
     notify: {
       budget: bool(n.budget, base.notify.budget),
       builds: bool(n.builds, base.notify.builds),

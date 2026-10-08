@@ -18,6 +18,8 @@ export class SettingsStore {
     this.file = path.join(dir, 'settings.json');
     let stored: unknown = {};
     try { stored = JSON.parse(fs.readFileSync(this.file, 'utf8')); } catch { /* first start */ }
+    // Settings written before the onboarding existed belong to someone who has used the app: no first-run flow for them.
+    if (stored && typeof stored === 'object' && Object.keys(stored).length > 0 && typeof (stored as Record<string, unknown>).onboardingDone !== 'boolean') (stored as Record<string, unknown>).onboardingDone = true;
     this.value = sanitizeSettings(stored, bundled ? { ...DEFAULT_SETTINGS, apiSource: 'daemon' } : DEFAULT_SETTINGS);
     this.setBundled(bundled);
     try {
@@ -27,6 +29,8 @@ export class SettingsStore {
         this.overlay.cliArgs = cli.slice(1);
       }
     } catch { /* invalid JSON: no override */ }
+    // A scripted verification run (screenshots, tour, CODELOUPE_APP_ONBOARDING=skip) goes straight to the screens.
+    if (env.CODELOUPE_APP_ONBOARDING === 'skip' || env.CODELOUPE_APP_SCREENSHOTS || env.CODELOUPE_APP_TOUR) this.overlay.onboardingDone = true;
     if (env.CODELOUPE_APP_API === 'mock' || env.CODELOUPE_APP_API === 'daemon') this.overlay.apiSource = env.CODELOUPE_APP_API;
   }
 

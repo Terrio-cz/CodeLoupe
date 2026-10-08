@@ -314,6 +314,12 @@ split over lines) is not covered. A value on a command line is visible to this u
 or the API instead. The Terrio workspace guard (`.claude/hooks/guard.ps1`) should deny reads of `…/codeloupe/secrets/` (add it to its
 `SecretFiles` pattern); until then only the `Read(**/*.env)` rule of `settings.json` covers the Read tool.
 
+## Repositories
+
+`codeloupe repos add <folder>...` writes the folders (each must hold a `.git`) to `config.json` `workspaces.repos` without touching the rest of the file (a file that is not valid JSON is refused,
+not rewritten) and asks the daemon a first question per repository so that it is known and its base index starts building; `repos list` prints what is configured, `--json` gives the report the
+desktop app's first-run onboarding reads. The running daemon already knows a repository after that first question; the configuration keeps it across restarts.
+
 ## Accounts
 
 `<home>/accounts.json` lists the Claude Code accounts of this machine (each a config directory, `CLAUDE_CONFIG_DIR`) and the YouTrack instances to mirror; the

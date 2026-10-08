@@ -50,7 +50,7 @@ class AccountsApiTest {
 
     init {
         // Account A worked in the fixture repository (two turns), account B in some other directory (one turn).
-        TranscriptBuilder(hourAgo).prompt("a").turn().turn().write(claudeA.resolve("projects").resolve(ProjectDirName.of(repo.toString())).resolve("s1.jsonl"))
+        TranscriptBuilder(hourAgo).prompt("a").turn().turn().write(claudeA.resolve("projects").resolve(ProjectDirName.of(repo.toRealPath().toString())).resolve("s1.jsonl"))
         TranscriptBuilder(hourAgo).prompt("b").turn().write(claudeB.resolve("projects").resolve("C--elsewhere-project").resolve("s2.jsonl"))
         Files.writeString(
             home.resolve(AccountsFile.FILE),
