@@ -75,7 +75,7 @@ async function main(): Promise<void> {
   const claude = new ClaudeConnector(execClaude(), () => findMarketplace({ resources: app.isPackaged ? process.resourcesPath : null, appDir: __dirname }));
 
   registerIpc({
-    store, manager, home, claude, source,
+    store, manager, client, home, claude, source,
     trustedOrigins: [APP_ORIGIN, ...(DEV_URL ? [new URL(DEV_URL).origin] : [])],
     applySettings: (prev, next) => applySettings(prev, next),
   });

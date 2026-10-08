@@ -49,6 +49,13 @@ class DockerApi(private val endpoint: DockerEndpoint) {
 
     fun snapshot(): List<DockerObject> = containers() + images() + volumes() + networks()
 
+    /** The memory of the running container [id] in bytes ([ContainerMemory]), null when it has stopped or the Engine does not say. */
+    fun memoryBytes(id: String): Long? {
+        val reply = http.request("GET", "/containers/${encode(id)}/stats?stream=false&one-shot=true")
+        if (reply.status != 200) return null
+        return runCatching { ContainerMemory.of(JsonFormat.json.parseToJsonElement(reply.text).jsonObject) }.getOrNull()
+    }
+
     /** The labels of the volume [name], null when there is none. */
     fun volumeLabels(name: String): Map<String, String>? {
         val reply = http.request("GET", "/volumes/${encode(name)}")

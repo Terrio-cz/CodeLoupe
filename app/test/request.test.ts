@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateRequest } from '../src/shared/request';
+import { timeoutMs, validateRequest } from '../src/shared/request';
 
 describe('validateRequest', () => {
   it('builds the daemon path from resource, id and allowed query keys', () => {
@@ -7,6 +7,12 @@ describe('validateRequest', () => {
     expect(r).toMatchObject({ ok: true, path: '/ui-api/v1/worktrees/a1f3c09e4b21' });
     const o = validateRequest({ resource: 'overview', query: { range: '30d' } });
     expect(o).toMatchObject({ ok: true, path: '/ui-api/v1/overview?range=30d' });
+  });
+
+  it('reaches the daemon routes outside the UI API that a screen needs, and no others', () => {
+    expect(validateRequest({ resource: 'status/history' })).toMatchObject({ ok: true, path: '/status/history' });
+    expect(validateRequest({ resource: 'shutdown' }).ok).toBe(false);
+    expect(validateRequest({ resource: 'status' }).ok).toBe(false);
   });
 
   it('drops empty and undefined query values', () => {
@@ -35,6 +41,13 @@ describe('validateRequest', () => {
     const r = validateRequest({ resource: 'worktrees', query: { q: 'a&layer=x#/../' } });
     expect(r).toMatchObject({ ok: true, path: '/ui-api/v1/worktrees?q=a%26layer%3Dx%23%2F..%2F' });
   });
+});
+
+it('gives the readings that walk files or ask Docker time to finish', () => {
+  expect(timeoutMs({ resource: 'workspaces', query: { size: 1 } })).toBe(120_000);
+  expect(timeoutMs({ resource: 'resources', query: { stats: 1 } })).toBe(120_000);
+  expect(timeoutMs({ resource: 'workspaces' })).toBe(5_000);
+  expect(timeoutMs({ resource: 'overview', query: { range: '7d' } })).toBe(5_000);
 });
 
 it('refuses dot-only ids that the daemon would normalise into another path', () => {

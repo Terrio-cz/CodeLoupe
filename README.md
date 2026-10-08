@@ -291,8 +291,21 @@ deny reading `*.env` cover it.
 | `codeloupe env list [--workspace w] [--repo r] [--all]` | name, scope, source, created, rotated, last use and by what — metadata the file holds in the clear; no key is touched |
 | `codeloupe env unset NAME --scope …` | removes it |
 | `codeloupe env run [--workspace w] [--repo r] -- <command>` | the command's environment gets every secret that applies (global < workspace < repository, the narrowest wins); what it prints is masked line by line of every stored value |
+| `codeloupe env audit [--name N] [--scope S] [--limit 50] [--consumers] [--json]` | the append-only audit (`<home>/secrets/audit.log`): every read by consumer, creation, rotation and removal with time; `--consumers` sums up who read each name. Names and times, never a value |
 | MCP tool `env` | the same names, never a value; `workspace`, `repository`, `all` |
+| `codeloupe env import scan [--include-excluded] [--json]` | inventory of the variables in `.env` and docker env files, `.claude/settings*.json` `env`, `.mcp.json` and `~/.claude.json` MCP server `env` under the configured roots: name, suggested scope, every source, duplicates and conflicts (equal or different values, compared by a hash that is salted per report), what the store already holds. Never a value |
+| `codeloupe env import run --select <id>[=scope] … \| --all-sensitive [--replace] [--overwrite]` | copies the selected occurrences into the store inside the process and reports created / updated / skipped; rerunning changes nothing. Two selected sources with different values for one name and scope are a conflict, stored from neither. `--replace` then swaps each imported value in its source for a reference (a comment in dotenv files, `${NAME}` in JSON) after saving an encrypted copy of the file |
+| `codeloupe env import rollback <backup-id> [--force]`, `backups`, `forget <id>` | puts every replaced file back byte for byte (a file edited since is left alone unless `--force`); lists and drops the copies |
 | `GET /env/values?workspace=&repository=&names=A,B` | for a local MCP server or script: the values, in its own process. Needs `x-codeloupe-env-token` (the contents of `<home>/secrets/api-token.env`, made on first use, readable by this user only) and says who asks in `x-codeloupe-used-by` |
+
+The import looks under the roots of `envImport` in `<home>/config.json` (`{"roots":[{"path":"~/IdeaProjects","kind":"repositories"}],"exclude":["tnt"]}`; kind
+`home`, `workspaces` or `repositories`). Without it: every `~/.claude*`, `~/Documents/Claude` (each folder one workspace, scope `workspace:<folder>`) and `~/IdeaProjects`
+(the nearest folder with `.git`, scope `repo:<folder>`). Folders whose name holds an `exclude` word (default: TNT, FoodRetailor and their sibling services) are listed, not
+entered, until `--include-excluded`. Templates (`.env.example`), build and dependency folders and the daemon's own home are never read. MCP `headers` and `args`,
+compose `environment:` blocks and shell profiles are not scanned.
+
+A name that has been as it is for longer than `secrets.rotationDays` in `config.json` (default 90, 0 = off) is flagged `ROTATE` in `env list`, in the `env` tool and
+in the Environment screen; rotating it (`env set` again) starts the age anew. The audit keeps about 8 MB of history (`audit.log` and `audit.log.1`).
 
 Every text that leaves the daemon (events, webhooks, summaries, `run` answers, `doc path=job:<id>`) is masked of the stored values
 (six characters or more) before the pattern rules for other secret shapes, and a finished job's log file is rewritten with the
@@ -517,6 +530,7 @@ read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-s
 | Repositories too large to walk | more than 40 000 indexed files: a worktree is checked through git alone (changed and untracked files; the stat cache and, if you enabled it, `core.fsmonitor` and `core.untrackedCache` make that fast) | `config.json` `largeWorktreeFiles` |
 | Index reads at once | 2 (the rest wait their turn: ten windows asking together would hold ten reads' memory) | `config.json` `maxParallelQueries` |
 | Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
+| Weighted-token budgets of a day and of one agent run (events for the desktop app) | none | `config.json` `budgets` `{ "dailyWeighted": 150000000, "runWeighted": 20000000 }` |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
 
@@ -566,7 +580,17 @@ workspace's `run/codemetrics.mjs`, and on the same transcripts the figures are i
 symbol or file, and calls answered empty, busy or with candidates only. Large windows are read one run at a time; add
 `CODELOUPE_OPTS=-Xmx1g` when a single transcript holds huge lines. `config.json` `metrics`: `transcriptDirs`,
 `categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
-ones, which know the Terrio workspace's shell commands) and `defaultCategories` (false = only yours).
+ones, which know the Terrio workspace's shell commands), `defaultCategories` (false = only yours) and `ingestTtlMs` (below).
+
+The desktop app's Runs, Overview and Gaps screens read the same transcripts through the daemon. The daemon does not watch
+them: a UI API call (`/ui-api/v1/runs`, `overview`, `gaps`, `nav`, `events`) starts a pass that reads only the transcripts
+that grew since the last one, from the byte offset it stopped at, into `<home>/transcripts.db` (runs, steps, hourly cost,
+gaps). Nothing runs between calls, and passes are at least `metrics.ingestTtlMs` (10 s) apart. The first pass over a few
+gigabytes of transcripts takes about a minute and goes on in the background (`ingest.running` in the answer). Step texts
+are cut to 200 characters and have secrets masked. `config.json` `budgets.dailyWeighted` and `budgets.runWeighted` (weighted
+tokens) make the daemon announce, once, the day or the run that goes over, as a `budget.breach` event; new gaps are
+`gap.new` events (`/events`, webhooks, the app's notifications). `codeloupe stop` writes `<home>/stopped`, which the desktop
+app honours by not starting the daemon again; `codeloupe start` removes it.
 
 ## Bundle
 

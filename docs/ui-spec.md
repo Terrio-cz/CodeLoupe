@@ -47,6 +47,7 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 |---|---|---|---|
 | `#/overview` | Přehled | — | `overview`, `/status` |
 | `#/branches` · `#/branches/:id` | Větve | drawer (520 px) | `worktrees`, `worktrees/{id}` |
+| `#/workspaces` · `#/workspaces/<repo>%2F<name>` | Workspaces (CL-72) | drawer (520 px) | `/workspaces`, `/resources`, `/reconcile`, `/workspaces/releases`, `/ports` (§ 9.18) |
 | `#/tasks` · `#/tasks/:id` | Úkoly | celá stránka s panelem vlastností vpravo | `tasks`, `tasks/{id}` |
 | `#/index` | Index | — | `index` |
 | `#/gaps` | Mezery | řádek se rozbalí | `gaps` |
@@ -116,6 +117,12 @@ Přehled                                             [24h|7d|30d]  ⟳
   (přepínač „Tabulka“). Jedna osa Y.
 - Úspora podle nástroje: vodorovné pruhy, jedna série, seřazeno sestupně, hodnota přímo u pruhu.
 - Daemon karta: z `/status` (reálný daemon i v mock režimu), tlačítka volají main proces (§ 8).
+- Řada **Latence · Paměť · CPU** (CL-40) pod grafem ceny: p95 latence volání podle nástroje z `/status` `latency`
+  (posledních 1 000 volání) s ryskou budgetu `p95Ms`; RSS daemonu z `GET /status/history` s ryskou `rssMb`;
+  zátěž CPU jako podíl jednoho jádra mezi dvěma odečty (rozdíl `cpuSec` / uplynulý čas, přes přestávku delší než
+  5 min bez čáry — daemon při nečinnosti žádné odečty nebere). Každý graf má tabulkový pohled a shrnutí v `aria-label`.
+- **Varování rozpočtů**: banner nad KPI, když `/status` `budgets.warnings` něco uvádí (p95, busy, čekání ve frontě,
+  RSS) nebo je překročen denní rozpočet tokenů; text varování je z daemonu, ikona ⚠ a slovo „překročeny“ nesou stav, ne barva.
 
 ### 3.2 Větve (worktree) + detail
 
@@ -157,8 +164,9 @@ Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hle
 ### 3.3 (zrušeno) Běhy agentů
 
 Obrazovka běhů a detail s časovou osou kroků (původně CL-42) byly vyřazeny rozhodnutím uživatele 2026-10-07:
-monitorování agentů patří launcheru, ne CodeLoupe. Data z transcriptů daemon dál používá jen agregovaně —
-pro spotřebu a úsporu na Přehledu a pro detektor mezer.
+monitorování agentů patří launcheru, ne CodeLoupe. Data z transcriptů daemon dál používá pro spotřebu a úsporu na
+Přehledu a pro detektor mezer. Seznam běhů a jejich kroky nově vystavuje i API (§ 9.7–9.8, CL-62), aby na něm šla
+postavit obrazovka Běhy (CL-40); samotná obrazovka je práce aplikace.
 
 ### 3.4 Úkoly (YouTrack mirror) + detail
 
@@ -232,6 +240,12 @@ Mezery                                      [Nástroj ▾] [Důvod ▾] [24h|7d|
 ```
 
 - Rozbalený řádek: jednotlivé výskyty (čas, důvod, náhrada, cíl, session a tah jako text — bez prokliku do běhu).
+- **Týdenní report** (CL-40) nahoře: výstup `codeloupe metrics gaps` (CL-22) po týdnech, nástroji a tvaru dotazu s druhem
+  mezery (`fallback` = agent sáhl po rg/cat/Read, `empty`, `busy`, `candidates`), počtem a několika hledanými identifikátory.
+  Čte ho daemon ze souboru `<home>/gaps-report.json` (`gaps.report`), protože čtení transkriptů trvá desítky sekund;
+  tlačítko „Přepočítat report“ pošle main procesu akci, ten spustí `<cli> metrics gaps --since <před 30 dny> --out <soubor>`
+  (pevné argumenty, bez shellu) a stránku obnoví. Rozsah 24h/7d/30d filtruje týdny, které do něj zasahují. Tabulka výskytů
+  z ingestu transkriptů (CL-62) se ukáže, až v ní něco je.
 
 ### 3.7 Prostředí (CL-54)
 
@@ -269,6 +283,41 @@ validaci (jméno `^[A-Z][A-Z0-9_]{0,63}$`, hodnota ≤ 16 KB).
 | Import (wizard) | 1) Inventář: main projde Claude složky (CL-52) a vrátí jen jména, zdroj a počet výskytů. 2) Potvrzení: uživatel zaškrtne, co importovat. 3) Import: main přesune hodnoty do storu, renderer vidí jen průběh. 4) Volitelně nahrazení zdroje odkazem na store (CL-53) s náhledem změn (jen cesty a jména). |
 | Odhalit | Jen po OS re-auth: Windows Hello přes nativní helper (Electron nemá API), macOS `systemPreferences.promptTouchID`, Linux heslo přes polkit. Hodnota se ukáže v modálním okně vlastněném main procesem (ne v rendereru aplikace), zkopírovat jde jedním tlačítkem, okno se samo zavře po 30 s; po 60 s se schránka vyčistí, jen pokud stále obsahuje odhalenou hodnotu (porovnání hashe). |
 | Smazat | Potvrzovací dialog main procesu se jménem klíče a jeho spotřebiteli. |
+
+### 3.7a Workspaces (CL-72)
+
+Registr workspaces daemonu (`codeloupe workspaces`) spojený s Docker inventářem a plánem úklidu: co každý worktree drží a co
+se s tím stane. Jen čtení, dvě akce jdou přes main proces (§ 10).
+
+```
+Workspaces                                 [Repo ▾] [Stav ▾] [🔍 hledat]  ☐ Zjistit disk a paměť
+┌ Aktivní 12 ┬ Dokončené 4 ┬ Opuštěné 1 ┬ Sirotci 1 ┬ Čeká na potvrzení 7 ┬ Uvolněné 1 ┐
+┌ Čeká na potvrzení úklidu (7) ──────────────── [Vybrat vše] [Potvrdit úklid vybraných (2)] ┐
+│ ☐ container  cltest_TER-3_db   TER-3   the workspace is abandoned                         │
+│ ☑ directory  …/TER-9           TER-9   a directory under a worktree root that git has …   │
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│ Workspace  Repo   Stav        Úkol   Větev          Docker             Porty  Disk RAM  Aktivita  Úklid │
+│ TER-1      wsrepo ● aktivní   TER-1  ↑1 nesloučeno  1 kont. · 1 vol.   19000  —    1 MB  před 9 min —    │
+│ TER-3      wsrepo ● opuštěný  TER-3  ↑1 nesloučeno  1 kont. · 1 vol.   —      —    —     před 37 dny 3 čeká na potvrzení │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- Všechny stavy registru: **aktivní**, **dokončený** (`landed`), **opuštěný**, **sirotek** (adresář pod kořenem worktrees,
+  který git nezná), a navíc **chybí v registru** pro workspace, který zmizel, ale jeho Docker prostředky zůstaly, a příznak
+  **uvolněný** (`ws release`). Filtr stavu je zná všechny; dlaždice se řídí filtrem repozitáře.
+- Řádek = jeden workspace spojený podle repa a jména workspace s prostředky (jen `owned` a `adopted`, cizí se nezobrazují),
+  záznamy plánu, uvolněním a porty. „Disk“ a „RAM“ se zjišťují jen na vyžádání (`size=1` projde soubory, `stats=1` se ptá
+  Dockeru na paměť běžících kontejnerů workspace).
+- Drawer: souhrn (větev, sloučení, úkol z mirroru, aktivita, disk, paměť), uvolnění (zbývá / opakuje se), Docker prostředky
+  s verdiktem (`auto` uklidí se samo, `confirm` čeká na potvrzení, `keep`, `protected`) a důvodem, počtem pokusů a poslední
+  chybou, porty s tím, co je drží (volný / používá workspace / koliduje).
+- **Uvolnit workspace…** (jen worktree, ne hlavní): main nejprve přečte registr a plán daemonu, ukáže v nativním dialogu,
+  které prostředky se odstraní, a po potvrzení zavolá `POST /workspaces/release`; úklid běží v daemonu na pozadí a stránka
+  se po dobu, kdy něco zbývá, obnovuje po 5 s.
+- **Potvrdit úklid…** (u workspace i hromadně nahoře): stránka pošle jen klíče položek plánu; main je ověří proti
+  aktuálnímu plánu (jen verdikt `confirm`), v nativním dialogu vypíše, co se smaže (kontejnery, sítě, volumes, images,
+  adresáře), a po potvrzení zavolá `POST /reconcile/run {confirm}`. Výsledek po položkách (odstraněno / už neexistovalo /
+  používané — zkusí se znovu / selhalo) se ukáže pod tlačítkem. V mock režimu akce nic nemění.
 
 ### 3.8 Nastavení
 
@@ -449,8 +498,8 @@ s ikonou a textem.
   notifikace a stav `error`.
 - **Stop / restart**: `… stop` (CLI posílá `POST /shutdown`), restart = stop + start. Ruční stop vypne
   autostart do dalšího ručního startu, i přes restart aplikace: aplikace při stopu zapíše `<home>/stopped`,
-  při startu a restartu ho smaže. Stejný marker zapíše `codeloupe stop` a smaže `codeloupe start` (požadavek
-  na CLI v CL-62; Node prototyp ho zatím nepíše, takže stop z terminálu aplikace bere jako výpadek). Když
+  při startu a restartu ho smaže. Stejný marker zapíše `codeloupe stop` (před zastavením daemonu; zapíše ho
+  i když daemon neběží) a smaže `codeloupe start` (CL-62). Když
   odpovídá daemon spuštěný **po** zapsání markeru (`daemon.json.startedAt` > mtime markeru), někdo ho spustil
   znovu a aplikace marker smaže; daemon spuštěný před markerem se teprve vypíná a stop platí dál.
 - **Přežije restart daemonu**: HTTP bez keep-alive, každé volání nové spojení; renderer jen zobrazí stav
@@ -523,7 +572,7 @@ interface Lane { running: string | null; waiting: string[] }
 interface LastBuild { at: Iso; ok: true; files: number; errors: number; ms: number; peakRssMb?: number }
 ```
 
-### 9.4a `GET /ui-api/v1/nav?gapsSince=<Iso>` (počty sidebaru)
+### 9.4a `GET /ui-api/v1/nav?gapsSince=<Iso>` (počty sidebaru; `newGaps` = mezery od `gapsSince`, bez parametru 0)
 ```ts
 interface Nav { activeWorktrees: number; openTasks: number; newGaps: number; indexState: RepoIndexState }
 ```
@@ -541,7 +590,7 @@ interface Overview {
     codeloupeCalls: number; callP50Ms: number;
     gaps: number; newGaps: number;
   };
-  budget: { dailyWeighted: number | null; usedToday: number };
+  budget: { dailyWeighted: number | null; usedToday: number };   // dailyWeighted z config.json budgets; usedToday od místní půlnoci
   costSeries: { t: Iso; weighted: number; baseline: number }[];  // 24h: hodinové, jinak denní buckety
   savingsByTool: { tool: string; calls: number; savedTokens: number }[];
   toolCalls: { tool: string; calls: number; p50Ms: number; p95Ms: number; avgResultChars: number;
@@ -564,9 +613,51 @@ interface WorktreeDetail extends WorktreeSummary {
 }
 ```
 
-### 9.7–9.8 (zrušeno)
+### 9.7 `GET /ui-api/v1/runs?range=&sort=&role=&q=&limit=&cursor=` (CL-62)
 
-API běhů agentů a jejich kroků (`runs`, `runs/{id}`, `runs/{id}/steps`) vypadlo s obrazovkou Běhy (§ 3.3).
+Běhy agentů z inkrementálního ingestu transcriptů (§ 9.17). `range` (výchozí `7d`) filtruje podle začátku běhu,
+`sort` je `start` (výchozí) | `weighted` | `turns` | `peak` | `share` | `duration`, vždy sestupně; `role` je přesná role
+(`main`, `terrio-coder`, …), `q` podřetězec názvu, TER, role nebo souboru; `limit` 1–200 (výchozí 50), `cursor` neprůhledný.
+```ts
+interface RunItem {
+  id: string;                 // stabilní, dokud existuje <home>/transcripts.db
+  file: string; session: string; project: string;   // file = název souboru bez .jsonl; session = sezení (u subagenta rodičovské)
+  kind: 'session' | 'subagent'; role: string; ter: string | null; model: string | null;
+  title: string;              // první řádek zadání, maskovaný, ≤ 120 znaků
+  startedAt: Iso; endedAt: Iso; durationSec: number;
+  turns: number; weighted: number; peakContext: number;
+  toolResultShare: number;    // 0..1, část váženého nákladu, kterou nese udržování výsledků nástrojů v kontextu
+  toolCalls: number; toolErrors: number;
+  overBudget: boolean;        // weighted > budgets.runWeighted
+}
+interface RunPage extends Page<RunItem> {
+  roles: string[];            // role, které daemon zná (pro filtr)
+  ingest: { running: boolean; filesDone: number; filesTotal: number; at: Iso | null };   // běží-li čtení transcriptů
+}
+```
+`ingest.running` je `true` během prvního průchodu přes gigabajty transcriptů (≈ minuta): odpověď je z toho, co už je
+uložené (nejnovější transcripty první), a klient volá znovu. Další volání čtou jen nové řádky a odpovídají v jednotkách ms.
+
+### 9.8 `GET /ui-api/v1/runs/{id}` a `GET /ui-api/v1/runs/{id}/steps?sort=&limit=&cursor=` (CL-62)
+```ts
+interface RunDetail {
+  run: RunItem;
+  usage: { input: number; cacheWrite5m: number; cacheWrite1h: number; cacheRead: number; output: number };  // tokeny podle ceny
+  categories: { category: string; calls: number; chars: number; carried: number; weighted: number; errors: number }[];  // podle carried
+}
+interface StepItem {
+  seq: number; turn: number; at: Iso | null;
+  tool: string; category: string;       // kategorie CL-21 (code_read, build_test, codeloupe, …)
+  summary: string;                      // o čem volání bylo (příkaz, soubor, vzor); maskované, ≤ 200 znaků, nikdy obsah
+  chars: number; durationMs: number;
+  error: boolean; errorText: string | null;
+  carried: number;                      // znaky výsledku × tahy, které po něm následovaly
+  weighted: number;                     // relativní cena držení výsledku v kontextu (carried cost per step)
+  gap: 'fallback' | 'empty' | 'candidates' | 'busy' | null;   // mezera, kterou volání CodeLoupe skončilo
+}
+type StepPage = Page<StepItem>;         // `sort`: seq (výchozí, vzestupně) | weighted | chars (sestupně); limit 1–500, výchozí 200
+```
+Nečíselné nebo neznámé `id` → `404 not_found`. `carried` a `weighted` rostou s dalšími tahy běžícího běhu.
 
 ### 9.9 `GET /ui-api/v1/tasks?project=&state=&q=&limit=&cursor=` → `Page<TaskSummary> & { mirrorSyncedAt: Iso | null }`
 
@@ -596,25 +687,45 @@ interface IndexHealth {
 }
 ```
 
-### 9.12 `GET /ui-api/v1/gaps?range=&tool=&reason=`
+### 9.12 `GET /ui-api/v1/gaps?range=&tool=&reason=` (CL-62; výchozí `range` 7d; volání odpovězená „busy“ se nepočítají)
 ```ts
 interface Gaps {
   summary: { tool: string; shape: string; fallback: string; count: number; lastAt: Iso }[];
   items: { id: string; at: Iso; tool: string; shape: string;
            fallback: 'rg' | 'grep' | 'sed' | 'cat' | 'Read' | 'other';
            reason: 'followup_read' | 'empty' | 'candidate_manual' | 'rollback';
-           session: string; turn: number | null; target: string }[];   // session a tah jen jako text
+           session: string; turn: number | null; target: string }[];   // session a tah jen jako text; nejvýš 200 nejnovějších
+  report: {                              // týdenní report jako `codeloupe metrics gaps`, posledních 30 dní (včetně „busy“); z ingestu, před prvním
+                                         // ingestem ze souboru `<home>/gaps-report.json` (`metrics gaps --out`); null, když není ani jedno
+    generatedAt: Iso | null; since: string | null; runs: number; calls: number;
+    rows: { week: string; tool: string; shape: string; kind: 'fallback' | 'empty' | 'busy' | 'candidates'; count: number; examples: string[] }[];
+  } | null;
 }
 ```
 
-### 9.13 `GET /ui-api/v1/environment` (CL-54; jen metadata, nikdy hodnoty)
+### 9.13 `GET /ui-api/v1/environment` (CL-54, CL-55; jen metadata, nikdy hodnoty)
 ```ts
 interface Environment {
   keys: { name: string; scope: 'global' | 'repo' | 'workspace'; scopeRef: string | null;
-          source: 'store' | 'env' | 'file'; consumers: string[]; lastUsedAt: Iso | null; updatedAt: Iso }[];
-  storeReady: boolean;                 // false, dokud není CL-50
+          source: 'store' | 'file'; sourceRef: string | null;   // file = importováno z cesty sourceRef
+          consumers: string[]; reads: number;                  // z auditu, poslední čtenář první
+          lastUsedAt: Iso | null; createdAt: Iso; updatedAt: Iso;   // updatedAt = rotace, jinak vytvoření
+          ageDays: number; rotationDue: boolean }[];           // rotationDue: starší než rotationDays
+  storeReady: boolean;                 // false, dokud nefunguje žádný ochránce klíče (OS úložiště ani heslo)
+  rotationDays: number;                // config.json secrets.rotationDays, výchozí 90, 0 = připomínky vypnuty
 }
 ```
+
+### 9.13b `GET /ui-api/v1/environment/audit?name=&scope=&limit=` (CL-55)
+```ts
+interface EnvironmentAudit {
+  events: { at: Iso; name: string; scope: 'global' | 'repo' | 'workspace'; scopeRef: string | null;
+            action: 'read' | 'created' | 'rotated' | 'removed'; consumer: string }[];   // nejnovější první, limit 1..500 (100)
+}
+```
+Audit je append-only soubor `<home>/secrets/audit.log` (řádek JSON na událost, bez hodnoty); po 4 MB se přejmenuje na
+`audit.log.1`, takže zůstane zhruba 8 MB historie. Čtení zapisuje spotřebitele z `x-codeloupe-used-by` (`/env/values`) nebo
+`env run: <program>`; maskování hodnot a čtení metadat se nezapisuje.
 
 ### 9.13a `GET /ui-api/v1/accounts` (CL-63; jen metadata, nikdy tokeny)
 ```ts
@@ -635,7 +746,10 @@ interface DaemonSettings {
   port: number; home: string; configFile: string; defaultRoot: string | null;
   repos: { id: string; path: string; baseRef: string }[];
   youtrack: { url: string; projects: string[]; tokenConfigured: boolean; pollSec: number }[];
-  budgets: { dailyWeighted: number | null; daemonRssMb: number; buildPeakRssMb: number };
+  budgets: {
+    dailyWeighted: number | null; daemonRssMb: number; buildPeakRssMb: number;
+    p95Ms: number; queueWaitMs: number; busyRate: number;   // limity z config.json `budgets`, podle kterých `/status` varuje
+  };
 }
 ```
 
@@ -646,13 +760,20 @@ interface Events {
   lastSeq: number;
   items: { seq: number; at: Iso; kind: 'budget_breach' | 'build_finished' | 'build_failed' | 'gap_new';
            severity: 'info' | 'warning' | 'critical'; title: string; body: string;
-           ref: { screen: 'overview' | 'index' | 'gaps'; id: string | null } }[];
+           ref: { screen: 'overview' | 'index' | 'gaps' | 'runs'; id: string | null } }[];   // 'runs' (id = RunItem.id): překročený rozpočet běhu
 }
 ```
 `since` chybí → jen `epoch`, `lastSeq` a prázdné `items` (aplikace po startu nenotifikuje historii). Události
 se ukládají v SQLite, takže restart daemonu číslování nezmění; když se `epoch` přesto změní (smazaný home),
 aplikace se znovu zarovná bez notifikací. Události vznikají líně při dotazu (`events`, ingest), daemon kvůli
 nim nemá časovač (plan.md § 5.1).
+
+Události z ingestu transcriptů (CL-62): `budget_breach` — **jedna** událost na den (`budgets.dailyWeighted`, titulek „Daily
+budget exceeded“, `ref: overview`) a jedna na běh (`budgets.runWeighted`, „Run budget exceeded“, `ref: runs/<id>`); klíč
+(`day:YYYY-MM-DD`, `run:<id>`) je uložený, takže se událost neopakuje ani po restartu. `gap_new` — jedna událost na
+průchod, nástroj, tvar dotazu a druh mezery („3× fallback for find:name“). Součty dne jsou po hodinách (dny jsou místní).
+První průchod (historie) žádnou událost nevysílá, jen si zapamatuje, co už je přes rozpočet. Stejné události jdou do
+webhooků (`budget.breach`, `gap.new`).
 
 ### 9.16 Mapování obrazovka → endpoint
 
@@ -669,6 +790,22 @@ nim nemá časovač (plan.md § 5.1).
 | Nastavení | `settings`, `/status` |
 | Tray, notifikace | `/status`, `events` |
 
+### 9.18 Cesty daemonu mimo `/ui-api/v1` (CL-72)
+
+Aplikace čte i několik stávajících jen čtecích cest daemonu; renderer je smí žádat jen jako zdroje v `request.ts`
+(pevná cesta, povolené klíče query), typy jsou v `app/src/shared/workspaces.ts`:
+
+| Zdroj | Cesta | Query |
+|---|---|---|
+| `status/history` | `GET /status/history` | – |
+| `workspaces` | `GET /workspaces` | `repo`, `size` |
+| `resources` | `GET /resources` | `stats` (paměť běžících kontejnerů workspace, `memoryBytes`) |
+| `reconcile` | `GET /reconcile` | – |
+| `releases` | `GET /workspaces/releases` | – |
+| `ports` | `GET /ports` | – |
+
+Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevolá; viz § 10.
+
 ### 9.17 Zdroje dat a implementace
 
 - CL-39 se staví v **Kotlin portu** (závisí na CL-56); Node prototyp ho nedostane.
@@ -676,8 +813,11 @@ nim nemá časovač (plan.md § 5.1).
   metodika `codeloupe metrics` CL-21, detektor mezer CL-22), spouštěný líně voláním UI API — bez časovače.
 - Telemetrie volání CodeLoupe (CL-24), úkoly z mirroru (CL-26), změny z `changes()` (CL-17) a vrstev (CL-16).
 - Dokud zdroj chybí, endpoint vrací prázdná data (ne 404), aby obrazovky fungovaly.
-- Rozpočet < 1 s na obrazovku (CL-40) se měří na ingestovaném baseline (2 651 sessions). Daemon neposkytuje
-  žádné API běhů ani kroků agentů.
+- Rozpočet < 1 s na obrazovku (CL-40) se měří na ingestovaném baseline (2 651 sessions).
+- **Ingest transcriptů (CL-62)**: `<home>/transcripts.db` (tabulky `runs`, `steps`, `usage_hours`, `gaps`, `breaches`, `files`
+  s offsetem a stavem parseru). Spouští ho volání UI API (`runs`, `overview`, `gaps`, `nav`, `events`), nejvýš jednou za
+  `metrics.ingestTtlMs` (10 s), v pozadí; volání čeká nejvýš 100 ms a odpoví z uloženého. Bez volání neběží nic (CPU v klidu 0).
+  Čte jen nové řádky od uloženého offsetu; adresáře z `metrics.transcriptDirs` (jinak všechny pod `~/.claude/projects`).
 
 **Stav implementace (CL-39, balíček `codeloupe.uiapi`, `GET /ui-api/v1/<zdroj>`):** všechny zdroje výše odpovídají, jen
 `GET` (jinak 405), `Cache-Control: no-store`, chyby `{ error: { code, message } }`; kontrakt aplikace
@@ -685,16 +825,17 @@ nim nemá časovač (plan.md § 5.1).
 
 | Zdroj | Z čeho | Zatím prázdné nebo nepřesné |
 |---|---|---|
-| `nav` | workspace scan, mirror, stav indexu | `newGaps` 0 |
-| `overview` | `calls.jsonl` (nově s `root` volání): `toolCalls`, p50, `activeWindows` (různé rooty za 15 min), `queriedWorktrees` | cena, baseline, úspory, `costSeries`, `savingsByTool`, `gaps`: 0/prázdné do ingestu transcriptů (CL-62) |
+| `nav` | workspace scan, mirror, stav indexu, mezery od `gapsSince` | – |
+| `overview` | `calls.jsonl` (nově s `root` volání): `toolCalls`, p50, `activeWindows` (různé rooty za 15 min), `queriedWorktrees`; z ingestu (CL-62) vážená cena dnes / včera do stejné hodiny / v rozsahu, `costSeries` (24h hodinové, jinak denní), `budget`, `gaps`, `newGaps` (posledních 24 h) | `baselineRange`, `savedTokens`, `savedPct`, `savingsByTool`, `costSeries[].baseline`: 0/prázdné (daemon nemá baseline po rolích) |
+| `runs`, `runs/{id}`, `runs/{id}/steps` | ingest transcriptů (CL-62), indexy pro každé řazení | – |
 | `worktrees` | workspace scan, `ahead`/`behind` z gitu, změněné soubory proti merge-base, stav vrstvy (`Overlays.layer`), počet volání za 24 h | `changedDecls` se počítá na pozadí (první odpověď ho může mít 0); první odpověď po startu u desítek worktrees trvá vteřiny, další jsou okamžité (poslední stav + obnova na pozadí) |
 | `worktrees/{id}` | `changes` ve strukturované podobě: deklarace, volající, testy | `index.layerFiles` = změněné indexované soubory, `parsedAt` null |
 | `tasks`, `tasks/{id}` | jen mirror (nikdy dotaz na tracker), kurzor = offset | `reads` 0, `mirror.lastReadAt` null (žádný čítač čtení) |
 | `index` | registr repozitářů, velikost a počty z indexu, sestavení z `build.done`/`overlay.refreshed` v `events.db` | `firstLine` chyb parseru 0, `kind` plného a inkrementálního buildu se neliší |
-| `gaps` | – | prázdné do ingestu (CL-62); týdenní report je `codeloupe metrics gaps` |
-| `environment` | – | `keys: []`, `storeReady: false` do úložiště tajemství (CL-50) |
-| `settings` | konfigurace daemonu, mirror, `tokenConfigured` (hodnota se nikdy nečte ven) | `budgets.dailyWeighted` null |
-| `events` | `events.db` + `epoch` (nová tabulka `meta`): `build_finished`, `build_failed` | `budget_breach`, `gap_new` se zatím nevysílají |
+| `gaps` | ingest transcriptů, detektor CL-22 s místem (tah, volání) a tím, po čem agent sáhl; `report` z téhož (30 dní), než je co ingestovat, ze souboru `<home>/gaps-report.json` (příklady projdou scrubberem) | volání „busy“ jsou jen v `report`, ne v `summary`/`items` |
+| `environment` | metadata vaultu + audit (CL-50, CL-55); nikdy hodnota | `keys: []`, `storeReady: false`, dokud nefunguje žádný ochránce klíče |
+| `settings` | konfigurace daemonu, mirror, `tokenConfigured` (hodnota se nikdy nečte ven), `budgets.dailyWeighted` | – |
+| `events` | `events.db` + `epoch` (tabulka `meta`): `build_finished`, `build_failed`, `budget_breach`, `gap_new` | – |
 
 ## 10. Bezpečnost aplikace
 
@@ -717,6 +858,11 @@ nim nemá časovač (plan.md § 5.1).
   - `open.external(url)` — pro „Otevřít v YouTracku“ (`TaskDetail.url`) i odkazy z markdownu; povolí se jen
     `https:` a origin přesně shodný s některou instancí z nastavení daemonu (`new URL().origin`, žádné
     porovnání prefixu); jiné odkazy se zobrazí jen jako text.
+  - **Akce** (`app/src/shared/actions.ts`, jediné zápisy aplikace kromě nastavení): `workspaceRelease({ repo, path })`,
+    `reconcileRun({ keys })`, `gapsRefresh()`. Stránka jen žádá; main ověří žádost proti vlastním datům daemonu
+    (worktree musí být v registru, role `worktree`; klíče musí být v plánu s verdiktem `confirm`), ukáže nativní
+    potvrzovací dialog s tím, co se změní, a teprve pak volá daemon (`POST` s hlavičkou `x-codeloupe`, bez `Origin`).
+    Bez důvěryhodného daemonu a v mock režimu se neprovedou.
   - `env.*` (§ 3.7.1) — přibudou až s CL-54, se stejnou kontrolou odesílatele a vlastní validací.
   - `open.worktree` a `open.external` jen když `/status.pid` odpovídá `daemon.json` (§ 8) — cizí proces na
     portu nic neotevře; `open.config` skládá cestu lokálně a kontrolu nepotřebuje.

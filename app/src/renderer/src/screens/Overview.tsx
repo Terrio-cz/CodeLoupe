@@ -2,9 +2,12 @@ import type { ToolCalls } from '../../../shared/contract';
 import { bridge, useApi } from '../api';
 import { BarList, CostChart } from '../components/Charts';
 import { DataTable, type Column } from '../components/DataTable';
+import { LatencyBars } from '../components/LatencyBars';
 import { Card, Delta, ErrorState, KpiTile, Loading, rangeLabel } from '../components/Parts';
 import { PhaseBadge } from '../components/StatusBadge';
+import { TimeChart } from '../components/TimeChart';
 import { ago, ms, num, pct, time, tokens } from '../format';
+import { cpuPoints, rssPoints } from '../history';
 import { useDaemon, useRange } from '../hooks';
 
 const callColumns: Column<ToolCalls>[] = [
@@ -18,10 +21,15 @@ const callColumns: Column<ToolCalls>[] = [
   { key: 'errors', header: 'Chyby', render: t => num(t.errors), numeric: true },
 ];
 
+const mb = (v: number) => `${num(Math.round(v))} MB`;
+const cpu = (v: number) => `${num(Math.round(v * 10) / 10)} %`;
+
 export function Overview() {
   const [range] = useRange();
   const { data, error, loading, reload } = useApi('overview', undefined, { range });
   const daemon = useDaemon();
+  const history = useApi('status/history');
+  const settings = useApi('settings');
 
   if (!data) return loading ? <Card><Loading /></Card> : <Card><ErrorState message={error?.message ?? 'Nelze načíst přehled.'} onRetry={reload} /></Card>;
   const k = data.kpis;
@@ -29,9 +37,24 @@ export function Overview() {
   const used = budget ? Math.min(100, (data.budget.usedToday / budget) * 100) : 0;
   const r = rangeLabel(range);
   const st = daemon?.status;
+  const limits = settings.data?.budgets;
+  const warnings = [
+    ...(budget && data.budget.usedToday > budget ? [`Denní rozpočet tokenů překročen: ${tokens(data.budget.usedToday)} z ${tokens(budget)}`] : []),
+    ...(st?.budgets?.warnings ?? []),
+  ];
+  const samples = history.data ?? [];
 
   return (
     <>
+      {warnings.length > 0 && (
+        <div className="banner" role="status">
+          <strong>⚠ Rozpočty překročeny</strong>
+          <ul className="plain">{warnings.map(w => <li key={w}>{w}</li>)}</ul>
+        </div>
+      )}
+      {k.weightedRange === 0 && data.costSeries.every(p => p.weighted === 0) && (
+        <div className="banner info" role="note">Spotřeba a úspora tokenů zatím chybí: daemon je počítá z transkriptů agentů až s jejich ingestem (CL-62). Latence, paměť a volání níže jsou skutečné.</div>
+      )}
       <section className="card" aria-label="Klíčová čísla">
         <div className="kpis">
           <KpiTile label="Cena dnes" value={tokens(k.weightedToday)} ctx={<Delta now={k.weightedToday} before={k.weightedYesterdaySameTime} unit=" než včera" />}>
@@ -78,6 +101,18 @@ export function Overview() {
         </Card>
       </div>
 
+      <div className="grid-3">
+        <Card title="Latence volání (p95)">
+          {st?.latency ? <LatencyBars latency={st.latency} budgetMs={limits?.p95Ms ?? null} /> : <div className="state">Daemon neběží, latence není k dispozici.</div>}
+        </Card>
+        <Card title="Paměť daemonu (RSS)">
+          <TimeChart label="RSS" points={rssPoints(samples)} format={mb} limit={limits ? { value: limits.daemonRssMb, label: 'budget' } : undefined} />
+        </Card>
+        <Card title="Zátěž CPU daemonu">
+          <TimeChart label="CPU" points={cpuPoints(samples)} format={cpu} />
+        </Card>
+      </div>
+
       <div className="grid-2e">
         <Card title={`Úspora podle nástroje (${r})`}>
           <BarList label="Úspora podle nástroje" items={data.savingsByTool.map(s => ({ name: s.tool, value: s.savedTokens, note: `${num(s.calls)}×` }))} />
@@ -85,6 +120,14 @@ export function Overview() {
         <Card title="Rozpočty">
           <dl className="dl">
             <dt>Denní rozpočet</dt><dd>{budget ? `${tokens(data.budget.usedToday)} z ${tokens(budget)}` : 'nenastaven'}</dd>
+            {limits && (
+              <>
+                <dt>Paměť daemonu</dt><dd>{st ? `${st.rssMb} MB z ${limits.daemonRssMb} MB` : `limit ${limits.daemonRssMb} MB`}</dd>
+                <dt>p95 latence</dt><dd>{st?.latency ? `${ms(st.latency.p95Ms)} z ${ms(limits.p95Ms)}` : `limit ${ms(limits.p95Ms)}`}</dd>
+                <dt>Busy</dt><dd>{st?.latency ? `${pct(st.latency.busyRate * 100, 1)} z ${pct(limits.busyRate * 100)}` : `limit ${pct(limits.busyRate * 100)}`}</dd>
+                <dt>Čekání ve frontě</dt><dd>{ms(limits.queueWaitMs)} nejvýš</dd>
+              </>
+            )}
             <dt>Aktualizováno</dt><dd>{ago(data.generatedAt)}</dd>
           </dl>
         </Card>

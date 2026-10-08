@@ -7,9 +7,12 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 
-/** `GET /resources`: the Docker inventory as [ResourceReport]. Always 200; what could not be read is in `problems`. */
+/**
+ * `GET /resources`: the Docker inventory as [ResourceReport]. Always 200; what could not be read is in `problems`.
+ * `stats=1` adds the memory of the running containers that belong to a workspace.
+ */
 fun Route.resourceRoutes(inventory: ResourceInventory) {
     get("/resources") {
-        call.respondText(JsonFormat.json.encodeToString(ResourceReport.serializer(), inventory.report()), ContentType.Application.Json, HttpStatusCode.OK)
+        call.respondText(JsonFormat.json.encodeToString(ResourceReport.serializer(), inventory.report(memory = call.parameters["stats"] in setOf("1", "true"))), ContentType.Application.Json, HttpStatusCode.OK)
     }
 }

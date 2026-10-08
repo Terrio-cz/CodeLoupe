@@ -339,8 +339,9 @@ Z transcriptů: volání codeloupe, po kterém agent do 2 tahů sáhne po `rg`/`
 symbol nebo soubor = **mezera** (nástroj nestačil). Report seskupený podle nástroje a tvaru dotazu → backlog
 vylepšení. Plus: prázdné výsledky, `candidate` výsledky, které agent dál ručně rozhodoval, zápisy s rollbackem.
 Hotovo (CL-22): `codeloupe metrics gaps` — druhy `fallback`, `empty`, `busy`, `candidates`, týdně podle nástroje a
-tvaru dotazu (`name`, `qualified`, `overload`, `glob`, `path`); zápisy s rollbackem čekají na write nástroje, obrazovka
-Gaps v UI na CL-40.
+tvaru dotazu (`name`, `qualified`, `overload`, `glob`, `path`); zápisy s rollbackem čekají na write nástroje. Obrazovka
+Mezery v aplikaci (CL-40) ukazuje tento report z `<home>/gaps-report.json`, který daemon servíruje v `gaps.report` a který
+se přepočítá tlačítkem v aplikaci (CLI v samostatném procesu, asi 17 s na 3 000 běhů, měřeno 2026-10-08).
 
 **Scaffold šablony (CL-35): no-go.** Změřeno 2026-10-08 na 1 427 nových kódových souborech z transcriptů od 2026-09-23
 (`codeloupe metrics boilerplate`): kostra (package, importy, hlavičky typů, anotace, závorky, prázdné řádky) je **13,3 %**
@@ -774,6 +775,60 @@ rozhoduje launcher.
   Java parser přidá do daemonu ~1 MB tříd, nárůst je velikost indexu). Plný build z git objektů: smíšený 2 917 souborů **11,2 s, peak
   workeru 400 MB**; jen Java 5 992 souborů 23,9 s, 351 MB; Terrio 8,9 s, 376 MB. Jediný soubor JDK s chybou parseru je
   `NormalizerImpl.java` (`for (a(), b(); …)` — IntelliJ parser ho nepřijme), zůstane v degradovaném režimu.
+
+### Výsledek CL-52 — import proměnných do storu (2026-10-08)
+
+- Skener (`codeloupe.secrets.imports`) prochází kořeny z `config.json` `envImport` (výchozí: `~/.claude*`, `~/Documents/Claude`, `~/IdeaProjects`) a čte `.env*`/`*.env`
+  (docker env soubory podle složky/compose souseda), `settings*.json` v `.claude*`, `.mcp.json` a `env` objekty kdekoli v `~/.claude.json`. Šablony (`.env.example`),
+  `node_modules`/`build`/… a vlastní home daemona se nečtou; složky TNT/FoodRetailor se jen vypíšou (`--include-excluded` je pustí dovnitř).
+- Report nese jméno, navržený scope (home → global, `Documents/Claude/<x>` → workspace, nejbližší `.git` → repo), zdroje, duplicity a konflikty. Hash hodnoty je
+  HMAC-SHA256 se solí, která žije jen v paměti jednoho reportu, zkrácený na 40 bitů: porovná dvě hodnoty uvnitř reportu, nedá se hádat offline ani spárovat s jiným reportem.
+- Import je idempotentní: hodnota, kterou store drží, se přeskočí; odlišná hodnota ve storu se nepřepíše (`--overwrite`), protože store mohl být rotován v aplikaci;
+  dva vybrané zdroje s různou hodnotou pro jedno jméno a scope jsou konflikt a neuloží se ani jeden (vyřeší se výběrem jednoho).
+- Náhrada zdrojů je volitelná. Dotenv výraz se změní na komentář (program, který soubor ještě čte, selže nahlas místo aby dostal placeholder), JSON řetězec na `${NAME}`;
+  zbytek souboru zůstane bajt po bajtu (pozice z vlastního JSON čtečky, CRLF a BOM zachovány). Před přepsáním se kopie souboru zapečetí klíčem vaultu do
+  `<home>/secrets/import-backups/<id>/` (manifest nese jen cesty a digesty); rollback vrátí každý soubor, soubor upravený po importu nechá být bez `--force`.
+- Na reálných kořenech tohoto počítače (jen jména, nic nebylo importováno ani přepsáno): 168 souborů, 712 výskytů, 113 jmen, 375 dvojic jméno+scope, 125 citlivých,
+  120 s duplicitní hodnotou, 57 s konfliktem, 3 vyloučené složky; sken trvá ~8 s včetně startu JVM.
+
+### Výsledek CL-55 — audit tajemství a připomenutí rotace (2026-10-08)
+
+- Každé vydání hodnoty spotřebiteli (`env run`, `/env/values` s hlavičkou `x-codeloupe-used-by`) a každé vytvoření, rotace a smazání zapíše řádek JSON
+  `{at, name, scope, action, consumer}` do `<home>/secrets/audit.log`; hodnota v něm není nikdy, test to hlídá na souboru. Zápis je best effort (plný disk nezastaví `env run`),
+  soubor se jen připisuje a po 4 MB přejde do `audit.log.1` (zůstane zhruba 8 MB historie). Maskování hodnot a čtení metadat se nezapisuje.
+- Stáří klíče = od rotace, jinak od vytvoření; `secrets.rotationDays` (výchozí 90, 0 = vypnuto) označí klíč `ROTATE` v `env list`, v nástroji `env` a ve sloupci Stáří obrazovky Prostředí.
+- `GET /ui-api/v1/environment` vrací klíče z metadat vaultu (bez dešifrování) se spotřebiteli z auditu a stářím, `GET /ui-api/v1/environment/audit` posledních až 500 událostí.
+
+### Výsledek CL-62 — ingest transcriptů, rozpočty a události pro aplikaci (2026-10-08)
+
+- **Ingest** (`codeloupe.ingest`, `<home>/transcripts.db`): líný, bez časovače. Volání UI API (`runs`, `overview`, `gaps`, `nav`,
+  `events`) spustí v pozadí průchod, nejvýš jednou za `metrics.ingestTtlMs` (10 s), a čeká nejvýš 100 ms; průchod projde
+  adresáře (jen velikost a mtime), přeskočí nezměněné soubory a změněné čte od uloženého bajtového offsetu. Stav parseru
+  (`TranscriptParser`, společný s `codeloupe metrics`) se ukládá jako JSON u souboru: součty, hashe viděných `message.id`,
+  čekající `tool_use` bez výsledku. Nedopsaný poslední řádek se nespotřebuje. Kratší soubor než offset = nahrazený, čte se znovu.
+  Změna pravidel kategorií (`fingerprint`) smaže uložené a načte transcripty znovu.
+- **Co se ukládá**: `runs` (součty, předpočítaná vážená cena, `tool_calls`, `result_attr`, `share` = podíl výsledků nástrojů
+  na ceně), `steps` (kategorie, redigovaný popis ≤ 200 znaků, `chars`, tah; `carried` a `weighted` se z nich počítají v SQL podle
+  aktuálního počtu tahů běhu, protože rostou s každým dalším tahem), `usage_hours` (cena po hodinách → dnes / včera / řady),
+  `gaps` (detektor CL-22 s tahem, časem a tím, po čem agent sáhl). Indexy: start, cena, tahy, peak, share, délka, role+start.
+- **Rozpočty**: `budgets.dailyWeighted`, `budgets.runWeighted` v `config.json`. Dny se sčítají z hodinových košů (dnes a včera),
+  běhy, které skončily za posledních 24 h. Klíč (`day:YYYY-MM-DD`, `run:<id>`) je v tabulce `breaches`, událost `budget.breach`
+  jde jen při prvním zápisu klíče, takže ani restart ji neopakuje. První průchod (historie) události nevysílá.
+  `gap.new` je jedna událost na průchod, nástroj, tvar a druh mezery. Události jdou přes `EventBus` (číslování i `epoch` v
+  `events.db` už měl CL-39), tedy i do webhooků.
+- **Redigování**: popis kroku je jen to, o čem volání bylo (příkaz, soubor, vzor), nikdy obsah (`Edit`/`Write` těla se neukládají);
+  prochází `Scrubber` (tokeny, `Authorization`, `*_TOKEN=`, hesla v URL, hodnoty z trezoru), pak se řízne na 200 znaků. Test se
+  zasetými tokeny.
+- **Ověření na Terrio workspace** (`C--Users-tadea-Documents-Claude-terrio`, 3 490 souborů / 2,2 GB / 621 720 řádků, 2 450 běhů za 30 dní):
+  první průchod 79 s (2 934 změněných souborů, běhy v pozadí, nejnovější první), špička RSS daemonu 172 MB (ustáleně 171 MB,
+  v klidu CPU 0), `transcripts.db` 49 MB. Pozdější volání: `runs?range=30d&sort=weighted` 5–7 ms, `runs/{id}/steps` (750 kroků)
+  3–7 ms, volání, které samo spustí průchod, čeká 100 ms a vrátí uložené (≈ 105–117 ms); průchod po změně 4–5 transcriptů čte jen
+  jejich nové řádky. Shoda s `codeloupe metrics collect --since 2026-09-08` na stejných souborech: 2 442 z 2 449 běhů shodných
+  v ceně, tazích, peak kontextu, roli, TER, délce i chybách; zbylých 7 jsou běhy, které mezi oběma čteními ještě rostly.
+  Generovaný test se 2 651 běhy: každé řazení seznamu a kroky < 200 ms, druhý průchod nečte nic.
+- **Rozhodnutí**: baseline po rolích daemon nemá, takže `baselineRange` a úspory zůstávají 0 (nevymýšlí se odhad); `busy` volání
+  nejsou mezera pro UI (je to zátěž daemonu). Seznam běhů a kroky vystavuje API, i když obrazovka Běhy z UI vypadla (§ 3.3):
+  data jsou potřeba pro Přehled a pro případnou obrazovku v aplikaci.
 
 ## 10. Rizika
 

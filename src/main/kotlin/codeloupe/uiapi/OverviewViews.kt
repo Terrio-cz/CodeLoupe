@@ -1,24 +1,46 @@
 package codeloupe.uiapi
 
 import codeloupe.daemon.CallRecord
+import codeloupe.ingest.RunWriter
+import codeloupe.ingest.Transcripts
+import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
 
 /**
- * The Overview screen from CodeLoupe's own call telemetry. Cost, baseline and savings need the transcript ingest of
- * CL-62 and are zero until then; the gap count likewise.
+ * The Overview screen: CodeLoupe's own call telemetry, and the cost, budget and gap figures of the transcript ingest. Baseline
+ * and savings need a per-role baseline the daemon does not keep yet and are zero.
  */
-internal class OverviewViews(private val calls: CallLog, private val worktrees: WorktreeViews) {
+internal class OverviewViews(
+    private val calls: CallLog,
+    private val worktrees: WorktreeViews,
+    private val transcripts: Transcripts,
+    private val zone: ZoneId = ZoneId.systemDefault(),
+) {
     suspend fun overview(range: String, now: Instant = Instant.now()): Overview {
-        val days = DAYS[range] ?: throw UiApiException.badRequest("range must be one of ${DAYS.keys.joinToString()}")
+        val days = Ranges.days(range)
+        transcripts.fresh()
         val records = calls.after(now.minusSeconds(days * 86_400))
         val roots = records.mapNotNull { it.root }.distinct()
         val recent = records.filter { instant(it)?.isAfter(now.minusSeconds(ACTIVE_WINDOW_S)) == true }.mapNotNull { it.root }.distinct()
         val known = worktrees.all()
         val queried = known.count { w -> roots.any { WorktreeId.contains(w.path, it) } }
+        val today = now.atZone(zone).toLocalDate()
+        val todayStart = today.atStartOfDay(zone).toInstant()
+        val yesterdayStart = today.minusDays(1).atStartOfDay(zone).toInstant()
+        val lastHour = Math.floorDiv(now.toEpochMilli(), RunWriter.HOUR_MS)
+        val windows = CostWindows(transcripts.queries.hours(CostWindows.firstHour(now, maxOf(days, 2)), lastHour + 1), zone)
+        val series = if (days == 1L) windows.hourly(HOURS_PER_DAY, now) else windows.daily(days.toInt(), today)
+        val usedToday = windows.between(todayStart.toEpochMilli(), Long.MAX_VALUE)
+        val sameTimeYesterday = yesterdayStart.plus(Duration.between(todayStart, now))
         return Overview(
             range = range, generatedAt = now.toString(),
-            kpis = Overview.Kpis(0, 0, 0, 0, 0, 0.0, recent.size, queried, records.size, percentile(records.map { it.ms }, 50), 0, 0),
-            budget = Overview.Budget(null, 0), costSeries = emptyList(), savingsByTool = emptyList(),
+            kpis = Overview.Kpis(
+                usedToday, windows.between(yesterdayStart.toEpochMilli(), sameTimeYesterday.toEpochMilli()), series.sumOf { it.weighted }, 0, 0, 0.0, recent.size, queried,
+                records.size, percentile(records.map { it.ms }, 50), transcripts.queries.gapCount(now.minusSeconds(days * 86_400).toEpochMilli()),
+                transcripts.queries.gapCount(now.minusSeconds(NEW_GAP_S).toEpochMilli()),
+            ),
+            budget = Overview.Budget(transcripts.budgets.dailyWeighted, usedToday), costSeries = series, savingsByTool = emptyList(),
             toolCalls = records.groupBy { it.tool }.map { (tool, rs) ->
                 Overview.ToolCalls(
                     tool, rs.size, percentile(rs.map { it.ms }, 50), percentile(rs.map { it.ms }, 95), rs.sumOf { it.chars.toLong() } / rs.size,
@@ -38,7 +60,8 @@ internal class OverviewViews(private val calls: CallLog, private val worktrees: 
     }
 
     private companion object {
-        val DAYS = linkedMapOf("24h" to 1L, "7d" to 7L, "30d" to 30L)
         const val ACTIVE_WINDOW_S = 15 * 60L
+        const val HOURS_PER_DAY = 24
+        const val NEW_GAP_S = 86_400L
     }
 }
