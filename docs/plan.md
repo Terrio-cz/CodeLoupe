@@ -566,6 +566,12 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   změny agenta se vždy ukážou. Cena: worktree s řídkým checkoutem vidí soubory mimo kužel z nové báze až po odvození (~1 s);
   worktree, které landing samo provedlo, má změněné soubory na disku a čeká jednou (0,7–1,0 s). Měřeno `tools/load-test.mjs`
   (8 worktrees, 10 klientů, commit 12 souborů): p95 ostatních worktrees v 5 s po landu 97–184 ms (5 běhů; předtím ~700 ms).
+- CL-10: fakta souboru se berou podle obsahu, ne jen podle cesty a předchozí báze. Aktualizace (`StoreUpdate.factSources`) před
+  parsem zkusí `StoreCopier.copyIfSame` — soubor se stejnou cestou a stejným `hash` (SHA-1 textu) v jiném uloženém indexu
+  (overlaye ostatních worktrees; formát musí sedět) se zkopíruje řádek po řádku a neparsuje. Použije se při syncu báze po
+  landu (autorův overlay už soubory naparsoval; `BuildResult.reused`) i při obnově overlaye. Už dřív platilo: sync báze
+  parsuje jen změněné bloby (≤ 20 souborů při změně 20 souborů), soubor worktree shodný s bází nevstoupí do overlaye (porovnání
+  textu) a soubor nedotčený od předchozí báze se kopíruje z ní. `Extraction.parsed` počítá parsy v procesu (testy, telemetrie).
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
   Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.

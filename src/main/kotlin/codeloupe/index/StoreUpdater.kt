@@ -16,13 +16,13 @@ object StoreUpdater {
         db.autoCommit = false
         val batch = try {
             StoreWriter(db).use { writer ->
-                Batch(writer).apply {
+                FactSources(update.factSources, db).use { sources -> Batch(writer, sources).apply {
                     update.removes.forEach(writer::remove)
                     update.tombstones.forEach(writer::tombstone)
                     copy(db, update)
                     update.puts.filter { it.blob == null }.forEach(::putFile)
                     putBlobs(blobs, update.puts.filter { it.blob != null })
-                }
+                } }
             }.also {
                 for ((key, value) in update.meta) Store.setMeta(db, key, value)
                 db.commit()
@@ -33,13 +33,14 @@ object StoreUpdater {
         } finally {
             db.autoCommit = true
         }
-        return BuildResult(ok = true, files = batch.files, errors = batch.errors, ms = System.currentTimeMillis() - started, unread = batch.unread)
+        return BuildResult(ok = true, files = batch.files, errors = batch.errors, ms = System.currentTimeMillis() - started, unread = batch.unread, reused = batch.reused)
     }
 
     /** One update in progress: what was written and what could not be read. */
-    private class Batch(private val writer: StoreWriter) {
+    private class Batch(private val writer: StoreWriter, private val sources: FactSources) {
         var files = 0
         var errors = 0
+        var reused = 0
         val unread = ArrayList<String>()
 
         fun copy(db: Connection, update: StoreUpdate) {
@@ -69,8 +70,16 @@ object StoreUpdater {
         }
 
         private fun put(entry: FilePut, text: String, size: Long) {
+            val hash = Sha1.hex(text)
+            // The same text at the same path has the same facts: a store that parsed it already hands them over.
+            writer.remove(entry.path)
+            if (sources.copy(entry.path, hash, size, entry.mtime)) {
+                files++
+                reused++
+                return
+            }
             val facts = Extraction.extract(entry.path, text)
-            writer.put(IndexedFile(entry.path, Languages.languageOf(entry.path)!!, Sha1.hex(text), size, entry.mtime, text), facts)
+            writer.put(IndexedFile(entry.path, Languages.languageOf(entry.path)!!, hash, size, entry.mtime, text), facts)
             files++
             if (facts.errors > 0) errors++
         }

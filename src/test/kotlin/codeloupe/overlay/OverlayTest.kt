@@ -313,6 +313,21 @@ class OverlayTest {
         assertEquals(0, registry.staleReads())
     }
 
+    @Test
+    fun `a landing reuses the facts the author's overlay parsed instead of parsing the files again`() {
+        val registry = Registry(config, queue)
+        assertContains(find(registry, repo, "Alpha.one"), "fun one")
+        write(feature, ALPHA, alpha("shared"))
+        assertContains(find(registry, feature, "Alpha.shared"), "fun shared")
+        commit(feature, "feature work")
+        git(repo, "merge", "-q", "--ff-only", "feature")
+        val parsed = codeloupe.index.Extraction.parsed.get()
+        // The default branch moved by the file the feature's overlay holds: the inline sync copies its facts.
+        assertContains(find(registry, repo, "Alpha.shared"), "fun shared")
+        assertEquals(git(repo, "rev-parse", "HEAD"), registry.snapshot().single().baseCommit, "base synced before the answer")
+        assertEquals(parsed, codeloupe.index.Extraction.parsed.get(), "nothing was parsed for the landing")
+    }
+
     private fun overlayFiles(): List<Path> = Files.walk(config.home).use { paths ->
         paths.filter { it.parent.fileName.toString() == "overlays" && it.toString().endsWith(".db") }.toList()
     }

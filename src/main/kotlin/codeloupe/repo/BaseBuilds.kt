@@ -10,6 +10,7 @@ import codeloupe.index.BuildResult
 import codeloupe.index.FilePut
 import codeloupe.index.StoreUpdate
 import codeloupe.lang.Languages
+import codeloupe.overlay.Overlays
 import codeloupe.index.InlineParse
 import codeloupe.platform.IsoTime
 import kotlinx.coroutines.Deferred
@@ -79,6 +80,8 @@ internal class BaseBuilds(
         return StoreUpdate(
             puts = changed.mapNotNull { entry -> entry.blob?.let { FilePut(entry.path, blob = it, size = sizes[it] ?: 0) } },
             removes = changed.filter { it.blob == null }.map { it.path },
+            // A worktree's overlay has usually parsed what a landing brings in.
+            factSources = Overlays.stores(repo),
         )
     }
 

@@ -226,7 +226,7 @@ class Overlays(
 
     /** The refresh job that writes [change], or null when nothing needs writing and [change] is already committed. */
     private fun start(repo: RepoState, state: OverlayState, change: OverlayChange): Deferred<*>? {
-        val update = change.update
+        val update = change.update.copy(factSources = stores(repo).filter { it != state.file.toString() })
         val base = update.meta.getValue("base")
         if (update.size == 0 && (change.entries.isEmpty() || state.fileBase == base)) {
             commit(state, change, emptyList())
@@ -325,11 +325,18 @@ class Overlays(
         return if (NativeCalls.isWindows) normal.lowercase() else normal
     }
 
-    private companion object {
-        const val DIR = "overlays"
+    companion object {
+        internal const val DIR = "overlays"
 
         /** Worktrees whose last walk stays in memory (~150 B per file each). */
-        const val MAX_STATES = 16
-        const val REBASES_AT_ONCE = 2
+        private const val MAX_STATES = 16
+        private const val REBASES_AT_ONCE = 2
+
+        /** The overlay stores of [repo], whoever's worktree they belong to: they hold the facts of files already parsed. */
+        internal fun stores(repo: RepoState): List<String> {
+            val dir = repo.dir.resolve(DIR)
+            if (!dir.exists()) return emptyList()
+            return dir.listDirectoryEntries("*.db").map { it.toString() }
+        }
     }
 }

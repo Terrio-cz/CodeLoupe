@@ -11,6 +11,9 @@ import java.sql.Types
  */
 class StoreCopier(source: Connection, private val target: Connection) : AutoCloseable {
     private val file = source.prepareStatement("SELECT id, lang, module, source_set, package, hash, eol, errors, content FROM files WHERE path = ? AND deleted = 0")
+    private val fileWithHash = source.prepareStatement(
+        "SELECT id, lang, module, source_set, package, hash, eol, errors, content FROM files WHERE path = ? AND hash = ? AND deleted = 0",
+    )
     private val imports = source.prepareStatement("SELECT fqn, alias, star FROM imports WHERE file_id = ?")
     private val decls = source.prepareStatement("SELECT id, $DECL_COLUMNS, parent_id FROM decls WHERE file_id = ? ORDER BY id")
     private val refs = source.prepareStatement("SELECT $REF_COLUMNS, decl_id FROM refs WHERE file_id = ?")
@@ -28,8 +31,13 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
     )
 
     /** Copies [path] (already removed from the target) with a new stamp; false when the source does not have it. */
-    fun copy(path: String, size: Long, mtime: Long): Boolean {
-        val (oldId, newId) = file.run {
+    fun copy(path: String, size: Long, mtime: Long): Boolean = copy(file, path, size, mtime)
+
+    /** As [copy], but only when the source holds [path] with the content of hash [hash]: the same text has the same facts. */
+    fun copyIfSame(path: String, hash: String, size: Long, mtime: Long): Boolean = copy(fileWithHash.also { it.setString(2, hash) }, path, size, mtime)
+
+    private fun copy(select: PreparedStatement, path: String, size: Long, mtime: Long): Boolean {
+        val (oldId, newId) = select.run {
             setString(1, path)
             executeQuery().use { rs ->
                 if (!rs.next()) return false
@@ -68,7 +76,7 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
     }
 
     override fun close() {
-        listOf(file, imports, decls, refs, insertFile, insertImport, insertDecl, insertRef).forEach { it.close() }
+        listOf(file, fileWithHash, imports, decls, refs, insertFile, insertImport, insertDecl, insertRef).forEach { it.close() }
     }
 
     private inline fun PreparedStatement.rows(fileId: Long, each: (java.sql.ResultSet) -> Unit) {
