@@ -36,6 +36,13 @@ class RecordedYouTrack(dump: String = load()) : HttpTransport {
     val missedByPages: MutableSet<String> = mutableSetOf()
     var failActivities = false
 
+    /** Comments are refused with a 400, as a tracker does for a user who may not comment. */
+    var failComments = false
+
+    /** The JSON bodies of the POSTs received, in order. */
+    val bodies: MutableList<String> = CopyOnWriteArrayList()
+    private var writeClock = 1_791_500_000_000L
+
     @Synchronized
     override fun get(path: String): HttpReply {
         val decoded = URLDecoder.decode(path, Charsets.UTF_8)
@@ -64,6 +71,44 @@ class RecordedYouTrack(dump: String = load()) : HttpTransport {
             }
             else -> HttpReply(400, """{"error":"bad request","error_description":"unexpected $decoded"}""")
         }
+    }
+
+    @Synchronized
+    override fun post(path: String, body: String): HttpReply {
+        val decoded = URLDecoder.decode(path, Charsets.UTF_8)
+        requests += "POST $decoded"
+        bodies += body
+        val route = decoded.substringBefore('?').removePrefix("/api/issues/")
+        val id = route.substringBefore('/')
+        if (id !in issues) return HttpReply(404, """{"error":"Not Found"}""")
+        val payload = Json.parseToJsonElement(body).jsonObject
+        writeClock += 1000
+        if (route.endsWith("/comments")) {
+            if (failComments) return HttpReply(400, """{"error":"Bad Request","error_description":"no permission to comment"}""")
+            val commentId = "${id.removePrefix("CL-")}-${100 + issues[id]!!["comments"]!!.jsonArray.size}"
+            edit(id, writeClock) { addComment(it, commentId, "dev1", writeClock, payload["text"]!!.jsonPrimitive.content) }
+            return ok(buildJsonObject {
+                put("id", commentId)
+                put("text", payload["text"]!!.jsonPrimitive.content)
+                put("created", writeClock)
+                put("author", buildJsonObject { put("login", "dev1") })
+                put("deleted", false)
+                put("issue", buildJsonObject { put("updated", writeClock) })
+            })
+        }
+        val unknown = payload["customFields"]?.jsonArray.orEmpty().map { it.jsonObject["name"]!!.jsonPrimitive.content }
+            .firstOrNull { name -> issues[id]!!["customFields"]!!.jsonArray.none { it.jsonObject["name"]!!.jsonPrimitive.content == name } }
+        if (unknown != null) return HttpReply(400, """{"error":"Bad Request","error_description":"unknown field $unknown"}""")
+        edit(id, writeClock) { issue ->
+            payload["summary"]?.let { issue["summary"] = it }
+            payload["description"]?.let { issue["description"] = it }
+            val given = payload["customFields"]?.jsonArray.orEmpty().associate { it.jsonObject["name"]!!.jsonPrimitive.content to it.jsonObject["value"]!! }
+            issue["customFields"] = JsonArray(issue["customFields"]!!.jsonArray.map { f ->
+                val name = f.jsonObject["name"]!!.jsonPrimitive.content
+                if (name in given) JsonObject(f.jsonObject + ("value" to given.getValue(name))) else f
+            })
+        }
+        return ok(issues[id]!!)
     }
 
     /** Changes [id] as YouTrack would: applies [change] and moves `updated` to [at]. */

@@ -2,6 +2,7 @@ package codeloupe.tracker.youtrack
 
 import codeloupe.tracker.FieldChange
 import codeloupe.tracker.IssueStamp
+import codeloupe.tracker.NewComment
 import codeloupe.tracker.TrackerAdapter
 import codeloupe.tracker.TrackerException
 import codeloupe.tracker.TrackerIssue
@@ -10,13 +11,20 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.net.URLEncoder
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * YouTrack REST (`/api`), read only. No dates go into queries (YouTrack reads them in the user's time zone):
- * updates are found by paging newest first, history by the epoch `start` of the activities API.
+ * YouTrack REST (`/api`). No dates go into queries (YouTrack reads them in the user's time zone): updates are found
+ * by paging newest first, history by the epoch `start` of the activities API. A write answers with the written issue
+ * (or comment) itself, so the mirror needs no second request.
  */
 class YouTrackAdapter(private val http: HttpTransport) : TrackerAdapter {
+    /** Custom field `project/name` (lower case) → its name and `$type`, learned the first time a write names it. */
+    private val fieldTypes = ConcurrentHashMap<String, Pair<String, String>>()
+
     override fun canonical(id: String): Pair<String, String>? =
         id.trim().uppercase().takeIf { ID.matches(it) }?.let { it to it.substringBeforeLast('-') }
 
@@ -65,6 +73,49 @@ class YouTrackAdapter(private val http: HttpTransport) : TrackerAdapter {
         }
     }
 
+    override fun update(id: String, fields: Map<String, String>): TrackerIssue {
+        val issueId = checkedId(id)
+        val own = fields.filterKeys { it.lowercase() in OWN_FIELDS }
+        val custom = fields - own.keys
+        val body = buildJsonObject {
+            own.forEach { (key, text) -> put(key.lowercase(), text) }
+            if (custom.isNotEmpty()) put("customFields", JsonArray(custom.map { (name, text) -> customField(issueId, name, text) }))
+        }
+        return YouTrackJson.issue(post("/api/issues/$issueId?fields=${YouTrackJson.ISSUE_FIELDS}", body))
+    }
+
+    override fun comment(id: String, text: String): NewComment {
+        val issueId = checkedId(id)
+        val reply = post("/api/issues/$issueId/comments?fields=${YouTrackJson.COMMENT_FIELDS}", buildJsonObject { put("text", text) })
+        val updated = (reply["issue"] as? JsonObject)?.get("updated")?.let { (it as? JsonPrimitive)?.content?.toLongOrNull() }
+        return NewComment(YouTrackJson.comment(reply), updated)
+    }
+
+    private fun customField(issueId: String, name: String, text: String): JsonObject {
+        val project = issueId.substringBefore('-').uppercase()
+        val key = "$project/${name.lowercase()}"
+        val (exact, type) = fieldTypes[key] ?: learnTypes(issueId, project)[key]
+            ?: throw TrackerException("no field '$name' on $issueId")
+        return YouTrackFieldBody.customField(exact, type, text)
+    }
+
+    private fun learnTypes(issueId: String, project: String): Map<String, Pair<String, String>> {
+        val reply = getOrNull("/api/issues/$issueId?fields=customFields(name)") as? JsonObject ?: throw TrackerException("no issue $issueId")
+        val types = (reply["customFields"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { f ->
+            val name = (f["name"] as? JsonPrimitive)?.content ?: return@mapNotNull null
+            val type = (f["\$type"] as? JsonPrimitive)?.content ?: return@mapNotNull null
+            "$project/${name.lowercase()}" to (name to type)
+        }.toMap()
+        fieldTypes.putAll(types)
+        return types
+    }
+
+    private fun post(path: String, body: JsonObject): JsonObject {
+        val reply = http.post(path, body.toString())
+        if (reply.status !in 200..299) throw TrackerException("YouTrack HTTP ${reply.status} on POST ${path.substringBefore('?')}${reason(reply.body)}")
+        return Json.parseToJsonElement(reply.body) as? JsonObject ?: throw TrackerException("YouTrack returned no object on POST ${path.substringBefore('?')}")
+    }
+
     private fun list(path: String, skip: Int, top: Int): List<JsonObject> {
         val reply = getOrNull("$path&\$skip=$skip&\$top=$top") as? JsonArray ?: throw TrackerException("YouTrack returned no list on ${path.substringBefore('?')}")
         return reply.mapNotNull { it as? JsonObject }
@@ -92,6 +143,7 @@ class YouTrackAdapter(private val http: HttpTransport) : TrackerAdapter {
         const val STAMP_PAGE = 100
         const val PAGE = 50
         const val ACTIVITY_PAGE = 500
+        val OWN_FIELDS = setOf("summary", "description")
         val PROJECT = Regex("[A-Za-z][A-Za-z0-9_]*")
         val ID = Regex("[A-Za-z][A-Za-z0-9_]*-\\d+")
     }
