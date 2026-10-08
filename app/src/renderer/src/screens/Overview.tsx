@@ -3,7 +3,9 @@ import { bridge, useApi } from '../api';
 import { BarList, CostChart } from '../components/Charts';
 import { DataTable, type Column } from '../components/DataTable';
 import { LatencyBars } from '../components/LatencyBars';
-import { Card, Delta, ErrorState, KpiTile, Loading, rangeLabel } from '../components/Parts';
+import { CountUp } from '../components/CountUp';
+import { Icon } from '../components/Icon';
+import { Banner, Card, Delta, ErrorState, KpiTile, Loading, rangeLabel } from '../components/Parts';
 import { PhaseBadge } from '../components/StatusBadge';
 import { TimeChart } from '../components/TimeChart';
 import { ago, ms, num, pct, time, tokens } from '../format';
@@ -31,7 +33,7 @@ export function Overview() {
   const history = useApi('status/history');
   const settings = useApi('settings');
 
-  if (!data) return loading ? <Card><Loading /></Card> : <Card><ErrorState message={error?.message ?? 'Nelze načíst přehled.'} onRetry={reload} /></Card>;
+  if (!data) return loading ? <><Loading variant="kpis" /><Card title="Cena v čase (vážené tokeny)"><Loading /></Card></> : <Card><ErrorState message={error?.message ?? 'Nelze načíst přehled.'} onRetry={reload} /></Card>;
   const k = data.kpis;
   const budget = data.budget.dailyWeighted;
   const used = budget ? Math.min(100, (data.budget.usedToday / budget) * 100) : 0;
@@ -47,17 +49,17 @@ export function Overview() {
   return (
     <>
       {warnings.length > 0 && (
-        <div className="banner" role="status">
-          <strong>⚠ Rozpočty překročeny</strong>
+        <Banner>
+          <strong>Rozpočty překročeny</strong>
           <ul className="plain">{warnings.map(w => <li key={w}>{w}</li>)}</ul>
-        </div>
+        </Banner>
       )}
       {k.weightedRange === 0 && data.costSeries.every(p => p.weighted === 0) && (
-        <div className="banner info" role="note">Spotřeba a úspora tokenů zatím chybí: daemon je počítá z transkriptů agentů až s jejich ingestem (CL-62). Latence, paměť a volání níže jsou skutečné.</div>
+        <Banner tone="info" role="note">Spotřeba a úspora tokenů zatím chybí: daemon je počítá z transkriptů agentů až s jejich ingestem (CL-62). Latence, paměť a volání níže jsou skutečné.</Banner>
       )}
-      <section className="card" aria-label="Klíčová čísla">
+      <section aria-label="Klíčová čísla">
         <div className="kpis">
-          <KpiTile label="Cena dnes" value={tokens(k.weightedToday)} ctx={<Delta now={k.weightedToday} before={k.weightedYesterdaySameTime} unit=" než včera" />}>
+          <KpiTile label="Cena dnes" value={<CountUp value={k.weightedToday} format={tokens} />} ctx={<Delta now={k.weightedToday} before={k.weightedYesterdaySameTime} unit=" než včera" />}>
             {budget && (
               <>
                 <div className={`meter${data.budget.usedToday > budget ? ' over' : ''}`} role="meter" aria-valuemin={0} aria-valuemax={budget} aria-valuenow={data.budget.usedToday} aria-label="Čerpání denního rozpočtu">
@@ -67,11 +69,11 @@ export function Overview() {
               </>
             )}
           </KpiTile>
-          <KpiTile label={`Cena ${r}`} value={tokens(k.weightedRange)} ctx={`baseline ${tokens(k.baselineRange)}`} />
-          <KpiTile label={`Úspora ${r}`} value={pct(k.savedPct, 1)} ctx={`${tokens(k.savedTokens)} tokenů`} />
-          <KpiTile label="Aktivní okna" value={num(k.activeWindows)} ctx={`${num(k.queriedWorktrees)} worktree dotazováno`} />
-          <KpiTile label={`Volání CodeLoupe ${r}`} value={num(k.codeloupeCalls)} ctx={`${ms(k.callP50Ms)} p50`} />
-          <KpiTile label={`Mezery ${r}`} value={num(k.gaps)} ctx={`${num(k.newGaps)} nových za 24 h`} />
+          <KpiTile label={`Cena ${r}`} value={<CountUp value={k.weightedRange} format={tokens} />} ctx={`baseline ${tokens(k.baselineRange)}`} />
+          <KpiTile label={`Úspora ${r}`} value={<CountUp value={k.savedPct} format={v => pct(v, 1)} />} ctx={`${tokens(k.savedTokens)} tokenů`} />
+          <KpiTile label="Aktivní okna" value={<CountUp value={k.activeWindows} format={num} />} ctx={`${num(k.queriedWorktrees)} worktree dotazováno`} />
+          <KpiTile label={`Volání CodeLoupe ${r}`} value={<CountUp value={k.codeloupeCalls} format={num} />} ctx={`${ms(k.callP50Ms)} p50`} />
+          <KpiTile label={`Mezery ${r}`} value={<CountUp value={k.gaps} format={num} />} ctx={`${num(k.newGaps)} nových za 24 h`} />
         </div>
       </section>
 
@@ -93,9 +95,9 @@ export function Overview() {
               {daemon.message && <><dt>Problém</dt><dd className="t2">{daemon.message}</dd></>}
             </dl>
           ) : <Loading />}
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <div className="actions" style={{ marginTop: 16 }}>
             {daemon?.phase === 'running'
-              ? <><button className="btn" onClick={() => void bridge().daemon.restart()}>Restartovat</button><button className="btn" onClick={() => void bridge().daemon.stop()}>Zastavit</button></>
+              ? <><button className="btn" onClick={() => void bridge().daemon.restart()}><Icon name="refresh" size={14} />Restartovat</button><button className="btn" onClick={() => void bridge().daemon.stop()}>Zastavit</button></>
               : <button className="btn primary" disabled={daemon?.phase === 'starting'} onClick={() => void bridge().daemon.start()}>Spustit daemon</button>}
           </div>
         </Card>
@@ -103,7 +105,7 @@ export function Overview() {
 
       <div className="grid-3">
         <Card title="Latence volání (p95)">
-          {st?.latency ? <LatencyBars latency={st.latency} budgetMs={limits?.p95Ms ?? null} /> : <div className="state">Daemon neběží, latence není k dispozici.</div>}
+          {st?.latency ? <LatencyBars latency={st.latency} budgetMs={limits?.p95Ms ?? null} /> : <div className="state"><span className="state-icon"><Icon name="chart" size={18} /></span><div>Daemon neběží, latence není k dispozici.</div></div>}
         </Card>
         <Card title="Paměť daemonu (RSS)">
           <TimeChart label="RSS" points={rssPoints(samples)} format={mb} limit={limits ? { value: limits.daemonRssMb, label: 'budget' } : undefined} />

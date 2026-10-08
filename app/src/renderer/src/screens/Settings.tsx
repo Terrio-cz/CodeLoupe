@@ -3,7 +3,7 @@ import type { AppMetrics } from '../../../shared/ipc';
 import { splitArgs, type AppSettings } from '../../../shared/settings';
 import { bridge, useApi } from '../api';
 import { ClaudeCodeCard } from '../components/ClaudeCodeCard';
-import { Card, Segmented } from '../components/Parts';
+import { Card, Loading, Segmented, Toast } from '../components/Parts';
 import { num, tokens } from '../format';
 import { publishSettings, useDaemon, useSettings } from '../hooks';
 
@@ -31,7 +31,7 @@ export function Settings() {
     return () => clearInterval(t);
   }, []);
 
-  if (!settings) return null;
+  if (!settings) return <Card title="Aplikace"><Loading /></Card>;
   const set = (patch: Partial<AppSettings>) => void update(patch).then(() => flash('Uloženo.'));
   const flash = (m: string) => { setSaved(m); setTimeout(() => setSaved(null), 4000); };
   const d = daemonSettings.data;
@@ -85,7 +85,7 @@ export function Settings() {
             ))}
           </div>
         </div>
-        {saved && <div className="toast" role="status">{saved}</div>}
+        {saved && <Toast>{saved}</Toast>}
       </Card>
 
       <ClaudeCodeCard />

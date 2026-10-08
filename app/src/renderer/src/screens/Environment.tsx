@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Environment as Env, EnvironmentAudit } from '../../../shared/contract';
 import { useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
-import { Card, ErrorState, Loading, Search, Select } from '../components/Parts';
+import { Banner, Card, ErrorState, Loading, Search, Select } from '../components/Parts';
 import { StatusBadge } from '../components/StatusBadge';
 import { ago, dateTime } from '../format';
 
@@ -51,16 +51,16 @@ export function Environment() {
         <button className="btn primary" disabled title="Přijde s CL-54">+ Přidat (CL-54)</button>
       </div>
       {data && !data.storeReady && (
-        <div className="banner info" role="note">Šifrované úložiště zatím není připravené (chybí úložiště klíčů systému i heslo). Hodnota se po uložení nikdy nezobrazí.</div>
+        <Banner tone="info" role="note">Šifrované úložiště zatím není připravené (chybí úložiště klíčů systému i heslo). Hodnota se po uložení nikdy nezobrazí.</Banner>
       )}
       {due > 0 && data && (
-        <div className="banner warning" role="status">{due === 1 ? '1 klíč je' : `${due} klíčů je`} starších než {data.rotationDays} dní: čas je rotovat.</div>
+        <Banner>{due === 1 ? '1 klíč je' : `${due} klíčů je`} starších než {data.rotationDays} dní: čas je rotovat.</Banner>
       )}
       <Card bodyClass="">
         {data ? <DataTable label="Klíče prostředí" rows={rows} columns={columns(data.rotationDays)} rowKey={k => `${k.scope}:${k.scopeRef}:${k.name}`} empty="Žádné klíče." />
-          : loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst prostředí.'} onRetry={reload} />}
+          : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Nelze načíst prostředí.'} onRetry={reload} />}
       </Card>
-      <Card title="Audit">
+      <Card title="Audit" bodyClass="">
         {audit.data ? (
           <DataTable
             label="Audit klíčů"
@@ -69,7 +69,7 @@ export function Environment() {
             rowKey={e => `${e.at}:${e.scope}:${e.scopeRef}:${e.name}:${e.action}:${e.consumer}`}
             empty="Zatím nikdo žádný klíč nečetl."
           />
-        ) : audit.loading ? <Loading /> : <ErrorState message={audit.error?.message ?? 'Nelze načíst audit.'} onRetry={audit.reload} />}
+        ) : audit.loading ? <Loading variant="table" /> : <ErrorState message={audit.error?.message ?? 'Nelze načíst audit.'} onRetry={audit.reload} />}
       </Card>
     </>
   );
