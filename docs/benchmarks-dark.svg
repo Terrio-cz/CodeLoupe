@@ -4,10 +4,7 @@
 <rect width="880" height="878" rx="14" fill="#0C0F14"/><rect x="0.5" y="0.5" width="879" height="877" rx="13.5" fill="none" stroke="#2A313C"/>
 <g transform="translate(814 22) scale(0.6)"><path d="M18 10H10V54H18M46 10H54V54H46" fill="none" stroke="#B6F04A" stroke-width="6" stroke-linecap="square"/><rect x="25" y="25" width="14" height="14" fill="#B6F04A"/></g>
 <text x="28" y="40" font-size="19" font-weight="700" letter-spacing="-0.4" fill="#E6EAE3">Tokens read per question</text><text x="28" y="62" fill="#8E98A6">median over the questions of each kind, log scale, lower is better</text>
-<rect x="28" y="86" width="12" height="12" fill="#2A313C" stroke="#5F6B7C"/><text x="46" y="96" fill="#E6EAE3">grep, minimal</text>
-<rect x="178" y="86" width="12" height="12" fill="#8E98A6"/><text x="196" y="96" fill="#E6EAE3">grep + read</text>
-<rect x="328" y="86" width="12" height="12" fill="#B6F04A"/><text x="346" y="96" fill="#E6EAE3">CodeLoupe</text>
-<rect x="478" y="86" width="12" height="12" fill="none" stroke="#E6EAE3" stroke-width="1.5"/><text x="496" y="96" fill="#E6EAE3">GitNexus</text>
+<rect x="28" y="86" width="12" height="12" rx="2" fill="#2A313C" stroke="#5F6B7C"/><text x="46" y="96" fill="#E6EAE3">grep, minimal</text><rect x="178" y="86" width="12" height="12" rx="2" fill="#8E98A6"/><text x="196" y="96" fill="#E6EAE3">grep + read</text><rect x="328" y="86" width="12" height="12" rx="2" fill="#B6F04A"/><text x="346" y="96" fill="#E6EAE3">CodeLoupe</text><rect x="478" y="86" width="12" height="12" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.25"/><text x="496" y="96" fill="#E6EAE3">GitNexus</text>
 <line x1="196" y1="120" x2="196" y2="806" stroke="#2A313C"/><text x="196" y="824" text-anchor="middle" fill="#8E98A6" font-size="11">10</text>
 <line x1="344" y1="120" x2="344" y2="806" stroke="#2A313C"/><text x="344" y="824" text-anchor="middle" fill="#8E98A6" font-size="11">100</text>
 <line x1="492" y1="120" x2="492" y2="806" stroke="#2A313C"/><text x="492" y="824" text-anchor="middle" fill="#8E98A6" font-size="11">1,000</text>
@@ -17,12 +14,12 @@
 <rect x="196" y="128" width="223.1" height="14" rx="2" fill="#2A313C" stroke="#5F6B7C"/><text x="426.1" y="139" font-size="11" fill="#E6EAE3">322</text>
 <rect x="196" y="146" width="280.7" height="14" rx="2" fill="#8E98A6"/><text x="483.7" y="157" font-size="11" fill="#E6EAE3">789</text>
 <rect x="196" y="164" width="224.0" height="14" rx="2" fill="#B6F04A"/><text x="427.0" y="175" font-size="11" font-weight="700" fill="#B6F04A">326</text>
-<rect x="196" y="182" width="341.1" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.5"/><text x="544.1" y="193" font-size="11" fill="#E6EAE3">2,016</text>
+<rect x="196" y="182" width="341.1" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.25"/><text x="544.1" y="193" font-size="11" fill="#E6EAE3">2,016</text>
 <text x="180" y="240" text-anchor="end" font-weight="700" fill="#E6EAE3">Source of a member</text><text x="180" y="256" text-anchor="end" font-size="11" fill="#8E98A6">n = 16</text>
 <rect x="196" y="214" width="158.4" height="14" rx="2" fill="#2A313C" stroke="#5F6B7C"/><text x="361.4" y="225" font-size="11" fill="#E6EAE3">118</text>
 <rect x="196" y="232" width="331.8" height="14" rx="2" fill="#8E98A6"/><text x="534.8" y="243" font-size="11" fill="#E6EAE3">1,746</text>
 <rect x="196" y="250" width="157.8" height="14" rx="2" fill="#B6F04A"/><text x="360.8" y="261" font-size="11" font-weight="700" fill="#B6F04A">117</text>
-<rect x="196" y="268" width="291.3" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.5"/><text x="494.3" y="279" font-size="11" fill="#E6EAE3">929</text>
+<rect x="196" y="268" width="291.3" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.25"/><text x="494.3" y="279" font-size="11" fill="#E6EAE3">929</text>
 <text x="180" y="326" text-anchor="end" font-weight="700" fill="#E6EAE3">Outline of a file</text><text x="180" y="342" text-anchor="end" font-size="11" fill="#8E98A6">n = 15</text>
 <rect x="196" y="300" width="191.6" height="14" rx="2" fill="#2A313C" stroke="#5F6B7C"/><text x="394.6" y="311" font-size="11" fill="#E6EAE3">197</text>
 <rect x="196" y="318" width="264.8" height="14" rx="2" fill="#8E98A6"/><text x="467.8" y="329" font-size="11" fill="#E6EAE3">615</text>
@@ -32,17 +29,17 @@
 <rect x="196" y="386" width="265.9" height="14" rx="2" fill="#2A313C" stroke="#5F6B7C"/><text x="468.9" y="397" font-size="11" fill="#E6EAE3">626</text>
 <rect x="196" y="404" width="366.5" height="14" rx="2" fill="#8E98A6"/><text x="569.5" y="415" font-size="11" fill="#E6EAE3">2,997</text>
 <rect x="196" y="422" width="258.7" height="14" rx="2" fill="#B6F04A"/><text x="461.7" y="433" font-size="11" font-weight="700" fill="#B6F04A">560</text>
-<rect x="196" y="440" width="326.0" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.5"/><text x="529.0" y="451" font-size="11" fill="#E6EAE3">1,596</text>
+<rect x="196" y="440" width="326.0" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.25"/><text x="529.0" y="451" font-size="11" fill="#E6EAE3">1,596</text>
 <text x="180" y="498" text-anchor="end" font-weight="700" fill="#E6EAE3">Callers of a member</text><text x="180" y="514" text-anchor="end" font-size="11" fill="#8E98A6">n = 16</text>
 <rect x="196" y="472" width="215.4" height="14" rx="2" fill="#2A313C" stroke="#5F6B7C"/><text x="418.4" y="483" font-size="11" fill="#E6EAE3">286</text>
 <rect x="196" y="490" width="315.4" height="14" rx="2" fill="#8E98A6"/><text x="518.4" y="501" font-size="11" fill="#E6EAE3">1,352</text>
 <rect x="196" y="508" width="181.5" height="14" rx="2" fill="#B6F04A"/><text x="384.5" y="519" font-size="11" font-weight="700" fill="#B6F04A">169</text>
-<rect x="196" y="526" width="274.9" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.5"/><text x="477.9" y="537" font-size="11" fill="#E6EAE3">720</text>
+<rect x="196" y="526" width="274.9" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.25"/><text x="477.9" y="537" font-size="11" fill="#E6EAE3">720</text>
 <text x="180" y="584" text-anchor="end" font-weight="700" fill="#E6EAE3">Subtypes of a type</text><text x="180" y="600" text-anchor="end" font-size="11" fill="#8E98A6">n = 16</text>
 <rect x="196" y="558" width="149.3" height="14" rx="2" fill="#2A313C" stroke="#5F6B7C"/><text x="352.3" y="569" font-size="11" fill="#E6EAE3">102</text>
 <rect x="196" y="576" width="246.6" height="14" rx="2" fill="#8E98A6"/><text x="449.6" y="587" font-size="11" fill="#E6EAE3">464</text>
 <rect x="196" y="594" width="185.2" height="14" rx="2" fill="#B6F04A"/><text x="388.2" y="605" font-size="11" font-weight="700" fill="#B6F04A">179</text>
-<rect x="196" y="612" width="317.9" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.5"/><text x="520.9" y="623" font-size="11" fill="#E6EAE3">1,406</text>
+<rect x="196" y="612" width="317.9" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.25"/><text x="520.9" y="623" font-size="11" fill="#E6EAE3">1,406</text>
 <text x="180" y="670" text-anchor="end" font-weight="700" fill="#E6EAE3">Text search, 30 hits</text><text x="180" y="686" text-anchor="end" font-size="11" fill="#8E98A6">n = 6</text>
 <rect x="196" y="644" width="321.9" height="14" rx="2" fill="#2A313C" stroke="#5F6B7C"/><text x="524.9" y="655" font-size="11" fill="#E6EAE3">1,497</text>
 <text x="202" y="673" font-size="11" fill="#8E98A6">n/a</text>
@@ -52,6 +49,6 @@
 <rect x="196" y="730" width="348.0" height="14" rx="2" fill="#2A313C" stroke="#5F6B7C"/><text x="551.0" y="741" font-size="11" fill="#E6EAE3">2,247</text>
 <rect x="196" y="748" width="577.4" height="14" rx="2" fill="#8E98A6"/><text x="780.4" y="759" font-size="11" fill="#E6EAE3">79,728</text>
 <rect x="196" y="766" width="387.5" height="14" rx="2" fill="#B6F04A"/><text x="590.5" y="777" font-size="11" font-weight="700" fill="#B6F04A">4,154</text>
-<rect x="196" y="784" width="494.0" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.5"/><text x="697.0" y="795" font-size="11" fill="#E6EAE3">21,767</text>
+<rect x="196" y="784" width="494.0" height="14" rx="2" fill="none" stroke="#E6EAE3" stroke-width="1.25"/><text x="697.0" y="795" font-size="11" fill="#E6EAE3">21,767</text>
 <text x="28" y="860" font-size="11" fill="#8E98A6">Run of 2026-10-08 on exposed and codeloupe; tokens are characters / 3.16</text>
 </svg>

@@ -16,6 +16,8 @@ export const THEMES = {
 
 export const CHARTS = ['tokens', 'share'];
 const FONT = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+// Geometry shared by both charts, so they read as one set.
+const G = { W: 880, left: 196, top: 128, barH: 14, radius: 2, gap: 4 };
 const e = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 function frame(t, W, H, title, desc, body) {
@@ -34,29 +36,40 @@ function header(t, title, sub) {
   return `<text x="28" y="40" font-size="19" font-weight="700" letter-spacing="-0.4" fill="${t.text}">${e(title)}</text><text x="28" y="62" fill="${t.sub}">${e(sub)}</text>`;
 }
 
+function legend(t, items) {
+  let lx = 28;
+  const out = [];
+  for (const [label, style, w] of items) {
+    out.push(`<rect x="${lx}" y="86" width="12" height="12" rx="2" ${style}/><text x="${lx + 18}" y="96" fill="${t.text}">${e(label)}</text>`);
+    lx += w;
+  }
+  return out.join('');
+}
+
+function rowLabel(t, label, n, y0) {
+  return `<text x="${G.left - 16}" y="${y0 + 12}" text-anchor="end" font-weight="700" fill="${t.text}">${e(label)}</text><text x="${G.left - 16}" y="${y0 + 28}" text-anchor="end" font-size="11" fill="${t.sub}">n = ${n}</text>`;
+}
+
 function tokensChart(t, d, h) {
   const { KINDS, pooled, num } = h;
   const series = [['minimal', 'grep, minimal'], ['typical', 'grep + read'], ['codeloupe', 'CodeLoupe'], ['gitnexus', 'GitNexus']];
-  const style = key => key === 'minimal' ? `fill="${t.minFill}" stroke="${t.minStroke}"` : key === 'typical' ? `fill="${t.read}"` : key === 'codeloupe' ? `fill="${t.accent}"` : `fill="none" stroke="${t.hollow}" stroke-width="1.5"`;
-  const W = 880, left = 196, right = 92, plotW = W - left - right, top = 128, rowH = 86;
+  const style = key => key === 'minimal' ? `fill="${t.minFill}" stroke="${t.minStroke}"` : key === 'typical' ? `fill="${t.read}"` : key === 'codeloupe' ? `fill="${t.accent}"` : `fill="none" stroke="${t.hollow}" stroke-width="1.25"`;
+  const { W, left, top, barH } = G, right = 92, plotW = W - left - right, rowH = 86;
   const H = top + KINDS.length * rowH + 62;
   const minV = 10, maxV = 100000;
   const x = v => left + plotW * (Math.log10(Math.max(v, minV)) - 1) / (Math.log10(maxV) - 1);
   const out = [header(t, 'Tokens read per question', 'median over the questions of each kind, log scale, lower is better')];
-  series.forEach(([key, label], i) => {
-    const lx = 28 + i * 150;
-    out.push(`<rect x="${lx}" y="86" width="12" height="12" ${style(key)}/><text x="${lx + 18}" y="96" fill="${t.text}">${e(label)}</text>`);
-  });
+  out.push(legend(t, series.map(([key, label]) => [label, style(key), 150])));
   const axisY = top + KINDS.length * rowH;
   for (const g of [10, 100, 1000, 10000, 100000]) out.push(`<line x1="${x(g)}" y1="${top - 8}" x2="${x(g)}" y2="${axisY - 10}" stroke="${t.grid}"/><text x="${x(g)}" y="${axisY + 8}" text-anchor="middle" fill="${t.sub}" font-size="11">${num(g)}</text>`);
   KINDS.forEach(([k, label], r) => {
     const p = pooled(d.results, k); const y0 = top + r * rowH;
-    out.push(`<text x="${left - 16}" y="${y0 + 26}" text-anchor="end" font-weight="700" fill="${t.text}">${e(label)}</text><text x="${left - 16}" y="${y0 + 42}" text-anchor="end" font-size="11" fill="${t.sub}">n = ${p.n}</text>`);
+    out.push(rowLabel(t, label, p.n, y0 + 14));
     series.forEach(([key], i) => {
       const v = p[key]; const y = y0 + i * 18;
       if (v == null) { out.push(`<text x="${left + 6}" y="${y + 11}" font-size="11" fill="${t.sub}">n/a</text>`); return; }
       const hero = key === 'codeloupe';
-      out.push(`<rect x="${left}" y="${y}" width="${Math.max(2, x(v) - left).toFixed(1)}" height="14" rx="2" ${style(key)}/><text x="${(x(v) + 7).toFixed(1)}" y="${y + 11}" font-size="11" ${hero ? `font-weight="700" fill="${t.accent}"` : `fill="${t.text}"`}>${num(v)}</text>`);
+      out.push(`<rect x="${left}" y="${y}" width="${Math.max(2, x(v) - left).toFixed(1)}" height="${barH}" rx="${G.radius}" ${style(key)}/><text x="${(x(v) + 7).toFixed(1)}" y="${y + 11}" font-size="11" ${hero ? `font-weight="700" fill="${t.accent}"` : `fill="${t.text}"`}>${num(v)}</text>`);
     });
   });
   const repos = d.meta.repos.map(r => r.name).join(' and ');
@@ -69,21 +82,22 @@ function shareChart(t, d, h) {
   const rows = KINDS.map(([k, label]) => [label, pooled(d.results, k)]).filter(([, p]) => p.typical != null && p.typical > 0);
   const typ = d.results.filter(r => r.typical);
   const total = [sum(typ.map(r => r.codeloupe.tokens)), sum(typ.map(r => r.typical.tokens))];
-  const W = 880, left = 196, trackW = 400, top = 100, rowH = 50;
-  const H = top + (rows.length + 1) * rowH + 64;
-  const out = [header(t, 'CodeLoupe answer as a share of grep + read', '100 % is what an agent reads with grep and a file read; a shorter bar is better')];
-  const bar = (label, cl, rd, y, bold) => {
+  const { W, left, top, barH } = G, trackW = 400, rowH = 56;
+  const H = top + (rows.length + 1) * rowH + 40;
+  const out = [header(t, 'CodeLoupe answer as a share of grep + read', 'median over the questions of each kind, lower is better'),
+    legend(t, [['CodeLoupe', `fill="${t.accent}"`, 150], ['grep + read = 100 %', `fill="${t.read}"`, 0]])];
+  const bar = (label, n, cl, rd, y, bold) => {
     const ratio = cl / rd;
-    out.push(`<text x="${left - 16}" y="${y + 18}" text-anchor="end" ${bold ? 'font-weight="700"' : ''} fill="${t.text}">${e(label)}</text>`,
-      `<rect x="${left}" y="${y + 4}" width="${trackW}" height="20" rx="3" fill="${t.grid}"/><rect x="${left}" y="${y + 4}" width="${Math.max(3, Math.min(1, ratio) * trackW).toFixed(1)}" height="20" rx="3" fill="${t.accent}"/>`,
-      `<text x="${left + trackW + 18}" y="${y + 20}" font-size="17" font-weight="700" fill="${t.accent}">${Math.round(100 * ratio)} %</text>`,
-      `<text x="${left + trackW + 84}" y="${y + 19}" font-size="11" fill="${t.sub}">${num(cl)} of ${num(rd)} tokens</text>`);
+    out.push(rowLabel(t, label, n, y),
+      `<rect x="${left}" y="${y}" width="${trackW}" height="${barH}" rx="${G.radius}" fill="${t.read}"/><rect x="${left}" y="${y}" width="${Math.max(2, Math.min(1, ratio) * trackW).toFixed(1)}" height="${barH}" rx="${G.radius}" fill="${t.accent}"/>`,
+      `<text x="${left + trackW + 14}" y="${y + 11}" font-size="11" font-weight="700" fill="${t.accent}">${Math.round(100 * ratio)} %</text>`,
+      `<text x="${left + trackW + 60}" y="${y + 11}" font-size="11" fill="${t.text}">${num(cl)} of ${num(rd)}</text>`);
   };
-  rows.forEach(([label, p], i) => bar(label, p.codeloupe, p.typical, top + i * rowH));
+  rows.forEach(([label, p], i) => bar(label, p.n, p.codeloupe, p.typical, top + i * rowH));
   const ly = top + rows.length * rowH;
-  out.push(`<line x1="28" y1="${ly + 2}" x2="${W - 28}" y2="${ly + 2}" stroke="${t.grid}"/>`);
-  bar('All, summed', total[0], total[1], ly + 8, true);
-  out.push(`<text x="28" y="${H - 18}" font-size="11" fill="${t.sub}">${e(`Run of ${d.meta.date}; text search has no grep + read variant and is left out`)}</text>`);
+  out.push(`<line x1="28" y1="${ly - 12}" x2="${W - 28}" y2="${ly - 12}" stroke="${t.grid}"/>`);
+  bar('All, summed', typ.length, total[0], total[1], ly + 4, true);
+  out.push(`<text x="28" y="${H - 18}" font-size="11" fill="${t.sub}">${e(`Run of ${d.meta.date}; tokens are characters / ${d.meta.charsPerToken}; text search has no grep + read variant and is left out`)}</text>`);
   return frame(t, W, H, 'CodeLoupe answer as a share of grep + read', 'Horizontal bars: tokens of the CodeLoupe answer as a percentage of the grep plus read answer for each question kind, and summed.', out.join('\n'));
 }
 
