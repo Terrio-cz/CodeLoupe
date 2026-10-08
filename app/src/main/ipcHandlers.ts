@@ -6,7 +6,7 @@ import { CH, type ApiResult, type AppMetrics, type ClaudeConnectKind } from '../
 import { validateRequest, type ApiRequest } from '../shared/request';
 import { applyRendererUpdate, isValidCli, type AppSettings } from '../shared/settings';
 import type { ApiSource } from './api/ApiSource';
-import { HttpError } from './daemon/DaemonClient';
+import { HttpError, type DaemonClient } from './daemon/DaemonClient';
 import { commandLines, type ClaudeConnector } from './claude/ClaudeConnector';
 import type { DaemonHome } from './daemon/DaemonHome';
 import type { DaemonManager } from './daemon/DaemonManager';
@@ -17,6 +17,7 @@ import { GapReportRefresh } from './gaps/GapReportRefresh';
 export interface IpcContext {
   store: SettingsStore;
   manager: DaemonManager;
+  client: DaemonClient;
   home: DaemonHome;
   claude: ClaudeConnector;
   source(): ApiSource;
@@ -34,7 +35,10 @@ export function registerIpc(ctx: IpcContext): void {
     });
   };
 
-  registerActions({ gapsRefresh: new GapReportRefresh(() => ctx.store.get(), () => ctx.home.dir) }, handle);
+  registerActions({
+    gapsRefresh: new GapReportRefresh(() => ctx.store.get(), () => ctx.home.dir),
+    client: ctx.client, daemonTrusted: () => ctx.manager.trusted, mock: () => ctx.source().kind === 'mock',
+  }, handle);
   handle(CH.api, (req: unknown) => callApi(ctx, req));
   handle(CH.daemonState, () => ctx.manager.check());
   handle(CH.daemonStart, () => ctx.manager.start());

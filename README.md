@@ -528,6 +528,7 @@ read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-s
 | Repositories too large to walk | more than 40 000 indexed files: a worktree is checked through git alone (changed and untracked files; the stat cache and, if you enabled it, `core.fsmonitor` and `core.untrackedCache` make that fast) | `config.json` `largeWorktreeFiles` |
 | Index reads at once | 2 (the rest wait their turn: ten windows asking together would hold ten reads' memory) | `config.json` `maxParallelQueries` |
 | Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
+| Weighted-token budgets of a day and of one agent run (events for the desktop app) | none | `config.json` `budgets` `{ "dailyWeighted": 150000000, "runWeighted": 20000000 }` |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
 
@@ -577,7 +578,17 @@ workspace's `run/codemetrics.mjs`, and on the same transcripts the figures are i
 symbol or file, and calls answered empty, busy or with candidates only. Large windows are read one run at a time; add
 `CODELOUPE_OPTS=-Xmx1g` when a single transcript holds huge lines. `config.json` `metrics`: `transcriptDirs`,
 `categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
-ones, which know the Terrio workspace's shell commands) and `defaultCategories` (false = only yours).
+ones, which know the Terrio workspace's shell commands), `defaultCategories` (false = only yours) and `ingestTtlMs` (below).
+
+The desktop app's Runs, Overview and Gaps screens read the same transcripts through the daemon. The daemon does not watch
+them: a UI API call (`/ui-api/v1/runs`, `overview`, `gaps`, `nav`, `events`) starts a pass that reads only the transcripts
+that grew since the last one, from the byte offset it stopped at, into `<home>/transcripts.db` (runs, steps, hourly cost,
+gaps). Nothing runs between calls, and passes are at least `metrics.ingestTtlMs` (10 s) apart. The first pass over a few
+gigabytes of transcripts takes about a minute and goes on in the background (`ingest.running` in the answer). Step texts
+are cut to 200 characters and have secrets masked. `config.json` `budgets.dailyWeighted` and `budgets.runWeighted` (weighted
+tokens) make the daemon announce, once, the day or the run that goes over, as a `budget.breach` event; new gaps are
+`gap.new` events (`/events`, webhooks, the app's notifications). `codeloupe stop` writes `<home>/stopped`, which the desktop
+app honours by not starting the daemon again; `codeloupe start` removes it.
 
 ## Bundle
 

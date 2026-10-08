@@ -59,23 +59,6 @@ internal class IndexViews(
         return listOf(RepoIndexState.ERROR, RepoIndexState.BUILDING, RepoIndexState.STALE, RepoIndexState.READY).firstOrNull { it in states } ?: RepoIndexState.NONE
     }
 
-    /** Notifications from the event log: finished and failed builds. `since` null only reports where the log stands. */
-    fun events(since: Long?, limit: Int): EventsView {
-        val last = events.lastSeq()
-        if (since == null) return EventsView(events.epoch(), last, emptyList())
-        val items = events.since(since, limit).mapNotNull { e ->
-            if (e.type != EventTypes.BUILD_DONE) return@mapNotNull null
-            val repo = e.data["repo"]?.jsonPrimitive?.contentOrNull
-            val name = repo?.let { id -> registry.snapshot().firstOrNull { it.id == id }?.let { registry.mainWorktree(it.commonDir).fileName.toString() } } ?: repo.orEmpty()
-            if (e.data["ok"]?.jsonPrimitive?.booleanOrNull == true) {
-                EventsView.Item(e.seq, e.at, EventsView.Kind.BUILD_FINISHED, EventsView.Severity.INFO, "Index built", "$name: ${e.data.int("files")} files in ${e.data.long("ms")} ms", EventsView.Ref("index", repo))
-            } else {
-                EventsView.Item(e.seq, e.at, EventsView.Kind.BUILD_FAILED, EventsView.Severity.WARNING, "Index build failed", "$name: ${e.data["error"]?.jsonPrimitive?.contentOrNull.orEmpty()}", EventsView.Ref("index", repo))
-            }
-        }
-        return EventsView(events.epoch(), last, items)
-    }
-
     private fun stateOf(s: RepoSummary, building: Boolean): RepoIndexState = when {
         building -> RepoIndexState.BUILDING
         s.baseCommit == null -> if (s.failure != null) RepoIndexState.ERROR else RepoIndexState.NONE

@@ -3,12 +3,14 @@ package codeloupe.uiapi
 import codeloupe.config.Config
 import codeloupe.daemon.QueueSnapshot
 import codeloupe.events.EventBus
+import codeloupe.ingest.Transcripts
 import codeloupe.repo.Registry
 import codeloupe.secrets.SecretAccess
 import codeloupe.tracker.Trackers
 import codeloupe.workspace.WorkspaceState
 import codeloupe.workspace.Workspaces
 import kotlinx.coroutines.CoroutineScope
+import java.time.Instant
 
 /**
  * The read-only API of the desktop app (`GET /ui-api/v1/<resource>`, docs/ui-spec.md § 9): every answer is read from what the
@@ -24,21 +26,30 @@ class UiApi(
     trackerPollSec: Long,
     scope: CoroutineScope,
     secrets: SecretAccess,
-) {
+    log: (String) -> Unit = {},
+    waitMs: Long = Transcripts.DEFAULT_WAIT_MS,
+) : AutoCloseable {
     private val catalog = RepoCatalog(registry, workspaces)
     private val callLog = CallLog(config.home.resolve("calls.jsonl"))
     private val worktrees = WorktreeViews(registry, catalog, callLog, scope)
     private val tasks = TaskViews(trackers, worktrees)
     private val index = IndexViews(registry, catalog, events, queue, config.budgets.rssMb)
-    private val overview = OverviewViews(callLog, worktrees)
+    private val transcripts = Transcripts(config, { type, data -> events.emit(type, data) }, scope, log, waitMs)
+    private val runViews = RunViews(transcripts)
+    private val gapViews = GapScreen(transcripts, GapViews(config.home.resolve(GapViews.FILE)))
+    private val feed = EventFeed(events, registry, transcripts)
+    private val overview = OverviewViews(callLog, worktrees, transcripts)
     private val settings = SettingsViews(config, catalog, trackers, trackerPollSec)
     private val environment = EnvironmentViews(secrets, config.secrets.rotationDays)
-    private val gaps = GapViews(config.home.resolve(GapViews.FILE))
 
-    suspend fun nav(): Nav = Nav(
-        activeWorktrees = catalog.scan().repos.sumOf { r -> r.workspaces.count { it.state == WorkspaceState.ACTIVE && it.role == "worktree" } },
-        openTasks = tasks.openCount(), newGaps = 0, indexState = index.overall(),
-    )
+    suspend fun nav(gapsSince: String?): Nav {
+        val since = gapsSince?.let { runCatching { Instant.parse(it) }.getOrNull() ?: throw UiApiException.badRequest("gapsSince must be an ISO instant") }
+        transcripts.fresh()
+        return Nav(
+            activeWorktrees = catalog.scan().repos.sumOf { r -> r.workspaces.count { it.state == WorkspaceState.ACTIVE && it.role == "worktree" } },
+            openTasks = tasks.openCount(), newGaps = since?.let { transcripts.queries.gapCount(it.toEpochMilli()) } ?: 0, indexState = index.overall(),
+        )
+    }
 
     suspend fun overview(range: String?): Overview = overview.overview(range ?: "7d")
 
@@ -52,7 +63,13 @@ class UiApi(
 
     suspend fun index(): IndexHealth = index.health()
 
-    fun gaps(): Gaps = gaps.gaps()
+    suspend fun runs(range: String?, sort: String?, role: String?, q: String?, limit: String?, cursor: String?): RunPage = runViews.page(range, sort, role, q, limit, cursor)
+
+    suspend fun run(id: String): RunDetail = runViews.detail(id)
+
+    suspend fun steps(id: String, sort: String?, limit: String?, cursor: String?): StepPage = runViews.steps(id, sort, limit, cursor)
+
+    suspend fun gaps(range: String?, tool: String?, reason: String?): Gaps = gapViews.gaps(range, tool, reason)
 
     fun environment(): EnvironmentView = environment.keys()
 
@@ -63,11 +80,13 @@ class UiApi(
 
     suspend fun settings(): SettingsView = settings.settings()
 
-    fun events(since: String?, limit: String?): EventsView {
+    suspend fun events(since: String?, limit: String?): EventsView {
         val from = since?.let { it.toLongOrNull()?.takeIf { n -> n >= 0 } ?: throw UiApiException.badRequest("since must be an event number") }
         val max = limit?.let { it.toIntOrNull()?.takeIf { n -> n in 1..MAX_EVENTS } ?: throw UiApiException.badRequest("limit must be 1..$MAX_EVENTS") } ?: DEFAULT_EVENTS
-        return index.events(from, max)
+        return feed.view(from, max)
     }
+
+    override fun close() = transcripts.close()
 
     private companion object {
         const val DEFAULT_EVENTS = 100

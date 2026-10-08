@@ -764,6 +764,37 @@ rozhoduje launcher.
 - Stáří klíče = od rotace, jinak od vytvoření; `secrets.rotationDays` (výchozí 90, 0 = vypnuto) označí klíč `ROTATE` v `env list`, v nástroji `env` a ve sloupci Stáří obrazovky Prostředí.
 - `GET /ui-api/v1/environment` vrací klíče z metadat vaultu (bez dešifrování) se spotřebiteli z auditu a stářím, `GET /ui-api/v1/environment/audit` posledních až 500 událostí.
 
+### Výsledek CL-62 — ingest transcriptů, rozpočty a události pro aplikaci (2026-10-08)
+
+- **Ingest** (`codeloupe.ingest`, `<home>/transcripts.db`): líný, bez časovače. Volání UI API (`runs`, `overview`, `gaps`, `nav`,
+  `events`) spustí v pozadí průchod, nejvýš jednou za `metrics.ingestTtlMs` (10 s), a čeká nejvýš 100 ms; průchod projde
+  adresáře (jen velikost a mtime), přeskočí nezměněné soubory a změněné čte od uloženého bajtového offsetu. Stav parseru
+  (`TranscriptParser`, společný s `codeloupe metrics`) se ukládá jako JSON u souboru: součty, hashe viděných `message.id`,
+  čekající `tool_use` bez výsledku. Nedopsaný poslední řádek se nespotřebuje. Kratší soubor než offset = nahrazený, čte se znovu.
+  Změna pravidel kategorií (`fingerprint`) smaže uložené a načte transcripty znovu.
+- **Co se ukládá**: `runs` (součty, předpočítaná vážená cena, `tool_calls`, `result_attr`, `share` = podíl výsledků nástrojů
+  na ceně), `steps` (kategorie, redigovaný popis ≤ 200 znaků, `chars`, tah; `carried` a `weighted` se z nich počítají v SQL podle
+  aktuálního počtu tahů běhu, protože rostou s každým dalším tahem), `usage_hours` (cena po hodinách → dnes / včera / řady),
+  `gaps` (detektor CL-22 s tahem, časem a tím, po čem agent sáhl). Indexy: start, cena, tahy, peak, share, délka, role+start.
+- **Rozpočty**: `budgets.dailyWeighted`, `budgets.runWeighted` v `config.json`. Dny se sčítají z hodinových košů (dnes a včera),
+  běhy, které skončily za posledních 24 h. Klíč (`day:YYYY-MM-DD`, `run:<id>`) je v tabulce `breaches`, událost `budget.breach`
+  jde jen při prvním zápisu klíče, takže ani restart ji neopakuje. První průchod (historie) události nevysílá.
+  `gap.new` je jedna událost na průchod, nástroj, tvar a druh mezery. Události jdou přes `EventBus` (číslování i `epoch` v
+  `events.db` už měl CL-39), tedy i do webhooků.
+- **Redigování**: popis kroku je jen to, o čem volání bylo (příkaz, soubor, vzor), nikdy obsah (`Edit`/`Write` těla se neukládají);
+  prochází `Scrubber` (tokeny, `Authorization`, `*_TOKEN=`, hesla v URL, hodnoty z trezoru), pak se řízne na 200 znaků. Test se
+  zasetými tokeny.
+- **Ověření na Terrio workspace** (`C--Users-tadea-Documents-Claude-terrio`, 3 490 souborů / 2,2 GB / 621 720 řádků, 2 450 běhů za 30 dní):
+  první průchod 79 s (2 934 změněných souborů, běhy v pozadí, nejnovější první), špička RSS daemonu 172 MB (ustáleně 171 MB,
+  v klidu CPU 0), `transcripts.db` 49 MB. Pozdější volání: `runs?range=30d&sort=weighted` 5–7 ms, `runs/{id}/steps` (750 kroků)
+  3–7 ms, volání, které samo spustí průchod, čeká 100 ms a vrátí uložené (≈ 105–117 ms); průchod po změně 4–5 transcriptů čte jen
+  jejich nové řádky. Shoda s `codeloupe metrics collect --since 2026-09-08` na stejných souborech: 2 442 z 2 449 běhů shodných
+  v ceně, tazích, peak kontextu, roli, TER, délce i chybách; zbylých 7 jsou běhy, které mezi oběma čteními ještě rostly.
+  Generovaný test se 2 651 běhy: každé řazení seznamu a kroky < 200 ms, druhý průchod nečte nic.
+- **Rozhodnutí**: baseline po rolích daemon nemá, takže `baselineRange` a úspory zůstávají 0 (nevymýšlí se odhad); `busy` volání
+  nejsou mezera pro UI (je to zátěž daemonu). Seznam běhů a kroky vystavuje API, i když obrazovka Běhy z UI vypadla (§ 3.3):
+  data jsou potřeba pro Přehled a pro případnou obrazovku v aplikaci.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
