@@ -163,6 +163,35 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
         return hits.sortedWith(PathOrder).take(limit)
     }
 
+    /**
+     * Streams path and content of the files that hold [literal] (every file with content when null), overlay copies
+     * masking base ones, optionally within a [module] and in or out of test sources. Rows are handed over one at a time:
+     * a scan over a large repository keeps no more than one file's text.
+     */
+    fun scanContent(literal: String?, module: String?, test: Boolean?, each: (path: String, content: String) -> Unit) {
+        val conds = ArrayList<String>()
+        val params = HashMap<String, Any?>()
+        if (literal != null) {
+            conds += "instr(f.content, :lit) > 0"
+            params["lit"] = literal
+        }
+        if (!module.isNullOrEmpty()) {
+            conds += "(f.module = :module OR f.module LIKE :modulePrefix ESCAPE '\\')"
+            params["module"] = module
+            params["modulePrefix"] = Like.escape(module) + "/%"
+        }
+        if (test == true) conds += "f.source_set LIKE '%test%'"
+        if (test == false) conds += "f.source_set NOT LIKE '%test%'"
+        val extra = conds.joinToString("") { " AND $it" }
+        val select = "SELECT f.path, f.content FROM {db}.files f WHERE f.deleted = 0 AND f.content IS NOT NULL$extra"
+        val sql = if (overlay) {
+            select.replace("{db}", "ov") + " UNION ALL " + select.replace("{db}", "main") + " AND f.path NOT IN (SELECT path FROM ov.files)"
+        } else {
+            select.replace("{db}", "main")
+        }
+        stream(sql, params) { each(it.getString(1), it.getString(2)) }
+    }
+
     /** Every module of the index (`importers/ruian`), the root module as an empty string. */
     fun modules(): List<String> {
         val base = query("SELECT DISTINCT module FROM main.files WHERE deleted = 0 AND module IS NOT NULL", emptyMap()) { it.getString(1) }
@@ -182,6 +211,15 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
         }
         named.bind(statement, params)
         statement.executeQuery().use { rs -> buildList { while (rs.next()) add(map(rs)) } }
+    }
+
+    private fun stream(sql: String, params: Map<String, Any?>, each: (java.sql.ResultSet) -> Unit) = Timings.measure(TimedPart.SQL) {
+        val (statement, named) = statements.getOrPut(sql) {
+            val named = NamedSql.parse(sql)
+            db.prepareStatement(named.sql) to named
+        }
+        named.bind(statement, params)
+        statement.executeQuery().use { rs -> while (rs.next()) each(rs) }
     }
 
     private companion object {

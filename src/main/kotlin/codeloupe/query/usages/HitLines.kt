@@ -33,7 +33,7 @@ internal object HitLines {
     fun ownerLine(d: DeclRow?): String = if (d == null) "(file level)" else ShortSignature.of(d)
 
     /** The trimmed line, or a window around the hit when it is long. */
-    private fun snippet(line: String, col: Int): String {
+    fun snippet(line: String, col: Int): String {
         val text = line.trim()
         if (text.length <= MAX_CODE) return text
         val at = (col - 1 - (line.length - line.trimStart().length)).coerceIn(0, text.length)

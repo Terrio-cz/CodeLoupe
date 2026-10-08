@@ -132,6 +132,18 @@ class UsagesTest {
     }
 
     @Test
+    fun `context - source, direct callers and callees in one answer, ambiguity untouched`() {
+        val out = ContextQuery.run(view, ContextQuery.Args("AccountService.rename"))
+        assertContains(out, "fun rename(id: String, to: String): Account? {")
+        assertContains(out, "callers of ")
+        assertContains(out, "= src/main/kotlin/com/example/other/Report.kt:9  [Report] fun run(…)  @15")
+        assertContains(out, "callees of ")
+        assertContains(out, "= src/main/kotlin/com/example/model/Account.kt:11  [Account] fun rename(…)  @30")
+        assertContains(ContextQuery.run(view, ContextQuery.Args("Account.rename")), "declarations match")
+        assertContains(ContextQuery.run(view, ContextQuery.Args("Nothing")), "no declaration \"Nothing\"")
+    }
+
+    @Test
     fun `hierarchy - subtypes, supertypes and overrides`() {
         assertContains(HierarchyQuery.run(view, "com.example.model.Account"), "subtypes:\n  src/main/kotlin/com/example/model/Account.kt:20  class SavingsAccount(…)")
         assertContains(HierarchyQuery.run(view, "AccountStore"), "supertypes:\n  src/main/kotlin/com/example/model/Account.kt:3  interface Store<T>")

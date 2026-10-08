@@ -143,3 +143,61 @@ jobs:
           name: bundle-${{ matrix.os }}
           path: build/distributions/*.zip
           retention-days: 3
+
+      # The Electron installer of this OS around the bundle just built (CL-104). Signing comes with CL-105.
+      # Install scripts stay off: electron-builder downloads the Electron it packs itself.
+      - name: Build the installer
+        working-directory: app
+        shell: bash
+        run: |
+          npm ci --ignore-scripts
+          npm run dist
+
+      # Unpacks the installer without installing it and runs the bundle inside on a PATH without Java: proves the
+      # installer carries a working daemon with its runtime. Installing and starting the app is CL-108.
+      - name: Check the installer contents
+        shell: bash
+        run: |
+          mkdir unpacked
+          case "${{ matrix.os }}" in
+            ubuntu-*)
+              dpkg-deb -x app/dist/*.deb unpacked/deb
+              chmod +x app/dist/*.AppImage
+              (cd unpacked && ../app/dist/*.AppImage --appimage-extract > /dev/null)
+              ls unpacked/squashfs-root
+              test -f unpacked/squashfs-root/codeloupe-desktop
+              deb_dir=$(find unpacked/deb -type d -path '*resources/codeloupe' | head -n 1)
+              node tools/bundle-smoke.mjs "$deb_dir"
+              node tools/bundle-smoke.mjs unpacked/squashfs-root/resources/codeloupe
+              ;;
+            macos-*)
+              hdiutil attach app/dist/*.dmg -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg"
+              cp -R "$RUNNER_TEMP/dmg/CodeLoupe.app" unpacked/
+              hdiutil detach "$RUNNER_TEMP/dmg"
+              node tools/bundle-smoke.mjs unpacked/CodeLoupe.app/Contents/Resources/codeloupe
+              ;;
+            windows-*)
+              7z x app/dist/CodeLoupe-*-win-*.exe -ounpacked/nsis -y > /dev/null
+              # Older 7-Zip leaves the app as a nested archive, newer unpacks it directly.
+              if [ -f 'unpacked/nsis/$PLUGINSDIR/app-64.7z' ]; then
+                7z x 'unpacked/nsis/$PLUGINSDIR/app-64.7z' -ounpacked/nsis -y > /dev/null
+              fi
+              app_exe=$(find unpacked/nsis -name CodeLoupe.exe | head -n 1)
+              test -n "$app_exe"
+              node tools/bundle-smoke.mjs "$(dirname "$app_exe")/resources/codeloupe"
+              ;;
+          esac
+          test -f "$(find unpacked -path '*claude-plugin/.claude-plugin/marketplace.json' | head -n 1)"
+          ls -l app/dist | grep -E '.(exe|dmg|AppImage|deb)$' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload installers
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-${{ matrix.os }}
+          path: |
+            app/dist/*.exe
+            app/dist/*.dmg
+            app/dist/*.AppImage
+            app/dist/*.deb
+          if-no-files-found: error
+          retention-days: 7

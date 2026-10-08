@@ -255,8 +255,8 @@ overloady a třída s konstruktory jsou jeden symbol.
 
 `root` = cesta do repozitáře nebo worktree (výchozí: výchozí větev repozitáře z `cwd` klienta). Výstup:
 kompaktní text, řádky 1-based, `limit` + `… +N dalších`. Strop: **≤ 14 nástrojů** celkem (popisy stojí tokeny
-v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`, `tasks mode=…`); dnes 7 kódových (`find`,
-`outline`, `symbol`, `usages`, `calls`, `hierarchy`, `changes`) + `task_code` (historie větve, funguje i bez trackeru) + 3 trackerové (`issue`, `tasks`, `update`, jen když je
+v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`, `tasks mode=…`); dnes 9 kódových (`find`, `grep`,
+`outline`, `symbol`, `context`, `usages`, `calls`, `hierarchy`, `changes`) + `task_code` (historie větve, funguje i bez trackeru) + 3 trackerové (`issue`, `tasks`, `update`, jen když je
 tracker v konfiguraci) + `job` (start/status/cancel jedním nástrojem, CL-84).
 
 ### Tracker (CL-26, CL-27, CL-29, CL-90)
@@ -326,7 +326,9 @@ reference, anonymní třídy.
 
 `calls.jsonl` na každé volání: nástroj, jazyk, latence, čekání ve frontě, velikost výsledku, počet
 `exact`/`candidate`, prázdný výsledek, `busy`. `/status`: RSS, CPU čas, délka fronty, doba sync/buildu,
-velikost DB, počet vrstev.
+velikost DB, počet vrstev; p50/p95 latence a velikosti, míra `empty`/`busy` z posledních 1000 volání
+(`latency`), `budgets` s varováními při překročení (`config.json` `budgets`: `p95Ms`, `queueWaitMs`, `rssMb`, `busyRate`)
+a `/status/history` s odečty RSS/heap/CPU (jednou za minutu při používání, posledních 240; CL-24).
 
 ### 8.3 Detektor mezer
 
@@ -350,7 +352,7 @@ codeloupe): reviewer a planner. Stejný model a effort. Výstup: tabulka metrik 
 |---|---|---|
 | 0 Spike + baseline | parser, RAM, chybovost; `codemetrics` + baseline | ✅ hotovo (§ 1, § 3) |
 | 1 Core + daemon ✅ | repo, daemon (single instance, HTTP MCP, fronta, `/status`), registry repozitářů, Kotlin adaptér, store, plný build v podprocesu, CLI `find/outline/symbol` | fixtury § 7 (Kotlin) zelené; build Terrio ≤ 10 s, DB ≤ 100 MB; restart daemonu okno přežije (jinak shim) |
-| 2 Čtení + resolver | ✅ `usages`, `calls` (callers/callees), `hierarchy` (CL-13/14/20); zbývá `grep`, `context`, `modules`, `check`; Java adaptér | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
+| 2 Čtení + resolver | ✅ `usages`, `calls` (callers/callees), `hierarchy` (CL-13/14/20); `grep` a `context` ✅ (CL-15, CL-18); zbývá `modules`, `check`; Java adaptér | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
 | 3 Vrstvy worktree | delta, vrstvy, líný sync, `changes`, úklid vrstev | změna/nový/smazaný soubor vidět v dalším dotazu; výchozí větev posunutá o 500 souborů → správné odpovědi, sync v P3 |
 | 4 Zápis *(podmíněná, po fázi 7)* | zápisové nástroje + pojistky + `rename_symbol` — jen když detektor mezer ukáže, že coder po `symbol` stejně čte celý soubor kvůli `Edit`, nebo když chybí rename bez IDEA | round-trip bajtově stejný (CRLF i LF); fuzz 200 zápisů + compile zelený; rename na 10 symbolech = compile zelený |
 | 5 Zátěž a platformy | 10 klientů paralelně (dotazy 8 worktree + sync + zápisy); testy na Linuxu (WSL/Docker) | budgety § 2; P0 p95 drží během P3; testy zelené na Windows i Linuxu |

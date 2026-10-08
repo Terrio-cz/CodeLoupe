@@ -4,11 +4,11 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['out/**', 'dist/**', 'node_modules/**'] },
+  { ignores: ['out/**', 'dist/**', 'stage/**', 'node_modules/**'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   {
-    files: ['src/main/**/*.ts', 'src/preload/**/*.ts', 'src/shared/**/*.ts', '*.ts', 'test/**/*.ts'],
+    files: ['src/main/**/*.ts', 'src/preload/**/*.ts', 'src/shared/**/*.ts', '*.ts', 'test/**/*.ts', 'scripts/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
   {

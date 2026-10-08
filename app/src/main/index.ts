@@ -9,6 +9,7 @@ import { DaemonApi } from './api/DaemonApi';
 import { MockApi } from './api/MockApi';
 import { APP_ORIGIN, handleAppScheme, registerAppScheme } from './appProtocol';
 import { ClaudeConnector, execClaude, findMarketplace } from './claude/ClaudeConnector';
+import { findBundledDaemon } from './daemon/BundledDaemon';
 import { DaemonClient } from './daemon/DaemonClient';
 import { DaemonHome } from './daemon/DaemonHome';
 import { DaemonManager } from './daemon/DaemonManager';
@@ -44,7 +45,11 @@ async function main(): Promise<void> {
   app.setAppUserModelId(app.isPackaged ? 'cz.terrio.codeloupe' : process.execPath);
   await app.whenReady();
 
-  const store = new SettingsStore(app.getPath('userData'));
+  // An installed app carries the daemon and its Java runtime in resources/codeloupe (CL-104).
+  const bundled = app.isPackaged
+    ? findBundledDaemon(process.resourcesPath, { appImage: process.env.APPIMAGE, stageDir: path.join(app.getPath('userData'), 'daemon'), version: app.getVersion() })
+    : null;
+  const store = new SettingsStore(app.getPath('userData'), process.env, bundled);
   const home = new DaemonHome();
   let win: BrowserWindow | null = null;
   let quitting = false;

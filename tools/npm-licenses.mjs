@@ -13,7 +13,9 @@ const lockPath = args.find((a, i) => !a.startsWith('--') && i !== outIndex + 1) 
 // Permissive licences only. An "A OR B" expression passes when any alternative is allowed, "A AND B" when all are.
 const ALLOWED = new Set(['MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0', '0BSD', 'BlueOak-1.0.0', 'Python-2.0']);
 // Data, not code, and only in the dev toolchain (browserslist data of the build); attribution is kept by the package.
-const EXCEPTIONS = { 'node_modules/caniuse-lite': 'CC-BY-4.0' };
+// truncate-utf8-bytes (WTFPL, "do what you want") comes through electron-builder's file-name sanitizer; the installer
+// tooling is not part of the shipped app.
+const EXCEPTIONS = { 'node_modules/caniuse-lite': 'CC-BY-4.0', 'node_modules/truncate-utf8-bytes': 'WTFPL' };
 
 function allowed(expression) {
   const tokens = expression.replace(/[()]/g, ' ').trim().split(/\s+/);

@@ -3,6 +3,11 @@
   "version": "0.4.0",
   "private": true,
   "description": "CodeLoupe desktop app: token usage and savings, branches, tasks, index health and gaps from the local daemon",
+  "author": {
+    "name": "Terrio",
+    "email": "codeloupe@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/Terrio-cz/CodeLoupe",
   "main": "out/main/index.js",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
@@ -14,7 +19,9 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "stage": "node scripts/stage-resources.mjs",
+    "dist": "electron-vite build && node scripts/stage-resources.mjs && electron-builder --publish never"
   },
   "dependencies": {
     "react": "19.3.0",
@@ -27,6 +34,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "5.2.0",
     "electron": "44.6.0",
+    "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "eslint": "10.12.0",
     "eslint-plugin-react-hooks": "7.1.1",

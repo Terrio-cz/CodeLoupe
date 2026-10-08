@@ -28,6 +28,7 @@ object ConfigLoader {
             overlayCheckMs = number("overlayCheckMs") ?: 1_000,
             jobs = JobsConfig.parse(file),
             workspaces = WorkspacesConfig.parse(file),
+            budgets = BudgetsConfig.parse(file),
         )
     }
 

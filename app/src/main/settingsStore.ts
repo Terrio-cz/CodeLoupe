@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_SETTINGS, isValidCli, sanitizeSettings, type AppSettings } from '../shared/settings';
+import type { BundledDaemon } from './daemon/BundledDaemon';
 
 /** Settings of the app in <userData>/settings.json, plus start-up overrides from the environment. */
 export class SettingsStore {
@@ -9,11 +10,19 @@ export class SettingsStore {
   private overlay: Partial<AppSettings> = {};
   private readonly file: string;
 
-  constructor(dir: string, env: NodeJS.ProcessEnv = process.env) {
+  /**
+   * `bundled` is the daemon an installer ships: the app then reads real data by default and runs that daemon unless
+   * the user chose another CLI. The bundle's path changes with every update, so it is never written to the file.
+   */
+  constructor(dir: string, env: NodeJS.ProcessEnv = process.env, bundled: BundledDaemon | null = null) {
     this.file = path.join(dir, 'settings.json');
     let stored: unknown = {};
     try { stored = JSON.parse(fs.readFileSync(this.file, 'utf8')); } catch { /* first start */ }
-    this.value = sanitizeSettings(stored, DEFAULT_SETTINGS);
+    this.value = sanitizeSettings(stored, bundled ? { ...DEFAULT_SETTINGS, apiSource: 'daemon' } : DEFAULT_SETTINGS);
+    if (bundled && this.value.cliCommand === DEFAULT_SETTINGS.cliCommand && this.value.cliArgs.length === 0) {
+      this.overlay.cliCommand = bundled.command;
+      this.overlay.cliArgs = bundled.args;
+    }
     try {
       const cli: unknown = env.CODELOUPE_APP_CLI ? JSON.parse(env.CODELOUPE_APP_CLI) : null;
       if (Array.isArray(cli) && isValidCli(cli[0], cli.slice(1))) {

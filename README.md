@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/banner-dark.svg">
+    <img alt="CodeLoupe: read less, know more" src="docs/brand/banner-light.svg" width="830">
+  </picture>
+</p>
+
 # CodeLoupe
 
 On-demand code index for AI coding agents. Ask for a declaration, a file outline, its usages, callers or type
@@ -74,7 +81,9 @@ buttons *Připojit plugin…* and *Přidat jen MCP server…* run exactly the co
 lists them, with the daemon's current port), through the `claude` CLI, so Claude Code writes its own configuration.
 Without `claude` on `PATH` the card shows the commands to run by hand. The plugin is added from the marketplace folder
 next to the app (`resources/claude-plugin` when packaged, `CODELOUPE_PLUGIN_DIR` to override, the repository root in a
-development run); the installer must ship `.claude-plugin/marketplace.json` and `plugin/` there (CL-104).
+development run); the installers ship `.claude-plugin/marketplace.json` and `plugin/` there. The plugin's session hook
+looks for `codeloupe` on `PATH`; an installed app does not put it there, so set `CODELOUPE_BIN` to
+`<install>/resources/codeloupe/bin/codeloupe` (`.bat` on Windows) or add that directory to `PATH`.
 
 A daemon on another port: set `CODELOUPE_PORT` for it and for Claude Code (the plugin's URL reads it); for the MCP entry
 the app writes the port it watches, and `codeloupe mcp-config` prints the entry for the configured one.
@@ -86,6 +95,8 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature` |
 | `outline` | members of a file or type with line ranges, no bodies |
 | `symbol` | one declaration's source (KDoc, annotations, body) by `Type.member`, `member(ParamType)`, `pkg.Type` or `File.kt:line`; large types collapse to header + members |
+| `grep` | text search in the indexed source (Kotlin and `.kts` files, worktree edits included) for string literals, SQL, annotation arguments, config keys: literal by default (`regex=true`, `ignoreCase=true`), hits grouped by file and enclosing declaration, one code line each; `module`, `test`, `limit` narrow it |
+| `context` | a declaration's source, its direct callers and the declarations it calls in one answer (`symbol` + `calls` depth 1) instead of three calls |
 | `usages` | every reference to a declaration, grouped by file and enclosing declaration, one code line each, `=` exact or `?` candidate; a superset of what `rg -w` finds in code, references that resolve elsewhere only counted (`all=true` lists them) |
 | `calls` | callers (default) or callees as a tree, depth ≤ 3; below the first level only exact links |
 | `hierarchy` | supertypes and subtypes of a type (object expressions included, and lambdas converted to a `fun interface`), or what a member overrides and what overrides it |
@@ -299,6 +310,7 @@ read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-s
 | Job slots | any name, one job each | `config.json` `slots` `{ "gradle-test": 2, "vps-test": 1 }` |
 | Policy for jobs | none (every command allowed) | `config.json` `policyHook` — argv of a PreToolUse hook, e.g. `["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/ws/.claude/hooks/guard.ps1"]`; `policyTimeoutMs` (30 s) |
 | Remote webhook targets | none (local only) | `config.json` `remoteWebhooks` `["https://hooks.example.com"]` |
+| Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
 
@@ -323,7 +335,10 @@ daemon has indexed.
 
 The daemon listens on 127.0.0.1 only and refuses requests with a foreign `Host`, any `Origin`, or
 without the `x-codeloupe` header; responses carry `Connection: close`. Calls are logged (tool, latency,
-size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
+size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`. `/status` adds `latency` (p50/p95 ms,
+p95 chars, empty and busy rate of the last 1000 calls, per tool) and `budgets` (`ok` and the `warnings` for what exceeds
+`config.json` `budgets`); `/status/history` lists RSS, heap and CPU readings taken while the daemon is used (one a minute,
+the last 240).
 
 ## Bundle
 
@@ -334,7 +349,7 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 The zip holds `bin/` (launchers), `lib/` (jars) and `runtime/`, a jlink runtime with only the modules the jars use
 (found by `jdeps`) plus the ones needed at run time. The launchers prefer `runtime/` to any JDK on the machine, so the
 bundle runs without Java. jlink output runs only on the OS it was built on, so CI builds one bundle per OS
-(`bundle` job in [ci.yml](.github/workflows/ci.yml)); the Electron installer takes the same directory.
+(`bundle` job in [ci.yml](.github/workflows/ci.yml)); the Electron installer takes the same directory (see [Installers](#installers)).
 `node tools/bundle-smoke.mjs <bundle dir>` runs a query on a PATH without any Java and prints the sizes and the
 daemon's RSS; CI runs it on every push and keeps the numbers as `bundle-report-<os>` artifacts.
 
@@ -347,6 +362,25 @@ Measured in CI on 2026-10-08 (Temurin 25.0.4, tiny repository, daemon idle after
 | macOS arm64 | 134.4 MB | 185 MB (95 MB) | 94 MB | 2.3 s / 0.16 s |
 
 The first query includes starting the daemon and creating the class-data archive.
+
+## Installers
+
+Per OS, one download that needs no Java: the desktop app with the bundle above inside (`resources/codeloupe`) and the
+Claude Code plugin (`resources/claude-plugin`). `./gradlew bundle`, then in `app/`: `npm ci && npm run dist`
+(electron-builder, config in [app/electron-builder.yml](app/electron-builder.yml)). The CPU is the one the build runs
+on, because the runtime is. CI builds them in the `bundle` job and keeps them for 7 days as `installer-<os>` artifacts.
+
+| OS | Installer | Notes |
+|---|---|---|
+| Windows x64 | `CodeLoupe-<v>-win-x64.exe` (NSIS, per user, one click) | Starts the app when it ends. An update or uninstall first stops the installation's own daemon. The uninstaller asks whether to delete the data (`%LOCALAPPDATA%\codeloupe`, `%APPDATA%\codeloupe-desktop`); `/S` and updates keep it. |
+| macOS arm64 | `CodeLoupe-<v>-mac-arm64.dmg` | Drag to Applications. Removing the app leaves the data in `~/Library/Caches/codeloupe` and `~/Library/Application Support/codeloupe-desktop` until it is deleted by hand. |
+| Linux x64 | `CodeLoupe-<v>-linux-x64.AppImage`, `.deb` | The AppImage copies the bundle to `<userData>/daemon/<version>` once, because the daemon outlives its mount. Removing the app leaves the data in `~/.cache/codeloupe` and `~/.config/codeloupe-desktop`. |
+
+An installed app reads real data (`apiSource: daemon`) and starts the daemon from its own runtime; the CLI command in
+Settings stays on its default and is resolved at start-up, so an update never leaves a stale path. Not yet: signing
+and notarisation (CL-105, until then Windows shows an unknown publisher and macOS refuses the app), the release
+pipeline (CL-106), auto-update (CL-107), installer smoke tests that install and start the app (CL-108; CI only
+unpacks each installer and runs the bundle inside), macOS x64.
 
 ## Develop
 

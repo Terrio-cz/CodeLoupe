@@ -70,6 +70,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.io.readByteArray
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -116,7 +117,8 @@ class Daemon private constructor(
         { resources.report().takeIf { it.engine != null }?.resources?.filter { it.kind == ResourceKind.CONTAINER } },
     )
     @Volatile private var lastClientCall: Instant? = null
-    private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = trackers::touch)
+    private val history = ResourceHistory()
+    private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = { trackers.touch(); history.sample() })
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
     private val pid = ProcessHandle.current().pid()
@@ -125,11 +127,16 @@ class Daemon private constructor(
     fun status(): DaemonStatus {
         val runtime = Runtime.getRuntime()
         val cpu = ProcessHandle.current().info().totalCpuDuration().map { it.toSeconds() }.orElse(0)
+        val rss = ProcessMemory.rssMb()
+        val latency = runner.latency()
+        val queueSnapshot = queue.snapshot()
+        history.sample()
         return DaemonStatus(
             name = CodeLoupe.NAME, version = CodeLoupe.VERSION, pid = pid, port = config.port, home = config.home.toString(),
-            uptimeSec = Instant.now().epochSecond - started.epochSecond, rssMb = ProcessMemory.rssMb(),
+            uptimeSec = Instant.now().epochSecond - started.epochSecond, rssMb = rss,
             heapMb = (runtime.totalMemory() - runtime.freeMemory()) / MB, cpuSec = cpu,
-            calls = runner.stats(), queue = queue.snapshot(), repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
+            calls = runner.stats(), latency = latency, budgets = BudgetState.check(config.budgets, latency, rss, queueSnapshot.waitMsMax),
+            queue = queueSnapshot, repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
             gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(), portAllocations = ports.allocated,
         )
     }
@@ -215,6 +222,7 @@ class Daemon private constructor(
         mcpStatelessStreamableHttp(path = "/mcp") { mcp.server() }
         routing {
             get("/status") { call.respondJson(HttpStatusCode.OK, DaemonStatus.serializer(), status()) }
+            get("/status/history") { call.respondJson(HttpStatusCode.OK, ListSerializer(ResourceSample.serializer()), history.list()) }
             post("/api/{tool}") {
                 val name = call.parameters["tool"].orEmpty()
                 val tool = tools.firstOrNull { it.name == name }

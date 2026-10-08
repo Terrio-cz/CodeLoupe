@@ -69,6 +69,14 @@ class DaemonTest {
         assertTrue(b["ok"]!!.jsonPrimitive.boolean, b.toString())
         assertEquals(1, daemon.status().queue.heavy.done, "one build")
         assertEquals(1, daemon.status().repos.size)
+        val status = daemon.status()
+        assertEquals(2, status.latency.window, "both calls are in the latency window")
+        assertEquals(setOf("find", "outline"), status.latency.byTool.keys)
+        // The test JVM holds the daemon and the whole suite, so its RSS says nothing; the other budgets must hold.
+        assertTrue(status.budgets.warnings.none { !it.startsWith("rss ") }, status.budgets.warnings.toString())
+        val history = http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/status/history")).header(CodeLoupe.HEADER, "1").GET().build(), HttpResponse.BodyHandlers.ofString())
+        assertEquals(200, history.statusCode())
+        assertContains(history.body(), "\"rssMb\"")
     }
 
     @Test
@@ -126,7 +134,7 @@ class DaemonTest {
             headers.append(CodeLoupe.HEADER, "1")
         }
         client.connect(transport)
-        assertEquals(listOf("calls", "changes", "find", "hierarchy", "job", "outline", "symbol", "task_code", "usages"), client.listTools().tools.map { it.name }.sorted())
+        assertEquals(listOf("calls", "changes", "context", "find", "grep", "hierarchy", "job", "outline", "symbol", "task_code", "usages"), client.listTools().tools.map { it.name }.sorted())
         val first = client.callTool("symbol", mapOf("root" to repo.toString(), "name" to "total"))
         assertContains((first.content.single() as TextContent).text, "fun total")
         daemon.stop()

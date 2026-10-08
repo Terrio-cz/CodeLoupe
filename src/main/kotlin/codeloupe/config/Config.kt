@@ -13,4 +13,5 @@ data class Config(
     val overlayCheckMs: Long = 1_000,
     val jobs: JobsConfig = JobsConfig(),
     val workspaces: WorkspacesConfig = WorkspacesConfig(),
+    val budgets: BudgetsConfig = BudgetsConfig(),
 )

@@ -14,8 +14,10 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 | You want | Use | Instead of |
 |---|---|---|
 | Where is `X` declared | `find` (`q` = name, `Type.member` or glob; `kind`, `module`, `test` narrow) | `grep -r "class X"` |
+| A string literal, SQL, annotation argument or config key written in code | `grep` (`pattern`, literal unless `regex=true`; hits grouped by enclosing declaration) | `rg` and reading around each hit |
 | What is in this file or type | `outline` (`target` = path or type; members with line ranges, no bodies) | reading the file |
 | The source of one declaration | `symbol` (`name`; KDoc, annotations, body; a large type collapses to header + members) | reading the file and scrolling |
+| Before changing `X`: its source, callers and callees | `context` (`name`; one call instead of `symbol` + `calls` twice) | three separate calls |
 | Who uses `X` | `usages` (`name`; exact `=` and candidate `?` hits grouped by enclosing declaration; `all=true` adds references that resolve elsewhere) | `grep -w` |
 | Who calls `f`, or what `f` calls | `calls` (`name`, `direction` = `callers` or `callees`, `depth` ≤ 3) | chains of greps |
 | Supertypes, subtypes, overrides | `hierarchy` (`name`) | grepping `: Type` |

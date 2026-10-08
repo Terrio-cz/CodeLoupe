@@ -20,6 +20,10 @@ data class DaemonStatus(
     val heapMb: Long,
     val cpuSec: Long,
     val calls: CallStats,
+    /** Percentiles over the last 1000 calls. */
+    val latency: CallLatency = CallLatency(),
+    /** Whether the daemon is within the `config.json` `budgets`, and which it exceeds. */
+    val budgets: BudgetState = BudgetState(true),
     val queue: QueueSnapshot,
     val repos: List<RepoSummary>,
     val jobs: JobsSnapshot,
