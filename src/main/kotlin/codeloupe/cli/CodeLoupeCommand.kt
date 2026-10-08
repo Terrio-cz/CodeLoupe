@@ -24,7 +24,7 @@ class CodeLoupeCommand(requested: String? = null) : CliktCommand(name = "codelou
         /** Each subcommand under its own name; `CodeLoupeCommandTest` keeps the names honest. */
         val COMMANDS: List<Pair<String, () -> CliktCommand>> = listOf(
             "daemon" to ::DaemonCommand, "start" to ::StartCommand, "stop" to ::StopCommand, "status" to ::StatusCommand,
-            "find" to ::FindCommand, "outline" to ::OutlineCommand, "symbol" to ::SymbolCommand, "usages" to ::UsagesCommand,
+            "find" to ::FindCommand, "grep" to ::GrepCommand, "outline" to ::OutlineCommand, "symbol" to ::SymbolCommand, "context" to ::ContextCommand, "usages" to ::UsagesCommand,
             "calls" to ::CallsCommand, "hierarchy" to ::HierarchyCommand, "changes" to ::ChangesCommand,
             "issue" to ::IssueCommand, "tasks" to ::TasksCommand, "task_code" to ::TaskCodeCommand, "code_tasks" to ::CodeTasksCommand,
             "update" to ::UpdateCommand, "job" to ::JobCommand, "webhook" to ::WebhookCommand, "workspaces" to ::WorkspacesCommand, "ws" to ::WsCommand,

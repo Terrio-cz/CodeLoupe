@@ -23,6 +23,7 @@ class ToolRunner(
     private val total = AtomicInteger()
     private val errors = AtomicInteger()
     private val busy = AtomicInteger()
+    private val window = CallWindow()
 
     suspend fun run(tool: Tool, args: ToolArgs, via: String): ToolOutcome {
         val started = Instant.now()
@@ -48,11 +49,14 @@ class ToolRunner(
             t = IsoTime.of(started), tool = tool.name, via = via, ms = Instant.now().toEpochMilli() - started.toEpochMilli(),
             chars = outcome.text.length, ok = outcome.ok, busy = wasBusy, empty = EMPTY.containsMatchIn(outcome.text),
         )
+        window.record(record.tool, record.ms, record.chars, record.busy, record.empty)
         calls.append(JsonFormat.json.encodeToString(CallRecord.serializer(), record))
         return outcome
     }
 
     fun stats() = CallStats(total.get(), errors.get(), busy.get())
+
+    fun latency() = window.snapshot()
 
     private companion object {
         val EMPTY = Regex("^no (declaration|type|indexed file|issue|tasks|ready tasks)")
