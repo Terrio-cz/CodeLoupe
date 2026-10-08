@@ -55,6 +55,41 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
         return Facts(taskAnswer(root, p.dir, p.repo, p.store, id.trim()), p.store, p.repo, p.dir, p.note)
     }
 
+    /** Where a task touches the code: [files] path → mark (`=` sure, `~` likely, `?` guess, `+` new); landed work counts as sure. */
+    class Touch(val id: String, val files: Map<String, Char>, val landed: Boolean)
+
+    /** A worktree on a branch other than the main one: the tasks its branch names and the files it changed against the merge-base. */
+    class LiveWindow(val branch: String, val path: String, val tasks: List<String>, val changed: Set<String>)
+
+    /** The touch sets of [ids] (landed files, else predicted from the issue text); a task the mirror does not hold has none. */
+    suspend fun touches(root: String, ids: List<String>): Map<String, Touch> {
+        val p = prelude(root)
+        val issues = ids.associateWith { id -> trackers.mirror(id)?.let { (mirror, canonical) -> Triple(mirror, canonical, mirror.store.issue(canonical)) } }
+        val landed = withContext(Dispatchers.IO) { ids.associateWith { LandedTask.of(p.store, trackers.mirror(it)?.second ?: it.uppercase()) } }
+        val open = ids.filter { landed.getValue(it).commits.isEmpty() && issues[it]?.third != null }
+        val predicted = if (open.isEmpty()) emptyMap() else registry.query(root, speculative = false) { view ->
+            open.associateWith { id ->
+                val (mirror, canonical, issue) = issues.getValue(id)!!
+                predict(view, p.dir, p.repo, mirror, canonical, issue!!.updated).predictions
+            }
+        }
+        return ids.associateWith { id ->
+            val task = landed.getValue(id)
+            if (task.commits.isNotEmpty()) Touch(id, withContext(Dispatchers.IO) { task.files(p.store) }.mapValues { '=' }, true)
+            else Touch(id, predicted[id].orEmpty().filter { it.path != null }.groupBy { it.path!! }.mapValues { (_, list) -> list.minBy { Prediction.ORDER.indexOf(it.mark) }.mark }, false)
+        }
+    }
+
+    /** Every worktree of the repository of [root] that is on a branch and is not the main worktree. */
+    suspend fun liveWindows(root: String): List<LiveWindow> {
+        val p = prelude(root)
+        val main = registry.mainWorktree(p.repo.commonDir).toString().replace('\\', '/')
+        return WorktreeBranches.of(p.repo.commonDir).filterValues { !it.equals(main, ignoreCase = true) }.map { (branch, path) ->
+            val set = runCatching { registry.changedFiles(path) }.getOrNull()
+            LiveWindow(branch, path, p.pattern.idsIn(branch), set?.let { s -> (s.files.map { it.path } + s.otherFiles).toSet() }.orEmpty())
+        }
+    }
+
     private suspend fun taskAnswer(root: String, dir: Path, repo: RepoState, store: TaskCodeStore, query: String): TaskCodeRender.TaskAnswer {
         val mirrored = trackers.mirror(query)
         val id = mirrored?.second ?: query.uppercase()

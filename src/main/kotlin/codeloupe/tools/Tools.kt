@@ -18,7 +18,7 @@ object Tools {
     fun catalog(trackers: Trackers): List<Tool> {
         // The document reader's memory is shared: `doc` and `task_context` tell a caller the same "you already have this".
         val docs = DocMemory()
-        val tracked = if (trackers.configured) listOf(IssueTool(trackers), TaskContextTool(trackers, docs), TasksTool(trackers), SimilarTool(trackers), UpdateTool(trackers)) else emptyList()
+        val tracked = if (trackers.configured) listOf(IssueTool(trackers), TaskContextTool(trackers, docs), DispatchPlanTool(trackers, docs), TasksTool(trackers), SimilarTool(trackers), UpdateTool(trackers)) else emptyList()
         return ALL + tracked + TaskCodeTool(trackers) + DocTool(docs)
     }
 
