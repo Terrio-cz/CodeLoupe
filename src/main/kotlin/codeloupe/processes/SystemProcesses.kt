@@ -20,7 +20,8 @@ class SystemProcesses(private val gradleHomes: List<Path> = GradleDaemonLog.home
                 table != null -> table[pid]
                 else -> ProcFsProcessDetails.read(pid)
             }
-            val commandLine = info.commandLine().orElse(null) ?: details?.commandLine
+            // The OS-specific read is the whole line; the JDK's is cut where Linux limits it, which loses the end of a long class path.
+            val commandLine = details?.commandLine ?: info.commandLine().orElse(null)
             val daemon = commandLine?.takeIf { ProcessKind.of(it) == ProcessKind.GRADLE_DAEMON }?.let { GradleDaemonLog.read(it, pid, gradleHomes) }
             ProcessInfo(
                 pid = pid, startMs = info.startInstant().map { it.toEpochMilli() }.orElse(0),

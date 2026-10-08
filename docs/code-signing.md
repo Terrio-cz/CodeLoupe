@@ -20,7 +20,8 @@ the app without a manual override, and macOS cannot update itself silently (CL-1
   and links to the release.
 - **Linux**: nothing needed; AppImage and `.deb` with checksums.
 - **Updates**: Windows (NSIS) and Linux (AppImage) update themselves with `electron-updater`, which checks the SHA-512 in
-  the release feed over HTTPS; macOS only notifies (CL-107).
+  the release feed over HTTPS (the app config sets no `publisherName`, so the publisher check, which an unsigned installer
+  could not pass, is skipped and the SHA-512 is what counts); macOS only notifies (CL-107, README → Updates).
 - Publishing the manifests to winget-pkgs, a Scoop bucket or a Homebrew tap is an outward-facing step the owner takes;
   the repository only generates the files.
 - **No free certificate fits**: SignPath Foundation signs open-source projects with an OSI-approved licence for free;

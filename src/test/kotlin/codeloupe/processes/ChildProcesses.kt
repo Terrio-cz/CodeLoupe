@@ -37,14 +37,25 @@ class ChildProcesses : AutoCloseable {
     /** The process table as far as these children go: a test must not see the real builds running on the machine. */
     fun world(gradleHomes: List<Path> = emptyList()): ProcessSource = ProcessSource { SystemProcesses(gradleHomes).read().filter { info -> started.any { it.pid() == info.pid } } }
 
-    /** Waits until the OS lists [process] with its working directory and command line: a JVM takes a moment to start. */
-    fun awaitListed(process: Process, source: ProcessSource = world()): ProcessInfo {
-        val until = System.currentTimeMillis() + 15_000
+    /**
+     * Waits until the OS lists [process] with its working directory and command line, and until the JVM has stopped starting up:
+     * a slow machine spends seconds of CPU on that, which would read as a busy daemon.
+     */
+    fun awaitListed(process: Process, source: ProcessSource = world(), settle: Boolean = true): ProcessInfo {
+        val until = System.currentTimeMillis() + 30_000
         while (System.currentTimeMillis() < until) {
-            source.read().firstOrNull { it.pid == process.pid() && it.cwd != null && it.commandLine != null }?.let { return it }
+            val listed = source.read().firstOrNull { it.pid == process.pid() && it.cwd != null && it.commandLine != null }
+            if (listed != null && (!settle || quiet(process))) return listed
             Thread.sleep(100)
         }
-        error("pid ${process.pid()} was not listed with its directory and command line")
+        error("pid ${process.pid()} was not listed with its directory and command line, or never settled")
+    }
+
+    private fun quiet(process: Process): Boolean {
+        val handle = process.toHandle()
+        val before = ProcessCpu.ms(handle)
+        Thread.sleep(500)
+        return ProcessCpu.ms(handle) - before < 30
     }
 
     override fun close() = started.forEach { runCatching { it.destroyForcibly() } }

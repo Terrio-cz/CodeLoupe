@@ -19,10 +19,7 @@ export class SettingsStore {
     let stored: unknown = {};
     try { stored = JSON.parse(fs.readFileSync(this.file, 'utf8')); } catch { /* first start */ }
     this.value = sanitizeSettings(stored, bundled ? { ...DEFAULT_SETTINGS, apiSource: 'daemon' } : DEFAULT_SETTINGS);
-    if (bundled && this.value.cliCommand === DEFAULT_SETTINGS.cliCommand && this.value.cliArgs.length === 0) {
-      this.overlay.cliCommand = bundled.command;
-      this.overlay.cliArgs = bundled.args;
-    }
+    this.setBundled(bundled);
     try {
       const cli: unknown = env.CODELOUPE_APP_CLI ? JSON.parse(env.CODELOUPE_APP_CLI) : null;
       if (Array.isArray(cli) && isValidCli(cli[0], cli.slice(1))) {
@@ -31,6 +28,16 @@ export class SettingsStore {
       }
     } catch { /* invalid JSON: no override */ }
     if (env.CODELOUPE_APP_API === 'mock' || env.CODELOUPE_APP_API === 'daemon') this.overlay.apiSource = env.CODELOUPE_APP_API;
+  }
+
+  /**
+   * Runs `bundled` as the daemon unless the user chose another CLI. Called again to switch to another bundle
+   * (the previous one, when the new daemon does not start: CL-107).
+   */
+  setBundled(bundled: BundledDaemon | null): void {
+    if (!bundled || this.value.cliCommand !== DEFAULT_SETTINGS.cliCommand || this.value.cliArgs.length > 0) return;
+    this.overlay.cliCommand = bundled.command;
+    this.overlay.cliArgs = bundled.args;
   }
 
   get(): AppSettings {

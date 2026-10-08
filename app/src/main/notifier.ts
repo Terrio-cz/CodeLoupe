@@ -7,7 +7,7 @@ const THROTTLE_MS = 60_000;
 const PAGE = 50;
 const MAX_PAGES = 10;
 
-type Kind = DaemonEvent['kind'] | 'daemon';
+type Kind = DaemonEvent['kind'] | 'daemon' | 'update';
 
 interface Pending {
   count: number;
@@ -94,6 +94,11 @@ export class Notifier {
     if (!this.settings().notify.daemon) return;
     this.outageShown = true;
     this.show('daemon', 'Daemon se nedaří spustit', message ?? 'Zkontrolujte příkaz CLI v Nastavení.', '#/settings', true);
+  }
+
+  /** A one-off message of the app itself (an update, a rollback); never throttled. */
+  info(title: string, body: string, hash: string): void {
+    this.show('update', title, body, hash, true);
   }
 
   private flush(): void {
