@@ -71,7 +71,8 @@ object ProcessAttribution {
             base.fileName?.let { rest.addFirst(it.toString()) }
             base = base.parent
         }
-        return rest.fold(base ?: path) { acc, name -> acc.resolve(name) }
+        val real = base?.let { runCatching { it.toRealPath() }.getOrNull() } ?: base ?: path
+        return rest.fold(real) { acc, name -> acc.resolve(name) }
     }
 
     private fun normalise(text: String): String = text.replace('\\', '/').let { if (File.separatorChar == '\\') it.lowercase() else it }
