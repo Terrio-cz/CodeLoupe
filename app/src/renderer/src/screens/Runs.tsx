@@ -51,11 +51,12 @@ export function Runs({ route }: { route: Route }) {
   const [range] = useRange();
   const [role, setRole] = useState('');
   const [sort, setSort] = useState<RunSortKey>('start');
-  // `#/runs?q=TER-1` (from a branch or a task) starts with that search.
+  // `#/runs?ter=TER-1` (from a branch or a task) lists exactly the runs of that task until the chip is cleared; `?q=` starts with a search.
   const [q, setQ] = useState(route.params.get('q') ?? '');
+  const [ter, setTer] = useState(route.params.get('ter') ?? '');
   const text = useDebounced(q);
   const [settings] = useSettings();
-  const query = { range, sort, role, q: text, limit: 50 };
+  const query = { range, sort, role, q: text, ter, limit: 50 };
   const signature = JSON.stringify(query);
   const page = useApi('runs', undefined, query);
   const rows = usePages<RunItem>('runs', undefined, query, page.data, signature);
@@ -80,6 +81,7 @@ export function Runs({ route }: { route: Route }) {
         <Select label="Role" value={role} onChange={setRole} options={[{ value: '', label: 'Všechny role' }, ...data.roles.map(r => ({ value: r, label: r }))]} />
         <Select label="Řazení" value={sort} onChange={v => setSort(v as RunSortKey)} options={SORTS} />
         <Search label="Hledat zadání, úkol, roli" value={q} onChange={setQ} />
+        {ter && <button className="btn" onClick={() => setTer('')} title="Zrušit filtr úkolu" aria-label={`Zrušit filtr úkolu ${ter}`}>Úkol {ter} ✕</button>}
         <span className="muted">Běhy agentů z transkriptů Claude Code: kolik stály a kde; aplikace je nesleduje za běhu.</span>
       </div>
       {reading && <Banner tone="info">Daemon čte transkripty ({num(data.ingest.filesDone)} z {num(data.ingest.filesTotal)} souborů), seznam se doplňuje.</Banner>}

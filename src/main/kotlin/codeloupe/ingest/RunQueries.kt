@@ -6,12 +6,16 @@ import java.sql.ResultSet
 
 /** The reads of the UI API on the ingested transcripts. Each answers from indexes in a few milliseconds, whatever the number of runs. */
 class RunQueries(private val db: TranscriptDb) {
-    fun runs(fromMs: Long, role: String?, text: String?, sort: RunSort, offset: Int, limit: Int): Page<RunRecord> = synchronized(db.reader) {
+    fun runs(fromMs: Long, role: String?, text: String?, sort: RunSort, offset: Int, limit: Int, ter: String? = null): Page<RunRecord> = synchronized(db.reader) {
         val where = StringBuilder("start_ms >= ?")
         val args = arrayListOf<Any>(fromMs)
         if (role != null) {
             where.append(" AND role = ?")
             args += role
+        }
+        if (ter != null) {
+            where.append(" AND ter = ? COLLATE NOCASE")
+            args += ter
         }
         if (text != null) {
             where.append(" AND (title LIKE ? ESCAPE '\\' OR ter LIKE ? ESCAPE '\\' OR role LIKE ? ESCAPE '\\' OR file LIKE ? ESCAPE '\\')")

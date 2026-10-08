@@ -68,9 +68,10 @@ export class MockRuns {
   page(q: Query): RunPage {
     const from = this.now - ({ '24h': 1, '7d': 7, '30d': 30 }[String(q.range)] ?? 7) * DAY;
     const text = typeof q.q === 'string' ? q.q.toLowerCase() : '';
+    const ter = typeof q.ter === 'string' ? q.ter.toLowerCase() : '';
     const key = ({ weighted: 'weighted', turns: 'turns', peak: 'peakContext', share: 'toolResultShare', duration: 'durationSec' } as const)[String(q.sort) as 'weighted'];
     const rows = this.runs
-      .filter(r => Date.parse(r.startedAt) >= from && (!q.role || r.role === q.role) && (!text || `${r.title} ${r.ter ?? ''} ${r.role} ${r.file}`.toLowerCase().includes(text)))
+      .filter(r => Date.parse(r.startedAt) >= from && (!q.role || r.role === q.role) && (!ter || r.ter?.toLowerCase() === ter) && (!text || `${r.title} ${r.ter ?? ''} ${r.role} ${r.file}`.toLowerCase().includes(text)))
       .sort((a, b) => (key ? (b[key] as number) - (a[key] as number) : b.startedAt.localeCompare(a.startedAt)));
     const ingest: IngestStatus = { running: false, filesDone: 2_651, filesTotal: 2_651, at: new Date(this.now - 90_000).toISOString() };
     return { ...paged(rows, q, 50, 200), roles: ROLES.map(x => x.role), ingest };

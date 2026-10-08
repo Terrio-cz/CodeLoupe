@@ -164,8 +164,8 @@ Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hle
 - Změny: značky `+` přidaná, `~` upravené tělo, `^` změněná signatura, `-` odstraněná (stejné jako `changes()`
   v plan.md § 6), vždy s textovým popiskem v `title`/`aria-label`.
 - Sekce draweru jsou sbalitelné; dlouhé seznamy po 20 + „zobrazit dalších N“.
-- **Běhy agentů na úkolu** (CL-41): pět nejdražších běhů za 30 dní, které úkol větve zmiňují (z `runs?q=<úkol>`), každý s
-  proklikem do detailu běhu (`#/runs/<id>`), a „Všechny běhy úkolu“ (`#/runs?q=<úkol>`). Úkol větve má vlastní tlačítko
+- **Běhy agentů na úkolu** (CL-41): pět nejdražších běhů za 30 dní, které úkol větve zmiňují (z `runs?ter=<úkol>`), každý s
+  proklikem do detailu běhu (`#/runs/<id>`), a „Všechny běhy úkolu“ (`#/runs?ter=<úkol>`). Úkol větve má vlastní tlačítko
   a sekci, i když ho mirror ještě nemá („v mirroru zatím není“). Detail běhu má zpětný odkaz na úkol.
 - „Otevřít složku“ = IPC `open.worktree(id)`: main vezme cestu z daemonu a otevře ji jen jako adresář s `.git` (§ 10).
 
@@ -682,11 +682,11 @@ interface WorktreeDetail extends WorktreeSummary {
 }
 ```
 
-### 9.7 `GET /ui-api/v1/runs?range=&sort=&role=&q=&limit=&cursor=` (CL-62)
+### 9.7 `GET /ui-api/v1/runs?range=&sort=&role=&q=&ter=&limit=&cursor=` (CL-62)
 
 Běhy agentů z inkrementálního ingestu transcriptů (§ 9.17). `range` (výchozí `7d`) filtruje podle začátku běhu,
 `sort` je `start` (výchozí) | `weighted` | `turns` | `peak` | `share` | `duration`, vždy sestupně; `role` je přesná role
-(`main`, `terrio-coder`, …), `q` podřetězec názvu, TER, role nebo souboru; `limit` 1–200 (výchozí 50), `cursor` neprůhledný.
+(`main`, `terrio-coder`, …), `q` podřetězec názvu, TER, role nebo souboru; `ter` přesné id úkolu (bez ohledu na velikost písmen, `TER-1` nenajde `TER-114`; CL-131); `limit` 1–200 (výchozí 50), `cursor` neprůhledný.
 ```ts
 interface RunItem {
   id: string;                 // stabilní, dokud existuje <home>/transcripts.db
