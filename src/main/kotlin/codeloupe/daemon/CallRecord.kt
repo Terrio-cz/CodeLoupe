@@ -13,6 +13,6 @@ data class CallRecord(
     val ok: Boolean,
     val busy: Boolean,
     val empty: Boolean,
-    /** The repository or worktree the call asked about; null for a tool without one and for lines written before it was recorded. */
+    /** The worktree the call asked about, as git spells its path; null for a tool without one and for lines written before it was recorded. */
     val root: String? = null,
 )

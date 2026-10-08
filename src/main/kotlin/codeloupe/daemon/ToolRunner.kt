@@ -34,7 +34,8 @@ class ToolRunner(
             // A tool without a repository keys per-caller state on root: only the caller's own, never the shared default.
             val root = args.string("root")?.takeIf { it.isNotEmpty() } ?: (if (tool.needsRoot) defaultRoot else "")
                 ?: throw IllegalArgumentException("pass root: the absolute path of the repository or worktree to answer for")
-            callRoot = root.takeIf { it.isNotEmpty() }
+            // The worktree the root is in, as git spells its path: the UI matches calls to worktrees by it.
+            callRoot = root.takeIf { it.isNotEmpty() }?.let { runCatching { registry.locate(it).worktree }.getOrDefault(it) }
             ToolOutcome(true, Timings.measure(TimedPart.TOOL) { tool.answer(registry, root, args) })
         } catch (e: CancellationException) {
             throw e
