@@ -11,7 +11,8 @@ import kotlinx.serialization.json.JsonPrimitive
  * always a root. A repo entry may be just the path. `adoption` maps resources without CodeLoupe labels to workspaces,
  * see [AdoptionRule]; `reconcile` configures the cleanup of released workspaces, see [ReconcileConfig]; `ports` gives the range of the port registry, see [PortsConfig].
  * `gradleUserHome` names the Gradle user home whose `daemon/` logs say where an idle Gradle daemon last built, when it is neither
- * `GRADLE_USER_HOME` of the daemon nor `~/.gradle`.
+ * `GRADLE_USER_HOME` of the daemon nor `~/.gradle`. `recentScanMs` is how long the read-only routes (`/workspaces`, `/resources`, `/reconcile`, `/ports`)
+ * share one registry scan; 0 makes each read its own.
  */
 data class WorkspacesConfig(
     val repos: List<Repo> = emptyList(),
@@ -21,6 +22,7 @@ data class WorkspacesConfig(
     val reconcile: ReconcileConfig = ReconcileConfig(),
     val ports: PortsConfig = PortsConfig(),
     val gradleUserHome: String? = null,
+    val recentScanMs: Long = 2_000,
 ) {
     data class Repo(val path: String, val roots: List<String> = emptyList())
 
@@ -35,7 +37,7 @@ data class WorkspacesConfig(
                 }
             }
             val adoption = (section["adoption"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(AdoptionRule::parse) }
-            return WorkspacesConfig(repos, (section["abandonedDays"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it > 0 } ?: 14, adoption, ReconcileConfig.parse(section["reconcile"] as? JsonObject), PortsConfig.parse(section["ports"] as? JsonObject), text(section["gradleUserHome"]))
+            return WorkspacesConfig(repos, (section["abandonedDays"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it > 0 } ?: 14, adoption, ReconcileConfig.parse(section["reconcile"] as? JsonObject), PortsConfig.parse(section["ports"] as? JsonObject), text(section["gradleUserHome"]), (section["recentScanMs"] as? JsonPrimitive)?.content?.toLongOrNull()?.takeIf { it >= 0 } ?: 2_000)
         }
 
         private fun text(element: Any?): String? = (element as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }

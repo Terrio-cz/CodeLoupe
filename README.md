@@ -158,8 +158,8 @@ for commercial use; the IDE-based server follows the IDE's licence.
 - **Syntax-level resolution**: no classpath, no compiler. Overloads are told apart by argument count, receivers by the
   types syntax shows, so some references stay `candidate` and a name shared by unrelated declarations must be
   qualified (`Type.member`). `usages` counts resolved references, not every line that holds the word.
-- **Search**: no semantic or conceptual search, no execution-flow or impact analysis; `find`, `grep`, `usages`, `calls`,
-  `hierarchy` work on names.
+- **Search**: no semantic search and no execution-flow or impact analysis. `find mode=search` ranks declarations for the
+  words of a question (names, KDoc, signatures, paths: lexical, not meaning); `grep`, `usages`, `calls`, `hierarchy` work on names.
 - **Runtime**: git ≥ 2.31, and the bundle or JDK 25. One daemon of about 200 MB; a repository's first query builds its
   index (seconds for the repositories measured, longer for larger ones; the largest measured has 802 Kotlin files including tests).
 - **Licence**: source-available under [PolyForm Noncommercial 1.0.0](LICENSE), not open source in the OSI sense. It
@@ -244,7 +244,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 
 | Tool | Returns |
 |---|---|
-| `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature` |
+| `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature`; `mode=search` (or a `q` with spaces) ranks declarations for the words of a question (`find q="where is the token limit computed" mode=search`): names split into words, KDoc/Javadoc, signatures and directories, BM25 over SQLite FTS5 with a boost for names and for declarations that are referenced a lot, top 10 by default, each hit followed by the words it matched. Undocumented members of a type are looked up by name, not by words. Worktree edits show in the next search |
 | `outline` | members of a file or type with line ranges, no bodies; without a target a map of the repository: files ranked by how much the rest of the code refers to them (PageRank over name references), their types as one-line signatures, cut to `budget` tokens (default 1500); `focus` (files or symbols) puts them first and ranks their neighbourhood, references counted both ways |
 | `symbol` | one declaration's source (KDoc, annotations, body) by `Type.member`, `member(ParamType)`, `pkg.Type` or `File.kt:line`; large types collapse to header + members |
 | `grep` | text search in the indexed source (Kotlin, `.kts` and Java files, worktree edits included) for string literals, SQL, annotation arguments, config keys: literal by default (`regex=true`, `ignoreCase=true`), hits grouped by file and enclosing declaration, one code line each; `module`, `test`, `limit` narrow it |
@@ -447,6 +447,11 @@ no `git` process runs. The first call in a repository waits for the scan of its 
 
 Repositories also come from a tracker's `repos` and from the repositories the daemon has served; `<repo name>-worktrees`
 beside a repository is always a root.
+
+The read-only routes that need the registry (`/workspaces` without `repo` and `size`, `/resources`, `/processes`, the dry run `GET /reconcile`,
+`/ports`) share one scan for `workspaces.recentScanMs` (default 2000, 0 = every read scans for itself), so the desktop app's Workspaces
+screen, which asks four of them at once, costs one scan. What decides something never uses it: `POST /reconcile/run`, the reconcile
+scheduler and a release read the registry and Docker afresh, and a release or a run that changed something drops the shared scan.
 
 ### Docker resources
 
@@ -653,6 +658,19 @@ symbol or file, and calls answered empty, busy or with candidates only. Large wi
 `CODELOUPE_OPTS=-Xmx1g` when a single transcript holds huge lines. `config.json` `metrics`: `transcriptDirs`,
 `categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
 ones, which know the Terrio workspace's shell commands), `defaultCategories` (false = only yours) and `ingestTtlMs` (below).
+
+Savings in the desktop app are measured against a baseline report in the daemon's home. Collect it over a period before CodeLoupe
+and store it with `--baseline`; the daemon reads `<home>/baseline.json` again whenever it changes:
+
+```bash
+codeloupe metrics collect --since 2026-09-23 --until 2026-10-02 --label baseline --baseline --dir ~/.claude/projects/<project>
+```
+
+A finished run whose role the baseline has counts the baseline's mean cost of one run of that role (the mean, because the
+runs of a period are compared as totals); every other run counts what it really cost on both sides. The saving is thus a
+comparison with the average run of the same role before CodeLoupe, not a controlled benchmark, and the screens say how much
+of the cost was compared. The Accounts screen applies the same figure to the runs of each Claude account. Without a
+baseline file they show a dash and how to create one.
 
 The desktop app's Runs, Overview and Gaps screens read the same transcripts through the daemon. The daemon does not watch
 them: a UI API call (`/ui-api/v1/runs`, `overview`, `gaps`, `nav`, `events`) starts a pass that reads only the transcripts

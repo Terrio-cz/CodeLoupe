@@ -164,8 +164,8 @@ Branches                       [Repo: all ▾] [Layer state ▾] [🔍 search br
 - Změny: značky `+` přidaná, `~` upravené tělo, `^` změněná signatura, `-` odstraněná (stejné jako `changes()`
   v plan.md § 6), vždy s textovým popiskem v `title`/`aria-label`.
 - Sekce draweru jsou sbalitelné; dlouhé seznamy po 20 + „show N more“.
-- **Agent runs on the task** (CL-41): pět nejdražších běhů za 30 dní, které úkol větve zmiňují (z `runs?q=<úkol>`), každý s
-  proklikem do detailu běhu (`#/runs/<id>`), a „All runs of the task“ (`#/runs?q=<úkol>`). Úkol větve má vlastní tlačítko
+- **Agent runs on the task** (CL-41): pět nejdražších běhů za 30 dní, které úkol větve zmiňují (z `runs?ter=<úkol>`), každý s
+  proklikem do detailu běhu (`#/runs/<id>`), a „All runs of the task“ (`#/runs?ter=<úkol>`). Úkol větve má vlastní tlačítko
   a sekci, i když ho mirror ještě nemá („not in the mirror yet“). Detail běhu má zpětný odkaz na úkol.
 - „Open folder“ = IPC `open.worktree(id)`: main vezme cestu z daemonu a otevře ji jen jako adresář s `.git` (§ 10).
 
@@ -652,20 +652,39 @@ interface Overview {
   range: Range; generatedAt: Iso;
   kpis: {
     weightedToday: number; weightedYesterdaySameTime: number;   // včera do stejné hodiny
-    weightedRange: number; baselineRange: number;   // baseline = medián role z baseline × počet sessions role
-    savedTokens: number; savedPct: number;          // odhad úspory nástrojů CodeLoupe (CL-21/CL-24)
+    weightedRange: number; baselineRange: number;   // co by běhy v rozsahu stály podle baseline (CL-133); 0 bez baseline
+    savedTokens: number; savedPct: number | null;   // baselineRange − weightedRange (i záporné); procenta z porovnaných běhů, null = nic k porovnání
     activeWindows: number;        // MCP klienti, kteří volali CodeLoupe za posledních 15 min
     queriedWorktrees: number;
     codeloupeCalls: number; callP50Ms: number;
     gaps: number; newGaps: number;
   };
+  baseline: BaselineInfo;   // vůči čemu se úspora měří, nebo proč žádná není (níže)
   budget: { dailyWeighted: number | null; usedToday: number };   // dailyWeighted z config.json budgets; usedToday od místní půlnoci
   costSeries: { t: Iso; weighted: number; baseline: number }[];  // 24h: hodinové, jinak denní buckety
   savingsByTool: { tool: string; calls: number; savedTokens: number }[];
   toolCalls: { tool: string; calls: number; p50Ms: number; p95Ms: number; avgResultChars: number;
                emptyShare: number; busy: number; errors: number }[];   // telemetrie volání (CL-24)
 }
+interface BaselineInfo {
+  state: 'ok' | 'none' | 'unreadable';   // none = v home daemona není baseline.json; unreadable = soubor není report metrics
+  label: string | null; since: string | null; until: string | null; runs: number;
+  coveredShare: number | null;   // 0..1: podíl ceny v rozsahu, která patří běhům s baseline své role; v seznamu účtů null
+  message: string | null;        // jak baseline vytvořit, nebo proč nejde použít
+}
 ```
+
+**Úspora vůči baseline (CL-133).** Baseline je report `codeloupe metrics collect --baseline` (soubor `<home>/baseline.json`;
+daemon ho čte znovu, kdykoli se změní). Z něj se bere **průměrná cena běhu každé role** (součet ceny / počet běhů), ne medián:
+úspora se porovnává jako součet a medián šikmého rozdělení cen leží pod součtem stejných běhů, takže by úspora vycházela
+záporně i bez změny. Hotový běh role, kterou baseline zná, se počítá průměrem baseline, rozloženým do hodin jako jeho skutečná
+cena; běh, jehož role v baseline chybí, a běh, který ještě běží (poslední zápis mladší než 15 min), se počítají skutečnou cenou
+na obou stranách, takže nic neušetří ani neztratí. `baselineRange` je součet takto spočtený za rozsah (srovnatelný s
+`weightedRange`), `savedTokens = baselineRange − weightedRange`, `savedPct = savedTokens / baseline porovnaných běhů`, takže
+neředí neporovnané běhy; `coveredShare` říká, kolik ceny se porovnalo. `costSeries[].baseline` je totéž po bucketech. Účet
+(`accounts[].savedPct7d`, Overview s `?account=`) použije stejný výpočet jen nad běhy svých transkriptů; účet bez běhu
+v rozsahu nebo bez baseline má `null`, obrazovky ukážou pomlčku a vedle ní větu o baseline. Jde o odhad proti průměrnému
+běhu před nasazením, ne o řízený benchmark (§ 8.4 plan.md).
 
 ### 9.5 `GET /ui-api/v1/worktrees?repo=&layer=&q=` → `{ items: WorktreeSummary[] }`
 
@@ -682,11 +701,11 @@ interface WorktreeDetail extends WorktreeSummary {
 }
 ```
 
-### 9.7 `GET /ui-api/v1/runs?range=&sort=&role=&q=&limit=&cursor=` (CL-62)
+### 9.7 `GET /ui-api/v1/runs?range=&sort=&role=&q=&ter=&limit=&cursor=` (CL-62)
 
 Běhy agentů z inkrementálního ingestu transcriptů (§ 9.17). `range` (výchozí `7d`) filtruje podle začátku běhu,
 `sort` je `start` (výchozí) | `weighted` | `turns` | `peak` | `share` | `duration`, vždy sestupně; `role` je přesná role
-(`main`, `terrio-coder`, …), `q` podřetězec názvu, TER, role nebo souboru; `limit` 1–200 (výchozí 50), `cursor` neprůhledný.
+(`main`, `terrio-coder`, …), `q` podřetězec názvu, TER, role nebo souboru; `ter` přesné id úkolu (bez ohledu na velikost písmen, `TER-1` nenajde `TER-114`; CL-131); `limit` 1–200 (výchozí 50), `cursor` neprůhledný.
 ```ts
 interface RunItem {
   id: string;                 // stabilní, dokud existuje <home>/transcripts.db
@@ -802,7 +821,10 @@ interface Accounts {
   claude: { id: string; label: string; email: string | null;      // e-mail z oauthAccount `.claude.json` účtu, nic jiného se nečte
             configDir: string; isDefault: boolean; implicit: boolean; exists: boolean;
             windows: number;          // pracovní složky tohoto účtu, které volaly CodeLoupe za posledních 15 min
-            weighted7d: number; savedPct7d: number; lastUsedAt: Iso | null }[];
+            weighted7d: number;
+            savedPct7d: number | null;   // úspora běhů tohoto účtu za 7 dní vůči baseline; null = bez baseline nebo bez běhu k porovnání (ne 0 %)
+            lastUsedAt: Iso | null }[];
+  baseline: BaselineInfo;
   youtrack: { id: string; label: string; url: string; projects: string[]; tokenConfigured: boolean;
               editable: boolean;      // false = tracker z config.json
               mirror: { state: 'synced' | 'syncing' | 'error' | 'off'; syncedAt: Iso | null } }[];
@@ -913,7 +935,7 @@ stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 
 | Zdroj | Z čeho | Zatím prázdné nebo nepřesné |
 |---|---|---|
 | `nav` | workspace scan, mirror, stav indexu, mezery od `gapsSince` | – |
-| `overview` | `calls.jsonl` (nově s `root` volání): `toolCalls`, p50, `activeWindows` (různé rooty za 15 min), `queriedWorktrees`; z ingestu (CL-62) vážená cena dnes / včera do stejné hodiny / v rozsahu, `costSeries` (24h hodinové, jinak denní), `budget`, `gaps`, `newGaps` (posledních 24 h) | `baselineRange`, `savedTokens`, `savedPct`, `savingsByTool`, `costSeries[].baseline`: 0/prázdné (daemon nemá baseline po rolích) |
+| `overview` | `calls.jsonl` (nově s `root` volání): `toolCalls`, p50, `activeWindows` (různé rooty za 15 min), `queriedWorktrees`; z ingestu (CL-62) vážená cena dnes / včera do stejné hodiny / v rozsahu, `costSeries` (24h hodinové, jinak denní), `budget`, `gaps`, `newGaps` (posledních 24 h) | `baselineRange`, `savedTokens`, `savedPct`, `costSeries[].baseline` z `<home>/baseline.json` (CL-133, níže); bez něj 0/`null` a `baseline.state` říká proč; `savingsByTool` zůstává prázdné (úspora se nepřičítá nástrojům, nic to nezměří) |
 | `runs`, `runs/{id}`, `runs/{id}/steps` | ingest transcriptů (CL-62), indexy pro každé řazení | – |
 | `worktrees` | workspace scan, `ahead`/`behind` z gitu, změněné soubory proti merge-base, stav vrstvy (`Overlays.layer`), počet volání za 24 h | `changedDecls` se počítá na pozadí (první odpověď ho může mít 0); první odpověď po startu u desítek worktrees trvá vteřiny, další jsou okamžité (poslední stav + obnova na pozadí) |
 | `worktrees/{id}` | `changes` ve strukturované podobě: deklarace, volající, testy | `index.layerFiles` = změněné indexované soubory, `parsedAt` null |

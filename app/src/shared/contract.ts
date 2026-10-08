@@ -113,6 +113,18 @@ export interface Nav {
   indexState: RepoIndexState;
 }
 
+/** Which baseline the savings are measured against, or why there is none (§ 9.4, § 9.13a). */
+export interface BaselineInfo {
+  state: 'ok' | 'none' | 'unreadable';
+  label: string | null;
+  since: string | null;
+  until: string | null;
+  runs: number;
+  /** Share (0..1) of the cost in the range that has a baseline for its role; null without a baseline or for the accounts list. */
+  coveredShare: number | null;
+  message: string | null;
+}
+
 // § 9.4
 export interface Overview {
   range: Range;
@@ -123,7 +135,8 @@ export interface Overview {
     weightedRange: number;
     baselineRange: number;
     savedTokens: number;
-    savedPct: number;
+    /** Percent saved on the runs that have a baseline; null when none could be compared. */
+    savedPct: number | null;
     /** Distinct MCP clients that called CodeLoupe in the last 15 minutes. */
     activeWindows: number;
     queriedWorktrees: number;
@@ -132,6 +145,7 @@ export interface Overview {
     gaps: number;
     newGaps: number;
   };
+  baseline: BaselineInfo;
   budget: { dailyWeighted: number | null; usedToday: number };
   costSeries: { t: Iso; weighted: number; baseline: number }[];
   savingsByTool: { tool: string; calls: number; savedTokens: number }[];
@@ -324,6 +338,7 @@ export interface Events {
 
 // § 9.13a — metadata only, never a token.
 export interface Accounts {
+  baseline: BaselineInfo;
   claude: {
     id: string;
     label: string;
@@ -337,7 +352,8 @@ export interface Accounts {
     /** Working directories of this account that called CodeLoupe in the last 15 minutes. */
     windows: number;
     weighted7d: number;
-    savedPct7d: number;
+    /** Null without a baseline or without a run of this account to compare. */
+    savedPct7d: number | null;
     lastUsedAt: Iso | null;
   }[];
   youtrack: {

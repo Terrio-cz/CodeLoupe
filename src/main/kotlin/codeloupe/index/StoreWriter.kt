@@ -24,9 +24,11 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
         Statement.RETURN_GENERATED_KEYS,
     )
     private val insertRef = db.prepareStatement("INSERT INTO refs(file_id, name, line, col, kind, recv, decl_id, bind, recv_type, args) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    private val search = SearchIndexer(db)
 
     fun remove(path: String) {
         val id = fileId.run { setString(1, path); executeQuery().use { if (it.next()) it.getLong(1) else null } } ?: return
+        search.remove(id)
         for (statement in listOf(deleteImports, deleteDecls, deleteRefs)) statement.run { setLong(1, id); executeUpdate() }
         deleteFile.run { setString(1, path); executeUpdate() }
     }
@@ -79,11 +81,15 @@ class StoreWriter(private val db: Connection) : AutoCloseable {
             addBatch()
         }
         insertRef.executeBatch()
+        search.put(file.path, file.content, facts.decls.mapIndexed { i, d ->
+            SearchEntry(declIds[i], d.kind, d.name, d.container, d.sig, d.start, d.declStart, d.local)
+        })
         return id
     }
 
     override fun close() {
         listOf(fileId, deleteFile, deleteImports, deleteDecls, deleteRefs, insertFile, insertImport, insertDecl, insertRef).forEach { it.close() }
+        search.close()
     }
 
     private fun PreparedStatement.insertReturningId(): Long {

@@ -53,11 +53,12 @@ export function Runs({ route }: { route: Route }) {
   const [range] = useRange();
   const [role, setRole] = useState('');
   const [sort, setSort] = useState<RunSortKey>('start');
-  // `#/runs?q=TER-1` (from a branch or a task) starts with that search.
+  // `#/runs?ter=TER-1` (from a branch or a task) lists exactly the runs of that task until the chip is cleared; `?q=` starts with a search.
   const [q, setQ] = useState(route.params.get('q') ?? '');
+  const [ter, setTer] = useState(route.params.get('ter') ?? '');
   const text = useDebounced(q);
   const [settings] = useSettings();
-  const query = { range, sort, role, q: text, limit: 50 };
+  const query = { range, sort, role, q: text, ter, limit: 50 };
   const signature = JSON.stringify(query);
   const page = useApi('runs', undefined, query);
   const rows = usePages<RunItem>('runs', undefined, query, page.data, signature);
@@ -82,6 +83,7 @@ export function Runs({ route }: { route: Route }) {
         <Select label="Role" value={role} onChange={setRole} options={[{ value: '', label: 'All roles' }, ...data.roles.map(r => ({ value: r, label: r }))]} />
         <Select label="Sort" value={sort} onChange={v => setSort(v as RunSortKey)} options={SORTS} />
         <Search label="Search prompt, task, role" value={q} onChange={setQ} />
+        {ter && <button className="btn" onClick={() => setTer('')} title="Clear the task filter" aria-label={`Clear the task filter ${ter}`}>Task {ter} ✕</button>}
         <span className="muted">Agent runs from Claude Code transcripts: what they cost and where. The app does not track them live.</span>
       </div>
       {reading && <Banner tone="info">The daemon is reading transcripts ({num(data.ingest.filesDone)} of {plural(data.ingest.filesTotal, 'file', 'files')}); the list is filling in.</Banner>}

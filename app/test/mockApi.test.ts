@@ -45,6 +45,9 @@ describe('MockApi follows the read-only contract', () => {
     expect(first.kpis.weightedRange + second.kpis.weightedRange).toBeLessThanOrEqual(all.kpis.weightedRange + 2);
     expect(second.kpis.weightedRange).toBeLessThan(first.kpis.weightedRange);
     expect(validateRequest({ resource: 'overview', query: { account: 'b' } }).ok).toBe(true);
+    expect(a.baseline.state).toBe('ok');
+    expect(a.claude.every(c => c.savedPct7d === null || c.savedPct7d > 0)).toBe(true);
+    expect(all.baseline.coveredShare).toBeGreaterThan(0);
   });
 
   it('overview series and KPIs are consistent', async () => {
@@ -70,6 +73,16 @@ describe('MockApi follows the read-only contract', () => {
     expect(p1.items).toHaveLength(5);
     const p2 = await get<Page<TaskSummary>>({ resource: 'tasks', query: { limit: 5, cursor: p1.nextCursor! } });
     expect(p2.items[0].id).not.toBe(p1.items[0].id);
+  });
+
+  it('lists the runs of exactly one task', async () => {
+    const all = await get<{ items: { ter: string | null }[]; total: number }>({ resource: 'runs', query: { range: '30d', limit: 200 } });
+    const task = all.items.find(r => r.ter)!.ter!;
+    const one = await get<{ items: { ter: string | null }[]; total: number }>({ resource: 'runs', query: { range: '30d', ter: task.toLowerCase(), limit: 200 } });
+    expect(one.total).toBeGreaterThan(0);
+    expect(one.items.every(r => r.ter === task)).toBe(true);
+    const prefix = await get<{ total: number }>({ resource: 'runs', query: { range: '30d', ter: task.slice(0, -1) } });
+    expect(prefix.total).toBe(0);
   });
 
   it('gaps carry session text, never a link to an agent run', async () => {

@@ -2,6 +2,7 @@ package codeloupe.ingest
 
 import codeloupe.accounts.Accounts
 import codeloupe.config.Config
+import codeloupe.metrics.BaselineStore
 import codeloupe.metrics.MetricsSetup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonObject
@@ -22,6 +23,7 @@ class Transcripts(
     private val db = TranscriptDb(config.home.resolve("transcripts.db"))
     val queries = RunQueries(db)
     val usage = AccountUsage(queries)
+    val baseline = BaselineStore(config.home.resolve(BaselineStore.FILE))
     val budgets = config.budgets
     val ingest = TranscriptIngest(
         { projectDirs(config, accounts) }, db, MetricsSetup(config).categorizer(),
