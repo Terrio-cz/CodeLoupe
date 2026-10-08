@@ -15,6 +15,7 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 |---|---|---|
 | Where is `X` declared | `find` (`q` = name, `Type.member` or glob; `kind`, `module`, `test` narrow) | `grep -r "class X"` |
 | A string literal, SQL, annotation argument or config key written in code | `grep` (`pattern`, literal unless `regex=true`; hits grouped by enclosing declaration) | `rg` and reading around each hit |
+| Orientation in a repository you do not know | `outline` without `target` (ranked map of files and types within `budget` tokens; `focus` = the files or symbols you work on) | `ls`, `find`, reading directory after directory |
 | What is in this file or type | `outline` (`target` = path or type; members with line ranges, no bodies) | reading the file |
 | The source of one declaration | `symbol` (`name`; KDoc, annotations, body; a large type collapses to header + members) | reading the file and scrolling |
 | Before changing `X`: its source, callers and callees | `context` (`name`; one call instead of `symbol` + `calls` twice) | three separate calls |

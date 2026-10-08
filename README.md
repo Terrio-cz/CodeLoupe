@@ -93,7 +93,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | Tool | Returns |
 |---|---|
 | `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature` |
-| `outline` | members of a file or type with line ranges, no bodies |
+| `outline` | members of a file or type with line ranges, no bodies; without a target a map of the repository: files ranked by how much the rest of the code refers to them (PageRank over name references), their types as one-line signatures, cut to `budget` tokens (default 1500); `focus` (files or symbols) puts them first and ranks their neighbourhood, references counted both ways |
 | `symbol` | one declaration's source (KDoc, annotations, body) by `Type.member`, `member(ParamType)`, `pkg.Type` or `File.kt:line`; large types collapse to header + members |
 | `grep` | text search in the indexed source (Kotlin and `.kts` files, worktree edits included) for string literals, SQL, annotation arguments, config keys: literal by default (`regex=true`, `ignoreCase=true`), hits grouped by file and enclosing declaration, one code line each; `module`, `test`, `limit` narrow it |
 | `context` | a declaration's source, its direct callers and the declarations it calls in one answer (`symbol` + `calls` depth 1) instead of three calls |
@@ -396,14 +396,18 @@ on, because the runtime is. CI builds them in the `bundle` job and keeps them fo
 | OS | Installer | Notes |
 |---|---|---|
 | Windows x64 | `CodeLoupe-<v>-win-x64.exe` (NSIS, per user, one click) | Starts the app when it ends. An update or uninstall first stops the installation's own daemon. The uninstaller asks whether to delete the data (`%LOCALAPPDATA%\codeloupe`, `%APPDATA%\codeloupe-desktop`); `/S` and updates keep it. |
-| macOS arm64 | `CodeLoupe-<v>-mac-arm64.dmg` | Drag to Applications. Removing the app leaves the data in `~/Library/Caches/codeloupe` and `~/Library/Application Support/codeloupe-desktop` until it is deleted by hand. |
+| macOS arm64, x64 | `CodeLoupe-<v>-mac-arm64.dmg`, `CodeLoupe-<v>-mac-x64.dmg` | Drag to Applications. Removing the app leaves the data in `~/Library/Caches/codeloupe` and `~/Library/Application Support/codeloupe-desktop` until it is deleted by hand. |
 | Linux x64 | `CodeLoupe-<v>-linux-x64.AppImage`, `.deb` | The AppImage copies the bundle to `<userData>/daemon/<version>` once, because the daemon outlives its mount. Removing the app leaves the data in `~/.cache/codeloupe` and `~/.config/codeloupe-desktop`. |
 
 An installed app reads real data (`apiSource: daemon`) and starts the daemon from its own runtime; the CLI command in
-Settings stays on its default and is resolved at start-up, so an update never leaves a stale path. Not yet: signing
-and notarisation (CL-105, until then Windows shows an unknown publisher and macOS refuses the app), the release
-pipeline (CL-106), auto-update (CL-107), installer smoke tests that install and start the app (CL-108; CI only
-unpacks each installer and runs the bundle inside), macOS x64.
+Settings stays on its default and is resolved at start-up, so an update never leaves a stale path.
+
+The `installer-smoke` CI job installs each installer on its OS, starts the app, waits for the daemon the app starts
+from the bundled runtime, runs `find` through the CLI and through the MCP endpoint on a PATH without Java, takes a
+screenshot of the app window (artifact `installer-smoke-<os>`) and uninstalls (`node tools/installer-smoke.mjs <installer>`;
+it uses its own home, port and app data, so it is safe on a developer machine; screenshots only when `CI` is set).
+Not yet: signing and notarisation (CL-105, until then Windows shows an unknown publisher and macOS refuses the app),
+the release pipeline (CL-106), auto-update (CL-107). CI cost and runners: [docs/ci.md](docs/ci.md).
 
 ## Develop
 
