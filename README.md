@@ -608,7 +608,7 @@ The `installer-smoke` CI job installs each installer on its OS, starts the app, 
 from the bundled runtime, runs `find` through the CLI and through the MCP endpoint on a PATH without Java, takes a
 screenshot of the app window (artifact `smoke-<os>`) and uninstalls (`node tools/installer-smoke.mjs <installer>`;
 it uses its own home, port and app data, so it is safe on a developer machine; screenshots only when `CI` is set).
-Not yet: signing and notarisation (CL-105, until then Windows shows an unknown publisher and macOS refuses the app),
+Not yet: signing and notarisation (CL-105, options and costs in [docs/code-signing.md](docs/code-signing.md); until the owner chooses, Windows shows an unknown publisher and macOS refuses the app),
 the release pipeline (CL-106), auto-update (CL-107). CI cost and runners: [docs/ci.md](docs/ci.md). Releasing (tag, checksums, SBOMs, draft release): [docs/release.md](docs/release.md).
 
 ## Develop
