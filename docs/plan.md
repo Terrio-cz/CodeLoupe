@@ -115,7 +115,7 @@ Technické budgety: daemon ustáleně ≤ 200 MB (JVM), špička ≤ 300 MB; bui
   Python, Go) později bez změny jádra.
 - Cache: `<home>/repos/<repo-id>/` (repo-id = hash git common dir) → víc repozitářů, víc workspaců,
   jedna instance.
-- Licence a README, konfigurační reference, CHANGELOG — součást v1.
+- Licence: **PolyForm Noncommercial 1.0.0** (uživatel 2026-10-08, CL-100: lidé to nesmějí prodávat ani komerčně využívat; nejsilnější ochrana při veřejném repu). README, konfigurační reference, CHANGELOG — součást v1.
 
 ## 5. Architektura
 

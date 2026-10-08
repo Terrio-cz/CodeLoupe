@@ -322,3 +322,10 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 TerrioImporter part runs where that repository is checked out (`CODELOUPE_TERRIO`). `UsagesGoldenTest` checks
 `usages` on 44 TerrioImporter symbols against a manually verified oracle (`src/test/resources/golden`) and writes
 `build/reports/codeloupe/golden-usages.md`: superset of `rg -w`, precision of `exact` (≥ 95 %), candidate share.
+
+## Licence
+
+CodeLoupe is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE): you may use, study, modify
+and share it for any noncommercial purpose (personal use, research, education, charities, public institutions), but
+not sell it, offer it as a paid product or service, or use it for commercial purposes. This is not an open-source
+licence in the OSI sense. For commercial use, contact the licensor (Terrio-cz).
