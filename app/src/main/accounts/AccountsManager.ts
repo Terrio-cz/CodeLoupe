@@ -40,12 +40,12 @@ function slug(text: string, fallback: string, taken: Set<string>): string {
 
 /** A plain https URL (or http to this machine, for a test instance) without credentials, as the origin only. */
 export function checkUrl(input: unknown): { ok: true; url: string } | { ok: false; error: string } {
-  if (typeof input !== 'string' || input.length > 300 || hasControl(input)) return { ok: false, error: 'adresa není platná' };
+  if (typeof input !== 'string' || input.length > 300 || hasControl(input)) return { ok: false, error: 'the URL is not valid' };
   let u: URL;
-  try { u = new URL(input.trim()); } catch { return { ok: false, error: 'adresa není platná' }; }
+  try { u = new URL(input.trim()); } catch { return { ok: false, error: 'the URL is not valid' }; }
   const local = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
-  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && local)) return { ok: false, error: 'adresa musí začínat https://' };
-  if (u.username || u.password) return { ok: false, error: 'adresa nesmí obsahovat přihlašovací údaje' };
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && local)) return { ok: false, error: 'the URL must start with https://' };
+  if (u.username || u.password) return { ok: false, error: 'the URL must not contain credentials' };
   return { ok: true, url: `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, '')}` };
 }
 
@@ -63,20 +63,20 @@ export class AccountsManager {
     const label = this.label(input?.label);
     if (typeof label !== 'string') return label;
     const dir = input?.configDir;
-    if (typeof dir !== 'string' || !dir.trim() || dir.length > 400 || hasControl(dir) || !path.isAbsolute(dir.trim())) return fail('Složka účtu musí být zadaná plnou cestou.');
+    if (typeof dir !== 'string' || !dir.trim() || dir.length > 400 || hasControl(dir) || !path.isAbsolute(dir.trim())) return fail('Enter the account folder as a full path.');
     const configDir = path.normalize(dir.trim());
     if (!fs.existsSync(configDir)) {
-      if (input.create !== true) return fail('Složka neexistuje; zaškrtněte vytvoření, nebo zadejte existující.');
-      try { fs.mkdirSync(configDir, { recursive: true }); } catch (e) { return fail(`Složku nelze vytvořit: ${(e as NodeJS.ErrnoException).code ?? 'chyba'}.`); }
-    } else if (!fs.statSync(configDir).isDirectory()) return fail('Zadaná cesta není složka.');
+      if (input.create !== true) return fail('The folder does not exist; tick “create it” or enter an existing one.');
+      try { fs.mkdirSync(configDir, { recursive: true }); } catch (e) { return fail(`The folder cannot be created: ${(e as NodeJS.ErrnoException).code ?? 'error'}.`); }
+    } else if (!fs.statSync(configDir).isDirectory()) return fail('The path is not a folder.');
     const data = this.load();
     // With nothing listed, `~/.claude` is the account Claude Code uses; it becomes a real entry before another one joins it.
-    if (data.claude.length === 0) data.claude.push({ id: 'default', label: 'Výchozí účet', configDir: path.join(this.deps.userHome(), '.claude'), default: true });
-    if (data.claude.some(c => same(c.configDir, configDir))) return fail('Účet s touto složkou už existuje.');
-    const id = slug(label, 'ucet', new Set(data.claude.map(c => c.id)));
+    if (data.claude.length === 0) data.claude.push({ id: 'default', label: 'Default account', configDir: path.join(this.deps.userHome(), '.claude'), default: true });
+    if (data.claude.some(c => same(c.configDir, configDir))) return fail('An account with this folder already exists.');
+    const id = slug(label, 'account', new Set(data.claude.map(c => c.id)));
     data.claude.push({ id, label, configDir, default: false });
     writeAccounts(this.deps.homeDir(), this.withDefault(data));
-    return ok(`Účet „${label}“ přidán.`);
+    return ok(`Account “${label}” added.`);
   }
 
   async claudeRename(id: string, label: string): Promise<AccountOutcome> {
@@ -86,20 +86,20 @@ export class AccountsManager {
     if (typeof clean !== 'string') return clean;
     const data = this.load();
     const entry = data.claude.find(c => c.id === id);
-    if (!entry) return fail('Účet neexistuje.');
+    if (!entry) return fail('The account does not exist.');
     entry.label = clean;
     writeAccounts(this.deps.homeDir(), data);
-    return ok('Účet přejmenován.');
+    return ok('Account renamed.');
   }
 
   async claudeSetDefault(id: string): Promise<AccountOutcome> {
     const blocked = this.deps.blocked?.();
     if (blocked) return fail(blocked);
     const data = this.load();
-    if (!data.claude.some(c => c.id === id)) return fail('Účet neexistuje.');
+    if (!data.claude.some(c => c.id === id)) return fail('The account does not exist.');
     for (const c of data.claude) c.default = c.id === id;
     writeAccounts(this.deps.homeDir(), data);
-    return ok('Výchozí účet nastaven.');
+    return ok('Default account set.');
   }
 
   async claudeRemove(id: string): Promise<AccountOutcome> {
@@ -107,11 +107,11 @@ export class AccountsManager {
     if (blocked) return fail(blocked);
     const data = this.load();
     const entry = data.claude.find(c => c.id === id);
-    if (!entry) return fail('Účet neexistuje.');
-    if (!(await this.deps.confirm(`Odebrat účet ${entry.label}?`, `Z CodeLoupe zmizí jen záznam o účtu. Složka ${entry.configDir} a její přihlášení zůstanou.`, 'Odebrat'))) return fail('Odebrání zrušeno.');
+    if (!entry) return fail('The account does not exist.');
+    if (!(await this.deps.confirm(`Remove account ${entry.label}?`, `Only the account entry disappears from CodeLoupe. The folder ${entry.configDir} and its sign-in stay.`, 'Remove'))) return fail('Removal cancelled.');
     data.claude = data.claude.filter(c => c.id !== id);
     writeAccounts(this.deps.homeDir(), this.withDefault(data));
-    return ok(`Účet ${entry.label} odebrán.`);
+    return ok(`Account ${entry.label} removed.`);
   }
 
   async youtrackAdd(input: YoutrackAccountInput): Promise<AccountOutcome> {
@@ -122,23 +122,23 @@ export class AccountsManager {
       const label = this.label(input?.label);
       if (typeof label !== 'string') return label;
       const url = checkUrl(input?.url);
-      if (!url.ok) return fail(`Účet nelze přidat: ${url.error}.`);
+      if (!url.ok) return fail(`The account cannot be added: ${url.error}.`);
       const projects = this.projects(input?.projects);
       if (typeof projects === 'string') return fail(projects);
       const bad = this.tokenProblem(token);
       if (bad) return fail(bad);
       const data = this.load();
-      if (data.youtrack.some(y => y.url.toLowerCase() === url.url.toLowerCase())) return fail('Účet pro tuto instanci už existuje.');
+      if (data.youtrack.some(y => y.url.toLowerCase() === url.url.toLowerCase())) return fail('An account for this instance already exists.');
       const id = slug(label, 'youtrack', new Set(data.youtrack.map(y => y.id)));
-      if (!(await this.deps.confirm('Přidat účet YouTrack?', `${url.url}\nProjekty: ${projects.join(', ')}\nDaemon se kvůli novému mirroru restartuje; běžící joby se přeruší.`, 'Přidat a restartovat'))) return fail('Přidání zrušeno.');
+      if (!(await this.deps.confirm('Add YouTrack account?', `${url.url}\nProjects: ${projects.join(', ')}\nThe daemon restarts for the new mirror; running jobs are interrupted.`, 'Add and restart'))) return fail('Adding cancelled.');
       const stored = await this.storeToken(tokenName(id), token as string);
       if (!stored.ok) return stored;
       data.youtrack.push({ id, label, url: url.url, projects, token: tokenName(id) });
       writeAccounts(this.deps.homeDir(), data);
       await this.deps.restartDaemon();
-      return ok(`Účet ${label} přidán, daemon restartován.`);
+      return ok(`Account ${label} added, daemon restarted.`);
     } catch (e) {
-      return fail(`Účet se nepodařilo přidat: ${firstLine(scrub((e as Error).message, String(token ?? '')))}`);
+      return fail(`Could not add the account: ${firstLine(scrub((e as Error).message, String(token ?? '')))}`);
     }
   }
 
@@ -146,17 +146,17 @@ export class AccountsManager {
     const blocked = this.deps.blocked?.();
     if (blocked) return fail(blocked);
     const entry = this.load().youtrack.find(y => y.id === id);
-    if (!entry) return fail('Účet neexistuje.');
+    if (!entry) return fail('The account does not exist.');
     const token = await this.deps.fetchStored(entry.token).catch(() => null);
-    if (!token) return fail('Token účtu není v úložišti; zadejte ho přes Rotovat token.');
+    if (!token) return fail('The account token is not in the store; enter it with Rotate token.');
     try {
       const r = await this.deps.http(`${entry.url}/api/users/me?fields=login`, { Authorization: `Bearer ${token}`, Accept: 'application/json' });
-      if (r.status === 401 || r.status === 403) return fail('Instance token odmítla (neplatný nebo bez oprávnění).');
-      if (r.status < 200 || r.status >= 300) return fail(`Instance odpověděla stavem ${r.status}.`);
+      if (r.status === 401 || r.status === 403) return fail('The instance rejected the token (invalid or without permission).');
+      if (r.status < 200 || r.status >= 300) return fail(`The instance answered with status ${r.status}.`);
       const login = (JSON.parse(r.body) as { login?: unknown }).login;
-      return ok(typeof login === 'string' && login ? `Připojeno jako ${login}.` : 'Připojeno.');
+      return ok(typeof login === 'string' && login ? `Connected as ${login}.` : 'Connected.');
     } catch (e) {
-      return fail(`Spojení selhalo: ${firstLine(scrub((e as Error).message, token))}`);
+      return fail(`Connection failed: ${firstLine(scrub((e as Error).message, token))}`);
     }
   }
 
@@ -166,9 +166,9 @@ export class AccountsManager {
     const bad = this.tokenProblem(token);
     if (bad) return fail(bad);
     const entry = this.load().youtrack.find(y => y.id === id);
-    if (!entry) return fail('Účet neexistuje.');
+    if (!entry) return fail('The account does not exist.');
     const stored = await this.storeToken(entry.token, token);
-    return stored.ok ? ok(`Token účtu ${entry.label} rotován.`) : stored;
+    return stored.ok ? ok(`Token of account ${entry.label} rotated.`) : stored;
   }
 
   async youtrackRemove(id: string): Promise<AccountOutcome> {
@@ -176,47 +176,47 @@ export class AccountsManager {
     if (blocked) return fail(blocked);
     const data = this.load();
     const entry = data.youtrack.find(y => y.id === id);
-    if (!entry) return fail('Účet neexistuje.');
-    if (!(await this.deps.confirm(`Odebrat účet ${entry.label}?`, `${entry.url}\nToken se smaže z úložiště, mirror úkolů se přestane aktualizovat a daemon se restartuje.`, 'Odebrat a restartovat'))) return fail('Odebrání zrušeno.');
+    if (!entry) return fail('The account does not exist.');
+    if (!(await this.deps.confirm(`Remove account ${entry.label}?`, `${entry.url}\nThe token is deleted from the store, the task mirror stops updating and the daemon restarts.`, 'Remove and restart'))) return fail('Removal cancelled.');
     data.youtrack = data.youtrack.filter(y => y.id !== id);
     writeAccounts(this.deps.homeDir(), data);
     try {
       await this.deps.run(['env', 'unset', entry.token, '--scope', 'global'], null, 60_000);
       await this.deps.restartDaemon();
     } catch (e) {
-      return fail(`Účet je odebrán, ale úklid selhal: ${firstLine((e as Error).message)}`);
+      return fail(`The account is removed, but the cleanup failed: ${firstLine((e as Error).message)}`);
     }
-    return ok(`Účet ${entry.label} odebrán, daemon restartován.`);
+    return ok(`Account ${entry.label} removed, daemon restarted.`);
   }
 
   private async storeToken(name: string, token: string): Promise<AccountOutcome> {
     try {
       const r = await this.deps.run(['env', 'set', name, '--scope', 'global', '--source', 'app'], `${token}\n`, 60_000);
-      return r.code === 0 ? ok('uloženo') : fail(`Token se nepodařilo uložit: ${firstLine(scrub(r.stderr || r.stdout, token))}`);
+      return r.code === 0 ? ok('saved') : fail(`Could not save the token: ${firstLine(scrub(r.stderr || r.stdout, token))}`);
     } catch (e) {
-      return fail(`Token se nepodařilo uložit: ${firstLine(scrub((e as Error).message, token))}`);
+      return fail(`Could not save the token: ${firstLine(scrub((e as Error).message, token))}`);
     }
   }
 
   private tokenProblem(token: unknown): string | null {
-    if (typeof token !== 'string' || token.length === 0) return 'Zadejte token.';
-    if (token.length > 4096 || hasControl(token)) return 'Token má neplatný tvar.';
+    if (typeof token !== 'string' || token.length === 0) return 'Enter a token.';
+    if (token.length > 4096 || hasControl(token)) return 'The token has an invalid format.';
     return null;
   }
 
   private projects(input: unknown): string[] | string {
-    if (!Array.isArray(input) || input.length === 0 || input.length > 50) return 'Zadejte aspoň jeden projekt (zkratku, např. TER).';
+    if (!Array.isArray(input) || input.length === 0 || input.length > 50) return 'Enter at least one project (its key, e.g. TER).';
     const out: string[] = [];
     for (const p of input) {
-      if (typeof p !== 'string' || !PROJECT.test(p.trim())) return `Projekt „${typeof p === 'string' ? p.slice(0, 20) : '?'}“ není platná zkratka.`;
+      if (typeof p !== 'string' || !PROJECT.test(p.trim())) return `Project “${typeof p === 'string' ? p.slice(0, 20) : '?'}” is not a valid key.`;
       if (!out.includes(p.trim().toUpperCase())) out.push(p.trim().toUpperCase());
     }
     return out;
   }
 
   private label(input: unknown): string | AccountOutcome {
-    if (typeof input !== 'string' || !input.trim()) return fail('Zadejte název účtu.');
-    if (input.trim().length > LABEL_MAX || hasControl(input)) return fail(`Název smí mít nejvýše ${LABEL_MAX} znaků.`);
+    if (typeof input !== 'string' || !input.trim()) return fail('Enter an account name.');
+    if (input.trim().length > LABEL_MAX || hasControl(input)) return fail(`The name may have at most ${LABEL_MAX} characters.`);
     return input.trim();
   }
 
@@ -234,7 +234,7 @@ export class AccountsManager {
 const same = (a: string, b: string): boolean => path.normalize(a).toLowerCase() === path.normalize(b).toLowerCase();
 
 function firstLine(text: string): string {
-  return text.trim().split(/\r?\n/).filter(Boolean)[0] ?? 'bez zprávy';
+  return text.trim().split(/\r?\n/).filter(Boolean)[0] ?? 'no message';
 }
 
 export type { ClaudeEntry, YoutrackEntry };

@@ -13,12 +13,12 @@ describe('LatencyBars', () => {
   it('names a tool over the p95 budget in words, slowest first', () => {
     const html = renderToStaticMarkup(<LatencyBars latency={latency} budgetMs={1000} />);
     expect(html.indexOf('changes')).toBeLessThan(html.indexOf('find'));
-    expect(html).toContain('nad budget');
+    expect(html).toContain('over budget');
     expect(html).toContain('budget 1');
   });
 
   it('says so when no call has been made', () => {
-    expect(renderToStaticMarkup(<LatencyBars latency={{ ...latency, window: 0, byTool: {} }} budgetMs={1000} />)).toContain('Zatím žádná volání');
+    expect(renderToStaticMarkup(<LatencyBars latency={{ ...latency, window: 0, byTool: {} }} budgetMs={1000} />)).toContain('No calls yet');
   });
 });
 
@@ -28,11 +28,11 @@ describe('TimeChart', () => {
   it('summarises the series and the exceeded budget for assistive technology', () => {
     const html = renderToStaticMarkup(<TimeChart label="RSS" points={points} format={v => `${v} MB`} limit={{ value: 250, label: 'budget' }} />);
     expect(html).toContain('role="img"');
-    expect(html).toContain('RSS: poslední 260 MB, maximum 260 MB, budget 250 MB, překročeno.');
-    expect(html).toContain('překročeno</strong>');
+    expect(html).toContain('RSS: last 260 MB, max 260 MB, budget 250 MB, exceeded.');
+    expect(html).toContain('exceeded</strong>');
   });
 
   it('says why there is nothing to draw', () => {
-    expect(renderToStaticMarkup(<TimeChart label="RSS" points={[]} format={String} />)).toContain('zatím nezaznamenal');
+    expect(renderToStaticMarkup(<TimeChart label="RSS" points={[]} format={String} />)).toContain('has not recorded');
   });
 });

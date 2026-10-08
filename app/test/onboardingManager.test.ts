@@ -23,7 +23,7 @@ describe('adding repositories', () => {
     const t = setup({}, () => ({ code: 0, stdout: JSON.stringify(report({ added: ['C:/Work/App'], already: ['C:/Work/Lib'], rejected: [{ path: 'C:/x', reason: 'not a git repository (no .git)' }] })), stderr: '' }));
     const out = await t.manager.addRepositories();
     expect(out).toMatchObject({ ok: true, added: ['C:/Work/App'], already: ['C:/Work/Lib'] });
-    expect((out as { message: string }).message).toBe('Přidáno 1, už bylo 1, odmítnuto 1. Index se staví na pozadí.');
+    expect((out as { message: string }).message).toBe('Added 1, already present 1, rejected 1. The index is building in the background.');
     expect(t.calls[0].args).toEqual(['repos', 'add', '--json', 'C:/Work/App', 'C:/Work/Lib']);
   });
 
@@ -31,8 +31,8 @@ describe('adding repositories', () => {
     const none = setup({ pickFolders: async () => [] });
     expect(await none.manager.addRepositories()).toBe('cancelled');
     expect(none.calls).toHaveLength(0);
-    const mock = setup({ blocked: () => 'Zdroj dat je Mock' });
-    expect(await mock.manager.addRepositories()).toMatchObject({ ok: false, message: 'Zdroj dat je Mock' });
+    const mock = setup({ blocked: () => 'The data source is Mock' });
+    expect(await mock.manager.addRepositories()).toMatchObject({ ok: false, message: 'The data source is Mock' });
     expect(mock.calls).toHaveLength(0);
     const odd = setup({ pickFolders: async () => ['C:/ok', 'C:/a\nb', ''] });
     await odd.manager.addRepositories();
@@ -44,11 +44,11 @@ describe('adding repositories', () => {
 
   it('reports no repository, a CLI that failed and one that could not start, without throwing', async () => {
     const rejected = setup({}, () => ({ code: 1, stdout: JSON.stringify(report({ rejected: [{ path: 'C:/x', reason: 'not a folder' }] })), stderr: '' }));
-    expect(await rejected.manager.addRepositories()).toMatchObject({ ok: false, message: 'Žádná z vybraných složek není git repozitář.' });
+    expect(await rejected.manager.addRepositories()).toMatchObject({ ok: false, message: 'None of the selected folders is a git repository.' });
     const broken = setup({}, () => ({ code: 2, stdout: '', stderr: 'Error: config.json is not valid JSON; fix it by hand first\n' }));
     expect(await broken.manager.addRepositories()).toMatchObject({ ok: false, message: expect.stringContaining('config.json is not valid JSON') });
-    const missing = setup({ run: async () => { throw new Error('příkaz „codeloupe“ nebyl nalezen'); } });
-    expect(await missing.manager.addRepositories()).toMatchObject({ ok: false, message: expect.stringContaining('nebyl nalezen') });
+    const missing = setup({ run: async () => { throw new Error('command “codeloupe” was not found'); } });
+    expect(await missing.manager.addRepositories()).toMatchObject({ ok: false, message: expect.stringContaining('was not found') });
   });
 });
 
@@ -58,15 +58,15 @@ describe('the trial query', () => {
     expect(await t.manager.query('app-1a2b')).toEqual({ ok: true, text: 'class App  src/App.kt:3' });
     expect(t.calls[0].args).toEqual(['outline', '--root', 'C:/Work/App', '--budget', '600']);
     expect(await t.manager.query('nobody')).toMatchObject({ ok: false });
-    expect(await t.manager.query('../../etc')).toMatchObject({ ok: false, text: 'Neplatné ID repozitáře.' });
+    expect(await t.manager.query('../../etc')).toMatchObject({ ok: false, text: 'Invalid repository ID.' });
     expect(t.calls).toHaveLength(1);
   });
 
   it('passes on a failing answer and a busy index as text', async () => {
     const t = setup({}, () => ({ code: 1, stdout: 'busy: the index of this repository is still building', stderr: '' }));
     expect(await t.manager.query('app-1a2b')).toEqual({ ok: false, text: 'busy: the index of this repository is still building' });
-    const mock = setup({ blocked: () => 'Zdroj dat je Mock' });
-    expect(await mock.manager.query('app-1a2b')).toEqual({ ok: false, text: 'Zdroj dat je Mock' });
+    const mock = setup({ blocked: () => 'The data source is Mock' });
+    expect(await mock.manager.query('app-1a2b')).toEqual({ ok: false, text: 'The data source is Mock' });
   });
 });
 

@@ -19,8 +19,8 @@ export function cliRunner(settings: () => AppSettings, homeDir: () => string): R
       env: { ...process.env, CODELOUPE_HOME: homeDir() },
     }, (err, stdout, stderr) => {
       const code = (err as NodeJS.ErrnoException | null)?.code;
-      if (code === 'ENOENT') return reject(new Error(`příkaz „${s.cliCommand}“ nebyl nalezen`));
-      if (code === 'EINVAL') return reject(new Error(`„${s.cliCommand}“ nejde spustit bez shellu; zadejte java a argumenty -cp <instalace>/lib/* codeloupe.MainKt`));
+      if (code === 'ENOENT') return reject(new Error(`command “${s.cliCommand}” was not found`));
+      if (code === 'EINVAL') return reject(new Error(`“${s.cliCommand}” cannot run without a shell; enter java with the arguments -cp <install dir>/lib/* codeloupe.MainKt`));
       const exit = err ? (typeof (err as { code?: unknown }).code === 'number' ? (err as unknown as { code: number }).code : 1) : 0;
       resolve({ code: exit, stdout: String(stdout), stderr: String(stderr) });
     });

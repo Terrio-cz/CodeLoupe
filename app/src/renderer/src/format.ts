@@ -1,13 +1,13 @@
-// Czech number and time formatting for dense tables.
+// English (en-US) number and time formatting for dense tables.
 
-const nf = new Intl.NumberFormat('cs-CZ');
-const nf1 = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 1 });
+const nf = new Intl.NumberFormat('en-US');
+const nf1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
 // One formatter per precision: each Intl.NumberFormat holds native ICU memory the GC does not see, and the
 // animated KPI numbers format every frame.
 const byDigits = new Map<number, Intl.NumberFormat>();
 const nfd = (digits: number) => {
   let f = byDigits.get(digits);
-  if (!f) byDigits.set(digits, (f = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: digits })));
+  if (!f) byDigits.set(digits, (f = new Intl.NumberFormat('en-US', { maximumFractionDigits: digits })));
   return f;
 };
 
@@ -15,11 +15,11 @@ export function num(n: number | null | undefined): string {
   return n === null || n === undefined ? '—' : nf.format(n);
 }
 
-/** 1 240 000 → "1,24M", 392 000 → "392k". */
+/** 1 240 000 → "1.24M", 392 000 → "392k". */
 export function tokens(n: number | null | undefined): string {
   if (n === null || n === undefined) return '—';
   const a = Math.abs(n);
-  if (a >= 1e9) return `${nf1.format(n / 1e9)} mld.`;
+  if (a >= 1e9) return `${nf1.format(n / 1e9)}B`;
   if (a >= 1e6) return `${nfd(2).format(n / 1e6)}M`;
   if (a >= 1e4) return `${nf.format(Math.round(n / 1e3))}k`;
   if (a >= 1e3) return `${nf1.format(n / 1e3)}k`;
@@ -27,7 +27,7 @@ export function tokens(n: number | null | undefined): string {
 }
 
 export function pct(x: number, digits = 0): string {
-  return `${nfd(digits).format(x)} %`;
+  return `${nfd(digits).format(x)}%`;
 }
 
 export function bytes(b: number): string {
@@ -47,11 +47,11 @@ export function ms(n: number | null | undefined): string {
 export function ago(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return '—';
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 60) return 'právě teď';
-  if (s < 3600) return `před ${Math.round(s / 60)} min`;
-  if (s < 86_400) return `před ${Math.round(s / 3600)} h`;
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86_400) return `${Math.round(s / 3600)} h ago`;
   const d = Math.round(s / 86_400);
-  return d === 1 ? 'včera' : `před ${d} dny`;
+  return d === 1 ? 'yesterday' : `${d} days ago`;
 }
 
 export function dateTime(iso: string | null | undefined): string {

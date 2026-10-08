@@ -38,13 +38,13 @@ export function jobCounts(jobs: JobRecord[]): JobCounts {
 
 export function jobStatus(j: JobRecord): { tone: Tone; label: string } {
   switch (j.status) {
-    case 'queued': return { tone: 'neutral', label: j.slot ? `čeká na slot ${j.slot}` : 'spouští se' };
-    case 'running': return { tone: 'running', label: 'běží' };
-    case 'done': return j.exit === 0 ? { tone: 'ok', label: 'hotovo' } : { tone: 'critical', label: `selhalo (exit ${j.exit})` };
-    case 'denied': return { tone: 'serious', label: 'zamítnuto' };
-    case 'cancelled': return { tone: 'neutral', label: 'zrušeno' };
-    case 'lost': return { tone: 'warning', label: 'ztraceno' };
-    case 'error': return { tone: 'critical', label: 'chyba' };
+    case 'queued': return { tone: 'neutral', label: j.slot ? `waiting for slot ${j.slot}` : 'starting' };
+    case 'running': return { tone: 'running', label: 'running' };
+    case 'done': return j.exit === 0 ? { tone: 'ok', label: 'done' } : { tone: 'critical', label: `failed (exit ${j.exit})` };
+    case 'denied': return { tone: 'serious', label: 'denied' };
+    case 'cancelled': return { tone: 'neutral', label: 'cancelled' };
+    case 'lost': return { tone: 'warning', label: 'lost' };
+    case 'error': return { tone: 'critical', label: 'error' };
   }
 }
 
@@ -70,7 +70,7 @@ export function slotLoad(s: SlotSnapshot): { used: number; free: number } {
 
 export const deliveryTone = (d: Delivery): Tone => (d.state === 'delivered' ? 'ok' : d.state === 'failed' ? 'critical' : d.attempts > 1 ? 'warning' : 'running');
 export const deliveryLabel = (d: Delivery): string =>
-  d.state === 'delivered' ? 'doručeno' : d.state === 'failed' ? 'selhalo' : d.attempts > 1 ? `opakuje (${d.attempts}.)` : 'čeká';
+  d.state === 'delivered' ? 'delivered' : d.state === 'failed' ? 'failed' : d.attempts > 1 ? `retrying (#${d.attempts})` : 'pending';
 
 export function shorten(text: string, max = 90): string {
   const one = text.replace(/\s+/g, ' ').trim();

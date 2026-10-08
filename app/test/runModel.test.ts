@@ -40,8 +40,8 @@ describe('runs', () => {
     expect(span(45)).toBe('45 s');
     expect(span(720)).toBe('12 min');
     expect(span(3900)).toBe('1 h 05 min');
-    expect(chars(950)).toBe('950 zn.');
-    expect(chars(41_200)).toBe('41 k zn.');
-    expect(chars(2_500_000)).toBe('2,5 M zn.');
+    expect(chars(950)).toBe('950 chars');
+    expect(chars(41_200)).toBe('41k chars');
+    expect(chars(2_500_000)).toBe('2.5M chars');
   });
 });

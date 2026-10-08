@@ -18,10 +18,10 @@ extraResources:
     to: codeloupe
   - from: stage/claude-plugin
     to: claude-plugin
-# Chromium's own strings (spell-check, context menus); the app's text is not translated through them.
+# Chromium's own strings (spell-check, context menus); the app's text is not translated through them. English only,
+# so a Czech OS does not bring Czech Chromium strings into the English UI.
 electronLanguages:
   - en-US
-  - cs
 artifactName: CodeLoupe-${version}-${os}-${arch}.${ext}
 # Ad hoc macOS signature (a no-op on the other platforms).
 afterPack: ./scripts/ad-hoc-sign.mjs

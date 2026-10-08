@@ -4,10 +4,10 @@ const DAY = 86_400_000;
 const RANGE_DAYS: Record<Range, number> = { '24h': 1, '7d': 7, '30d': 30 };
 
 export const KIND_LABELS: Record<GapKind, string> = {
-  fallback: 'agent sáhl po rg/cat/Read',
-  empty: 'prázdný výsledek',
+  fallback: 'agent fell back to rg/cat/Read',
+  empty: 'empty result',
   busy: 'busy',
-  candidates: 'jen kandidáti',
+  candidates: 'candidates only',
 };
 
 /** First day (UTC) of an ISO week label like `2026-W41`; null for `unknown` or anything else. */

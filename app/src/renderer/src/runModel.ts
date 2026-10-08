@@ -1,7 +1,7 @@
 import type { RunDetail, RunSortKey, StepItem } from '../../shared/runs';
 
 export const SORT_LABELS: Record<RunSortKey, string> = {
-  start: 'Začátek', weighted: 'Cena', turns: 'Tahy', peak: 'Peak kontext', share: 'Podíl výsledků', duration: 'Délka',
+  start: 'Start', weighted: 'Cost', turns: 'Turns', peak: 'Peak context', share: 'Result share', duration: 'Duration',
 };
 
 /** Weighted cost by price class (docs/plan.md § 1): input 1, 5 min cache write 1.25, 1 h cache write 2, cache read 0.1, output 5. */
@@ -14,12 +14,12 @@ export function usageParts(u: RunDetail['usage']): { name: string; value: number
 }
 
 export const GAP_LABELS: Record<NonNullable<StepItem['gap']>, string> = {
-  fallback: 'agent sáhl po rg/cat/Read', empty: 'prázdný výsledek', candidates: 'jen kandidáti', busy: 'busy',
+  fallback: 'agent fell back to rg/cat/Read', empty: 'empty result', candidates: 'candidates only', busy: 'busy',
 };
 
-/** Characters of a tool result: `41 200` → `41 k zn.`. */
+/** Characters of a tool result: `41200` → `41k chars`. */
 export function chars(n: number): string {
-  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1).replace('.', ',')} M zn.` : n >= 1000 ? `${Math.round(n / 1000)} k zn.` : `${n} zn.`;
+  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M chars` : n >= 1000 ? `${Math.round(n / 1000)}k chars` : `${n} chars`;
 }
 
 /** Seconds as `1 h 05 min`, `12 min`, `45 s`. */

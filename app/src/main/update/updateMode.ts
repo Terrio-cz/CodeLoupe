@@ -22,15 +22,15 @@ export interface ModeEnv {
  * Scoop alone updates it.
  */
 export function detectMode(env: ModeEnv): UpdateMode {
-  if (!env.packaged) return { kind: 'unavailable', reason: 'Vývojová verze se neaktualizuje.' };
+  if (!env.packaged) return { kind: 'unavailable', reason: 'A development build does not update.' };
   if (env.platform === 'win32') {
     const uninstaller = path.win32.join(path.win32.dirname(env.execPath), `Uninstall ${path.win32.basename(env.execPath)}`);
     return env.exists(uninstaller)
       ? { kind: 'install', engine: 'nsis' }
-      : { kind: 'notify', reason: 'Kopie bez instalátoru (například ze Scoopu): aktualizujte stejným správcem balíčků.' };
+      : { kind: 'notify', reason: 'A copy without an installer (from Scoop, for example): update it with the same package manager.' };
   }
-  if (env.platform === 'darwin') return { kind: 'notify', reason: 'macOS bez podpisu Developer ID: aplikace jen ohlásí novou verzi, stáhněte ji ručně nebo přes Homebrew.' };
+  if (env.platform === 'darwin') return { kind: 'notify', reason: 'macOS without a Developer ID signature: the app only announces a new version; download it manually or through Homebrew.' };
   return env.appImage
     ? { kind: 'install', engine: 'appimage' }
-    : { kind: 'notify', reason: 'Balíček .deb: aktualizujte přes správce balíčků nebo stažením nové verze.' };
+    : { kind: 'notify', reason: '.deb package: update it through the package manager or by downloading the new version.' };
 }

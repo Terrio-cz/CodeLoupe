@@ -62,7 +62,7 @@ export function Drawer({ title, subtitle, actions, wide, onClose, children }: Pr
             {subtitle && <div className="muted">{subtitle}</div>}
           </div>
           {actions}
-          <button className="btn ghost icon-only drawer-close" onClick={() => requestClose.current()} aria-label="Zavřít detail"><Icon name="close" /></button>
+          <button className="btn ghost icon-only drawer-close" onClick={() => requestClose.current()} aria-label="Close detail"><Icon name="close" /></button>
         </div>
         <div className="drawer-body">{children}</div>
       </div>

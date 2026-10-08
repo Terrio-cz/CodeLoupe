@@ -74,8 +74,8 @@ export function TimeChart({ label, points, format, limit, gapMs = 5 * 60_000 }: 
   const peak = points.reduce((m, p) => Math.max(m, p.v), 0);
   const over = limit ? points.some(p => p.v > limit.value) : false;
   const summary = last
-    ? `${label}: poslední ${format(last.v)}, maximum ${format(peak)}${limit ? `, ${limit.label} ${format(limit.value)}${over ? ', překročeno' : ''}` : ''}.`
-    : `${label}: žádná data.`;
+    ? `${label}: last ${format(last.v)}, max ${format(peak)}${limit ? `, ${limit.label} ${format(limit.value)}${over ? ', exceeded' : ''}` : ''}.`
+    : `${label}: no data.`;
 
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const r = svg.current!.getBoundingClientRect();
@@ -86,19 +86,19 @@ export function TimeChart({ label, points, format, limit, gapMs = 5 * 60_000 }: 
   };
   const h = hover !== null ? points[hover] : null;
 
-  if (points.length === 0) return <Empty icon="chart">Daemon zatím nezaznamenal žádné odečty (měří se jen při používání).</Empty>;
+  if (points.length === 0) return <Empty icon="chart">The daemon has not recorded any readings yet (it measures only while in use).</Empty>;
 
   return (
     <div>
       <div className="legend" style={{ marginBottom: 6 }}>
         <span><span className="sw" aria-hidden="true" />{label} <strong>{format(last.v)}</strong></span>
-        {limit && <span><span className="sw base" aria-hidden="true" />{limit.label} {format(limit.value)}{over && <> · <span className="badge critical"><strong>překročeno</strong></span></>}</span>}
-        <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}><Icon name={asTable ? 'chart' : 'table'} size={14} />{asTable ? 'Graf' : 'Tabulka'}</button>
+        {limit && <span><span className="sw base" aria-hidden="true" />{limit.label} {format(limit.value)}{over && <> · <span className="badge critical"><strong>exceeded</strong></span></>}</span>}
+        <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}><Icon name={asTable ? 'chart' : 'table'} size={14} />{asTable ? 'Chart' : 'Table'}</button>
       </div>
       {asTable ? (
         <div className="table-wrap" style={{ maxHeight: H }}>
           <table className="data" aria-label={label}>
-            <thead><tr><th scope="col">Čas</th><th scope="col" className="num">{label}</th></tr></thead>
+            <thead><tr><th scope="col">Time</th><th scope="col" className="num">{label}</th></tr></thead>
             <tbody>{[...points].reverse().map(p => <tr key={p.t}><td>{time(p.t)}</td><td className="num">{format(p.v)}</td></tr>)}</tbody>
           </table>
         </div>

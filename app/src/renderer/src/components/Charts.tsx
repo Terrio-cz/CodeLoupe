@@ -44,7 +44,7 @@ export function CostChart({ points, hourly }: { points: CostPoint[]; hourly: boo
 
   const label = (iso: string) => {
     const d = new Date(iso);
-    return hourly ? `${String(d.getHours()).padStart(2, '0')}:00` : `${d.getDate()}. ${d.getMonth() + 1}.`;
+    return hourly ? `${String(d.getHours()).padStart(2, '0')}:00` : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
   const sumActual = points.reduce((a, p) => a + p.weighted, 0);
   const sumBase = points.reduce((a, p) => a + p.baseline, 0);
@@ -62,14 +62,14 @@ export function CostChart({ points, hourly }: { points: CostPoint[]; hourly: boo
   return (
     <div>
       <div className="legend" style={{ marginBottom: 8 }}>
-        <span><span className="sw" aria-hidden="true" />Skutečnost <strong>{tokens(sumActual)}</strong></span>
+        <span><span className="sw" aria-hidden="true" />Actual <strong>{tokens(sumActual)}</strong></span>
         <span><span className="sw base" aria-hidden="true" />Baseline <strong>{tokens(sumBase)}</strong></span>
-        <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}><Icon name={asTable ? 'chart' : 'table'} size={14} />{asTable ? 'Graf' : 'Tabulka'}</button>
+        <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}><Icon name={asTable ? 'chart' : 'table'} size={14} />{asTable ? 'Chart' : 'Table'}</button>
       </div>
       {asTable ? (
         <div className="table-wrap" style={{ maxHeight: 220 }}>
-          <table className="data" aria-label="Cena v čase">
-            <thead><tr><th scope="col">Období</th><th scope="col" className="num">Skutečnost</th><th scope="col" className="num">Baseline</th></tr></thead>
+          <table className="data" aria-label="Cost over time">
+            <thead><tr><th scope="col">Period</th><th scope="col" className="num">Actual</th><th scope="col" className="num">Baseline</th></tr></thead>
             <tbody>{points.map(p => <tr key={p.t}><td>{label(p.t)}</td><td className="num">{tokens(p.weighted)}</td><td className="num">{tokens(p.baseline)}</td></tr>)}</tbody>
           </table>
         </div>
@@ -79,7 +79,7 @@ export function CostChart({ points, hourly }: { points: CostPoint[]; hourly: boo
             ref={svg}
             viewBox={`0 0 ${W} ${H}`}
             role="img"
-            aria-label={`Cena v čase: skutečnost ${tokens(sumActual)} vážených tokenů, baseline ${tokens(sumBase)}.`}
+            aria-label={`Cost over time: actual ${tokens(sumActual)} weighted tokens, baseline ${tokens(sumBase)}.`}
             onMouseMove={onMove}
             onMouseLeave={() => setHover(null)}
           >
@@ -112,7 +112,7 @@ export function CostChart({ points, hourly }: { points: CostPoint[]; hourly: boo
           {hover !== null && h && (
             <div className="tooltip" style={{ left: `${(geo.x(hover) / W) * 100}%`, top: `${(geo.y(Math.max(h.weighted, h.baseline)) / H) * 100}%` }}>
               <strong>{label(h.t)}</strong>
-              <div className="row"><span className="sw" aria-hidden="true" />Skutečnost {tokens(h.weighted)}</div>
+              <div className="row"><span className="sw" aria-hidden="true" />Actual {tokens(h.weighted)}</div>
               <div className="row"><span className="sw base" aria-hidden="true" />Baseline {tokens(h.baseline)}</div>
             </div>
           )}

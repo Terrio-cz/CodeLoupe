@@ -47,14 +47,14 @@ export class EnvManager {
     const blocked = this.deps.blocked?.();
     if (blocked) return { ok: false, message: blocked };
     const checked = checkSet(input);
-    if (!checked.ok) return { ok: false, message: `Hodnotu nelze uložit: ${checked.error}.` };
+    if (!checked.ok) return { ok: false, message: `The value cannot be saved: ${checked.error}.` };
     const { name, scope, value } = checked.value;
     try {
       const r = await this.deps.run(['env', 'set', name, '--scope', scope, '--source', 'app'], `${value}\n`, SHORT_MS);
-      if (r.code !== 0) return { ok: false, message: `Uložení selhalo: ${lastLine(scrub(r.stderr || r.stdout, value))}` };
-      return { ok: true, message: `${name} uloženo (${scope}).` };
+      if (r.code !== 0) return { ok: false, message: `Save failed: ${lastLine(scrub(r.stderr || r.stdout, value))}` };
+      return { ok: true, message: `${name} saved (${scope}).` };
     } catch (e) {
-      return { ok: false, message: `Uložení selhalo: ${lastLine(scrub((e as Error).message, value))}` };
+      return { ok: false, message: `Save failed: ${lastLine(scrub((e as Error).message, value))}` };
     }
   }
 
@@ -62,12 +62,12 @@ export class EnvManager {
     const blocked = this.deps.blocked?.();
     if (blocked) return { ok: false, message: blocked };
     const checked = checkKeyRef(input);
-    if (!checked.ok) return { ok: false, message: `Klíč nelze smazat: ${checked.error}.` };
+    if (!checked.ok) return { ok: false, message: `The key cannot be deleted: ${checked.error}.` };
     const key = checked.value;
     const consumers = await this.deps.consumers(key).catch(() => []);
-    const detail = [`Rozsah: ${key.scope}`, consumers.length ? `Čtou ho: ${consumers.join(', ')}` : 'Zatím ho nikdo nečetl.', 'Hodnotu nelze vrátit.'].join('\n');
-    if (!(await this.deps.confirm(`Smazat klíč ${key.name}?`, detail, 'Smazat'))) return { ok: false, message: 'Smazání zrušeno.' };
-    return this.simple(['env', 'unset', key.name, '--scope', key.scope], `${key.name} smazáno.`, 'Smazání selhalo');
+    const detail = [`Scope: ${key.scope}`, consumers.length ? `Read by: ${consumers.join(', ')}` : 'Nobody has read it yet.', 'The value cannot be restored.'].join('\n');
+    if (!(await this.deps.confirm(`Delete key ${key.name}?`, detail, 'Delete'))) return { ok: false, message: 'Deletion cancelled.' };
+    return this.simple(['env', 'unset', key.name, '--scope', key.scope], `${key.name} deleted.`, 'Delete failed');
   }
 
   async scan(includeExcluded: boolean): Promise<EnvScanResult> {
@@ -75,12 +75,12 @@ export class EnvManager {
     if (blocked) return { ok: false, message: blocked };
     try {
       const r = await this.deps.run(['env', 'import', 'scan', '--json', ...(includeExcluded === true ? ['--include-excluded'] : [])], null, LONG_MS);
-      if (r.code !== 0) return { ok: false, message: `Inventář selhal: ${lastLine(r.stderr || r.stdout)}` };
+      if (r.code !== 0) return { ok: false, message: `Inventory failed: ${lastLine(r.stderr || r.stdout)}` };
       const inventory = JSON.parse(r.stdout) as EnvInventory;
-      if (!Array.isArray(inventory.variables) || !inventory.counts) return { ok: false, message: 'Inventář má neočekávaný tvar.' };
+      if (!Array.isArray(inventory.variables) || !inventory.counts) return { ok: false, message: 'The inventory has an unexpected shape.' };
       return { ok: true, inventory };
     } catch (e) {
-      return { ok: false, message: `Inventář selhal: ${lastLine((e as Error).message)}` };
+      return { ok: false, message: `Inventory failed: ${lastLine((e as Error).message)}` };
     }
   }
 
@@ -88,24 +88,24 @@ export class EnvManager {
     const blocked = this.deps.blocked?.();
     if (blocked) return { ok: false, message: blocked };
     const checked = checkImport(input);
-    if (!checked.ok) return { ok: false, message: `Import nelze spustit: ${checked.error}.` };
+    if (!checked.ok) return { ok: false, message: `The import cannot start: ${checked.error}.` };
     const { select, replaceSources, overwrite, includeExcluded } = checked.value;
     if (replaceSources) {
       const ok = await this.deps.confirm(
-        'Nahradit hodnoty ve zdrojových souborech odkazy?',
-        'Hodnoty se nejdřív uloží do úložiště. Pak se v souborech .env a v JSON konfiguracích Claude nahradí odkazem (v .env komentářem, v JSON `${JMÉNO}`), zbytek souboru zůstane. Šifrovaná záloha každého souboru zůstane, dokud ji nevrátíte nebo nesmažete.',
-        'Nahradit',
+        'Replace the values in the source files with references?',
+        'The values are saved to the store first. Then, in .env files and Claude JSON configs, each value is replaced with a reference (a comment in .env, `${NAME}` in JSON); the rest of the file stays. An encrypted backup of every file is kept until you restore or delete it.',
+        'Replace',
       );
-      if (!ok) return { ok: false, message: 'Import zrušen.' };
+      if (!ok) return { ok: false, message: 'Import cancelled.' };
     }
     const args = ['env', 'import', 'run', '--json', ...select.flatMap(s => ['--select', s]),
       ...(replaceSources ? ['--replace'] : []), ...(overwrite ? ['--overwrite'] : []), ...(includeExcluded ? ['--include-excluded'] : [])];
     try {
       const r = await this.deps.run(args, null, LONG_MS);
-      if (r.code !== 0) return { ok: false, message: `Import selhal: ${lastLine(r.stderr || r.stdout)}` };
+      if (r.code !== 0) return { ok: false, message: `Import failed: ${lastLine(r.stderr || r.stdout)}` };
       return { ok: true, result: JSON.parse(r.stdout) as EnvImportResult };
     } catch (e) {
-      return { ok: false, message: `Import selhal: ${lastLine((e as Error).message)}` };
+      return { ok: false, message: `Import failed: ${lastLine((e as Error).message)}` };
     }
   }
 
@@ -113,21 +113,21 @@ export class EnvManager {
     const blocked = this.deps.blocked?.();
     if (blocked) return { ok: false, message: blocked };
     const id = checkBackupId(backupId);
-    if (!id.ok) return { ok: false, message: `Zálohu nelze vrátit: ${id.error}.` };
-    if (!(await this.deps.confirm('Vrátit zdrojové soubory do stavu před importem?', 'Každý nahrazený soubor se obnoví z šifrované zálohy. Soubor, který jste po importu upravili, se nechá být. Hodnoty zůstanou v úložišti.', 'Vrátit'))) {
-      return { ok: false, message: 'Návrat zrušen.' };
+    if (!id.ok) return { ok: false, message: `The backup cannot be restored: ${id.error}.` };
+    if (!(await this.deps.confirm('Restore the source files to their state before the import?', 'Every replaced file is restored from its encrypted backup. A file you edited after the import is left alone. The values stay in the store.', 'Restore'))) {
+      return { ok: false, message: 'Restore cancelled.' };
     }
     try {
       const r = await this.deps.run(['env', 'import', 'rollback', id.value, '--json'], null, LONG_MS);
       const parsed = safeJson(r.stdout) as { restored?: number; alreadyOriginal?: number; changedSince?: string[]; complete?: boolean } | null;
-      if (!parsed) return { ok: false, message: `Návrat selhal: ${lastLine(r.stderr || r.stdout)}` };
+      if (!parsed) return { ok: false, message: `Restore failed: ${lastLine(r.stderr || r.stdout)}` };
       const left = parsed.changedSince?.length ?? 0;
       return {
         ok: parsed.complete === true,
-        message: `Vráceno souborů: ${parsed.restored ?? 0}.${left ? ` ${left} souborů jste od importu upravili, zůstaly beze změny.` : ''}`,
+        message: `Files restored: ${parsed.restored ?? 0}.${left ? ` ${left} ${left === 1 ? 'file was' : 'files were'} edited since the import and left unchanged.` : ''}`,
       };
     } catch (e) {
-      return { ok: false, message: `Návrat selhal: ${lastLine((e as Error).message)}` };
+      return { ok: false, message: `Restore failed: ${lastLine((e as Error).message)}` };
     }
   }
 
@@ -135,16 +135,16 @@ export class EnvManager {
   async reveal(input: EnvKeyRef): Promise<EnvOutcome> {
     const blocked = this.deps.blocked?.();
     if (blocked) return { ok: false, message: blocked };
-    if (!this.deps.reauth) return { ok: false, message: 'Tato platforma neumí znovu ověřit uživatele, hodnotu proto nelze zobrazit ani zkopírovat.' };
+    if (!this.deps.reauth) return { ok: false, message: 'This platform cannot re-authenticate the user, so the value cannot be shown or copied.' };
     const checked = checkKeyRef(input);
-    if (!checked.ok) return { ok: false, message: `Hodnotu nelze zkopírovat: ${checked.error}.` };
-    if (!(await this.deps.reauth())) return { ok: false, message: 'Ověření nebylo potvrzeno.' };
+    if (!checked.ok) return { ok: false, message: `The value cannot be copied: ${checked.error}.` };
+    if (!(await this.deps.reauth())) return { ok: false, message: 'Authentication was not confirmed.' };
     const value = await this.deps.fetchValue(checked.value).catch(() => null);
-    if (value === null) return { ok: false, message: 'Klíč se nepodařilo přečíst.' };
+    if (value === null) return { ok: false, message: 'Could not read the key.' };
     this.deps.clipboard.write(value);
     const digest = sha256(value);
     this.deps.schedule(() => { void Promise.resolve(this.deps.clipboard.read()).then(now => { if (sha256(now) === digest) this.deps.clipboard.write(''); }); }, CLIPBOARD_MS);
-    return { ok: true, message: 'Hodnota je ve schránce a za minutu se z ní vymaže.' };
+    return { ok: true, message: 'The value is on the clipboard and will be cleared in a minute.' };
   }
 
   private async simple(args: string[], done: string, failed: string): Promise<EnvOutcome> {
@@ -160,7 +160,7 @@ export class EnvManager {
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 
 function lastLine(text: string): string {
-  return text.trim().split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? 'bez zprávy';
+  return text.trim().split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? 'no message';
 }
 
 function safeJson(text: string): unknown {

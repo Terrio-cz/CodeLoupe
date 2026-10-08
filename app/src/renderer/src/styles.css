@@ -654,7 +654,7 @@ table.data.import-table td { vertical-align: top; height: auto; padding-top: 8px
 /*
  * Memory first (budget 300 MB). Without GPU every compositor layer is a software bitmap and every repainted frame is
  * rastered again, and Chromium holds that raster memory for seconds. Measured with the screenshot run
- * (docs/design-revamp.md, Paměť), two things cost:
+ * (docs/design-revamp.md, Memory), two things cost:
  * - large areas repainting while a screen appears (the old staggered rise of every card and tile);
  * - any transform/opacity animation inside a scroller (.content, the sidebar, a drawer body): to move it on the
  *   compositor, Chromium promotes the whole scroller to a layer and rasters it again, twice.

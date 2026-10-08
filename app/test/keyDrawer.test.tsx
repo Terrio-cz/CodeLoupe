@@ -16,8 +16,8 @@ describe('KeyDrawer', () => {
 
   it('rotates a fixed name and scope, with no old value to show', () => {
     const html = renderToStaticMarkup(<KeyDrawer rotate={{ name: 'GITHUB_TOKEN', scope: 'repo', scopeRef: 'c:/work/app' }} onClose={noop} onSaved={noop} />);
-    expect(html).toContain('Rotovat GITHUB_TOKEN');
-    expect(html).toContain('Nová hodnota');
+    expect(html).toContain('Rotate GITHUB_TOKEN');
+    expect(html).toContain('New value');
     expect(/<input[^>]*id="key-name"[^>]*>/.exec(html)![0]).toContain('disabled');
     expect(valueInput(html)).not.toMatch(/\svalue=/);
     expect(html).toContain('c:/work/app');

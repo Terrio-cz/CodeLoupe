@@ -34,7 +34,7 @@ export function KeyDrawer({ rotate, onClose, onSaved }: Props) {
     if (!field || busy) return;
     const secret = field.value;
     field.value = '';
-    if (!secret) { setError('Zadejte hodnotu.'); return; }
+    if (!secret) { setError('Enter a value.'); return; }
     setBusy(true);
     setError(null);
     const outcome = await bridge().env.set({ name: name.trim(), scope: kind === 'global' ? { kind } : { kind, ref: ref.trim() }, value: secret });
@@ -44,15 +44,15 @@ export function KeyDrawer({ rotate, onClose, onSaved }: Props) {
   };
 
   return (
-    <Drawer title={rotate ? `Rotovat ${rotate.name}` : 'Přidat klíč'} subtitle="Hodnota se uloží šifrovaně a po uložení se už nikde nezobrazí." onClose={onClose}>
+    <Drawer title={rotate ? `Rotate ${rotate.name}` : 'Add key'} subtitle="The value is stored encrypted and never shown anywhere after saving." onClose={onClose}>
       <form className="key-form" onSubmit={e => { e.preventDefault(); void submit(); }} autoComplete="off">
         <div className="form-row">
-          <label className="label" htmlFor="key-name">Jméno</label>
+          <label className="label" htmlFor="key-name">Name</label>
           <input id="key-name" className="input mono" value={name} onChange={e => setName(e.target.value)} disabled={!!rotate} required maxLength={64}
-            pattern="[A-Za-z_][A-Za-z0-9_]*" placeholder="např. YOUTRACK_TOKEN" autoComplete="off" spellCheck={false} />
+            pattern="[A-Za-z_][A-Za-z0-9_]*" placeholder="e.g. YOUTRACK_TOKEN" autoComplete="off" spellCheck={false} />
         </div>
         <div className="form-row">
-          <label className="label" htmlFor="key-scope">Rozsah</label>
+          <label className="label" htmlFor="key-scope">Scope</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select id="key-scope" className="select" value={kind} onChange={e => setKind(e.target.value as EnvScopeKind)} disabled={!!rotate}>
               <option value="global">global</option>
@@ -60,23 +60,23 @@ export function KeyDrawer({ rotate, onClose, onSaved }: Props) {
               <option value="repo">repo</option>
             </select>
             {kind !== 'global' && (
-              <input aria-label="Cesta nebo identifikátor rozsahu" className="input mono" style={{ flex: 1, minWidth: 220 }} value={ref} onChange={e => setRef(e.target.value)}
-                disabled={!!rotate} required placeholder={kind === 'workspace' ? 'složka workspace, např. C:/Users/me/Documents/Claude/terrio' : 'cesta k repozitáři'} autoComplete="off" spellCheck={false} />
+              <input aria-label="Scope path or identifier" className="input mono" style={{ flex: 1, minWidth: 220 }} value={ref} onChange={e => setRef(e.target.value)}
+                disabled={!!rotate} required placeholder={kind === 'workspace' ? 'workspace folder, e.g. C:/Users/me/Documents/Claude/terrio' : 'repository path'} autoComplete="off" spellCheck={false} />
             )}
           </div>
         </div>
         <div className="form-row">
-          <label className="label" htmlFor="key-value">{rotate ? 'Nová hodnota' : 'Hodnota'}</label>
+          <label className="label" htmlFor="key-value">{rotate ? 'New value' : 'Value'}</label>
           <input id="key-value" ref={value} className="input mono" type="password" autoComplete="new-password" spellCheck={false} autoCapitalize="off" autoCorrect="off"
             required={true} aria-describedby="key-value-note" />
         </div>
         <p id="key-value-note" className="muted">
-          Pole se vyprázdní při odeslání. Hodnota jde jen do hlavního procesu aplikace a odtud na vstup CLI; do příkazové řádky ani do logu se nedostane.
+          The field is cleared on submit. The value goes only to the app's main process and from there to the CLI's input; it never reaches the command line or a log.
         </p>
         {error && <div className="banner" role="alert">{error}</div>}
         <div className="drawer-actions">
-          <button type="submit" className="btn primary" disabled={busy || !name.trim() || (kind !== 'global' && !ref.trim())}>{busy ? 'Ukládám…' : rotate ? 'Rotovat' : 'Uložit'}</button>
-          <button type="button" className="btn" onClick={onClose}>Zrušit</button>
+          <button type="submit" className="btn primary" disabled={busy || !name.trim() || (kind !== 'global' && !ref.trim())}>{busy ? 'Saving…' : rotate ? 'Rotate' : 'Save'}</button>
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
         </div>
       </form>
     </Drawer>

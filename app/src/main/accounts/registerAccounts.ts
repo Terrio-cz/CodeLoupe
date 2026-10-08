@@ -25,7 +25,7 @@ export function registerAccounts(ctx: AccountsContext, handle: <A extends unknow
       return { status: r.status, body: (await r.text()).slice(0, MAX_BODY) };
     },
     restartDaemon: async () => { await ctx.restartDaemon(); },
-    blocked: () => (ctx.source().kind === 'mock' ? 'Zdroj dat je Mock: účty se v tomto režimu nemění. Přepněte v Nastavení zdroj dat na Daemon.' : null),
+    blocked: () => (ctx.source().kind === 'mock' ? 'The data source is Mock: accounts do not change in this mode. Switch the data source to Daemon in Settings.' : null),
   });
   handle(ACCOUNT_CH.claudeAdd, (input: unknown) => manager.claudeAdd(input as Parameters<AccountsManager['claudeAdd']>[0]));
   handle(ACCOUNT_CH.claudeRename, (id: unknown, label: unknown) => manager.claudeRename(String(id), String(label)));

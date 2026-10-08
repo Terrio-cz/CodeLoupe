@@ -13,7 +13,7 @@ export function sidebarCounts(nav: Nav | null): Partial<Record<Screen, ReactNode
   return {
     branches: nav.activeWorktrees,
     tasks: nav.openTasks,
-    gaps: nav.newGaps ? <span title="nové od poslední návštěvy">{nav.newGaps} nové</span> : undefined,
+    gaps: nav.newGaps ? <span title="new since your last visit">{nav.newGaps} new</span> : undefined,
     index: <RepoBadge state={nav.indexState} />,
   };
 }
@@ -56,7 +56,7 @@ export function Sidebar({ current, counts, daemon, settings }: {
   const st = daemon?.status;
   return (
     <aside className="sidebar">
-      <nav ref={nav} className="nav" aria-label="Hlavní navigace">
+      <nav ref={nav} className="nav" aria-label="Main navigation">
         {box && (
           <span
             className="nav-indicator"
@@ -76,7 +76,7 @@ export function Sidebar({ current, counts, daemon, settings }: {
         <div className="daemon-pill">
           <div className="line" aria-live="polite">{daemon ? <PhaseBadge phase={daemon.phase} /> : 'Daemon …'}</div>
           <div className="detail muted">
-            {st ? `${st.rssMb} MB · fronta ${st.queue.fast.waiting.length + st.queue.heavy.waiting.length} · :${daemon?.port}` : daemon?.message ?? `port ${daemon?.port ?? '—'}`}
+            {st ? `${st.rssMb} MB · queue ${st.queue.fast.waiting.length + st.queue.heavy.waiting.length} · :${daemon?.port}` : daemon?.message ?? `port ${daemon?.port ?? '—'}`}
           </div>
           {settings?.apiSource === 'mock' && <span className="chip tag">Data: mock</span>}
         </div>

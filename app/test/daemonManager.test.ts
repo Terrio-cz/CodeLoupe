@@ -166,7 +166,7 @@ describe('resolveCommand', () => {
   it('refuses a .cmd shim on Windows and resolves an .exe', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-path-'));
     fs.writeFileSync(path.join(dir, 'codeloupe.cmd'), '');
-    expect(() => resolveCommand('codeloupe', { PATH: dir }, 'win32')).toThrow(/bez shellu/);
+    expect(() => resolveCommand('codeloupe', { PATH: dir }, 'win32')).toThrow(/without a shell/);
     fs.writeFileSync(path.join(dir, 'clx.exe'), '');
     expect(resolveCommand('clx', { PATH: dir }, 'win32')).toBe(path.join(dir, 'clx.exe'));
     expect(resolveCommand('C:/x/node.exe', { PATH: dir }, 'win32')).toBe('C:/x/node.exe');

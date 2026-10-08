@@ -6,7 +6,7 @@ import { ClaudeCodeCard } from '../components/ClaudeCodeCard';
 import { Card, Select } from '../components/Parts';
 import { StatusBadge } from '../components/StatusBadge';
 
-const STEPS = ['Repozitáře', 'YouTrack', 'Claude Code', 'Zkouška'] as const;
+const STEPS = ['Repositories', 'YouTrack', 'Claude Code', 'Test'] as const;
 
 /**
  * First-run setup: repositories, a YouTrack account, the Claude Code connector and a real query. Every step can be skipped and
@@ -19,10 +19,10 @@ export function Onboarding({ onFinish }: { onFinish(): void }) {
   return (
     <div className="onboarding">
       <header className="onboarding-head">
-        <h1>Vítejte v CodeLoupe</h1>
-        <button className="btn ghost" onClick={onFinish}>Přeskočit vše</button>
+        <h1>Welcome to CodeLoupe</h1>
+        <button className="btn ghost" onClick={onFinish}>Skip all</button>
       </header>
-      <ol className="steps" aria-label="Kroky průvodce">
+      <ol className="steps" aria-label="Guide steps">
         {STEPS.map((title, i) => (
           <li key={title} aria-current={i === step ? 'step' : undefined} className={i < step ? 'done' : undefined}>
             <button className="btn ghost" onClick={() => setStep(i)}>{i + 1}. {title}</button>
@@ -36,10 +36,10 @@ export function Onboarding({ onFinish }: { onFinish(): void }) {
         {step === 3 && <Trial />}
       </main>
       <footer className="onboarding-foot">
-        <button className="btn" disabled={step === 0} onClick={() => setStep(step - 1)}>Zpět</button>
+        <button className="btn" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>
         <span style={{ flex: 1 }} />
-        {!last && <button className="btn" onClick={() => setStep(step + 1)}>Přeskočit krok</button>}
-        <button className="btn primary" onClick={() => (last ? onFinish() : setStep(step + 1))}>{last ? 'Hotovo' : 'Další'}</button>
+        {!last && <button className="btn" onClick={() => setStep(step + 1)}>Skip step</button>}
+        <button className="btn primary" onClick={() => (last ? onFinish() : setStep(step + 1))}>{last ? 'Done' : 'Next'}</button>
       </footer>
     </div>
   );
@@ -61,17 +61,17 @@ function Repositories() {
   };
   const repos = settings.data?.repos ?? [];
   return (
-    <Card title="Které repozitáře má CodeLoupe indexovat?">
-      <p className="t2">Vyberte složky s repozitáři (kde je .git). Zapíšou se do konfigurace daemona a hned se začnou indexovat na pozadí; složku vybíráte v okně systému, stránka žádnou cestu nepíše.</p>
-      <div className="actions"><button className="btn primary" disabled={busy} onClick={() => void add()}>{busy ? 'Přidávám…' : 'Přidat repozitáře…'}</button></div>
+    <Card title="Which repositories should CodeLoupe index?">
+      <p className="t2">Pick folders with repositories (where .git is). They are written to the daemon's configuration and start indexing in the background right away; you pick the folder in a system dialog, the page writes no path.</p>
+      <div className="actions"><button className="btn primary" disabled={busy} onClick={() => void add()}>{busy ? 'Adding…' : 'Add repositories…'}</button></div>
       {result && (
         <div className={`banner${result.ok ? ' info' : ''}`} role={result.ok ? 'status' : 'alert'}>
           {result.message}
           {result.rejected.length > 0 && <ul className="plain">{result.rejected.map(r => <li key={r.path}><span className="mono">{r.path}</span>: {r.reason}</li>)}</ul>}
         </div>
       )}
-      <div className="sublabel">Daemon zná</div>
-      {repos.length === 0 ? <p className="t2">Zatím žádný repozitář.</p> : <ul className="plain">{repos.map(r => <li key={r.id} className="mono">{r.path}</li>)}</ul>}
+      <div className="sublabel">Known to the daemon</div>
+      {repos.length === 0 ? <p className="t2">No repositories yet.</p> : <ul className="plain">{repos.map(r => <li key={r.id} className="mono">{r.path}</li>)}</ul>}
     </Card>
   );
 }
@@ -83,16 +83,16 @@ function Youtrack() {
   const list = accounts.data?.youtrack ?? [];
   const test = async (id: string) => setMessage((await bridge().accounts.youtrackTest(id)).message);
   return (
-    <Card title="YouTrack (volitelné)">
-      <p className="t2">S tokenem CodeLoupe zrcadlí úkoly a agenti je čtou bez volání YouTrack. Token se uloží šifrovaně (klíč chrání systém: DPAPI, Keychain nebo libsecret) a okno ho po uložení nikdy neukáže. Přidání restartuje daemon.</p>
-      <div className="actions"><button className="btn primary" onClick={() => setOpen(true)}>Přidat účet YouTrack…</button></div>
+    <Card title="YouTrack (optional)">
+      <p className="t2">With a token, CodeLoupe mirrors tasks and agents read them without calling YouTrack. The token is stored encrypted (the key is protected by the system: DPAPI, Keychain or libsecret) and the window never shows it after saving. Adding an account restarts the daemon.</p>
+      <div className="actions"><button className="btn primary" onClick={() => setOpen(true)}>Add YouTrack account…</button></div>
       {message && <div className="banner info" role="status">{message}</div>}
       {list.length > 0 && (
         <ul className="plain">
           {list.map(a => (
             <li key={a.id}>
-              {a.label} <span className="mono muted">{a.url}</span> {a.tokenConfigured ? <StatusBadge tone="ok">token nastaven</StatusBadge> : <StatusBadge tone="warning">token chybí</StatusBadge>}{' '}
-              {a.editable && <button className="btn" onClick={() => void test(a.id)} aria-label={`Otestovat spojení ${a.label}`}>Test</button>}
+              {a.label} <span className="mono muted">{a.url}</span> {a.tokenConfigured ? <StatusBadge tone="ok">token set</StatusBadge> : <StatusBadge tone="warning">token missing</StatusBadge>}{' '}
+              {a.editable && <button className="btn" onClick={() => void test(a.id)} aria-label={`Test connection ${a.label}`}>Test</button>}
             </li>
           ))}
         </ul>
@@ -119,12 +119,12 @@ function Trial() {
     }
   };
   return (
-    <Card title="Zkouška: skutečný dotaz">
-      <p className="t2">Pošle daemonu dotaz <span className="mono">outline</span> (mapa nejdůležitějších deklarací) na vybraný repozitář a ukáže jeho odpověď. Když se index ještě staví, odpověď to řekne; zkuste to za chvíli.</p>
-      {repos.length === 0 ? <p className="t2">Nejdřív přidejte repozitář v prvním kroku.</p> : (
+    <Card title="Test: a real query">
+      <p className="t2">Sends the daemon an <span className="mono">outline</span> query (a map of the most important declarations) for the chosen repository and shows its answer. If the index is still building, the answer says so; try again in a moment.</p>
+      {repos.length === 0 ? <p className="t2">Add a repository in the first step first.</p> : (
         <div className="actions">
-          <Select label="Repozitář" value={chosen} onChange={setRepoId} options={repos.map(r => ({ value: r.id, label: r.path }))} />
-          <button className="btn primary" disabled={busy || !chosen} onClick={() => void run()}>{busy ? 'Ptám se…' : 'Spustit dotaz'}</button>
+          <Select label="Repository" value={chosen} onChange={setRepoId} options={repos.map(r => ({ value: r.id, label: r.path }))} />
+          <button className="btn primary" disabled={busy || !chosen} onClick={() => void run()}>{busy ? 'Querying…' : 'Run query'}</button>
         </div>
       )}
       {answer && <pre className={`mono${answer.ok ? '' : ' warn'}`} aria-live="polite">{answer.text}</pre>}

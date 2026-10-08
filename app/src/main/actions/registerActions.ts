@@ -11,8 +11,8 @@ export interface ActionContext {
   mock(): boolean;
 }
 
-const MOCK: ActionOutcome = { ok: false, message: 'Akce mění skutečný daemon; přepněte zdroj dat na Daemon (Nastavení).' };
-const DOWN: ActionOutcome = { ok: false, message: 'Daemon neodpovídá.' };
+const MOCK: ActionOutcome = { ok: false, message: 'Actions change the real daemon; switch the data source to Daemon (Settings).' };
+const DOWN: ActionOutcome = { ok: false, message: 'The daemon is not responding.' };
 
 /** Registers the channels of shared/actions.ts; `handle` checks the sender, as for every other channel. */
 export function registerActions(ctx: ActionContext, handle: <A extends unknown[], R>(channel: string, fn: (...args: A) => Promise<R> | R) => void): void {
@@ -23,7 +23,7 @@ export function registerActions(ctx: ActionContext, handle: <A extends unknown[]
     try {
       return await fn(input);
     } catch (e) {
-      return { ok: false, message: `Daemon akci odmítl: ${(e as Error).message}`, ...extra } as T;
+      return { ok: false, message: `The daemon refused the action: ${(e as Error).message}`, ...extra } as T;
     }
   };
 
@@ -41,7 +41,7 @@ ${detail}`);
     return AUTOCONFIRM === 'accept';
   }
   const win = BrowserWindow.getFocusedWindow();
-  const opts = { type: 'warning' as const, buttons: [accept, 'Zrušit'], defaultId: 1, cancelId: 1, title: 'CodeLoupe', message, detail };
+  const opts = { type: 'warning' as const, buttons: [accept, 'Cancel'], defaultId: 1, cancelId: 1, title: 'CodeLoupe', message, detail };
   const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
   return response === 0;
 };

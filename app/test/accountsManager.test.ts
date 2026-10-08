@@ -45,41 +45,41 @@ const everything = () => fs.readdirSync(home).map(f => fs.readFileSync(path.join
 describe('Claude accounts', () => {
   it('adds an account, materialising ~/.claude as the default first, and writes the file the daemon reads', async () => {
     const t = setup();
-    const out = await t.manager.claudeAdd({ label: 'Účet B', configDir: dir('claude-b'), create: true });
-    expect(out).toEqual({ ok: true, message: 'Účet „Účet B“ přidán.' });
+    const out = await t.manager.claudeAdd({ label: 'Åsa B', configDir: dir('claude-b'), create: true });
+    expect(out).toEqual({ ok: true, message: 'Account “Åsa B” added.' });
     expect(fs.existsSync(dir('claude-b'))).toBe(true);
     const file = JSON.parse(fs.readFileSync(path.join(home, 'accounts.json'), 'utf8')) as Record<string, unknown>;
     expect(Object.keys(file).sort()).toEqual(['claude', 'version', 'youtrack']);
     expect(file.claude).toEqual([
-      { id: 'default', label: 'Výchozí účet', configDir: path.join(userHome, '.claude'), default: true },
-      { id: 'ucet-b', label: 'Účet B', configDir: path.normalize(dir('claude-b')), default: false },
+      { id: 'default', label: 'Default account', configDir: path.join(userHome, '.claude'), default: true },
+      { id: 'asa-b', label: 'Åsa B', configDir: path.normalize(dir('claude-b')), default: false },
     ]);
   });
 
   it('refuses a relative path, a missing directory without create, a file, a duplicate and the implicit default again', async () => {
     const t = setup();
     expect((await t.manager.claudeAdd({ label: 'x', configDir: 'relative/dir', create: true })).ok).toBe(false);
-    expect((await t.manager.claudeAdd({ label: 'x', configDir: dir('nope'), create: false })).message).toContain('neexistuje');
+    expect((await t.manager.claudeAdd({ label: 'x', configDir: dir('nope'), create: false })).message).toContain('does not exist');
     fs.writeFileSync(dir('afile'), 'x');
-    expect((await t.manager.claudeAdd({ label: 'x', configDir: dir('afile'), create: false })).message).toContain('není složka');
+    expect((await t.manager.claudeAdd({ label: 'x', configDir: dir('afile'), create: false })).message).toContain('not a folder');
     expect((await t.manager.claudeAdd({ label: '  ', configDir: dir('ok'), create: true })).ok).toBe(false);
-    expect((await t.manager.claudeAdd({ label: 'Default', configDir: path.join(userHome, '.claude'), create: false })).message).toContain('už existuje');
+    expect((await t.manager.claudeAdd({ label: 'Default', configDir: path.join(userHome, '.claude'), create: false })).message).toContain('already exists');
     expect(fs.existsSync(path.join(home, 'accounts.json'))).toBe(false);
     fs.mkdirSync(dir('b'));
     expect((await t.manager.claudeAdd({ label: 'B', configDir: dir('b'), create: false })).ok).toBe(true);
-    expect((await t.manager.claudeAdd({ label: 'B again', configDir: dir('b'), create: false })).message).toContain('už existuje');
+    expect((await t.manager.claudeAdd({ label: 'B again', configDir: dir('b'), create: false })).message).toContain('already exists');
   });
 
   it('renames, changes the default and removes with a confirmation that says the directory stays', async () => {
     const t = setup();
     fs.mkdirSync(dir('b'));
     await t.manager.claudeAdd({ label: 'B', configDir: dir('b'), create: false });
-    expect((await t.manager.claudeRename('b', 'Práce')).ok).toBe(true);
+    expect((await t.manager.claudeRename('b', 'Work')).ok).toBe(true);
     expect((await t.manager.claudeRename('zzz', 'x')).ok).toBe(false);
     expect((await t.manager.claudeSetDefault('b')).ok).toBe(true);
-    expect(readAccounts(home).claude.map(c => [c.id, c.label, c.default])).toEqual([['default', 'Výchozí účet', false], ['b', 'Práce', true]]);
-    expect((await t.manager.claudeRemove('b')).message).toContain('odebrán');
-    expect(t.confirms[0].detail).toContain('zůstanou');
+    expect(readAccounts(home).claude.map(c => [c.id, c.label, c.default])).toEqual([['default', 'Default account', false], ['b', 'Work', true]]);
+    expect((await t.manager.claudeRemove('b')).message).toContain('removed');
+    expect(t.confirms[0].detail).toContain('stay');
     expect(fs.existsSync(dir('b'))).toBe(true);
     // The default went away: the one that is left takes over.
     expect(readAccounts(home).claude.map(c => [c.id, c.default])).toEqual([['default', true]]);
@@ -95,16 +95,16 @@ describe('YouTrack accounts', () => {
   it('stores the token in the store on stdin, lists no secret in the file, asks first and restarts the daemon', async () => {
     const t = setup();
     const out = await t.manager.youtrackAdd(input);
-    expect(out).toEqual({ ok: true, message: 'Účet Terrio přidán, daemon restartován.' });
+    expect(out).toEqual({ ok: true, message: 'Account Terrio added, daemon restarted.' });
     expect(t.calls).toHaveLength(1);
     expect(t.calls[0].args).toEqual(['env', 'set', 'YOUTRACK_TOKEN_TERRIO', '--scope', 'global', '--source', 'app']);
     expect(t.calls[0].stdin).toBe(`${TOKEN}\n`);
-    expect(t.confirms[0].detail).toContain('restartuje');
+    expect(t.confirms[0].detail).toContain('restarts');
     expect(t.state.restarts).toBe(1);
     expect(readAccounts(home).youtrack).toEqual([{ id: 'terrio', label: 'Terrio', url: 'https://terrio.youtrack.cloud', projects: ['TER', 'CL'], token: 'YOUTRACK_TOKEN_TERRIO' }]);
     expect(everything()).not.toContain(TOKEN);
     expect(JSON.stringify([out, t.calls[0].args])).not.toContain(TOKEN);
-    expect((await t.manager.youtrackAdd({ ...input, label: 'Again' })).message).toContain('už existuje');
+    expect((await t.manager.youtrackAdd({ ...input, label: 'Again' })).message).toContain('already exists');
   });
 
   it('refuses a bad URL, bad projects, an empty token and does nothing before the user agrees', async () => {
@@ -115,7 +115,7 @@ describe('YouTrack accounts', () => {
     expect(t.calls).toHaveLength(0);
     expect(t.state.restarts).toBe(0);
     const declined = setup({ confirm: async () => false });
-    expect((await declined.manager.youtrackAdd(input)).message).toBe('Přidání zrušeno.');
+    expect((await declined.manager.youtrackAdd(input)).message).toBe('Adding cancelled.');
     expect(declined.calls).toHaveLength(0);
     expect(checkUrl('http://127.0.0.1:47533')).toEqual({ ok: true, url: 'http://127.0.0.1:47533' });
   });
@@ -133,12 +133,12 @@ describe('YouTrack accounts', () => {
     const t = setup();
     await t.manager.youtrackAdd(input);
     const out = await t.manager.youtrackTest('terrio');
-    expect(out).toEqual({ ok: true, message: 'Připojeno jako dev.user.' });
+    expect(out).toEqual({ ok: true, message: 'Connected as dev.user.' });
     expect(t.state.http[0].url).toBe('https://terrio.youtrack.cloud/api/users/me?fields=login');
     expect(t.state.http[0].headers.Authorization).toBe(`Bearer ${TOKEN}`);
     const rejected = setup({ http: async () => ({ status: 401, body: '' }) });
     await rejected.manager.youtrackAdd(input);
-    expect((await rejected.manager.youtrackTest('terrio')).message).toContain('odmítla');
+    expect((await rejected.manager.youtrackTest('terrio')).message).toContain('rejected the token');
     const broken = setup({ http: async () => { throw new Error(`connect failed with ${TOKEN}`); } });
     await broken.manager.youtrackAdd(input);
     const failed = await broken.manager.youtrackTest('terrio');
@@ -146,7 +146,7 @@ describe('YouTrack accounts', () => {
     expect(failed.message).not.toContain(TOKEN);
     const missing = setup({ fetchStored: async () => null });
     await missing.manager.youtrackAdd(input);
-    expect((await missing.manager.youtrackTest('terrio')).message).toContain('není v úložišti');
+    expect((await missing.manager.youtrackTest('terrio')).message).toContain('not in the store');
     expect((await t.manager.youtrackTest('nobody')).ok).toBe(false);
   });
 
@@ -173,8 +173,8 @@ describe('YouTrack accounts', () => {
 
 describe('while the screen shows mock data', () => {
   it('changes nothing', async () => {
-    const t = setup({ blocked: () => 'Zdroj dat je Mock' });
-    expect((await t.manager.claudeAdd({ label: 'B', configDir: dir('b'), create: true })).message).toBe('Zdroj dat je Mock');
+    const t = setup({ blocked: () => 'The data source is Mock' });
+    expect((await t.manager.claudeAdd({ label: 'B', configDir: dir('b'), create: true })).message).toBe('The data source is Mock');
     expect((await t.manager.youtrackAdd({ label: 'T', url: 'https://t.example', projects: ['T'], token: TOKEN })).ok).toBe(false);
     expect((await t.manager.youtrackTest('x')).ok).toBe(false);
     expect(t.calls).toHaveLength(0);

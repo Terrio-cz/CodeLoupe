@@ -13,13 +13,13 @@ export interface TrayActions {
 }
 
 const PHASE_TEXT: Record<DaemonState['phase'], string> = {
-  unknown: 'zjišťuji stav',
-  starting: 'spouští se',
-  running: 'běží',
-  stopping: 'zastavuje se',
-  stopped: 'zastaven',
-  down: 'neodpovídá',
-  error: 'chyba',
+  unknown: 'checking',
+  starting: 'starting',
+  running: 'running',
+  stopping: 'stopping',
+  stopped: 'stopped',
+  down: 'not responding',
+  error: 'error',
 };
 
 export function glyphFor(s: DaemonState): Glyph {
@@ -35,7 +35,7 @@ export function stateLine(s: DaemonState): string {
   if (s.status) {
     const q = s.status.queue;
     const waiting = q.fast.waiting.length + q.heavy.waiting.length + (q.fast.running ? 1 : 0);
-    parts.push(`${s.status.rssMb} MB`, `fronta ${waiting}`);
+    parts.push(`${s.status.rssMb} MB`, `queue ${waiting}`);
   }
   return parts.join(' · ');
 }
@@ -59,7 +59,7 @@ export class AppTray {
     }
     const line = stateLine(s);
     this.tray.setToolTip(`CodeLoupe — ${line}`);
-    const build = s.status?.queue.heavy.running ? `Build: ${s.status.queue.heavy.running}` : 'Build: žádný';
+    const build = s.status?.queue.heavy.running ? `Build: ${s.status.queue.heavy.running}` : 'Build: none';
     const running = s.phase === 'running';
     const key = `${line}|${build}|${running}|${this.actions.openAtLogin()}`;
     if (key === this.lastMenuKey) return;
@@ -68,14 +68,14 @@ export class AppTray {
       { label: line, enabled: false },
       { label: build, enabled: false },
       { type: 'separator' },
-      { label: 'Otevřít CodeLoupe', click: () => this.actions.open() },
-      { label: 'Restartovat daemon', enabled: running, click: () => this.actions.restart() },
+      { label: 'Open CodeLoupe', click: () => this.actions.open() },
+      { label: 'Restart daemon', enabled: running, click: () => this.actions.restart() },
       running
-        ? { label: 'Zastavit daemon', click: () => this.actions.stop() }
-        : { label: 'Spustit daemon', enabled: s.phase !== 'starting', click: () => this.actions.start() },
+        ? { label: 'Stop daemon', click: () => this.actions.stop() }
+        : { label: 'Start daemon', enabled: s.phase !== 'starting', click: () => this.actions.start() },
       { type: 'separator' },
-      { label: 'Spouštět po přihlášení', type: 'checkbox', checked: this.actions.openAtLogin(), click: () => this.actions.toggleLogin() },
-      { label: 'Ukončit', click: () => this.actions.quit() },
+      { label: 'Launch at login', type: 'checkbox', checked: this.actions.openAtLogin(), click: () => this.actions.toggleLogin() },
+      { label: 'Quit', click: () => this.actions.quit() },
     ]));
   }
 

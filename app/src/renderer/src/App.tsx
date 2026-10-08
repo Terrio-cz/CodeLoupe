@@ -36,7 +36,7 @@ export function App() {
   }, [route.screen]);
 
   // The daemon answers the first list of worktrees after a start in seconds (it reads git for each) and every later one
-  // at once, so the list is asked for here, once per daemon, before anyone opens Větve.
+  // at once, so the list is asked for here, once per daemon, before anyone opens Branches.
   const warmedPid = useRef<number | null>(null);
   useEffect(() => {
     const pid = daemon?.status?.pid ?? null;
@@ -73,7 +73,7 @@ export function App() {
         if (s) { e.preventDefault(); s.focus(); }
         return;
       }
-      // The second key wins over a new prefix, so `g g` goes to Mezery.
+      // The second key wins over a new prefix, so `g g` goes to Gaps.
       const target = SCREEN_DEFS.find(d => d.key === e.key);
       if (pendingG && Date.now() - pendingG < 1200 && target) {
         e.preventDefault();
@@ -112,8 +112,8 @@ export function App() {
               <h1>{def.title}</h1>
             </div>
             <span className="spacer" />
-            {def.range && <Segmented label="Časový rozsah" value={range} onChange={setRange} options={RANGE_OPTIONS} />}
-            <button className="btn ghost icon-only" onClick={() => { setSpin(n => n + 1); refreshAll(); }} aria-label="Obnovit data (Ctrl+R)" title="Obnovit (Ctrl+R)">
+            {def.range && <Segmented label="Time range" value={range} onChange={setRange} options={RANGE_OPTIONS} />}
+            <button className="btn ghost icon-only" onClick={() => { setSpin(n => n + 1); refreshAll(); }} aria-label="Refresh data (Ctrl+R)" title="Refresh (Ctrl+R)">
               <Icon name="refresh" key={spin} className={spin ? 'spin' : undefined} />
             </button>
           </header>

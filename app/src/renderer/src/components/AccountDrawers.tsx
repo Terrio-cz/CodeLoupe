@@ -22,8 +22,8 @@ function Form({ title, subtitle, submit, busy, error, disabled, onSubmit, onClos
         {children}
         {error && <div className="banner" role="alert">{error}</div>}
         <div className="drawer-actions">
-          <button type="submit" className="btn primary" disabled={busy || disabled}>{busy ? 'Pracuji…' : submit}</button>
-          <button type="button" className="btn" onClick={onClose}>Zrušit</button>
+          <button type="submit" className="btn primary" disabled={busy || disabled}>{busy ? 'Working…' : submit}</button>
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
         </div>
       </form>
     </Drawer>
@@ -45,7 +45,7 @@ function useSubmit(onDone: (message: string) => void) {
   return { busy, error, run };
 }
 
-const TOKEN_NOTE = 'Token se uloží šifrovaně a po uložení se už nikde nezobrazí; pole se vyprázdní při odeslání.';
+const TOKEN_NOTE = 'The token is stored encrypted and never shown anywhere after saving; the field is cleared on submit.';
 
 function TokenField({ field, label }: { field: React.RefObject<HTMLInputElement | null>; label: string }) {
   return (
@@ -63,17 +63,17 @@ export function ClaudeAccountDrawer({ onClose, onDone }: { onClose(): void; onDo
   const [create, setCreate] = useState(false);
   const { busy, error, run } = useSubmit(onDone);
   return (
-    <Form title="Přidat Claude účet" subtitle="Účet je složka s nastavením Claude Code (CLAUDE_CONFIG_DIR). Přihlášení v ní uděláte v Claude Code, CodeLoupe ho nevidí." submit="Přidat" busy={busy} error={error}
+    <Form title="Add Claude account" subtitle="An account is a Claude Code settings folder (CLAUDE_CONFIG_DIR). You sign in to it in Claude Code; CodeLoupe never sees the login." submit="Add" busy={busy} error={error}
       disabled={!label.trim() || !configDir.trim()} onSubmit={() => void run(() => bridge().accounts.claudeAdd({ label, configDir, create }))} onClose={onClose}>
       <div className="form-row">
-        <label className="label" htmlFor="acct-label">Název</label>
-        <input id="acct-label" className="input" value={label} onChange={e => setLabel(e.target.value)} maxLength={60} required placeholder="např. Účet B (práce)" autoComplete="off" />
+        <label className="label" htmlFor="acct-label">Name</label>
+        <input id="acct-label" className="input" value={label} onChange={e => setLabel(e.target.value)} maxLength={60} required placeholder="e.g. Account B (work)" autoComplete="off" />
       </div>
       <div className="form-row">
-        <label className="label" htmlFor="acct-dir">Složka</label>
+        <label className="label" htmlFor="acct-dir">Folder</label>
         <input id="acct-dir" className="input mono" value={configDir} onChange={e => setConfigDir(e.target.value)} required placeholder="C:/Users/me/.claude-b" autoComplete="off" spellCheck={false} />
       </div>
-      <label className="check"><input type="checkbox" checked={create} onChange={e => setCreate(e.target.checked)} /> Vytvořit složku, pokud neexistuje</label>
+      <label className="check"><input type="checkbox" checked={create} onChange={e => setCreate(e.target.checked)} /> Create the folder if it does not exist</label>
     </Form>
   );
 }
@@ -82,9 +82,9 @@ export function RenameDrawer({ id, label: current, onClose, onDone }: { id: stri
   const [label, setLabel] = useState(current);
   const { busy, error, run } = useSubmit(onDone);
   return (
-    <Form title={`Přejmenovat ${current}`} submit="Uložit" busy={busy} error={error} disabled={!label.trim()} onSubmit={() => void run(() => bridge().accounts.claudeRename(id, label))} onClose={onClose}>
+    <Form title={`Rename ${current}`} submit="Save" busy={busy} error={error} disabled={!label.trim()} onSubmit={() => void run(() => bridge().accounts.claudeRename(id, label))} onClose={onClose}>
       <div className="form-row">
-        <label className="label" htmlFor="acct-label">Název</label>
+        <label className="label" htmlFor="acct-label">Name</label>
         <input id="acct-label" className="input" value={label} onChange={e => setLabel(e.target.value)} maxLength={60} required autoComplete="off" />
       </div>
     </Form>
@@ -103,17 +103,17 @@ export function YoutrackAccountDrawer({ onClose, onDone }: { onClose(): void; on
     void run(() => bridge().accounts.youtrackAdd({ label, url, projects: projects.split(/[\s,;]+/).filter(Boolean), token: secret }));
   };
   return (
-    <Form title="Přidat účet YouTrack" subtitle="Přidání restartuje daemon, aby mohl mirrorovat novou instanci." submit="Přidat" busy={busy} error={error} disabled={!label.trim() || !url.trim() || !projects.trim()} onSubmit={submit} onClose={onClose}>
+    <Form title="Add YouTrack account" subtitle="Adding restarts the daemon so it can mirror the new instance." submit="Add" busy={busy} error={error} disabled={!label.trim() || !url.trim() || !projects.trim()} onSubmit={submit} onClose={onClose}>
       <div className="form-row">
-        <label className="label" htmlFor="acct-label">Název</label>
-        <input id="acct-label" className="input" value={label} onChange={e => setLabel(e.target.value)} maxLength={60} required placeholder="např. Terrio" autoComplete="off" />
+        <label className="label" htmlFor="acct-label">Name</label>
+        <input id="acct-label" className="input" value={label} onChange={e => setLabel(e.target.value)} maxLength={60} required placeholder="e.g. Terrio" autoComplete="off" />
       </div>
       <div className="form-row">
-        <label className="label" htmlFor="acct-url">Adresa instance</label>
-        <input id="acct-url" className="input mono" value={url} onChange={e => setUrl(e.target.value)} required placeholder="https://firma.youtrack.cloud" autoComplete="off" spellCheck={false} />
+        <label className="label" htmlFor="acct-url">Instance URL</label>
+        <input id="acct-url" className="input mono" value={url} onChange={e => setUrl(e.target.value)} required placeholder="https://company.youtrack.cloud" autoComplete="off" spellCheck={false} />
       </div>
       <div className="form-row">
-        <label className="label" htmlFor="acct-projects">Projekty</label>
+        <label className="label" htmlFor="acct-projects">Projects</label>
         <input id="acct-projects" className="input mono" value={projects} onChange={e => setProjects(e.target.value)} required placeholder="TER, CL" autoComplete="off" spellCheck={false} />
       </div>
       <TokenField field={token} label="Token" />
@@ -130,8 +130,8 @@ export function TokenDrawer({ id, label, onClose, onDone }: { id: string; label:
     void run(() => bridge().accounts.youtrackRotate(id, secret));
   };
   return (
-    <Form title={`Rotovat token: ${label}`} subtitle="Starý token se nezobrazuje." submit="Rotovat" busy={busy} error={error} onSubmit={submit} onClose={onClose}>
-      <TokenField field={token} label="Nový token" />
+    <Form title={`Rotate token: ${label}`} subtitle="The old token is not shown." submit="Rotate" busy={busy} error={error} onSubmit={submit} onClose={onClose}>
+      <TokenField field={token} label="New token" />
     </Form>
   );
 }

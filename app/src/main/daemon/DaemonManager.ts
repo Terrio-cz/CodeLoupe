@@ -128,9 +128,9 @@ export class DaemonManager extends EventEmitter {
       try {
         await this.cli('stop');
       } catch (e) {
-        this.set({ message: `Zastavení selhalo: ${(e as Error).message}` });
+        this.set({ message: `Stop failed: ${(e as Error).message}` });
       }
-      if (!(await this.waitFor(false))) this.set({ phase: 'error', message: 'Daemon po zastavení stále odpovídá.' });
+      if (!(await this.waitFor(false))) this.set({ phase: 'error', message: 'The daemon still responds after stopping.' });
       return this.state;
     });
   }
@@ -149,10 +149,10 @@ export class DaemonManager extends EventEmitter {
 
   /** Whether /status came from the daemon that wrote daemon.json; `hard` = not CodeLoupe at all. */
   private foreign(status: DaemonStatus): { hard: boolean; message: string } | null {
-    if (status.name !== 'codeloupe') return { hard: true, message: `Na portu ${this.port()} odpovídá jiná služba.` };
+    if (status.name !== 'codeloupe') return { hard: true, message: `Another service is responding on port ${this.port()}.` };
     const info = this.home.info();
     if (!info || info.pid !== status.pid) {
-      return { hard: false, message: `Na portu ${this.port()} odpovídá proces ${status.pid}, daemon.json uvádí ${info ? info.pid : 'nic'}.` };
+      return { hard: false, message: `Process ${status.pid} is responding on port ${this.port()}, daemon.json names ${info ? info.pid : 'none'}.` };
     }
     return null;
   }
@@ -164,7 +164,7 @@ export class DaemonManager extends EventEmitter {
     if (this.attempts.length >= MAX_ATTEMPTS) {
       if (!this.gaveUp) {
         this.gaveUp = true;
-        this.set({ phase: 'error', message: 'Daemon se nepodařilo spustit 5× za 10 minut. Zkontrolujte příkaz CLI v Nastavení.' });
+        this.set({ phase: 'error', message: 'The daemon failed to start 5 times in 10 minutes. Check the CLI command in Settings.' });
         this.emit('gaveUp', this.state.message);
       }
       return;
@@ -181,11 +181,11 @@ export class DaemonManager extends EventEmitter {
     try {
       await this.cli('start');
     } catch (e) {
-      this.set({ phase: 'error', message: `Spuštění selhalo: ${(e as Error).message}` });
+      this.set({ phase: 'error', message: `Start failed: ${(e as Error).message}` });
       this.emit('failed', this.state.message);
       return this.state;
     }
-    if (!(await this.waitFor(true))) this.set({ phase: 'error', message: 'Daemon po spuštění neodpovídá na /status.' });
+    if (!(await this.waitFor(true))) this.set({ phase: 'error', message: 'The daemon does not answer /status after starting.' });
     return this.state;
   }
 
@@ -252,7 +252,7 @@ export function resolveCommand(command: string, env: NodeJS.ProcessEnv = process
   for (const dir of dirs) {
     for (const ext of ['.cmd', '.bat']) {
       if (fs.existsSync(path.join(dir, command + ext))) {
-        throw new Error(`„${command}“ je skript ${ext}, který nejde spustit bez shellu; v Nastavení zadejte java a argumenty -cp <instalace>/lib/* codeloupe.MainKt`);
+        throw new Error(`“${command}” is a ${ext} script, which cannot run without a shell; in Settings enter java with the arguments -cp <install dir>/lib/* codeloupe.MainKt`);
       }
     }
   }
@@ -270,8 +270,8 @@ function execCli(s: AppSettings, verb: 'start' | 'stop', port: number): Promise<
     }, (err, stdout, stderr) => {
       if (err) {
         const code = (err as NodeJS.ErrnoException).code;
-        if (code === 'ENOENT') return reject(new Error(`příkaz „${s.cliCommand}“ nebyl nalezen`));
-        if (code === 'EINVAL') return reject(new Error(`„${s.cliCommand}“ nejde spustit bez shellu; zadejte java a argumenty -cp <instalace>/lib/* codeloupe.MainKt`));
+        if (code === 'ENOENT') return reject(new Error(`command “${s.cliCommand}” was not found`));
+        if (code === 'EINVAL') return reject(new Error(`“${s.cliCommand}” cannot run without a shell; enter java with the arguments -cp <install dir>/lib/* codeloupe.MainKt`));
         return reject(new Error(String(stderr || err.message).trim().split(/\r?\n/).slice(-1)[0]));
       }
       resolve(String(stdout));

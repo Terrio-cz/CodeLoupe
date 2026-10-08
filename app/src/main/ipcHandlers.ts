@@ -73,11 +73,11 @@ export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
     const win = BrowserWindow.getFocusedWindow();
     const opts = {
       type: 'question' as const,
-      buttons: ['Uložit', 'Zrušit'],
+      buttons: ['Save', 'Cancel'],
       defaultId: 1,
       cancelId: 1,
       title: 'CodeLoupe',
-      message: 'Změnit příkaz pro spouštění daemonu?',
+      message: 'Change the command that starts the daemon?',
       detail: [command as string, ...args].map(a => (/\s/.test(a) ? `"${a}"` : a)).join(' '),
     };
     const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
@@ -93,11 +93,11 @@ export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
     const win = BrowserWindow.getFocusedWindow();
     const opts = {
       type: 'question' as const,
-      buttons: ['Připojit', 'Zrušit'],
+      buttons: ['Connect', 'Cancel'],
       defaultId: 1,
       cancelId: 1,
       title: 'CodeLoupe',
-      message: k === 'mcp' ? 'Přidat CodeLoupe do Claude Code jako MCP server (uživatelská úroveň)?' : 'Nainstalovat plugin CodeLoupe do Claude Code?',
+      message: k === 'mcp' ? 'Add CodeLoupe to Claude Code as an MCP server (user level)?' : 'Install the CodeLoupe plugin into Claude Code?',
       detail: commandLines(k, port, ctx.claude.marketplaceDir()).join('\n'),
     };
     const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
@@ -153,13 +153,13 @@ async function callApi(ctx: IpcContext, input: unknown): Promise<ApiResult<unkno
   if (!v.ok) return { ok: false, code: 'bad_request', message: v.error };
   const source = ctx.source();
   if (source.kind === 'daemon' && !daemonTrusted(ctx)) {
-    return { ok: false, code: 'unavailable', message: ctx.manager.current.message ?? 'Daemon neběží.' };
+    return { ok: false, code: 'unavailable', message: ctx.manager.current.message ?? 'The daemon is not running.' };
   }
   try {
     return { ok: true, data: await source.get(v.request as ApiRequest, v.path) };
   } catch (e) {
     if (e instanceof HttpError) {
-      const message = e.status === 404 && source.kind === 'daemon' ? 'Daemon tento endpoint zatím neposkytuje (CL-39).' : e.message;
+      const message = e.status === 404 && source.kind === 'daemon' ? 'The daemon does not provide this endpoint yet (CL-39).' : e.message;
       return { ok: false, code: e.code, message };
     }
     return { ok: false, code: 'unavailable', message: (e as Error).message };

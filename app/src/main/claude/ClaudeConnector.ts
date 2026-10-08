@@ -66,11 +66,11 @@ export class ClaudeConnector {
     const marketplace = this.marketplace();
     const manual = commandLines(kind, port, marketplace);
     if (kind === 'plugin' && !marketplace) {
-      return { ok: false, message: 'Složka s pluginem (marketplace) nebyla nalezena; plugin nainstalujete ručně podle README.', manual };
+      return { ok: false, message: 'The plugin folder (marketplace) was not found; install the plugin manually as described in the README.', manual };
     }
     const version = await this.run(['--version']).catch(() => null);
     if (!version || version.code !== 0) {
-      return { ok: false, message: 'Příkaz „claude“ nebyl nalezen na PATH; spusťte příkazy ručně.', manual };
+      return { ok: false, message: 'The “claude” command was not found on PATH; run the commands manually.', manual };
     }
     const steps = kind === 'mcp' ? await this.mcpSteps(port) : this.pluginSteps(marketplace!);
     for (const step of steps) {
@@ -79,7 +79,7 @@ export class ClaudeConnector {
         return { ok: false, message: `claude ${step.slice(0, 3).join(' ')}: ${lastLine(r.stderr || r.stdout)}`, manual };
       }
     }
-    return { ok: true, message: kind === 'mcp' ? 'MCP server přidán (scope user). Nové relace Claude Code ho uvidí.' : 'Plugin nainstalován. Nové relace Claude Code ho načtou.', manual };
+    return { ok: true, message: kind === 'mcp' ? 'MCP server added (scope user). New Claude Code sessions will see it.' : 'Plugin installed. New Claude Code sessions will load it.', manual };
   }
 
   /** An existing user-level entry is replaced, so a changed port ends up in it. */
@@ -108,7 +108,7 @@ function hasPlugin(json: string): boolean {
   }
 }
 
-const lastLine = (s: string) => s.trim().split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? 'selhalo';
+const lastLine = (s: string) => s.trim().split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? 'failed';
 
 /**
  * `claude` is a real executable on a native install (~/.local/bin/claude[.exe], also on PATH). An npm install is a
