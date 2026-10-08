@@ -35,6 +35,10 @@ object ConfigLoader {
         )
     }
 
+    /** Where the variable import looks: `envImport` of `<home>/config.json`, else the usual places under [userHome]. */
+    fun envImport(home: Path, userHome: Path = Path.of(System.getProperty("user.home"))): EnvImportConfig =
+        EnvImportConfig.parse(readFile(home.resolve("config.json")), userHome)
+
     /** The `port` in the default home's `config.json`, or null when it sets none. */
     fun defaultHomePort(env: Map<String, String> = System.getenv(), os: String = System.getProperty("os.name")): Int? =
         number(readFile(defaultHome(env, os).resolve("config.json")), "port")?.toInt()
