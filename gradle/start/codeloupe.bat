@@ -10,8 +10,12 @@ setlocal
 for %%I in ("%~dp0..") do set "APP_HOME=%%~fI"
 
 set "JAVA_EXE=java.exe"
+@rem A bundled runtime (runtime\ next to bin\) wins over any JDK on the machine: the bundle needs none.
+if exist "%APP_HOME%\runtime\bin\java.exe" set "JAVA_EXE=%APP_HOME%\runtime\bin\java.exe"
+if exist "%APP_HOME%\runtime\bin\java.exe" goto haveJava
 if defined JAVA_HOME set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
 if defined JAVA_HOME if not exist "%JAVA_EXE%" goto badJava
+:haveJava
 
 @rem Same place as ConfigLoader.defaultHome.
 set "CL_HOME=%USERPROFILE%\AppData\Local\codeloupe"

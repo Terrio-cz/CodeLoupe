@@ -19,7 +19,10 @@ do
 done
 APP_HOME=$( cd -P "${APP_HOME:-./}.." > /dev/null && pwd -P ) || exit
 
-if [ -n "$JAVA_HOME" ]; then
+# A bundled runtime (runtime/ next to bin/) wins over any JDK on the machine: the bundle needs none.
+if [ -x "$APP_HOME/runtime/bin/java" ]; then
+    JAVACMD=$APP_HOME/runtime/bin/java
+elif [ -n "$JAVA_HOME" ]; then
     JAVACMD=$JAVA_HOME/bin/java
     if [ ! -x "$JAVACMD" ]; then
         echo "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME" >&2

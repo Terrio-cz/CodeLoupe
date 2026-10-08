@@ -79,6 +79,8 @@ tasks.startScripts {
     }
 }
 
+apply(from = "gradle/bundle.gradle.kts")
+
 tasks.test {
     useJUnitPlatform()
     jvmArgs("--enable-native-access=ALL-UNNAMED")
