@@ -1,8 +1,9 @@
 # CodeLoupe Desktop — design revamp
 
-Stav 2026-10-08 · větev `CL-design-revamp`. Vizuální vrstva aplikace (`app/src/renderer`) pro všech deset obrazovek
-(Přehled, Větve, Workspaces, Úkoly, Joby, Běhy, Index, Mezery, Prostředí, Nastavení); data, IPC, kontrakt a chování
-se nemění. Nahrazuje § 6 (tokeny) a doplňuje § 1, § 5 a § 7 v [ui-spec.md](ui-spec.md).
+Stav 2026-10-08 · větev `CL-design-revamp`. Vizuální vrstva aplikace (`app/src/renderer`) pro všech jedenáct obrazovek
+(Přehled, Větve, Workspaces, Úkoly, Joby, Běhy, Index, Mezery, Prostředí, Účty, Nastavení), jejich detaily a stavy,
+úvodní průvodce (na stejném vsazeném panelu, kroky jako segmenty, akce stále na očích) a vlastní titulková lišta okna; data, IPC, kontrakt a chování se nemění. Nahrazuje § 6 (tokeny) a doplňuje § 1, § 5 a § 7
+v [ui-spec.md](ui-spec.md).
 Před/po: [design-revamp/](design-revamp/).
 
 ## Směr
@@ -12,9 +13,9 @@ Před/po: [design-revamp/](design-revamp/).
 s jemným okrajem, karty na něm o krok světlejší. Hierarchii nesou typografie, odstíny šedi a mezery, ne barva.
 Jediný akcent je indigo; stavové barvy se objevují jen ve stavech (pilulka s tečkou a slovem).
 
-Pohyb vysvětluje, co se stalo (obrazovka přijela, data dorazila, panel se otevřel), nikdy nezdržuje: vstupy
-≤ 360 ms, interakce ≤ 180 ms, nic neběží ve smyčce kromě stavu „běží“ a skeletonu. `prefers-reduced-motion`
-vypne všechny animace i odpočet čísel.
+Pohyb vysvětluje, co se stalo (obrazovka se vyměnila, data dorazila, panel se otevřel), nikdy nezdržuje: vstupy
+≤ 260 ms (graf 700 ms), interakce ≤ 180 ms, ve smyčce běží jen načítání. `prefers-reduced-motion` vypne všechny
+animace i odpočet čísel (ověřeno živě, viz Pohyb v aplikaci).
 
 ## Reference (Mobbin)
 
@@ -30,7 +31,8 @@ vypne všechny animace i odpočet čísel.
 Starší reference z původní specifikace (ui-spec § 12) platí dál pro rozvržení obrazovek.
 
 Screenshoty (720 px, mock data): `design-revamp/before-<režim>-<obrazovka>.png` (původní vzhled) a
-`design-revamp/after-<režim>-<obrazovka>.png` (revamp), režim `dark` / `light`.
+`design-revamp/after-<režim>-<obrazovka>.png` (revamp, druhé kolo s vlastní titulkovou lištou), režim `dark` / `light`.
+Screenshot režim zachytí jen stránku: systémová tlačítka okna v nich nejsou, místo pro ně ano.
 
 ## Tokeny
 
@@ -59,7 +61,7 @@ a skupin 11 px kapitálky s prostrkáním 0,06 em.
 
 **Mřížka a tvary**: krok 4 px (`--s-1` … `--s-8` = 4–32 px). Radius `--r-sm` 6 (prvky), `--r-md` 8
 (tlačítka, inputy), `--r-lg` 12 (karty), `--r-xl` 14 (panel, drawer), `--r-full` (pilulky). Řádek tabulky 34 px,
-topbar 52 px, sidebar 224 px.
+titulková lišta `--titlebar` 36 px, topbar 52 px, sidebar 224 px.
 
 **Elevace**: `--shadow-1` (karty, jemná), `--shadow-2` (tooltip, toast), `--shadow-3` (drawer); v tmavém
 režimu doplněná o 1px horní světlo (`--highlight`). Žádný `backdrop-filter` — aplikace běží bez GPU
@@ -67,39 +69,72 @@ akcelerace (ui-spec § 11), rozmazání by se počítalo softwarově.
 
 **Pohyb**: `--dur-1` 120 ms (hover, stisk), `--dur-2` 180 ms (přepínače, tooltip), `--dur-3` 260 ms
 (drawer), `--dur-4` 360 ms (vstup obsahu); `--ease-out` `cubic-bezier(.16,1,.3,1)`, `--ease-in-out`
-`cubic-bezier(.65,0,.35,1)`, `--ease-spring` `cubic-bezier(.34,1.36,.64,1)`; rozestup vstupů `--stagger` 40 ms.
+`cubic-bezier(.65,0,.35,1)`, `--ease-spring` `cubic-bezier(.34,1.36,.64,1)`.
+
+## Titulková lišta
+
+Okno nemá systémový titulek (`titleBarStyle: 'hidden'`); lištu kreslí stránka (`.titlebar`, 36 px, barva `--sidebar`)
+s logem, názvem a verzí, které dřív byly nahoře v sidebaru. Systém si nechá jen svá tlačítka jako překryv
+(`titleBarOverlay`) v barvách tokenů `--sidebar` a `--text-2`; při změně motivu je main přebarví
+(`win.setTitleBarOverlay`). Místo pro ně stránka nechá podle `env(titlebar-area-*)`. Celá lišta je drag region:
+přesun okna, dvojklik na maximalizaci a snap layouts ve Windows 11 obstará systém. Drawer i jeho pozadí začínají pod
+lištou, takže okno jde posunout i s otevřeným detailem a systémové „zavřít“ nikdy nepřekryje zavírací tlačítko
+draweru. Barvy a výšku hlídá `app/test/windowChrome.test.ts` proti `styles.css`.
+
+Překryv místo `frame: false` s vlastními tlačítky: vlastní tlačítka by potřebovala IPC (minimalizovat, maximalizovat,
+zavřít) a přišla by o snap layouts při najetí na maximalizaci, o nativní hover, tooltipy a chování při vysokém DPI.
+Na macOS stejné nastavení nechá semafor vlevo a `env(titlebar-area-x)` posune obsah lišty za něj.
 
 ## Pohyb v aplikaci
 
 | Kde | Co |
 |---|---|
-| Přechod obrazovek | obsah se při změně obrazovky vymění a jeho bloky vyjedou po sobě (6 px, fade); titul a ikona v topbaru se vymění |
+| Přechod obrazovek | nový obsah se vynoří: přes něj zmizí závoj v barvě pozadí (260 ms); titul a ikona v topbaru se vymění |
 | Sidebar | aktivní pilulka se přesune na novou položku (transform), ikony reagují na hover |
-| KPI | dlaždice vyjedou po sobě, čísla se dopočítají od nuly (600 ms, ease-out) |
-| Grafy | čára se vykreslí zleva (`stroke-dashoffset`), plocha a baseline se rozsvítí, pruhy vyrostou zleva |
-| Tabulky | hover celého řádku, vybraný řádek s akcentovou linkou; řádky samy neanimují (viz Paměť) |
-| Drawer | vyjede zprava a zase odjede, pozadí ztmavne; fokus a `Esc` beze změny |
-| Stavy | „běží“ tečka pulzuje, skeleton dýchá (opacity), refresh ikona se otočí |
+| KPI | čísla se dopočítají od nuly (650 ms, ease-out) |
+| Grafy | čára se vykreslí zleva (`stroke-dashoffset`, 700 ms), plocha a baseline se rozsvítí, pruhy a měřáky vyrostou zleva (600 ms) |
+| Tabulky | hover celého řádku, vybraný řádek s akcentovou linkou; řádky samy neanimují |
+| Drawer | vyjede zprava a zase odjede, pozadí ztmavne; sekce, kterou uživatel otevře, se rozsvítí; fokus a `Esc` beze změny |
+| Stavy | tečka u toho, co právě běží (job, build, daemon), třikrát pulzne; načítaný blok dýchá jako celek; refresh ikona se otočí |
 | Tlačítka | hover o tón, stisk o 1 px dolů |
 
-Vstupy animují registrované CSS proměnné (`@property --enter/--grow/--pulse`), ne přímo `opacity`/`transform`:
-běží na hlavním vlákně a překreslí se na místě, takže žádná karta ani řádek nedostane vlastní vrstvu kompozitoru.
-Jako vrstva se posouvá jen drawer. `prefers-reduced-motion: reduce` nastaví délky na 0 a odpočet čísel ukáže
-rovnou konečnou hodnotu.
+Proti prvnímu kolu ubylo: postupné vyjíždění bloků a KPI dlaždic (nejdražší pohyb, viz Paměť), pulz u všech
+„běžících“ stavů (úkol In Progress, aktivní workspace) a rozsvícení sekcí, které jsou otevřené od začátku.
+
+Pravidla (komentář v `styles.css`, Motion): uvnitř scrollerů (`.content`, sidebar, tělo draweru) se nic neanimuje
+přes `transform`/`opacity`, protože Chromium by kvůli tomu povýšil celý scroller na vrstvu a dvakrát ho znovu
+rastroval; malé věci se tam překreslí na místě (registrované proměnné `@property --grow/--pulse/--enter`,
+`box-shadow`). Jako vrstvy se hýbou jen plochy nad obsahem: závoj (jednobarevná vrstva bez rastrových dlaždic),
+drawer a toast.
+
+`prefers-reduced-motion: reduce` nastaví délky na 0, závoj skryje, zastaví dýchání a pulz, drawer zavře bez odjezdu
+a odpočet čísel ukáže rovnou konečnou hodnotu. Ověřeno v běžící aplikaci emulací média přes DevTools protokol:
+40 ms po změně obrazovky 0 běžících animací (bez nastavení 13–32), KPI už s konečnými čísly, drawer zmizí do 30 ms
+po `Esc`.
 
 ## Paměť
 
 Aplikace běží bez GPU akcelerace, takže každý animovaný snímek je softwarové překreslení a Chromium si rastrové
-buffery chvíli drží. Měřeno screenshot během (`CODELOUPE_APP_SCREENSHOTS`, mock data, Windows 11, součet working setů):
+buffery chvíli drží. Dvě měření, obě mock data, Windows 11, součet working setů (`app.getAppMetrics`), stejný stroj
+a sestavení, 2–3 běhy každé:
 
-| | Po průchodu všemi obrazovkami | 30 s v klidu |
-|---|---|---|
-| `main` před revampem | ~315 MB | ~284 MB |
-| revamp | ~400–430 MB | ~308 MB |
+- **screenshot běh** (`CODELOUPE_APP_SCREENSHOTS`: obě témata, 15 obrazovek, 900 ms na každou, `capturePage`);
+- **rychlé přepínání** (všech 15 obrazovek a detailů po 250 ms, třikrát se střídáním tématu, přes DevTools protokol).
 
-Špička je přechodná (rychlé přepínání obrazovek, každá s animací vstupu) a po pár sekundách klidu se vrací;
-trvale revamp přidá ~20–25 MB. Kvůli tomu neanimují řádky tabulek ani nadpisy, KPI se dopočítávají jen při
-zobrazení a změně hodnoty a `Intl.NumberFormat` se znovu používá místo vytváření v každém snímku.
+| | Screenshot běh: špička | po 2 s | Rychlé přepínání: špička | po 5 s klidu |
+|---|---|---|---|---|
+| `main` před revampem (45e792a) | 342–372 MB | 348–354 MB | 351–358 MB | 336–346 MB |
+| revamp, první kolo (e12c9a4) | 408–434 MB | 399–422 MB | 427–436 MB | 370–383 MB |
+| revamp, druhé kolo | 387–408 MB | 378–390 MB | 384–393 MB | 344–347 MB |
+| druhé kolo bez jakékoli animace (pokus) | 363–379 MB | 355–373 MB | | |
+
+Druhé kolo vrací klidovou paměť na úroveň `main` a špičku při rychlém přepínání snižuje o ~45 MB (z +78 na +33 MB
+nad `main`). Zbylých ~20 MB nad „bez animace“ je odpočet čísel, růst pruhů, kreslení grafu a drawer; zbytek nad `main`
+nese statický vzhled. Co rozhodlo (pokusy po jedné změně, šum ±10 MB): postupný vstup bloků stál ~20 MB bez ohledu
+na techniku (ani jedna vrstva pro celý `.content` nepomohla, protože se obsah rastroval dvakrát); animace
+`transform`/`opacity` uvnitř scrolleru povýšila celý scroller na vrstvu (pulz tečky „běží“ tak držel vrstvu
+1118 × 811 px skoro 5 s). Stíny ani písma měřitelně nestojí nic. Rozpočet 300 MB z README tímto během nesplňuje ani
+`main`: screenshot a DevTools měření mají vlastní režii a README měří `CODELOUPE_APP_TOUR` z OS.
 
 ## Zásady
 
@@ -110,3 +145,6 @@ zobrazení a změně hodnoty a `Intl.NumberFormat` se znovu používá místo vy
 5. Přístupnost beze změny: kontrast ≥ 4,5:1 textu a ≥ 3:1 ovládacích okrajů ověřuje `app/test/tokens.test.ts`
    v obou režimech (včetně textu stavových pilulek na jejich pozadí), viditelný fokus 2 px, klávesnice, `aria-*`.
 6. Lehkost: žádná nová runtime závislost; ikony jsou vlastní inline SVG, animace CSS + Web Animations/rAF.
+7. Tabulka se vejde do 1440 px okna bez vodorovného posunu (užší okno ji posouvá uvnitř karty): sloupce, které nic nerozlišují, se schovají (Repo jen
+   při víc repozitářích, Disk a RAM jen po „Zjistit disk a paměť“), dlouhé texty se zkrátí nebo zalomí. Tabulka
+   v draweru je orámovaná a roste s ním, nemá vlastní scroll.

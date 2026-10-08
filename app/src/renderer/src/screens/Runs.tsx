@@ -19,13 +19,13 @@ function columns(): Column<RunItem>[] {
   return [
     { key: 'start', header: 'Začátek', sortKey: 'start', render: r => dateTime(r.startedAt) },
     { key: 'role', header: 'Role', render: r => <span className="mono">{r.role}</span> },
-    { key: 'title', header: 'Zadání', render: r => <span title={r.title}>{r.title}</span>, className: 'ellipsis' },
+    { key: 'title', header: 'Zadání', render: r => <span title={r.title}>{r.title}</span>, className: 'ellipsis narrow' },
     { key: 'ter', header: 'Úkol', render: r => r.ter ?? '—' },
     { key: 'duration', header: 'Délka', sortKey: 'duration', render: r => span(r.durationSec), numeric: true },
     { key: 'turns', header: 'Tahy', sortKey: 'turns', render: r => num(r.turns), numeric: true },
     { key: 'weighted', header: 'Cena', sortKey: 'weighted', render: r => tokens(r.weighted), numeric: true },
-    { key: 'peak', header: 'Peak kontext', sortKey: 'peak', render: r => tokens(r.peakContext), numeric: true },
-    { key: 'share', header: 'Podíl výsledků', sortKey: 'share', render: r => pct(r.toolResultShare * 100), numeric: true },
+    { key: 'peak', header: 'Peak', sortKey: 'peak', render: r => tokens(r.peakContext), numeric: true },
+    { key: 'share', header: 'Výsledky', sortKey: 'share', render: r => pct(r.toolResultShare * 100), numeric: true },
     { key: 'calls', header: 'Volání', render: r => `${num(r.toolCalls)}${r.toolErrors ? ` · ${r.toolErrors} chyb` : ''}`, numeric: true },
     { key: 'budget', header: 'Rozpočet', render: r => (r.overBudget ? <StatusBadge tone="warning">nad rozpočet</StatusBadge> : <span className="muted">—</span>) },
   ];
@@ -144,7 +144,7 @@ function RunDrawer({ id, onClose }: { id: string; onClose(): void }) {
           </Section>
 
           <Section title="Podle kategorie nástroje" count={data.categories.length}>
-            <div className="table-wrap" style={{ maxHeight: 260 }}>
+            <div className="table-wrap">
               <table className="data" aria-label="Kategorie nástrojů">
                 <thead><tr><th scope="col">Kategorie</th><th scope="col" className="num">Volání</th><th scope="col" className="num">Výsledky</th><th scope="col" className="num">Držení × tahy</th><th scope="col" className="num">Cena</th><th scope="col" className="num">Chyby</th></tr></thead>
                 <tbody>
@@ -163,7 +163,7 @@ function RunDrawer({ id, onClose }: { id: string; onClose(): void }) {
             </div>
             {!steps.data ? (steps.error ? <ErrorState message={steps.error.message} onRetry={steps.reload} /> : <Loading />) : (
               <>
-                <div className="table-wrap" style={{ maxHeight: 420 }}>
+                <div className="table-wrap">
                   <table className="data" aria-label="Kroky běhu">
                     <thead><tr><th scope="col" className="num">#</th><th scope="col" className="num">Tah</th><th scope="col">Nástroj</th><th scope="col">Kategorie</th><th scope="col">O čem</th><th scope="col" className="num">Výsledek</th><th scope="col" className="num">Doba</th><th scope="col" className="num">Cena</th><th scope="col">Stav</th></tr></thead>
                     <tbody>

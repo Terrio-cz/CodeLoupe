@@ -1,12 +1,13 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Range } from '../../../shared/contract';
 import { Icon, type IconName } from './Icon';
 
-/** Collapsible drawer/detail section with a count in its heading. */
+/** Collapsible drawer/detail section with a count in its heading. Only a section the user toggles animates its body. */
 export function Section({ title, count, children, open = true }: { title: string; count?: number; children: ReactNode; open?: boolean }) {
+  const [toggled, setToggled] = useState(false);
   return (
-    <details className="section" open={open}>
-      <summary>
+    <details className={toggled ? 'section toggled' : 'section'} open={open}>
+      <summary onClick={() => setToggled(true)}>
         <Icon name="chevron" size={14} className="chev" />
         {title}
         {count !== undefined && <span className="count">{count}</span>}
@@ -130,11 +131,13 @@ export function Loading({ variant = 'lines' }: { variant?: 'lines' | 'table' | '
   );
 }
 
-export function ErrorState({ message, onRetry, action }: { message: string; onRetry?: () => void; action?: ReactNode }) {
+/** A heading in the app's words, then the message as it came (a daemon error can be terse or English), then what to do. */
+export function ErrorState({ message, onRetry, action, title = 'Nepodařilo se načíst data' }: { message: string; onRetry?: () => void; action?: ReactNode; title?: string }) {
   return (
     <div className="state error" role="alert">
       <span className="state-icon"><Icon name="alert" size={18} /></span>
-      <div className="state-text">{message}</div>
+      <div className="state-title">{title}</div>
+      <div className="state-text muted">{message}</div>
       <div className="actions">
         {onRetry && <button className="btn" onClick={onRetry}><Icon name="refresh" size={14} />Zkusit znovu</button>}
         {action}

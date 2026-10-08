@@ -4,6 +4,8 @@ import { bridge } from '../api';
 import { Card, Toast } from './Parts';
 
 const yes = (ok: boolean, on: string, off: string) => (ok ? `${on} ✓` : off);
+// The claude CLI answers in a second or two; until then a quiet word, not an ellipsis that looks like a value.
+const Checking = () => <span className="muted">zjišťuji…</span>;
 
 /** "Connect to Claude Code": adds the MCP server or installs the plugin through the claude CLI after a native confirmation. */
 export function ClaudeCodeCard() {
@@ -35,9 +37,9 @@ export function ClaudeCodeCard() {
   return (
     <Card title="Claude Code">
       <dl className="dl">
-        <dt>Příkaz claude</dt><dd>{status ? (status.cli ? 'nalezen ✓' : 'nenalezen — příkazy níže spusťte ručně') : '…'}</dd>
-        <dt>MCP server</dt><dd>{status ? yes(status.mcp, 'přidán', 'nepřidán') : '…'}</dd>
-        <dt>Plugin</dt><dd>{status ? yes(status.plugin, 'nainstalován', 'nenainstalován') : '…'}</dd>
+        <dt>Příkaz claude</dt><dd>{status ? (status.cli ? 'nalezen ✓' : 'nenalezen — příkazy níže spusťte ručně') : <Checking />}</dd>
+        <dt>MCP server</dt><dd>{status ? yes(status.mcp, 'přidán', 'nepřidán') : <Checking />}</dd>
+        <dt>Plugin</dt><dd>{status ? yes(status.plugin, 'nainstalován', 'nenainstalován') : <Checking />}</dd>
       </dl>
       <p className="t2">
         Plugin přidá MCP server, skill a spouštění daemonu při startu relace. Samotný MCP server je jednodušší varianta

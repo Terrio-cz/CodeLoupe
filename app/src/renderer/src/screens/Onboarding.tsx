@@ -70,7 +70,7 @@ function Repositories() {
           {result.rejected.length > 0 && <ul className="plain">{result.rejected.map(r => <li key={r.path}><span className="mono">{r.path}</span>: {r.reason}</li>)}</ul>}
         </div>
       )}
-      <h2 className="t2">Daemon zná</h2>
+      <div className="sublabel">Daemon zná</div>
       {repos.length === 0 ? <p className="t2">Zatím žádný repozitář.</p> : <ul className="plain">{repos.map(r => <li key={r.id} className="mono">{r.path}</li>)}</ul>}
     </Card>
   );

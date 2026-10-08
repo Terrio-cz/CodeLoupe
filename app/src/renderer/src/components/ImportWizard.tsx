@@ -3,6 +3,7 @@ import type { EnvImportResult, EnvInventory } from '../../../shared/envActions';
 import { bridge } from '../api';
 import { choose, defaultPicks, groupKey, needsChoice, outcomeLabel, scopeLabel, selectedCount, selectionsOf, togglePick, type Picks } from '../envImport';
 import { Drawer } from './Drawer';
+import { ErrorState } from './Parts';
 import { StatusBadge } from './StatusBadge';
 
 interface Props {
@@ -61,12 +62,7 @@ export function ImportWizard({ onClose, onChanged }: Props) {
         <div className="state" aria-busy="true" aria-label="Prohledávám">Prohledávám složky Claude a repozitáře (čtou se jen soubory s proměnnými, v okně zůstanou jména)…</div>
       )}
       {phase.step === 'importing' && <div className="state" aria-busy="true" aria-label="Importuji">Importuji do úložiště…</div>}
-      {phase.step === 'failed' && (
-        <div className="state" role="alert">
-          <div>{phase.message}</div>
-          <button className="btn" onClick={() => void scan(includeExcluded)}>Zkusit znovu</button>
-        </div>
-      )}
+      {phase.step === 'failed' && <ErrorState message={phase.message} onRetry={() => void scan(includeExcluded)} />}
       {phase.step === 'choose' && <Choose inventory={phase.inventory} picks={picks} setPicks={setPicks} onlySensitive={onlySensitive} setOnlySensitive={setOnlySensitive}
         includeExcluded={includeExcluded} setIncludeExcluded={v => { setIncludeExcluded(v); void scan(v); }} replaceSources={replaceSources} setReplaceSources={setReplaceSources}
         overwrite={overwrite} setOverwrite={setOverwrite} onRun={() => void run(phase.inventory)} />}
@@ -108,16 +104,18 @@ export function Choose(p: ChooseProps) {
         <label className="check"><input type="checkbox" checked={p.onlySensitive} onChange={e => p.setOnlySensitive(e.target.checked)} /> Jen údaje, které vypadají citlivě</label>
         <label className="check"><input type="checkbox" checked={p.includeExcluded} onChange={e => p.setIncludeExcluded(e.target.checked)} /> Zahrnout vyloučené složky</label>
       </div>
-      <table className="data import-table choose">
-        <caption className="sr-only">Nalezené proměnné</caption>
-        <thead>
-          <tr><th scope="col">Importovat</th><th scope="col">Klíč</th><th scope="col">Rozsah</th><th scope="col">Zdroje</th><th scope="col">Stav</th></tr>
-        </thead>
-        <tbody>
-          {shown.length === 0 && <tr><td colSpan={5}>Nic k importu.</td></tr>}
-          {shown.map(g => <GroupRow key={groupKey(g)} g={g} picks={picks} setPicks={p.setPicks} />)}
-        </tbody>
-      </table>
+      <div className="table-wrap">
+        <table className="data import-table choose">
+          <caption className="sr-only">Nalezené proměnné</caption>
+          <thead>
+            <tr><th scope="col">Importovat</th><th scope="col">Klíč</th><th scope="col">Rozsah</th><th scope="col">Zdroje</th><th scope="col">Stav</th></tr>
+          </thead>
+          <tbody>
+            {shown.length === 0 && <tr><td colSpan={5}>Nic k importu.</td></tr>}
+            {shown.map(g => <GroupRow key={groupKey(g)} g={g} picks={picks} setPicks={p.setPicks} />)}
+          </tbody>
+        </table>
+      </div>
       <fieldset className="import-options">
         <legend className="sr-only">Možnosti importu</legend>
         <label className="check"><input type="checkbox" checked={p.replaceSources} onChange={e => p.setReplaceSources(e.target.checked)} /> Po importu nahradit hodnoty ve zdrojích odkazem (záloha zůstane, jde vrátit)</label>
@@ -173,20 +171,22 @@ export function Done({ result, rolled, onRollback, onClose }: { result: EnvImpor
   return (
     <>
       <div className="banner info" role="status">Vytvořeno {result.created}, aktualizováno {result.updated}, přeskočeno {result.skipped}.{result.replacedFiles > 0 ? ` Zdroje nahrazeny v ${result.replacedFiles} souborech.` : ''}</div>
-      <table className="data import-table">
-        <caption className="sr-only">Výsledek importu</caption>
-        <thead><tr><th scope="col">Klíč</th><th scope="col">Rozsah</th><th scope="col">Výsledek</th><th scope="col">Zdroj</th></tr></thead>
-        <tbody>
-          {result.items.slice(0, 200).map(i => (
-            <tr key={i.id}>
-              <td className="mono">{i.name}</td>
-              <td>{scopeLabel(i.scope)}</td>
-              <td>{outcomeLabel(i.outcome)}{i.replaced ? ', zdroj nahrazen odkazem' : ''}</td>
-              <td>{i.file}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="table-wrap">
+        <table className="data import-table">
+          <caption className="sr-only">Výsledek importu</caption>
+          <thead><tr><th scope="col">Klíč</th><th scope="col">Rozsah</th><th scope="col">Výsledek</th><th scope="col">Zdroj</th></tr></thead>
+          <tbody>
+            {result.items.slice(0, 200).map(i => (
+              <tr key={i.id}>
+                <td className="mono">{i.name}</td>
+                <td>{scopeLabel(i.scope)}</td>
+                <td>{outcomeLabel(i.outcome)}{i.replaced ? ', zdroj nahrazen odkazem' : ''}</td>
+                <td>{i.file}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {result.items.length > 200 && <p className="muted">… a {result.items.length - 200} dalších.</p>}
       {result.notReplaced.length > 0 && (
         <div className="banner" role="note">

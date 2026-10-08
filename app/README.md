@@ -76,6 +76,14 @@ Budget ≤ 300 MB RSS. The GPU and network services run inside the main process,
 - about 290 MB after visiting every screen in both themes;
 - about 140 MB in the tray only.
 
-The entrance animations repaint in software (no GPU), and Chromium holds the raster memory for a few seconds: a quick
-run through every screen peaks around 400 MB and settles back to about 310 MB when idle
-([docs/design-revamp.md](../docs/design-revamp.md), Paměť).
+Animations repaint in software (no GPU), and Chromium holds the raster memory for a few seconds. Switching quickly
+through every screen peaks about 35 MB above the pre-revamp app and is back at its level after 5 s idle; the motion
+rules that keep it there (no staggered entrances, no transform/opacity animation inside a scroller) and the
+measurements are in [docs/design-revamp.md](../docs/design-revamp.md), Paměť.
+
+## Window
+
+The window has no system title bar: the page draws its own (name and version, a drag region: move, double-click to
+maximise, Windows 11 snap layouts) and the OS keeps only its caption buttons as an overlay in the design's colours
+(`src/main/windowChrome.ts`, recoloured when the theme changes). Screenshot mode captures the page only, without the
+caption buttons.

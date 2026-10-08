@@ -4,7 +4,8 @@ import type { Accounts as AccountsData } from '../../../shared/contract';
 import { bridge, refreshAll, useApi } from '../api';
 import { ClaudeAccountDrawer, RenameDrawer, TokenDrawer, YoutrackAccountDrawer } from '../components/AccountDrawers';
 import { DataTable, type Column } from '../components/DataTable';
-import { Card, ErrorState, Loading } from '../components/Parts';
+import { Icon } from '../components/Icon';
+import { Banner, Card, ErrorState, Loading } from '../components/Parts';
 import { StatusBadge, type Tone } from '../components/StatusBadge';
 import { ago, pct, tokens } from '../format';
 
@@ -44,6 +45,7 @@ export function Accounts() {
           {a.email && <span className="muted" style={{ display: 'block' }}>{a.email}</span>}
         </span>
       ),
+      className: 'two-line',
     },
     {
       key: 'dir', header: 'Složka (CLAUDE_CONFIG_DIR)',
@@ -67,7 +69,7 @@ export function Accounts() {
   ];
 
   const youtrackColumns: Column<YoutrackRow>[] = [
-    { key: 'instance', header: 'Instance', render: a => <span>{a.label}<span className="muted mono" style={{ display: 'block' }}>{a.url}</span></span> },
+    { key: 'instance', header: 'Instance', render: a => <span>{a.label}<span className="muted mono" style={{ display: 'block' }}>{a.url}</span></span>, className: 'two-line' },
     { key: 'projects', header: 'Projekty', render: a => a.projects.join(', ') },
     { key: 'token', header: 'Token', render: a => (a.tokenConfigured ? <StatusBadge tone="ok">nastaven</StatusBadge> : <StatusBadge tone="warning">chybí</StatusBadge>) },
     {
@@ -88,16 +90,16 @@ export function Accounts() {
 
   return (
     <>
-      {notice && <div className={`banner${notice.ok ? ' info' : ''}`} role={notice.ok ? 'status' : 'alert'}>{notice.message}</div>}
-      <Card title="Claude účty" actions={<button className="btn primary" onClick={() => setPanel({ kind: 'claude-add' })}>+ Přidat účet</button>} bodyClass="">
+      {notice && <Banner tone={notice.ok ? 'info' : 'warning'} role={notice.ok ? 'status' : 'alert'}>{notice.message}</Banner>}
+      <Card title="Claude účty" actions={<button className="btn primary" onClick={() => setPanel({ kind: 'claude-add' })}><Icon name="plus" size={14} />Přidat účet</button>} bodyClass="">
         {data ? <DataTable label="Claude účty" rows={data.claude} columns={claudeColumns} rowKey={a => a.id} empty="Žádný účet." />
-          : loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst účty.'} onRetry={reload} />}
+          : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Nelze načíst účty.'} onRetry={reload} />}
       </Card>
-      <Card title="YouTrack účty" actions={<button className="btn primary" onClick={() => setPanel({ kind: 'youtrack-add' })}>+ Přidat účet</button>} bodyClass="">
+      <Card title="YouTrack účty" actions={<button className="btn" onClick={() => setPanel({ kind: 'youtrack-add' })}><Icon name="plus" size={14} />Přidat účet</button>} bodyClass="">
         {data ? <DataTable label="YouTrack účty" rows={data.youtrack} columns={youtrackColumns} rowKey={a => a.id} empty="Žádný účet YouTrack. Přidejte instanci s tokenem." />
-          : loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst účty.'} onRetry={reload} />}
+          : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Nelze načíst účty.'} onRetry={reload} />}
       </Card>
-      <p className="muted">Cena a okna se přiřazují účtu podle složky, ve které leží transcript. Tokeny jsou jen v šifrovaném úložišti; tato obrazovka je nikdy neukáže.</p>
+      <p className="footnote muted">Cena a okna se přiřazují účtu podle složky, ve které leží transcript. Tokeny jsou jen v šifrovaném úložišti; tato obrazovka je nikdy neukáže.</p>
       {panel?.kind === 'claude-add' && <ClaudeAccountDrawer onClose={() => setPanel(null)} onDone={done} />}
       {panel?.kind === 'claude-rename' && <RenameDrawer id={panel.id} label={panel.label} onClose={() => setPanel(null)} onDone={done} />}
       {panel?.kind === 'youtrack-add' && <YoutrackAccountDrawer onClose={() => setPanel(null)} onDone={done} />}

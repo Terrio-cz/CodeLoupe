@@ -22,6 +22,7 @@ import { AppTray } from './tray';
 import { UpdateGuard } from './update/UpdateGuard';
 import { setupUpdates } from './update/setupUpdates';
 import { UpdateDir } from './update/UpdateDir';
+import { canRecolourOverlay, titleBarOptions, titleBarOverlay, windowBackground } from './windowChrome';
 
 const DEV_URL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
 // Verification modes write files and switch themes: development builds only.
@@ -105,6 +106,14 @@ async function main(): Promise<void> {
     openAtLogin: () => store.get().openAtLogin,
   });
 
+  // The caption buttons follow the theme (settings, the OS, the screenshot run): the page's title bar does it by CSS.
+  nativeTheme.on('updated', () => {
+    if (!win || win.isDestroyed()) return;
+    const dark = nativeTheme.shouldUseDarkColors;
+    win.setBackgroundColor(windowBackground(dark));
+    if (canRecolourOverlay(process.platform)) win.setTitleBarOverlay(titleBarOverlay(dark));
+  });
+
   manager.on('state', s => {
     tray.update(s);
     if (win && !win.isDestroyed()) win.webContents.send(CH.daemonPush, s);
@@ -155,7 +164,8 @@ async function main(): Promise<void> {
       show: false,
       title: 'CodeLoupe',
       icon: glyphImage('app', 64, 1),
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d0d0d' : '#f9f9f7',
+      backgroundColor: windowBackground(nativeTheme.shouldUseDarkColors),
+      ...titleBarOptions(process.platform, nativeTheme.shouldUseDarkColors),
       autoHideMenuBar: true,
       webPreferences: {
         preload: path.join(__dirname, '../preload/index.js'),
