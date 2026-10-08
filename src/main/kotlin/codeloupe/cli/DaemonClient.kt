@@ -3,6 +3,7 @@ package codeloupe.cli
 import codeloupe.CodeLoupe
 import codeloupe.JsonFormat
 import codeloupe.config.Config
+import codeloupe.config.PortPolicy
 import codeloupe.daemon.ToolOutcome
 import codeloupe.platform.DetachedStart
 import codeloupe.platform.JavaProcess
@@ -33,6 +34,7 @@ class DaemonClient(private val config: Config) {
 
     fun ensureDaemon(): JsonObject {
         status()?.let { return checkedHome(it) }
+        PortPolicy.refusal(config)?.let { throw IllegalStateException(it) }
         Files.createDirectories(config.home)
         // Its own home as working directory: the daemon outlives the CLI and must not hold the user's directory.
         val args = listOf("daemon", "--detached", "--home", config.home.toString(), "--port", config.port.toString()) +

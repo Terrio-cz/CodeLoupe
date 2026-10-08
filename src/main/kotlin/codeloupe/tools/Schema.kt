@@ -12,6 +12,8 @@ internal object Schema {
 
     fun boolean(description: String? = null) = typed("boolean", description)
 
+    fun obj(description: String? = null) = typed("object", description)
+
     fun integer(min: Int, max: Int) = buildJsonObject {
         put("type", "integer")
         put("minimum", min)

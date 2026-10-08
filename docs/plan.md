@@ -256,7 +256,7 @@ overloady a třída s konstruktory jsou jeden symbol.
 `root` = cesta do repozitáře nebo worktree (výchozí: výchozí větev repozitáře z `cwd` klienta). Výstup:
 kompaktní text, řádky 1-based, `limit` + `… +N dalších`. Strop: **≤ 14 nástrojů** celkem (popisy stojí tokeny
 v každém okně) — příbuzné operace sdílí nástroj s parametrem (`calls`, `tasks mode=…`); dnes 7 kódových (`find`,
-`outline`, `symbol`, `usages`, `calls`, `hierarchy`, `changes`) + 2 trackerové (`issue`, `tasks`, jen když je
+`outline`, `symbol`, `usages`, `calls`, `hierarchy`, `changes`) + 3 trackerové (`issue`, `tasks`, `update`, jen když je
 tracker v konfiguraci) + `job` (start/status/cancel jedním nástrojem, CL-84).
 
 ### Tracker (CL-26, CL-27, CL-29, CL-90)
@@ -526,9 +526,15 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   (pool bez `shrink_memory` 208–234 MB). Teplé dotazy 132–138 MB.
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
-  Globální `core.excludesFile` se neprojeví až do nové báze nebo hromadné změny — za běhu jako dosud, nově i po
-  restartu (snapshot ho nehlídá); `git add -f` / `git rm --cached` za běhu daemonu stejně. Snapshot se přepisuje celý i
-  po každé obnově indexu (IDE), synchronně pod zámkem worktree.
+  Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.
+- CL-111: stav gitu (`ScanSnapshot.gitState`) nově razítkuje globální excludes (`core.excludesFile` z `~/.gitconfig`,
+  `$XDG_CONFIG_HOME/git/config` a configu repozitáře, jinak `$XDG_CONFIG_HOME/git/ignore`; čte se ze souborů, bez
+  procesu) a počet záznamů indexu z jeho 12bajtové hlavičky. Změna jednoho z nich zabije snapshot po restartu i
+  vynutí reconcile za běhu; razítko indexu samotné dál ne (IDE ho přepisuje pořád, počet záznamů se tím nemění).
+  Cena: čtení tří malých configů a hlavičky indexu při každé kontrole, v profilu bez rozdílu (teplý dotaz 5,2 / 60,8 ms
+  před 5,1 / 74,1, nezměněný worktree 48,6 / 52,1 ms před 46,9 / 53,4, 0 git procesů). Mez: `git add` běžného
+  nového souboru počet záznamů mění také, takže stojí jeden reconcile (150–300 ms); přidání a odebrání ve stejné
+  chvíli (stejný počet) a `core.excludesFile` v `include`d configu se neprojeví do dalšího reconcile.
 - Opraveno cestou: `MergeBases` otevíral DB merge-base zapisovatelně jen kvůli čtení — souběžný zápis dával
   `SQLITE_BUSY`, čerstvě založený soubor bez schématu „no such table“ (`ChangesTest` souběh dvou worktree).
 - Testy: 74 (nově `GitLayoutTest`, `GitObjectsTest` — refy, merge-base, bloby jako git, žádný proces, chybějící blob a
@@ -612,7 +618,21 @@ rozhoduje launcher.
   TER-666 1 125 / 2 598; opakované čtení ~100 zn. (~30 tokenů). `yt_get_issue` 2,4–3,2 tis. zn. bez komentářů,
   5,4–6,3 tis. s komentáři a odkazy. `ready` na TER-164, TER-161, TER-163 = nezávislý výpočet nad YouTrack API
   (11, 24, 10 tasků).
-- Mimo rozsah: zápisy (CL-28), registr workspaců (CL-66 — dnes větve git worktree), keychain OS.
+- Mimo rozsah: registr workspaců (CL-66 — dnes větve git worktree), keychain OS.
+
+### Výsledek CL-28 — štíhlý zápis do trackeru (2026-10-07)
+
+- Nástroj `update(id, set={Pole: hodnota}, comment)` (CLI `codeloupe update CL-5 --set State=Done --comment …`): zápis jde do
+  YouTracku (`POST /api/issues/<id>`, komentář `POST /api/issues/<id>/comments`), odpověď je **jeden řádek ≤ 300 zn.**:
+  změněná pole `Pole: staré→nové` (hodnoty zkrácené na 40 zn.), `+comment <id>`, nový stav, když se sám neměnil. Příliš dlouhá
+  odpověď se ořízne na „… +N“; selhání komentáře po zapsaných polích se hlásí v odpovědi, ne výjimkou.
+- Mirror dostane odpověď zápisu samotnou (POST vrací celé issue, resp. komentář s `issue(updated)`) a uloží ji hned — žádné
+  další čtení issue; příští sync vidí shodné `updated` a nic nestahuje. Typ pole (`$type`) se zjistí jedním malým GET při
+  prvním zápisu do pole a pamatuje se; hodnoty se tvarují podle typu (enum/stav/verze `name`, uživatel `login`, multi pole
+  čárkou, text, číslo, datum; prázdná hodnota maže). Pravidla lifecycle a completion zůstávají v Terrio vrstvě.
+- Měřeno: odpověď `yt_update_fields` (youtrack MCP) je `{updated, verified: <celé issue>}` = 4,6–8,5 tis. zn. (TER-672 4 561, TER-660
+  5 628, TER-114 8 450; `yt_get_issue` stejného tvaru); `update` 31–52 zn. na živém CL (stav, komentář, stav + komentář),
+  po každém zápisu mirror shodný s čerstvým čtením (stav, `updated`, komentáře, pole).
 
 ## 10. Rizika
 

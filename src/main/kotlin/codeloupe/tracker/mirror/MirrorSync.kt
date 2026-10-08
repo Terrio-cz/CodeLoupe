@@ -1,7 +1,9 @@
 package codeloupe.tracker.mirror
 
+import codeloupe.tracker.IssueComment
 import codeloupe.tracker.TrackerAdapter
 import codeloupe.tracker.TrackerException
+import codeloupe.tracker.TrackerIssue
 
 /**
  * Brings one project of the mirror up to date: a full load the first time, afterwards only the issues whose
@@ -43,6 +45,42 @@ class MirrorSync(
         if (issue.id != id) store.delete(listOf(id))
         if (mirrored(issue.project)) store.upsert(listOf(issue), clock())
         return issue.id
+    }
+
+    /**
+     * Writes [fields] and then [comment] to [id] (canonical) and stores what the tracker answered in the mirror at once,
+     * so the issue is current without a read. A comment that fails after the fields went through is reported in the result.
+     */
+    fun write(id: String, fields: Map<String, String>, comment: String?): WriteResult {
+        val before = store.issue(id)
+        var current: TrackerIssue? = null
+        if (fields.isNotEmpty()) {
+            current = adapter.update(id, fields)
+            store.upsert(listOf(current), clock())
+        }
+        var added: IssueComment? = null
+        var problem: String? = null
+        if (comment != null) {
+            try {
+                val new = adapter.comment(id, comment)
+                added = new.comment
+                current = withComment(id, current, before, new.comment, new.issueUpdated)
+            } catch (e: TrackerException) {
+                if (current == null) throw e
+                problem = "comment not added: ${e.message}"
+            }
+        }
+        return WriteResult(before, current ?: throw TrackerException("nothing to write to $id"), added, problem)
+    }
+
+    /** The issue with [comment] in it, stored. Without a held version it is fetched, since the comment is already there. */
+    private fun withComment(id: String, current: TrackerIssue?, before: TrackerIssue?, comment: IssueComment, issueUpdated: Long?): TrackerIssue {
+        val base = current ?: before?.copy(comments = store.comments(id), attachments = store.attachments(id))
+        val merged = if (base == null) adapter.issue(id) ?: throw TrackerException("no issue $id") else {
+            base.copy(updated = maxOf(issueUpdated ?: comment.created, base.updated + 1), comments = base.comments.filter { it.id != comment.id } + comment)
+        }
+        store.upsert(listOf(merged), clock())
+        return merged
     }
 
     private fun load(project: String, now: Long): Pair<Int, Long?> {

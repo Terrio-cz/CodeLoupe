@@ -3,6 +3,7 @@ package codeloupe.daemon
 import codeloupe.CodeLoupe
 import codeloupe.JsonFormat
 import codeloupe.config.Config
+import codeloupe.config.PortPolicy
 import codeloupe.events.EventBus
 import codeloupe.events.EventStore
 import codeloupe.events.WebhookKey
@@ -216,8 +217,13 @@ class Daemon private constructor(
         private const val MAX_BODY = 4L * 1024 * 1024
         private const val IDLE_SECONDS = 2
 
-        /** Binds 127.0.0.1:<port>; fails with a BindException while another daemon holds the port. */
-        fun start(config: Config, exitOnShutdown: Boolean = false, webhookBackoffMs: List<Long> = Webhooks.BACKOFF_MS): Daemon =
-            Daemon(config, exitOnShutdown, webhookBackoffMs).apply { start() }
+        /**
+         * Binds 127.0.0.1:<port>; fails with a BindException while another daemon holds the port, and with an
+         * IllegalStateException when a non-default home asks for the default home's port ([PortPolicy]).
+         */
+        fun start(config: Config, exitOnShutdown: Boolean = false, webhookBackoffMs: List<Long> = Webhooks.BACKOFF_MS): Daemon {
+            PortPolicy.refusal(config)?.let { throw IllegalStateException(it) }
+            return Daemon(config, exitOnShutdown, webhookBackoffMs).apply { start() }
+        }
     }
 }
