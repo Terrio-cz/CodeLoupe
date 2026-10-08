@@ -350,6 +350,10 @@ pro `create_file(kind, name, members)` byl 30 %.
 codeloupe): reviewer a planner. Stejný model a effort. Výstup: tabulka metrik 8.1 + porovnání nálezů
 (neztratil reviewer nic?). Spustí se jednou po fázi 6 a po každé větší změně nástroje.
 
+Veřejné měření nástroje (CL-123): `node tools/benchmark.mjs` → [benchmarks.md](benchmarks.md). Na veřejných
+repozitářích (Exposed, CodeLoupe) srovnává velikost odpovědí a zdroje proti grepu a GitNexu; neměří chování agenta,
+takže tento řízený benchmark agentů zůstává nespuštěný.
+
 ### 8.5 Živé porovnání
 
 2 týdny po nasazení `codeloupe metrics compare baseline.json after.json`; týdenní report mezer.
