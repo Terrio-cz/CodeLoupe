@@ -45,6 +45,9 @@ describe('MockApi follows the read-only contract', () => {
     expect(first.kpis.weightedRange + second.kpis.weightedRange).toBeLessThanOrEqual(all.kpis.weightedRange + 2);
     expect(second.kpis.weightedRange).toBeLessThan(first.kpis.weightedRange);
     expect(validateRequest({ resource: 'overview', query: { account: 'b' } }).ok).toBe(true);
+    expect(a.baseline.state).toBe('ok');
+    expect(a.claude.every(c => c.savedPct7d === null || c.savedPct7d > 0)).toBe(true);
+    expect(all.baseline.coveredShare).toBeGreaterThan(0);
   });
 
   it('overview series and KPIs are consistent', async () => {

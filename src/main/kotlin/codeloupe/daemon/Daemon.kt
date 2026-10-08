@@ -10,6 +10,8 @@ import codeloupe.docker.ResourceInventory
 import codeloupe.docker.resourceRoutes
 import codeloupe.events.EventBus
 import codeloupe.events.EventStore
+import codeloupe.hooks.Hooks
+import codeloupe.hooks.hookRoutes
 import codeloupe.index.Extraction
 import codeloupe.index.ParseWorkerClient
 import codeloupe.events.WebhookKey
@@ -146,7 +148,7 @@ class Daemon private constructor(
     private val reconciler = Reconciler(
         reconcileConfig, { workspaces.list() }, { resources.report(it) }, ReconcilePlanner(reconcileConfig, releases::releasedAt),
         ReconcileExecutor({ DockerApi.connect() }, ProcessStopper(processSource))::execute, ReconcileState(config.home.resolve("reconcile-state.json"), reconcileConfig), releases, ::log,
-        { processes.report(it) }, ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
+        { processes.report(it) }, { workspaces.recent() }, workspaces::invalidate, ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
     )
     private val ports = PortRegistry(
         config.workspaces.ports, PortStore(config.home.resolve("ports.json")), LocalPorts(),
@@ -155,6 +157,7 @@ class Daemon private constructor(
     @Volatile private var lastClientCall: Instant? = null
     private val history = ResourceHistory()
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = { trackers.touch(); history.sample() })
+    private val hooks = Hooks.create(config, registry, runner::callsOn)
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
     private val pid = ProcessHandle.current().pid()
@@ -174,6 +177,7 @@ class Daemon private constructor(
             calls = runner.stats(), latency = latency, budgets = BudgetState.check(config.budgets, latency, rss, queueSnapshot.waitMsMax),
             queue = queueSnapshot, repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
             gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(), portAllocations = ports.allocated,
+            hooks = hooks.stats(),
         )
     }
 
@@ -198,6 +202,7 @@ class Daemon private constructor(
     private fun released(ref: WorkspaceRef) {
         log("workspace ${ref.workspace} of ${ref.repo} released")
         ports.free(ref)
+        workspaces.invalidate()
         scope.launch { runCatching { reconciler.run("release", auto = reconcileConfig.auto) } }
         // The verdict comes from transcripts: worked out once the daemon has settled, and only when the cached one is old.
         if (writeGate.stale()) scope.launch(Dispatchers.IO) { delay(GATE_DELAY_MS); runCatching { writeGate.refresh() } }
@@ -276,6 +281,7 @@ class Daemon private constructor(
                 val args = readBody(call) ?: return@post call.respondJson(HttpStatusCode.InternalServerError, error("body too large"))
                 call.respondJson(HttpStatusCode.OK, ToolOutcome.serializer(), runner.run(tool, ToolArgs(args), "api"))
             }
+            hookRoutes(hooks)
             jobRoutes(jobs)
             workspaceRoutes(workspaces, processes)
             resourceRoutes(resources)

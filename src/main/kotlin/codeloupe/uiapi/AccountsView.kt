@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /** The Claude and YouTrack accounts of this machine: metadata only, never a token. */
 @Serializable
-data class AccountsView(val claude: List<Claude>, val youtrack: List<Youtrack>) {
+data class AccountsView(val claude: List<Claude>, val youtrack: List<Youtrack>, val baseline: BaselineInfo) {
     @Serializable
     data class Claude(
         val id: String,
@@ -19,8 +19,8 @@ data class AccountsView(val claude: List<Claude>, val youtrack: List<Youtrack>) 
         /** Distinct working directories of this account that called CodeLoupe in the last 15 minutes. */
         val windows: Int,
         val weighted7d: Long,
-        /** Zero until the daemon keeps a baseline (the Overview's savings are zero for the same reason). */
-        val savedPct7d: Double,
+        /** Percent this account's runs of the last 7 days saved against the baseline; null without a baseline or without a run to compare. */
+        val savedPct7d: Double?,
         val lastUsedAt: String?,
     )
 

@@ -64,6 +64,14 @@ class Registry(
         return RepoLocation(worktree, commonDir)
     }
 
+    /** The repository with a built index, this run's or an earlier one's; null for one the daemon has never indexed. Starts nothing. */
+    fun known(commonDir: String): RepoState? {
+        val loaded = repos[commonDir] ?: repoDir(commonDir).takeIf { Files.exists(it.resolve("repo.json")) }?.let { repo(commonDir) }
+        return loaded?.takeIf { synchronized(it) { it.baseFile != null } }
+    }
+
+    private fun repoDir(commonDir: String): Path = config.home.resolve("repos").resolve(Sha1.hex(commonDir.lowercase()).take(12))
+
     fun repo(commonDir: String): RepoState = repos.computeIfAbsent(commonDir) {
         val id = Sha1.hex(commonDir.lowercase()).take(12)
         val dir = config.home.resolve("repos").resolve(id)

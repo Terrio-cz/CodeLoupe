@@ -1,5 +1,5 @@
 {
-  "description": "Starts the CodeLoupe daemon with the session",
+  "description": "Starts the CodeLoupe daemon with the session and points shell searches and whole-file reads at CodeLoupe",
   "hooks": {
     "SessionStart": [
       {
@@ -9,6 +9,18 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/start-daemon.sh\"",
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/hook.sh\"",
+            "timeout": 5
           }
         ]
       }
