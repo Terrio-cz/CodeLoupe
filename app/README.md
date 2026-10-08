@@ -21,6 +21,7 @@ npm start          # electron-vite preview of the built app
 npm run dev        # dev server with hot reload
 npm test           # vitest: request validation, settings, mock API, token contrast, daemon manager
 npm run typecheck
+npm run lint       # eslint; CI runs npm ci, lint, typecheck, test and build on every OS
 ```
 
 ## Configuration
