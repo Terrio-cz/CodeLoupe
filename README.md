@@ -654,6 +654,19 @@ symbol or file, and calls answered empty, busy or with candidates only. Large wi
 `categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
 ones, which know the Terrio workspace's shell commands), `defaultCategories` (false = only yours) and `ingestTtlMs` (below).
 
+Savings in the desktop app are measured against a baseline report in the daemon's home. Collect it over a period before CodeLoupe
+and store it with `--baseline`; the daemon reads `<home>/baseline.json` again whenever it changes:
+
+```bash
+codeloupe metrics collect --since 2026-09-23 --until 2026-10-02 --label baseline --baseline --dir ~/.claude/projects/<project>
+```
+
+A finished run whose role the baseline has counts the baseline's mean cost of one run of that role (the mean, because the
+runs of a period are compared as totals); every other run counts what it really cost on both sides. The saving is thus a
+comparison with the average run of the same role before CodeLoupe, not a controlled benchmark, and the screens say how much
+of the cost was compared. The Accounts screen applies the same figure to the runs of each Claude account. Without a
+baseline file they show a dash and how to create one.
+
 The desktop app's Runs, Overview and Gaps screens read the same transcripts through the daemon. The daemon does not watch
 them: a UI API call (`/ui-api/v1/runs`, `overview`, `gaps`, `nav`, `events`) starts a pass that reads only the transcripts
 that grew since the last one, from the byte offset it stopped at, into `<home>/transcripts.db` (runs, steps, hourly cost,

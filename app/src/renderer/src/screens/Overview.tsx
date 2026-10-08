@@ -6,6 +6,7 @@ import { DataTable, type Column } from '../components/DataTable';
 import { LatencyBars } from '../components/LatencyBars';
 import { CountUp } from '../components/CountUp';
 import { Icon } from '../components/Icon';
+import { BaselineNote } from '../components/BaselineNote';
 import { Banner, Card, Delta, ErrorState, KpiTile, Loading, rangeLabel, Select } from '../components/Parts';
 import { PhaseBadge } from '../components/StatusBadge';
 import { TimeChart } from '../components/TimeChart';
@@ -80,13 +81,15 @@ export function Overview() {
               </>
             )}
           </KpiTile>
-          <KpiTile label={`Cost ${r}`} value={<CountUp value={k.weightedRange} format={tokens} />} ctx={`baseline ${tokens(k.baselineRange)}`} />
-          <KpiTile label={`Savings ${r}`} value={<CountUp value={k.savedPct} format={v => pct(v, 1)} />} ctx={`${tokens(k.savedTokens)} tokens`} />
+          <KpiTile label={`Cost ${r}`} value={<CountUp value={k.weightedRange} format={tokens} />} ctx={k.savedPct === null ? 'no baseline to compare' : `baseline ${tokens(k.baselineRange)}`} />
+          <KpiTile label={`Savings ${r}`} value={k.savedPct === null ? '—' : <CountUp value={k.savedPct} format={v => pct(v, 1)} />} ctx={k.savedPct === null ? (data.baseline.state === 'ok' ? 'no run to compare' : 'no baseline') : `${tokens(k.savedTokens)} tokens`} />
           <KpiTile label="Active windows" value={<CountUp value={k.activeWindows} format={num} />} ctx={`${num(k.queriedWorktrees)} worktrees queried`} />
           <KpiTile label={`CodeLoupe calls ${r}`} value={<CountUp value={k.codeloupeCalls} format={num} />} ctx={`${ms(k.callP50Ms)} p50`} />
           <KpiTile label={`Gaps ${r}`} value={<CountUp value={k.gaps} format={num} />} ctx={`${num(k.newGaps)} new in 24h`} />
         </div>
       </section>
+
+      <BaselineNote baseline={data.baseline} />
 
       <div className="grid-2">
         <Card title="Cost over time (weighted tokens)">
