@@ -24,4 +24,6 @@ data class PlanEntry(
     val attempts: Int = 0,
     val nextAttempt: String? = null,
     val lastError: String? = null,
+    /** A process: the directory of the workspace it was found in, which it is checked against again before it is stopped. */
+    val path: String? = null,
 )

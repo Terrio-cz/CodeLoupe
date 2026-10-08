@@ -1,7 +1,10 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { ACTION_CH } from '../shared/actions';
+import { ENV_CH } from '../shared/envActions';
+import { ACCOUNT_CH } from '../shared/accountActions';
+import { ONBOARDING_CH } from '../shared/onboardingActions';
 import { JOB_CH, type LiveEvent } from '../shared/jobs';
-import { CH, type CodeLoupeBridge, type DaemonState } from '../shared/ipc';
+import { CH, type CodeLoupeBridge, type DaemonState, type UpdateState } from '../shared/ipc';
 
 // The renderer's only access to anything outside the page; every call is validated again in main.
 const bridge: CodeLoupeBridge = {
@@ -27,8 +30,18 @@ const bridge: CodeLoupeBridge = {
     connect: kind => ipcRenderer.invoke(CH.claudeConnect, kind),
     manual: kind => ipcRenderer.invoke(CH.claudeManual, kind),
   },
+  update: {
+    state: () => ipcRenderer.invoke(CH.updateState),
+    check: () => ipcRenderer.invoke(CH.updateCheck),
+    install: () => ipcRenderer.invoke(CH.updateInstall),
+    openRelease: () => ipcRenderer.invoke(CH.updateRelease),
+    onState: cb => {
+      const listener = (_e: IpcRendererEvent, s: UpdateState) => cb(s);
+      ipcRenderer.on(CH.updatePush, listener);
+      return () => ipcRenderer.removeListener(CH.updatePush, listener);
+    },
+  },
   actions: {
-    gapsRefresh: () => ipcRenderer.invoke(ACTION_CH.gapsRefresh),
     workspaceRelease: req => ipcRenderer.invoke(ACTION_CH.workspaceRelease, req),
     reconcileRun: req => ipcRenderer.invoke(ACTION_CH.reconcileRun, req),
   },
@@ -45,6 +58,29 @@ const bridge: CodeLoupeBridge = {
         void ipcRenderer.invoke(JOB_CH.liveStop);
       };
     },
+  },
+  env: {
+    capabilities: () => ipcRenderer.invoke(ENV_CH.capabilities),
+    set: input => ipcRenderer.invoke(ENV_CH.set, input),
+    remove: key => ipcRenderer.invoke(ENV_CH.remove, key),
+    scan: includeExcluded => ipcRenderer.invoke(ENV_CH.scan, includeExcluded),
+    importRun: input => ipcRenderer.invoke(ENV_CH.importRun, input),
+    rollback: id => ipcRenderer.invoke(ENV_CH.rollback, id),
+    reveal: key => ipcRenderer.invoke(ENV_CH.reveal, key),
+  },
+  accounts: {
+    claudeAdd: input => ipcRenderer.invoke(ACCOUNT_CH.claudeAdd, input),
+    claudeRename: (id, label) => ipcRenderer.invoke(ACCOUNT_CH.claudeRename, id, label),
+    claudeSetDefault: id => ipcRenderer.invoke(ACCOUNT_CH.claudeDefault, id),
+    claudeRemove: id => ipcRenderer.invoke(ACCOUNT_CH.claudeRemove, id),
+    youtrackAdd: input => ipcRenderer.invoke(ACCOUNT_CH.youtrackAdd, input),
+    youtrackTest: id => ipcRenderer.invoke(ACCOUNT_CH.youtrackTest, id),
+    youtrackRotate: (id, token) => ipcRenderer.invoke(ACCOUNT_CH.youtrackRotate, id, token),
+    youtrackRemove: id => ipcRenderer.invoke(ACCOUNT_CH.youtrackRemove, id),
+  },
+  onboarding: {
+    addRepositories: () => ipcRenderer.invoke(ONBOARDING_CH.addRepositories),
+    query: repoId => ipcRenderer.invoke(ONBOARDING_CH.query, repoId),
   },
   metrics: () => ipcRenderer.invoke(CH.metrics),
   open: {

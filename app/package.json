@@ -24,6 +24,7 @@
     "dist": "electron-vite build && node scripts/stage-resources.mjs && electron-builder --publish never"
   },
   "dependencies": {
+    "electron-updater": "6.8.10",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

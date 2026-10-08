@@ -41,6 +41,7 @@ class UiApi(
     private val overview = OverviewViews(callLog, worktrees, transcripts)
     private val settings = SettingsViews(config, catalog, trackers, trackerPollSec)
     private val environment = EnvironmentViews(secrets, config.secrets.rotationDays)
+    private val accountViews = AccountViews(transcripts.accounts, transcripts, trackers, secrets, callLog)
 
     suspend fun nav(gapsSince: String?): Nav {
         val since = gapsSince?.let { runCatching { Instant.parse(it) }.getOrNull() ?: throw UiApiException.badRequest("gapsSince must be an ISO instant") }
@@ -51,7 +52,14 @@ class UiApi(
         )
     }
 
-    suspend fun overview(range: String?): Overview = overview.overview(range ?: "7d")
+    suspend fun overview(range: String?, account: String? = null): Overview {
+        val filter = account?.let { id ->
+            AccountFilter(id, accountViews.transcriptPrefix(id) ?: throw UiApiException.badRequest("unknown account $id"), accountViews.rootsOf(id))
+        }
+        return overview.overview(range ?: "7d", filter)
+    }
+
+    suspend fun accounts(): AccountsView = accountViews.accounts()
 
     suspend fun worktrees(repo: String?, layer: String?, q: String?): WorktreeList = worktrees.list(repo, layer, q)
 

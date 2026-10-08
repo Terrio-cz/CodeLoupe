@@ -8,8 +8,11 @@
 //                                  [--expect-version <version>]   (a release build: installer name, daemon, /status and CLI must say so)
 //
 // Windows: NSIS installer, silent, into a temporary directory. Linux: the .deb through apt (needs sudo), the app on a
-// virtual display. macOS: the .dmg, the app copied to a temporary directory.
+// virtual display. macOS: the .dmg, the app copied to a temporary directory. Both of those only notify about a newer
+// release (CL-107): a release list on 127.0.0.1 offers v99.0.0 and the app must say so (Windows updates itself, and
+// tools/update-test.mjs covers that).
 import fs from 'node:fs';
+import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -85,6 +88,10 @@ async function install() {
     appDir = path.join(apps, 'CodeLoupe.app');
     appBin = path.join(appDir, 'Contents', 'MacOS', 'CodeLoupe');
     resources = path.join(appDir, 'Contents', 'Resources');
+    // Signed ad hoc (CL-130): Apple Silicon does not run an unsigned app, and the copy must still verify.
+    run('codesign', ['--verify', '--deep', '--strict', appDir]);
+    if (!run('codesign', ['-dv', appDir]).stderr.includes('Signature=adhoc')) throw new Error('the installed app is not signed ad hoc');
+    report.signature = 'adhoc';
     uninstall = async () => { fs.rmSync(appDir, { recursive: true, force: true }); };
   }
   if (!fs.existsSync(appBin)) throw new Error(`installed, but ${appBin} is missing`);
@@ -94,8 +101,22 @@ async function install() {
 // ---- the app ----------------------------------------------------------------------------------------------------------
 let app = null;
 let xvfb = null;
+let releases = null;
+/** A release list with one newer release, in GitHub's atom format, on a loopback port. */
+async function serveReleases() {
+  releases = http.createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/atom+xml' });
+    res.end('<feed><entry><link rel="alternate" type="text/html" href="http://127.0.0.1/releases/tag/v99.0.0"/></entry></feed>');
+  });
+  await new Promise(resolve => releases.listen(0, '127.0.0.1', resolve));
+  return releases.address().port;
+}
 async function startApp() {
   const appEnv = { ...env };
+  if (platform !== 'win32') {
+    appEnv.CODELOUPE_UPDATE_FEED = `http://127.0.0.1:${await serveReleases()}/`;
+    appEnv.CODELOUPE_UPDATE_DELAY_MS = '2000';
+  }
   const args = [`--user-data-dir=${userData}`];
   if (platform === 'linux') {
     // A virtual display for the window, and no Chromium sandbox: the runner's user namespaces are restricted.
@@ -209,6 +230,18 @@ try {
     if (!text.includes('Greeter')) throw new Error(`find through MCP did not return the fixture: ${text}`);
   });
 
+  if (platform !== 'win32') {
+    await step('update notice', async () => {
+      const log = path.join(userData, 'update', 'update.log');
+      for (let i = 0; i < 60; i++) {
+        if (fs.existsSync(log) && /state available latest=99\.0\.0/.test(fs.readFileSync(log, 'utf8'))) return;
+        await sleep(1000);
+      }
+      throw new Error(`the app did not report the newer release:
+${tail(log)}`);
+    });
+  }
+
   await sleep(3000);
   screenshot('app');
   report.rssMb = (await status())?.rssMb;
@@ -223,6 +256,7 @@ try {
       else try { process.kill(-app.pid, 'SIGKILL'); } catch { /* already gone */ }
     }
     if (xvfb) xvfb.kill();
+    releases?.close();
     if (resources) cli(['stop'], tmp);
     await sleep(1000);
     if (uninstall) {

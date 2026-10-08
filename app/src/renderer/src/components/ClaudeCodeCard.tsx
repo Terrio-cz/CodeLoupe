@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ClaudeConnectKind, ClaudeStatus } from '../../../shared/ipc';
 import { bridge } from '../api';
-import { Card } from './Parts';
+import { Card, Toast } from './Parts';
 
 const yes = (ok: boolean, on: string, off: string) => (ok ? `${on} ✓` : off);
 
@@ -43,11 +43,11 @@ export function ClaudeCodeCard() {
         Plugin přidá MCP server, skill a spouštění daemonu při startu relace. Samotný MCP server je jednodušší varianta
         bez skillu a bez automatického startu. Obojí až po potvrzení; zápis provede příkaz claude, aplikace jeho konfiguraci neupravuje.
       </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="actions">
         <button className="btn primary" disabled={busy || status?.plugin} onClick={() => void connect('plugin')}>Připojit plugin…</button>
         <button className="btn" disabled={busy || status?.mcp} onClick={() => void connect('mcp')}>Přidat jen MCP server…</button>
       </div>
-      {message && <div className="toast" role="status">{message}</div>}
+      {message && <Toast>{message}</Toast>}
       {manual.length > 0 && <pre className="mono">{manual.join('\n')}</pre>}
     </Card>
   );

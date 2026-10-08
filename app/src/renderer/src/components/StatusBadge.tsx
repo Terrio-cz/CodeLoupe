@@ -5,9 +5,9 @@ import type { Verdict, WorkspaceState } from '../../../shared/workspaces';
 export type Tone = 'ok' | 'warning' | 'serious' | 'critical' | 'neutral' | 'running';
 
 /** State is always a dot plus a word; colour never carries it alone. */
-export function StatusBadge({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+export function StatusBadge({ tone, live, children }: { tone: Tone; live?: boolean; children: React.ReactNode }) {
   return (
-    <span className={`badge ${tone}`}>
+    <span className={`badge ${tone}${live ? ' live' : ''}`}>
       <span className="dot" aria-hidden="true" />
       {children}
     </span>
@@ -41,7 +41,7 @@ const PHASE: Record<DaemonPhase, [Tone, string]> = {
   down: ['critical', 'neodpovídá'],
   error: ['critical', 'chyba'],
 };
-export const PhaseBadge = ({ phase }: { phase: DaemonPhase }) => <StatusBadge tone={PHASE[phase][0]}>Daemon {PHASE[phase][1]}</StatusBadge>;
+export const PhaseBadge = ({ phase }: { phase: DaemonPhase }) => <StatusBadge tone={PHASE[phase][0]} live={phase === 'running'}>Daemon {PHASE[phase][1]}</StatusBadge>;
 
 export function taskTone(state: string): Tone {
   if (state === 'Done') return 'ok';

@@ -25,6 +25,7 @@ describe('bundled daemon', () => {
     const root = makeBundle(resources, 'win32');
     const found = findBundledDaemon(resources, { platform: 'win32' });
     expect(found?.command).toBe(path.join(root, 'runtime', 'bin', 'java.exe'));
+    expect(found?.version).toBe('0.1.0');
     expect(found?.args.slice(-2)).toEqual(['-jar', path.join(root, 'lib', 'codeloupe-0.1.0.jar')]);
   });
 
@@ -51,7 +52,7 @@ describe('bundled daemon', () => {
 
   it('makes the settings default to the bundle and real data, without writing the bundle path', () => {
     const dir = tmp();
-    const bundled = { command: '/app/resources/codeloupe/runtime/bin/java', args: ['-jar', '/app/resources/codeloupe/lib/codeloupe-0.1.0.jar'] };
+    const bundled = { command: '/app/resources/codeloupe/runtime/bin/java', args: ['-jar', '/app/resources/codeloupe/lib/codeloupe-0.1.0.jar'], version: '0.1.0' };
     const store = new SettingsStore(dir, {}, bundled);
     expect(store.get()).toMatchObject({ apiSource: 'daemon', cliCommand: bundled.command, cliArgs: bundled.args });
     store.save({ ...store.get(), theme: 'dark' });
@@ -62,7 +63,7 @@ describe('bundled daemon', () => {
   it('leaves a CLI the user chose alone', () => {
     const dir = tmp();
     fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ cliCommand: 'node', cliArgs: ['cli.mjs'], apiSource: 'mock' }));
-    const store = new SettingsStore(dir, {}, { command: '/bundled/java', args: [] });
+    const store = new SettingsStore(dir, {}, { command: '/bundled/java', args: [], version: '0.1.0' });
     expect(store.get()).toMatchObject({ cliCommand: 'node', cliArgs: ['cli.mjs'], apiSource: 'mock' });
   });
 });

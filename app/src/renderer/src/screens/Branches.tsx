@@ -3,9 +3,10 @@ import type { LayerState, WorktreeSummary } from '../../../shared/contract';
 import { bridge, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
 import { Drawer } from '../components/Drawer';
+import { Icon } from '../components/Icon';
 import { Card, ErrorState, Loading, Search, Section, Select } from '../components/Parts';
 import { ChangeMark, LayerBadge, StatusBadge, taskTone } from '../components/StatusBadge';
-import { ago, num } from '../format';
+import { ago, num, tokens } from '../format';
 import { useDebounced, useSettings } from '../hooks';
 import { go, type Route } from '../router';
 
@@ -46,7 +47,7 @@ export function Branches({ route }: { route: Route }) {
         {data ? (
           <DataTable label="Větve a worktree" rows={data.items} columns={columns} rowKey={w => w.id} selected={route.id}
             onOpen={w => go('branches', w.id)} shortcuts={settings?.shortcuts} empty="Žádný worktree neodpovídá filtru." />
-        ) : loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst větve.'} onRetry={reload} />}
+        ) : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Nelze načíst větve.'} onRetry={reload} />}
       </Card>
       {route.id && <BranchDrawer id={route.id} onClose={() => go('branches')} />}
     </>
@@ -55,6 +56,8 @@ export function Branches({ route }: { route: Route }) {
 
 function BranchDrawer({ id, onClose }: { id: string; onClose(): void }) {
   const { data: w, error, reload } = useApi('worktrees/:id', id);
+  // The costliest runs of the branch's task, from the transcripts: where the cost of the work went.
+  const runs = useApi(w?.taskId ? 'runs' : null, undefined, { q: w?.taskId ?? undefined, range: '30d', sort: 'weighted', limit: 5 });
   const [opened, setOpened] = useState<boolean | null>(null);
   const LIMIT = 20;
   const [more, setMore] = useState(false);
@@ -67,13 +70,13 @@ function BranchDrawer({ id, onClose }: { id: string; onClose(): void }) {
     >
       {!w ? (error ? <ErrorState message={error.message} onRetry={reload} /> : <Loading />) : (
         <>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="drawer-summary">
             <LayerBadge state={w.layer} />
             <span>↑{w.ahead} ↓{w.behind} od <span className="mono">{w.baseRef}</span> (merge-base <span className="mono">{w.mergeBase}</span>)</span>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {(w.task ?? w.taskId) && <button className="btn" onClick={() => go('tasks', w.task?.id ?? w.taskId)}>Úkol {w.task?.id ?? w.taskId} →</button>}
-            <button className="btn" onClick={() => void bridge().open.worktree(w.id).then(setOpened)}>Otevřít složku</button>
+          <div className="actions">
+            {(w.task ?? w.taskId) && <button className="btn" onClick={() => go('tasks', w.task?.id ?? w.taskId)}>Úkol {w.task?.id ?? w.taskId}<Icon name="arrowRight" size={14} /></button>}
+            <button className="btn" onClick={() => void bridge().open.worktree(w.id).then(setOpened)}><Icon name="folder" size={14} />Otevřít složku</button>
             {opened === false && <span className="t2" role="status">Složku nejde otevřít (neexistuje nebo to není git worktree).</span>}
           </div>
 
@@ -88,6 +91,23 @@ function BranchDrawer({ id, onClose }: { id: string; onClose(): void }) {
                   </>
                 ) : <span className="grow muted">v mirroru YouTrack zatím není</span>}
               </li></ul>
+            </Section>
+          )}
+
+          {w.taskId && (
+            <Section title="Běhy agentů na úkolu" count={runs.data?.total}>
+              {!runs.data ? (runs.error ? <div className="muted">{runs.error.message}</div> : <div className="muted">Načítám…</div>) : runs.data.items.length === 0 ? <div className="muted">Za posledních 30 dní žádný běh, který by úkol zmiňoval.</div> : (
+                <ul className="rows">
+                  {runs.data.items.map(r => (
+                    <li key={r.id}>
+                      <button className="link mono" onClick={() => go('runs', r.id)}>{r.role}</button>
+                      <span className="grow" title={r.title}>{r.title}</span>
+                      <span className="muted num">{tokens(r.weighted)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {runs.data && runs.data.total > runs.data.items.length && <button className="link" onClick={() => go('runs', null, { q: w.taskId! })}>Všechny běhy úkolu ({runs.data.total}) →</button>}
             </Section>
           )}
 

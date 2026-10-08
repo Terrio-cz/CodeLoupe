@@ -17,10 +17,10 @@ internal class OverviewViews(
     private val transcripts: Transcripts,
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
-    suspend fun overview(range: String, now: Instant = Instant.now()): Overview {
+    suspend fun overview(range: String, account: AccountFilter? = null, now: Instant = Instant.now()): Overview {
         val days = Ranges.days(range)
         transcripts.fresh()
-        val records = calls.after(now.minusSeconds(days * 86_400))
+        val records = calls.after(now.minusSeconds(days * 86_400)).filter { account == null || it.root?.let(account.owns) == true }
         val roots = records.mapNotNull { it.root }.distinct()
         val recent = records.filter { instant(it)?.isAfter(now.minusSeconds(ACTIVE_WINDOW_S)) == true }.mapNotNull { it.root }.distinct()
         val known = worktrees.all()
@@ -29,7 +29,7 @@ internal class OverviewViews(
         val todayStart = today.atStartOfDay(zone).toInstant()
         val yesterdayStart = today.minusDays(1).atStartOfDay(zone).toInstant()
         val lastHour = Math.floorDiv(now.toEpochMilli(), RunWriter.HOUR_MS)
-        val windows = CostWindows(transcripts.queries.hours(CostWindows.firstHour(now, maxOf(days, 2)), lastHour + 1), zone)
+        val windows = CostWindows(transcripts.queries.hours(CostWindows.firstHour(now, maxOf(days, 2)), lastHour + 1, account?.transcriptPrefix), zone)
         val series = if (days == 1L) windows.hourly(HOURS_PER_DAY, now) else windows.daily(days.toInt(), today)
         val usedToday = windows.between(todayStart.toEpochMilli(), Long.MAX_VALUE)
         val sameTimeYesterday = yesterdayStart.plus(Duration.between(todayStart, now))
@@ -37,8 +37,8 @@ internal class OverviewViews(
             range = range, generatedAt = now.toString(),
             kpis = Overview.Kpis(
                 usedToday, windows.between(yesterdayStart.toEpochMilli(), sameTimeYesterday.toEpochMilli()), series.sumOf { it.weighted }, 0, 0, 0.0, recent.size, queried,
-                records.size, percentile(records.map { it.ms }, 50), transcripts.queries.gapCount(now.minusSeconds(days * 86_400).toEpochMilli()),
-                transcripts.queries.gapCount(now.minusSeconds(NEW_GAP_S).toEpochMilli()),
+                records.size, percentile(records.map { it.ms }, 50), transcripts.queries.gapCount(now.minusSeconds(days * 86_400).toEpochMilli(), account?.transcriptPrefix),
+                transcripts.queries.gapCount(now.minusSeconds(NEW_GAP_S).toEpochMilli(), account?.transcriptPrefix),
             ),
             budget = Overview.Budget(transcripts.budgets.dailyWeighted, usedToday), costSeries = series, savingsByTool = emptyList(),
             toolCalls = records.groupBy { it.tool }.map { (tool, rs) ->

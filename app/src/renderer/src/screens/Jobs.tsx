@@ -3,7 +3,8 @@ import type { Delivery, JobLogText, JobRecord, SlotSnapshot, Webhook } from '../
 import { bridge, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
 import { Drawer } from '../components/Drawer';
-import { Card, ErrorState, KpiTile, Loading, Search, Section, Select } from '../components/Parts';
+import { CountUp } from '../components/CountUp';
+import { Card, Empty, ErrorState, KpiTile, Loading, Search, Section, Select } from '../components/Parts';
 import { StatusBadge } from '../components/StatusBadge';
 import { ago, dateTime, ms, num } from '../format';
 import { useSettings } from '../hooks';
@@ -64,7 +65,7 @@ export function Jobs({ route }: { route: Route }) {
     return () => clearInterval(t);
   }, [active]);
 
-  if (!jobs.data) return <Card>{jobs.loading ? <Loading /> : <ErrorState message={jobs.error?.message ?? 'Nelze načíst joby.'} onRetry={jobs.reload} />}</Card>;
+  if (!jobs.data) return <Card bodyClass="">{jobs.loading ? <Loading variant="table" /> : <ErrorState message={jobs.error?.message ?? 'Nelze načíst joby.'} onRetry={jobs.reload} />}</Card>;
 
   const counts = jobCounts(items);
   const shown = items.filter(j => matches(j, { filter, q }));
@@ -77,21 +78,21 @@ export function Jobs({ route }: { route: Route }) {
         <Select label="Stav jobu" value={filter} onChange={v => setFilter(v as JobFilter)} options={FILTERS} />
         <Search label="Hledat job, příkaz, štítek" value={q} onChange={setQ} />
         <span style={{ flex: 1 }} />
-        <span className="muted">Posledních {num(items.length)} jobů · živě z proudu událostí daemonu{status.data?.jobs?.policyHook ? ' · politika hlídá příkazy' : ''}</span>
+        <span className="muted">Posledních {num(items.length)} jobů{settings?.apiSource === 'daemon' ? ' · živě z proudu událostí daemonu' : ' · mock data, bez živého proudu'}{status.data?.jobs?.policyHook ? ' · politika hlídá příkazy' : ''}</span>
       </div>
 
-      <section className="card" aria-label="Počty jobů">
+      <section aria-label="Počty jobů">
         <div className="kpis">
-          <KpiTile label="Běží" value={num(counts.running)} ctx="právě teď" />
-          <KpiTile label="Ve frontě" value={num(counts.queued)} ctx="čekají na slot" />
-          <KpiTile label="Hotové" value={num(counts.passed)} ctx="exit 0" />
-          <KpiTile label="Selhané" value={num(counts.failed)} ctx="exit ≠ 0, chyba, ztracené" />
-          <KpiTile label="Zamítnuté a zrušené" value={num(counts.stopped)} ctx="nespuštěné nebo přerušené" />
+          <KpiTile label="Běží" value={<CountUp value={counts.running} format={num} />} ctx="právě teď" />
+          <KpiTile label="Ve frontě" value={<CountUp value={counts.queued} format={num} />} ctx="čekají na slot" />
+          <KpiTile label="Hotové" value={<CountUp value={counts.passed} format={num} />} ctx="exit 0" />
+          <KpiTile label="Selhané" value={<CountUp value={counts.failed} format={num} />} ctx="exit ≠ 0, chyba, ztracené" />
+          <KpiTile label="Zamítnuté a zrušené" value={<CountUp value={counts.stopped} format={num} />} ctx="nespuštěné nebo přerušené" />
         </div>
       </section>
 
       <Card title="Sloty a kdo je drží" bodyClass="">
-        {slots.length === 0 ? <div className="state">Daemon nemá žádný slot (každý job běží hned).</div> : (
+        {slots.length === 0 ? <Empty icon="jobs">Daemon nemá žádný slot (každý job běží hned).</Empty> : (
           <ul className="slots" aria-label="Sloty">
             {slots.map(s => <SlotRow key={s.name} slot={s} byId={byId} />)}
           </ul>

@@ -339,6 +339,21 @@ split over lines) is not covered. A value on a command line is visible to this u
 or the API instead. The Terrio workspace guard (`.claude/hooks/guard.ps1`) should deny reads of `…/codeloupe/secrets/` (add it to its
 `SecretFiles` pattern); until then only the `Read(**/*.env)` rule of `settings.json` covers the Read tool.
 
+## Repositories
+
+`codeloupe repos add <folder>...` writes the folders (each must hold a `.git`) to `config.json` `workspaces.repos` without touching the rest of the file (a file that is not valid JSON is refused,
+not rewritten) and asks the daemon a first question per repository so that it is known and its base index starts building; `repos list` prints what is configured, `--json` gives the report the
+desktop app's first-run onboarding reads. The running daemon already knows a repository after that first question; the configuration keeps it across restarts.
+
+## Accounts
+
+`<home>/accounts.json` lists the Claude Code accounts of this machine (each a config directory, `CLAUDE_CONFIG_DIR`) and the YouTrack instances to mirror; the
+desktop app writes it, the daemon reads it afresh on every call. Without it the one account is `~/.claude`. The transcripts of every listed account are ingested
+(`<configDir>/projects/*`) and attributed to it by the folder they lie in, so `GET /ui-api/v1/accounts` shows each account's cost for 7 days, last use and working directories
+that called CodeLoupe in the last 15 minutes, and `GET /ui-api/v1/overview?account=<id>` narrows the Overview to one. A YouTrack account is `{ id, label, url, projects, token }` where
+`token` is the name of a global secret in the store (`YOUTRACK_TOKEN_<ID>`); the daemon mirrors it like a tracker of `config.json` (a tracker of that file wins a name clash), reading the
+token from the store at most every 30 seconds. The API never returns a token, only whether one is stored.
+
 ## Documents
 
 One layer serves every large text an agent would otherwise read twice: `doc` (plans, brain notes, persisted tool outputs)
@@ -416,10 +431,11 @@ port but the daemon's, unless `remoteWebhooks` lists the https origin; redirects
 
 ## Workspaces
 
-`codeloupe workspaces [--repo <path>] [--state orphan] [--size] [--json]` and `GET /workspaces?repo=&size=1` (JSON, for the
+`codeloupe workspaces [--repo <path>] [--state orphan] [--size] [--ram] [--json]` and `GET /workspaces?repo=&size=1&ram=1` (JSON, for the
 app) list every worktree of the configured repositories: role, branch, task id (from the branch name, else the directory
 name, by the repository's task pattern), commits ahead of the default branch, the task's state from the tracker mirror,
-last activity (newer of the HEAD commit and the last git operation in the worktree) and, with `size`, disk size.
+last activity (newer of the HEAD commit and the last git operation in the worktree) and, with `size`, disk size and, with `ram`, the
+working set of the processes that work in the directory and how many they are.
 State: `active`; `landed` (everything is on the default branch and the task is resolved or has commits there);
 `abandoned` (unmerged work, idle for more than `abandonedDays`); `orphan` (a directory under a worktree root git has no
 worktree for, or a worktree whose directory is gone). Nothing is removed: orphans are only reported. Git is read in-process,
@@ -521,6 +537,30 @@ cleanup of leftovers.
 `auto` is off by default. `protect` patterns are regular expressions tried (case-insensitively, anywhere in the name,
 so anchor them) against each name of a resource and its compose project; without `kinds` they also cover directories.
 
+### Processes and build daemons per workspace
+
+`codeloupe ws processes [--workspace TER-5] [--json]` (`GET /processes`) lists the processes that work in a workspace
+directory and the memory each workspace holds. A process belongs to the workspace whose directory holds its working directory
+(the deepest one when worktrees sit inside the main checkout), or else the one whose path appears in its command line (at a path
+boundary: `TER-5` is not `TER-50`). The working directory comes from the process itself: `/proc/<pid>/cwd` on Linux, `lsof` on
+macOS, the PEB of the process on Windows. Another user's or a protected process is not seen. A Gradle daemon works in the project's
+directory only while a build runs and goes back to its own directory after it, so an idle daemon is placed by its own log
+(`<gradle user home>/daemon/<version>/daemon-<pid>.out.log`: the directory of the last `Received command: Build{…}` and the last
+`Marking the daemon as busy / idle`; the Gradle user home is `workspaces.gradleUserHome`, `GRADLE_USER_HOME` or `~/.gradle`).
+An idle daemon left behind by a finished task is what keeps hundreds of MB, and on Windows what keeps the worktree directory
+from being deleted, which is why the reconciler stops it. `via` in the output says whether a process was placed by its
+`cwd`, by its `last build` or by its `command line`.
+
+The reconciler plans **build tools only**: Gradle daemons and workers, and the Kotlin compile daemon. Other processes (an editor, a
+shell, a dev server) are listed and never touched. A build tool of a **released** workspace is an `auto` entry (`process:<pid>:<start>`)
+and is stopped without asking, also with `auto` off, once it is checked again at the moment of the stop: it is the same process (pid
+and start time), still a build tool, still placed in that workspace, **idle** (Gradle's own log does not mark it busy, and neither it nor
+its children use CPU for 0.6 s) and no `gradlew` build runs in that workspace. The Kotlin daemon serves every workspace, so it waits for any running Gradle build. A process
+that fails these checks is *blocked* and retried with the usual backoff. Processes of a workspace that landed, was abandoned or is an
+orphan are `confirm` entries (`ws reconcile --confirm process:…`), those of an active workspace are kept. A `protect` rule that
+matches the command line, the working directory or the workspace path keeps a process untouched. Only processes of registered
+workspaces are ever considered, so processes of other projects are not.
+
 ### Ports per workspace
 
 With `"ports": { "range": [19000, 19999] }` under `workspaces`, a workspace asks for a port by name:
@@ -536,8 +576,13 @@ workspace's. `codeloupe status` shows `portAllocations`.
 
 ## Desktop app
 
-`app/` holds the Electron desktop app (tray, notifications, daemon start/stop, screens over the daemon's
-read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
+`app/` holds the Electron desktop app (tray, notifications, daemon start/stop). Screens, light and dark: Overview (cost and
+savings, p95 latency, daemon memory and CPU with the budget warnings), Branches (changed declarations, callers, tests, the
+runs of the task), Workspaces (every registry state with its Docker resources, ports, disk and memory; release and confirmed
+cleanup), Tasks, Jobs (states, slots and holders, live, logs with the summary first, chains, webhooks), Runs (what each agent
+run cost and where), Index, Gaps (the weekly gap report), Environment and Settings. They read the daemon's UI API and a few
+of its read-only routes; the two actions that change something ask in a native dialog first. See [app/README.md](app/README.md)
+and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
 
 ## Configuration
 
@@ -652,7 +697,7 @@ on, because the runtime is. CI builds them in the `bundle` job and keeps them fo
 |---|---|---|
 | Windows x64 | `CodeLoupe-<v>-win-x64.exe` (NSIS, per user, one click) | Starts the app when it ends. An update or uninstall first stops the installation's own daemon. The uninstaller asks whether to delete the data (`%LOCALAPPDATA%\codeloupe`, `%APPDATA%\codeloupe-desktop`); `/S` and updates keep it. |
 | macOS arm64, x64 | `CodeLoupe-<v>-mac-arm64.dmg`, `CodeLoupe-<v>-mac-x64.dmg` | Drag to Applications. Removing the app leaves the data in `~/Library/Caches/codeloupe` and `~/Library/Application Support/codeloupe-desktop` until it is deleted by hand. |
-| Linux x64 | `CodeLoupe-<v>-linux-x64.AppImage`, `.deb` | The AppImage copies the bundle to `<userData>/daemon/<version>` once, because the daemon outlives its mount. Removing the app leaves the data in `~/.cache/codeloupe` and `~/.config/codeloupe-desktop`. |
+| Linux x64 | `CodeLoupe-<v>-linux-x86_64.AppImage`, `-linux-amd64.deb` | The AppImage copies the bundle to `<userData>/daemon/<version>` once, because the daemon outlives its mount. Removing the app leaves the data in `~/.cache/codeloupe` and `~/.config/codeloupe-desktop`. |
 
 An installed app reads real data (`apiSource: daemon`) and starts the daemon from its own runtime; the CLI command in
 Settings stays on its default and is resolved at start-up, so an update never leaves a stale path.
@@ -661,8 +706,51 @@ The `installer-smoke` CI job installs each installer on its OS, starts the app, 
 from the bundled runtime, runs `find` through the CLI and through the MCP endpoint on a PATH without Java, takes a
 screenshot of the app window (artifact `smoke-<os>`) and uninstalls (`node tools/installer-smoke.mjs <installer>`;
 it uses its own home, port and app data, so it is safe on a developer machine; screenshots only when `CI` is set).
-Not yet: signing and notarisation (CL-105, options and costs in [docs/code-signing.md](docs/code-signing.md); until the owner chooses, Windows shows an unknown publisher and macOS refuses the app),
-the release pipeline (CL-106), auto-update (CL-107). CI cost and runners: [docs/ci.md](docs/ci.md). Releasing (tag, checksums, SBOMs, draft release): [docs/release.md](docs/release.md).
+CI cost and runners: [docs/ci.md](docs/ci.md). Releasing (tag, checksums, SBOMs, draft release): [docs/release.md](docs/release.md).
+
+### Unsigned installers: installing without a warning
+
+Nothing is paid for ([docs/code-signing.md](docs/code-signing.md)), so the installers carry no publisher signature:
+the Windows installer is unsigned, the macOS app is signed ad hoc (`codesign -dv` shows `Signature=adhoc`, enough for
+Apple Silicon to run it). Every release lists a SHA-256 for each file in `SHA256SUMS.txt`, and the files come from a
+public CI run of the tag.
+
+| OS | Install | Why there is no warning |
+|---|---|---|
+| Windows | `winget install Terrio.CodeLoupe` or `scoop install codeloupe` (once the owner has submitted the manifests) | A package manager downloads the file without the Mark of the Web, which is what SmartScreen judges. |
+| macOS | `brew install --cask codeloupe` | The cask removes the quarantine flag after installing. |
+| Linux | the `.AppImage` (`chmod +x`) or `sudo apt install ./CodeLoupe-<v>-linux-amd64.deb` | Nothing to allow. |
+
+A download from the browser needs one manual allow, once:
+
+- **Windows**: SmartScreen says "Windows protected your PC": **More info**, then **Run anyway**.
+- **macOS**: right-click the app and choose **Open** (then **Open** again), or System Settings → Privacy & Security →
+  **Open Anyway**, or in a terminal `xattr -dr com.apple.quarantine /Applications/CodeLoupe.app`.
+
+The manifests (`packaging-manifests.zip` on each release) are generated by `node tools/packaging-manifests.mjs --dir
+<release files> --version <v> --out <dir>` from the release's URLs and checksums; publishing them to winget-pkgs, a
+Scoop bucket or a Homebrew tap is a separate, manual step ([docs/release.md](docs/release.md)).
+
+### Updates
+
+The installed app looks for a newer release on GitHub 30 seconds after it starts and every six hours (Settings →
+Aktualizace; **Hledat novou verzi automaticky** switches the check off, and with it off the app never contacts anything
+by itself). What happens next depends on the installation:
+
+| Installation | A newer release |
+|---|---|
+| Windows installer (NSIS), Linux AppImage | Downloaded in the background, the SHA-512 and size from the release's `latest.yml` / `latest-linux.yml` checked, then **Restartovat a aktualizovat** in Settings (or the next quit) installs it. The installer stops the daemon of the old installation and replaces its files; settings (`%APPDATA%\codeloupe-desktop`), secrets, task mirror and indexes (the daemon's home) are not touched, and the new app starts the daemon from the new bundle. An index written in an older format is rebuilt, never served. |
+| macOS, Linux `.deb`, a Windows copy unpacked by Scoop | Only a notification and **Otevřít stránku vydání** in Settings: macOS cannot update an app that has no Developer ID signature (nothing is paid for, [docs/code-signing.md](docs/code-signing.md)), the package manager owns the other two. Install the new version the way you installed this one. |
+
+The first run of a new version is watched: the daemon of the new bundle has 90 seconds to answer. If it does not, the
+previous bundle (kept in `<app data>/update/previous` while the update was pending, about 190 MB, deleted once the new
+daemon has answered) runs instead, Settings says so, and the next update tries again. Privacy: the app asks only
+`github.com/Terrio-cz/CodeLoupe` (the releases feed and the files of one release), with the User-Agent `CodeLoupe`, English as
+the language, no cookies, no account and no identifier; the installer is verified against the SHA-512 in the release before it
+runs. Pre-release versions follow each other only when the number after the dot grows (`v1.0.0-rc.1`, `rc.2`, `rc.10`); an rc
+is offered the next rc and the final release, a final release only final releases. `node tools/update-test.mjs --old <installer>
+--new <installer> [--bad <installer>]` proves an update between two builds on this machine against a local feed
+([docs/release.md](docs/release.md)).
 
 ## Develop
 
@@ -708,6 +796,7 @@ accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram
 | `jobs` | commands run for agents: policy hook, slots, processes, summaries, completion actions, `job` tool |
 | `workspace` | `GET /workspaces`: worktrees, branches, tasks, merge and tracker state, orphan directories |
 | `reconcile` | `GET /reconcile`, `POST /reconcile/run`: policy, executor, backoff state, scheduler, journal |
+| `processes` | `GET /processes`: processes by workspace directory, memory per workspace, stopping the build tools of released workspaces |
 | `docker` | Docker Engine API client (named pipe / unix socket), ownership labels, compose override, `GET /resources`: owned / adopted / unowned |
 | `events` | event log, server-sent-events stream, webhook subscriptions and deliveries |
 | `cli` | `codeloupe` commands and the daemon client |

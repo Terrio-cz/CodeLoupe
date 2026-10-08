@@ -1,11 +1,9 @@
 import { app, BrowserWindow, dialog } from 'electron';
 import { ACTION_CH, type ActionOutcome, type ReconcileOutcome } from '../../shared/actions';
 import type { DaemonClient } from '../daemon/DaemonClient';
-import type { GapReportRefresh } from '../gaps/GapReportRefresh';
 import { WorkspaceActions, type Confirm } from './WorkspaceActions';
 
 export interface ActionContext {
-  gapsRefresh: GapReportRefresh;
   client: DaemonClient;
   /** The daemon answers for real: false in mock mode, or while a foreign process holds the port. */
   daemonTrusted(): boolean;
@@ -29,7 +27,6 @@ export function registerActions(ctx: ActionContext, handle: <A extends unknown[]
     }
   };
 
-  handle(ACTION_CH.gapsRefresh, () => ctx.gapsRefresh.run());
   handle(ACTION_CH.workspaceRelease, guarded<ActionOutcome>(input => workspaces.release(input), {}));
   handle(ACTION_CH.reconcileRun, guarded<ReconcileOutcome>(input => workspaces.reconcile(input), { results: [] }));
 }

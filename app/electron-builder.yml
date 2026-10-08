@@ -1,6 +1,6 @@
 # Installers of the desktop app with the daemon and its Java runtime inside (CL-104). `npm run dist` builds the one
 # for the OS and CPU it runs on: jlink output is specific to both, so each installer comes from its own runner.
-# Signing and notarisation come with CL-105; until then macOS and Windows installers are unsigned.
+# Nothing is paid for (CL-105, docs/code-signing.md): the Windows installer is unsigned, the macOS app is signed ad hoc.
 appId: cz.terrio.codeloupe
 productName: CodeLoupe
 copyright: Terrio
@@ -10,8 +10,8 @@ directories:
 files:
   - out/**/*
   - package.json
-  # The renderer is bundled by Vite and main imports only Electron and Node modules.
-  - "!node_modules"
+  # The renderer is bundled by Vite; main requires Electron, Node and electron-updater (CL-107), which brings its own
+  # production dependencies along (electron-builder leaves out the dev tooling).
 extraResources:
   # stage/ is filled by scripts/stage-resources.mjs: the Gradle bundle and the Claude Code plugin.
   - from: stage/codeloupe
@@ -23,6 +23,17 @@ electronLanguages:
   - en-US
   - cs
 artifactName: CodeLoupe-${version}-${os}-${arch}.${ext}
+# Ad hoc macOS signature (a no-op on the other platforms).
+afterPack: ./scripts/ad-hoc-sign.mjs
+# Auto-update (CL-107). `--publish never` publishes nothing; this makes electron-builder write the feed files
+# (latest.yml, latest-linux.yml: SHA-512 and size of each installer) and resources/app-update.yml. The release job attaches
+# the feed files to the draft release; the app finds a newer release itself and reads the files from that release's
+# directory (app/src/main/update), so no channel names are involved: always `latest`.
+publish:
+  provider: github
+  owner: Terrio-cz
+  repo: CodeLoupe
+  channel: latest
 
 win:
   target: nsis
@@ -40,7 +51,8 @@ mac:
   target: dmg
   category: public.app-category.developer-tools
   icon: stage/icon.png
-  # No certificate yet (CL-105): without this electron-builder looks for one in the keychain.
+  # No certificate (CL-105: nothing is paid for): without this electron-builder looks for one in the keychain.
+  # The app is signed ad hoc by the afterPack hook instead (CL-130).
   identity: null
 
 linux:
