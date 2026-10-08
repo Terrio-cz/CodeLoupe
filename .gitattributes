@@ -6,3 +6,5 @@ gradlew text eol=lf
 src/test/resources/fixtures/** text eol=lf
 # The plugin hook runs under bash on every OS: a CRLF checkout would break it.
 plugin/hooks/*.sh text eol=lf
+# SKILL.md frontmatter is matched with a LF-only pattern (app/test/pluginFiles.test.ts); CRLF broke it on Windows.
+plugin/skills/**/*.md text eol=lf
