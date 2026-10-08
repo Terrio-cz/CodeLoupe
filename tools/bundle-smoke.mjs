@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { noJavaEnv } from './no-java-env.mjs';
 
 const [bundle, ...rest] = process.argv.slice(2);
-const opt = name => rest[rest.indexOf(`--${name}`) + 1];
+const opt = name => { const at = rest.indexOf(`--${name}`); return at < 0 ? undefined : rest[at + 1]; };
 if (!bundle || !fs.existsSync(path.join(bundle, 'bin'))) { console.error('usage: bundle-smoke.mjs <bundle dir> [--zip file] [--out file]'); process.exit(2); }
 const windows = process.platform === 'win32';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
