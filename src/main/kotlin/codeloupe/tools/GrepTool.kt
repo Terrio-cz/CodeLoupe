@@ -5,7 +5,7 @@ import codeloupe.query.View
 
 object GrepTool : ViewTool {
     override val name = "grep"
-    override val description = "Text search in the indexed source (Kotlin files, worktree edits included) for what find/usages do not " +
+    override val description = "Text search in the indexed source (Kotlin and Java files, worktree edits included) for what find/usages do not " +
         "see: string literals, SQL, annotation arguments, config keys. Literal by default (regex=true for a regex, one line at a " +
         "time). Hits are grouped by file and enclosing declaration, one code line each."
     override val properties = Schema.properties(

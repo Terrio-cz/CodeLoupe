@@ -12,7 +12,10 @@ describe('validateRequest', () => {
   it('reaches the daemon routes outside the UI API that a screen needs, and no others', () => {
     expect(validateRequest({ resource: 'status/history' })).toMatchObject({ ok: true, path: '/status/history' });
     expect(validateRequest({ resource: 'shutdown' }).ok).toBe(false);
-    expect(validateRequest({ resource: 'status' }).ok).toBe(false);
+    expect(validateRequest({ resource: 'status' })).toMatchObject({ ok: true, path: '/status' });
+    expect(validateRequest({ resource: 'jobs/:id', id: 'J20261008-K2QF' })).toMatchObject({ ok: true, path: '/jobs/J20261008-K2QF' });
+    expect(validateRequest({ resource: 'jobs/:id', id: '../shutdown' }).ok).toBe(false);
+    expect(validateRequest({ resource: 'events/stream' }).ok).toBe(false);
   });
 
   it('drops empty and undefined query values', () => {
@@ -21,7 +24,7 @@ describe('validateRequest', () => {
   });
 
   it.each([
-    [{ resource: 'runs' }, 'unknown resource'],
+    [{ resource: 'agents' }, 'unknown resource'],
     [{ resource: '../status' }, 'unknown resource'],
     [{ resource: 'overview', id: 'x' }, 'id not allowed'],
     [{ resource: 'tasks/:id' }, 'id required'],
