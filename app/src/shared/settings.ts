@@ -13,6 +13,8 @@ export interface AppSettings {
   portOverride: number | null;
   autoStartDaemon: boolean;
   openAtLogin: boolean;
+  /** Look for a newer release on GitHub now and then (CL-107); off = the app never contacts the release feed by itself. */
+  autoUpdate: boolean;
   theme: Theme;
   /** Single-key shortcuts can be turned off (WCAG 2.1.4). */
   shortcuts: boolean;
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   portOverride: null,
   autoStartDaemon: true,
   openAtLogin: false,
+  autoUpdate: true,
   theme: 'system',
   shortcuts: true,
   notify: { budget: true, builds: true, gaps: true, daemon: true },
@@ -51,6 +54,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     portOverride,
     autoStartDaemon: bool(s.autoStartDaemon, base.autoStartDaemon),
     openAtLogin: bool(s.openAtLogin, base.openAtLogin),
+    autoUpdate: bool(s.autoUpdate, base.autoUpdate),
     theme: s.theme === 'system' || s.theme === 'light' || s.theme === 'dark' ? s.theme : base.theme,
     shortcuts: bool(s.shortcuts, base.shortcuts),
     notify: {
