@@ -1168,6 +1168,19 @@ rozhoduje launcher.
 - Pravidla psaní: odkaz na stránku je `[text](Page-Name#nadpis)`, na soubor repozitáře plná adresa `github.com/.../blob/main/...`
   (relativní cesty ve wiki nefungují). Nová funkce = nový řádek v README jen u nástroje; popis patří na stránku wiki.
 
+### Výsledek CL-141 — seznam nástrojů MCP bajt po bajtu stejný (2026-10-09)
+
+
+- **Proč**: klient dává `tools/list` do předpony promptu a prompt cache ji drží; změna jediného bajtu seznamu nebo popisu zneplatní cache celé relace (zápis 1 h stojí 2, čtení 0,1 váhy tokenu, tedy
+  20× víc). Seznam má při 15 nástrojích **15 398 bajtů** (≈ 4 800 tokenů při 3,2 znaku na token), 14 nástrojů bez `edit`. Při mediánu 58 tahů a kontextu 100 tisíc tokenů stojí jedna změna seznamu
+  uprostřed relace přepsání cache ≈ 200 tisíc jednotek místo 10 tisíc čtených.
+- **Co se mohlo měnit**: `edit` se nabízel podle brány `auto` při každém požadavku (`tools()` volané z MCP i z `/api`), a brána se mění na pozadí po uvolnění workspace; popisy jsou konstanty. **Opraveno**:
+  `OfferedTools` rozhodne o `edit` jednou při startu daemona (`write.mode` `on`/`off` je rozhodnuto vždy, `auto` podle verdiktu z `write-gate.json` v tu chvíli) a seznam se už nemění; `ServerCapabilities.tools.listChanged`
+  je `false`. Nový verdikt brány se projeví při dalším startu. Seznam dál závisí na startu jen ve dvou věcech, obě zdokumentované: `edit` (nastavení + verdikt) a nástroje trackeru (jen s nakonfigurovaným trackerem).
+- **Otisk**: `/status` `toolList` = `fingerprint` (SHA-1 z verze a ze serializovaných definic nástrojů seřazených podle jména: jméno, popis, schéma), `tools`, `editOffered`. Dva restarty téhož daemona na stejné konfiguraci:
+  `bddfaa6a…` ×2 (14 nástrojů), s `write.mode: on` `362626c9…` (15).
+- **Testy** (`ToolListStabilityTest`): seznam z MCP klienta je bajt po bajtu stejný před a po práci daemona (indexace repozitáře, volání) a na druhém daemonu s jinou domovinou, bez repozitáře a s jinými rozpočty; otisk přežije dva restarty
+  a změní se s `edit`; `auto` bez verdiktu = `off`; brána, která se otevře po startu, seznam nezmění. Popis, který by závisel na stavu, test shodí.
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

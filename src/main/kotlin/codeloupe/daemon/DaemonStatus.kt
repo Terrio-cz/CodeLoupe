@@ -39,4 +39,6 @@ data class DaemonStatus(
     val timings: Map<String, PartTime> = emptyMap(),
     /** The plugin's hook calls since the daemon started (`POST /hook`). */
     val hooks: HookStats = HookStats(),
+    /** The MCP tool list this daemon serves; it does not change while the daemon runs. */
+    val toolList: ToolListStatus = ToolListStatus(),
 )
