@@ -1,10 +1,34 @@
 # Code signing and notarisation (CL-105)
 
-Status: options and costs written down (2026-10-08); the choice is the owner's. Until one is made the installers are
-unsigned: Windows shows "unknown publisher" (SmartScreen), macOS refuses to open the app without a manual override,
-and `electron-updater` cannot verify an update (CL-107 waits for this card).
+Status: **decided 2026-10-08 by the owner: nothing is paid for.** The installers stay unsigned, with checksums and SBOMs,
+and the free routes below make that as painless as it can be. The options and costs stay written down in case that
+changes. Unsigned means: Windows shows "unknown publisher" (SmartScreen) for a browser download, macOS refuses to open
+the app without a manual override, and macOS cannot update itself silently (CL-107 covers what is possible).
 
-## What each platform needs
+## The free path (what the project does)
+
+- **Release assets**: installers, bundle zips, `SHA256SUMS.txt`, CycloneDX SBOMs and the notes, published by hand from
+  the draft release ([release.md](release.md)). The build runs in public CI from a tag.
+- **Windows**: SmartScreen judges files that carry the Mark of the Web, which a browser download has and a download by a
+  package manager does not. The release pipeline generates a **winget manifest** and a **Scoop manifest** from the
+  published files and their SHA-256; installing through them avoids the warning. Browser downloads: "More info → Run
+  anyway".
+- **macOS**: the app is signed **ad hoc** (free, `codesign --sign -`), the minimum Apple Silicon needs to run it at all;
+  Gatekeeper still asks for a manual allow once (right-click → Open, System Settings → Privacy & Security → Open Anyway,
+  or `xattr -dr com.apple.quarantine /Applications/CodeLoupe.app`). A **Homebrew cask** generated from the release
+  removes the quarantine flag on install. macOS does not update itself: the app tells the user that a new version exists
+  and links to the release.
+- **Linux**: nothing needed; AppImage and `.deb` with checksums.
+- **Updates**: Windows (NSIS) and Linux (AppImage) update themselves with `electron-updater`, which checks the SHA-512 in
+  the release feed over HTTPS; macOS only notifies (CL-107).
+- Publishing the manifests to winget-pkgs, a Scoop bucket or a Homebrew tap is an outward-facing step the owner takes;
+  the repository only generates the files.
+- **No free certificate fits**: SignPath Foundation signs open-source projects with an OSI-approved licence for free;
+  CodeLoupe's PolyForm Noncommercial 1.0.0 is not OSI-approved. If the licence ever changes, apply there.
+
+## Options that cost money (not chosen)
+
+## What each platform needs for a clean install
 
 | Platform | Needed for a clean install | What happens without it |
 |---|---|---|
