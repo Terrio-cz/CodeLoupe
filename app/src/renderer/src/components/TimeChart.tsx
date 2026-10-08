@@ -93,7 +93,6 @@ export function TimeChart({ label, points, format, limit, gapMs = 5 * 60_000 }: 
       <div className="legend" style={{ marginBottom: 6 }}>
         <span><span className="sw" aria-hidden="true" />{label} <strong>{format(last.v)}</strong></span>
         {limit && <span><span className="sw base" aria-hidden="true" />{limit.label} {format(limit.value)}{over && <> · <span className="badge critical"><strong>překročeno</strong></span></>}</span>}
-        <span style={{ flex: 1 }} />
         <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}><Icon name={asTable ? 'chart' : 'table'} size={14} />{asTable ? 'Graf' : 'Tabulka'}</button>
       </div>
       {asTable ? (

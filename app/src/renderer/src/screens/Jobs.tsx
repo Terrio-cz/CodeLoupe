@@ -22,7 +22,7 @@ const elapsed = (j: JobRecord, now: number): number | null =>
 function columns(now: number): Column<JobRecord>[] {
   return [
     { key: 'id', header: 'Job', render: j => <span className="mono">{j.id}</span> },
-    { key: 'status', header: 'Stav', render: j => { const s = jobStatus(j); return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>; } },
+    { key: 'status', header: 'Stav', render: j => { const s = jobStatus(j); return <StatusBadge tone={s.tone} live={j.status === 'running'}>{s.label}</StatusBadge>; } },
     { key: 'command', header: 'Příkaz', render: j => <span className="mono" title={j.command}>{shorten(j.command, 70)}</span>, className: 'ellipsis' },
     { key: 'slot', header: 'Slot', render: j => j.slot ?? '—' },
     { key: 'tag', header: 'Štítek', render: j => j.tag ?? '—' },
@@ -166,14 +166,14 @@ function JobDrawerBody({ id, now }: { id: string; now: number }) {
   }, [reload]);
   if (!data) return error ? <ErrorState message={error.message} onRetry={reload} /> : <Loading />;
   const job = data.chain.find(j => j.id === id) ?? data.chain[0];
-  if (!job) return <ErrorState message="Job už daemon nezná." />;
+  if (!job) return <ErrorState title="Job nenalezen" message="Job už daemon nezná." />;
   const st = jobStatus(job);
   const d = elapsed(job, now);
 
   return (
     <>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
+        <StatusBadge tone={st.tone} live={job.status === 'running'}>{st.label}</StatusBadge>
         {d !== null && <span>{ms(d)}</span>}
         {job.tag && <span className="chip">{job.tag}</span>}
         {job.failureBranch && <span className="chip warn">větev po selhání</span>}
@@ -242,13 +242,13 @@ function LogSummary({ job }: { job: JobRecord }) {
       {counts && <div style={{ marginBottom: 8 }}><strong>{counts}</strong></div>}
       {s && s.failures.length > 0 && (
         <>
-          <div className="muted">Chyby</div>
+          <div className="sublabel">Chyby</div>
           <pre className="mono log failures">{s.failures.join('\n')}</pre>
         </>
       )}
       {s && s.tail.length > 0 && (
         <>
-          <div className="muted">Poslední řádky</div>
+          <div className="sublabel">Poslední řádky</div>
           <pre className="mono log">{s.tail.join('\n')}</pre>
         </>
       )}

@@ -152,6 +152,7 @@
   --r-full: 999px;
   --row: 34px;
   --topbar: 52px;
+  --titlebar: 36px;
   --sidebar-w: 224px;
   --dur-1: 120ms;
   --dur-2: 180ms;
@@ -160,7 +161,6 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
-  --stagger: 40ms;
 }
 
 * { box-sizing: border-box; }
@@ -193,20 +193,35 @@ code, .mono { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 35
 
 .icon { display: block; flex: none; }
 
-/* ── Shell: quiet sidebar, content on an inset panel ─────────────────────────── */
-.shell { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); height: 100%; }
-.sidebar {
-  background: var(--sidebar);
-  display: flex; flex-direction: column; gap: 1px;
-  padding: var(--s-3) var(--s-2) var(--s-3) var(--s-3); overflow-y: auto; overflow-x: hidden;
+/* ── Shell: own title bar, quiet sidebar, content on an inset panel ──────────── */
+.app { display: flex; flex-direction: column; height: 100%; }
+/*
+ * Title bar drawn by the page (main/windowChrome.ts). The OS overlays its caption buttons in one corner and reports the
+ * free area as env(titlebar-area-*); outside the app (tests, a browser) the fallbacks give a plain full-width bar.
+ * The whole bar is a drag region: the OS moves the window, maximises it on double-click and offers snap layouts.
+ */
+.titlebar {
+  flex: none; display: flex; align-items: center; gap: 8px; min-width: 0;
+  height: env(titlebar-area-height, var(--titlebar));
+  padding-left: calc(env(titlebar-area-x, 0px) + 16px);
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 12px);
+  background: var(--sidebar); color: var(--text-2); font-size: var(--fs-sm);
+  -webkit-app-region: drag; user-select: none;
 }
-.brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; font-weight: 600; font-size: var(--fs-md); letter-spacing: -0.01em; }
+.titlebar :is(a, button, input, select) { -webkit-app-region: no-drag; }
+.titlebar .brand-name { color: var(--text); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+.titlebar .brand-version { color: var(--text-muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .brand-mark {
-  width: 26px; height: 26px; border-radius: var(--r-md); display: grid; place-items: center; flex: none;
+  width: 20px; height: 20px; border-radius: var(--r-sm); display: grid; place-items: center; flex: none;
   background: var(--accent); color: var(--btn-primary-fg);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), var(--shadow-1);
 }
-.brand small { color: var(--text-muted); font-weight: 400; font-size: var(--fs-xs); margin-left: auto; font-variant-numeric: tabular-nums; }
+.shell { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); flex: 1; min-height: 0; }
+.sidebar {
+  background: var(--sidebar);
+  display: flex; flex-direction: column; gap: 1px;
+  padding: var(--s-1) var(--s-2) var(--s-3) var(--s-3); overflow-y: auto; overflow-x: hidden;
+}
 .nav { position: relative; display: flex; flex-direction: column; gap: 1px; }
 .nav-indicator {
   position: absolute; left: 0; right: 0; top: 0; height: 32px; border-radius: var(--r-md); pointer-events: none;
@@ -239,7 +254,7 @@ code, .mono { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 35
 
 .main {
   display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
-  margin: 8px 8px 8px 0; background: var(--bg);
+  margin: 0 8px 8px 0; background: var(--bg);
   border: 1px solid var(--border); border-radius: var(--r-xl);
   box-shadow: var(--shadow-1), inset 0 1px 0 var(--highlight);
 }
@@ -280,7 +295,6 @@ button, select, input { font: inherit; color: inherit; }
 .btn.ghost:hover { background: var(--surface-2); color: var(--text); }
 .btn.icon-only { padding: 0; width: 30px; }
 .btn .spin { animation: spin 600ms var(--ease-out); }
-.btn .icon.spinning { animation: spin 900ms linear infinite; }
 .btn .icon.chev, .btn .icon.open { transition: transform var(--dur-2) var(--ease-out); }
 .btn .icon.open { transform: rotate(90deg); }
 .input, .select {
@@ -342,6 +356,10 @@ button, select, input { font: inherit; color: inherit; }
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--s-4); }
 .grid-2e { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-4); }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--s-3); }
+/* Six tiles that no longer fit in one row go 3 + 3 instead of leaving one alone on the second row. */
+@media (max-width: 1400px) {
+  .kpis:has(> .kpi:nth-child(6):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .kpi {
   position: relative; overflow: hidden;
   padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0;
@@ -399,6 +417,10 @@ table.data tr.group th {
 table.data tr.group > td { background: var(--surface-2); border-bottom: 1px solid var(--border); }
 table.data td.wrap { white-space: normal; }
 table.data td.ellipsis { max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
+table.data td.ellipsis.narrow { max-width: 240px; }
+table.data td.wrap-cell { white-space: normal; min-width: 170px; line-height: 1.35; padding-top: 6px; padding-bottom: 6px; }
+/* Row pickers: native checkboxes and radios (keyboard, forms) in the accent colour, sized to the row. */
+table.data input:is([type='checkbox'], [type='radio']) { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; vertical-align: middle; cursor: pointer; }
 table.data td.empty-cell { height: auto; padding: 0; }
 table.data td.empty-cell .state { padding: 28px 16px; }
 .table-foot { padding: 10px 16px; display: flex; gap: var(--s-2); align-items: center; color: var(--text-muted); font-size: var(--fs-sm); border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
@@ -408,23 +430,20 @@ table.data td.empty-cell .state { padding: 28px 16px; }
   display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
   padding: 1px 8px 1px 7px; min-height: 20px; border-radius: var(--r-full); background: var(--surface-2);
 }
-.badge .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; position: relative; }
+.badge .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: currentColor; }
 .badge.ok { color: var(--ok-text); background: var(--ok-weak); }
 .badge.warning { color: var(--warning-text); background: var(--warning-weak); }
 .badge.serious { color: var(--serious-text); background: var(--serious-weak); }
 .badge.critical { color: var(--critical-text); background: var(--critical-weak); }
 .badge.neutral { color: var(--text-2); background: var(--surface-2); }
 .badge.running { color: var(--accent-text); background: var(--accent-weak); }
-.badge.ok .dot { background: var(--ok); }
-.badge.warning .dot { background: var(--warning); }
-.badge.serious .dot { background: var(--serious); }
-.badge.critical .dot { background: var(--critical); }
+/* The dot's own colour is the solid tone; a live dot (a job, a build, the daemon running now) pings with it. */
+.badge.ok .dot { color: var(--ok); }
+.badge.warning .dot { color: var(--warning); }
+.badge.serious .dot { color: var(--serious); }
+.badge.critical .dot { color: var(--critical); }
 .badge.neutral .dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-muted); }
-.badge.running .dot { background: var(--accent); }
-.badge.running .dot::after, .badge.ok.live .dot::after {
-  content: ''; position: absolute; inset: 0; border-radius: 50%; background: inherit; animation: ping 1.6s var(--ease-out) 3;
-  opacity: 0;
-}
+.badge.running .dot { color: var(--accent); }
 .chip {
   display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; min-height: 20px; border-radius: var(--r-sm);
   font-size: var(--fs-sm); background: var(--surface-2); color: var(--text-2); white-space: nowrap; box-shadow: inset 0 0 0 1px var(--border);
@@ -469,16 +488,19 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 }
 .chart .tooltip .row { display: flex; align-items: center; gap: 6px; }
 .chart .tooltip .row .sw { margin: 0; }
-.legend { display: flex; gap: 16px; font-size: var(--fs-sm); color: var(--text-2); align-items: center; flex-wrap: wrap; }
+.legend { display: flex; gap: 4px 16px; font-size: var(--fs-sm); color: var(--text-2); align-items: center; flex-wrap: wrap; min-height: 30px; }
 .legend > span { white-space: nowrap; }
+/* The table/chart switch stays at the right end, also when a narrow card wraps the legend. */
+.legend > .btn { margin-left: auto; }
 .legend .sw { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; background: var(--series-1); }
 .legend .sw.base { background: none; border-top: 2px dashed var(--series-baseline); height: 0; border-radius: 0; }
 .legend strong { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
 
 /* ── Drawer ──────────────────────────────────────────────────────────────── */
-.drawer-backdrop { position: fixed; inset: 0; background: var(--scrim); z-index: 20; }
+/* Both stay below the title bar: the window can still be moved, and the OS caption buttons never cover the close button. */
+.drawer-backdrop { position: fixed; inset: env(titlebar-area-height, var(--titlebar)) 0 0 0; background: var(--scrim); z-index: 20; }
 .drawer {
-  position: fixed; top: 8px; right: 8px; bottom: 8px; z-index: 21; width: 540px; max-width: calc(100vw - 16px);
+  position: fixed; top: env(titlebar-area-height, var(--titlebar)); right: 8px; bottom: 8px; z-index: 21; width: 540px; max-width: calc(100vw - 16px);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--shadow-3), inset 0 1px 0 var(--highlight);
   display: flex; flex-direction: column; overflow: hidden;
 }
@@ -490,6 +512,10 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 .drawer-body { flex: 1; overflow: auto; padding: 16px 20px 28px; display: flex; flex-direction: column; gap: 18px; }
 /* Flex columns that scroll: a child with its own overflow must not be squeezed to fit. */
 .content > *, .drawer-body > * { flex-shrink: 0; }
+.drawer-head h1 .mono { font-size: inherit; font-weight: 500; }
+/* A table inside a drawer is framed like a card and grows with the drawer, which scrolls: no scroller in a scroller. */
+.drawer-body .table-wrap { max-height: none; border: 1px solid var(--border); border-radius: var(--r-md); }
+.drawer-body .table-wrap + .table-foot { border-top: 0; padding-left: 0; padding-right: 0; }
 .drawer-summary { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 14px; background: var(--surface-2); border-radius: var(--r-md); }
 
 @media (max-width: 900px) {
@@ -497,8 +523,8 @@ table.data td.empty-cell .state { padding: 28px 16px; }
   .sidebar { padding: var(--s-3) var(--s-2); }
   /* Labels stay in the accessibility tree; only the icon is visible. */
   .sidebar .label-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .sidebar .count, .nav-group, .brand small, .daemon-pill .detail, .daemon-pill .tag { display: none; }
-  .brand { justify-content: center; padding: 6px 0 14px; }
+  .sidebar .count, .nav-group, .daemon-pill .detail, .daemon-pill .tag { display: none; }
+  .nav-group + .nav-link { margin-top: 12px; }
   .nav-link { justify-content: center; padding: 0; }
   .daemon-pill { padding: 8px; align-items: center; }
   .daemon-pill .line .badge { font-size: 0; gap: 0; }
@@ -523,6 +549,11 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 .rows li:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .rows li:last-child { border-bottom: 0; }
 .rows .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A row with a second line under its name (a resource and why it is planned to go). */
+.rows li.stacked { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 2px; align-items: center; }
+.rows li.stacked > .sub { grid-column: 2 / -1; font-size: var(--fs-sm); }
+.sublabel { margin: 10px 0 4px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.sublabel:first-child { margin-top: 0; }
 
 /* ── Task detail ─────────────────────────────────────────────────────────── */
 .crumbs { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
@@ -581,6 +612,9 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 .form-row:last-of-type { border-bottom: 0; padding-bottom: 0; }
 .form-row > .label { color: var(--text); font-weight: 500; }
 .form-row > .seg { justify-self: start; }
+/* In a drawer the label column is narrower and the fields take the rest. */
+.drawer-body .form-row { grid-template-columns: 110px minmax(0, 1fr); min-height: 46px; }
+.drawer-body .form-row > .input { min-width: 0; width: 100%; }
 .footnote { margin: 0; font-size: var(--fs-sm); }
 pre.mono { background: var(--surface-2); padding: 10px 12px; border-radius: var(--r-md); overflow: auto; }
 
@@ -615,54 +649,56 @@ table.data.import-table td { vertical-align: top; height: auto; padding-top: 8px
 
 /* ── Motion ──────────────────────────────────────────────────────────────── */
 /*
- * Entrances animate registered custom properties, not opacity/transform directly. Those run on the main thread
- * and repaint in place, so no element is promoted to its own compositor layer: with GPU acceleration off every layer
- * is a software bitmap, and promoting each card and row cost ~90 MB of working set (ui-spec § 11).
- * Only the drawer, which is one surface on top, slides as a real layer. Rows and headings do not animate: every animated
- * frame is a software repaint, and while screens are switched quickly the raster memory it takes is held for a while.
+ * Memory first (budget 300 MB). Without GPU every compositor layer is a software bitmap and every repainted frame is
+ * rastered again, and Chromium holds that raster memory for seconds. Measured with the screenshot run
+ * (docs/design-revamp.md, Paměť), two things cost:
+ * - large areas repainting while a screen appears (the old staggered rise of every card and tile);
+ * - any transform/opacity animation inside a scroller (.content, the sidebar, a drawer body): to move it on the
+ *   compositor, Chromium promotes the whole scroller to a layer and rasters it again, twice.
+ * So: inside scrollers only small things move, by repainting in place (registered custom properties, box-shadow),
+ * and only for a moment; the screen change is a veil in the background colour that fades out over the new content.
+ * The veil is positioned against .main, outside the scroller: a single-colour layer, which needs no raster tile.
+ * Fixed surfaces on top (drawer, toast) move as real layers. Nothing loops except a loading block.
  */
-@property --enter { syntax: '<number>'; inherits: false; initial-value: 1; }
 @property --grow { syntax: '<number>'; inherits: false; initial-value: 1; }
 @property --pulse { syntax: '<number>'; inherits: false; initial-value: 1; }
+@property --enter { syntax: '<number>'; inherits: false; initial-value: 1; }
 
-@keyframes enter { from { --enter: 0; } to { --enter: 1; } }
+@keyframes veil { from { opacity: 1; } to { opacity: 0; } }
 @keyframes grow { from { --grow: 0; } to { --grow: 1; } }
-@keyframes breathe { 0%, 100% { --pulse: 1; } 50% { --pulse: 0.45; } }
+@keyframes breathe { 0%, 100% { --pulse: 1; } 50% { --pulse: 0.5; } }
+@keyframes enter { from { --enter: 0; } to { --enter: 1; } }
 @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes ping { 0% { transform: scale(1); opacity: 0.55; } 80%, 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes ping {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); }
+  to { box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 0%, transparent); }
+}
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes drawer-in { from { transform: translateX(calc(100% + 16px)); } to { transform: none; } }
 @keyframes drawer-out { from { transform: none; } to { transform: translateX(calc(100% + 16px)); } }
 @keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-/* Rise: fade in from 6 px lower. `top` on a relative box moves only its paint, never its neighbours. */
-.content > *, .kpis > .kpi {
-  position: relative; opacity: var(--enter); top: calc((1 - var(--enter)) * 6px);
-  animation: enter var(--dur-4) var(--ease-out) backwards;
+/* Screen change: the content area is re-keyed, so its veil starts over. */
+.main { position: relative; }
+.content::after {
+  content: ''; position: absolute; inset: var(--topbar) 0 0 0; z-index: 2; pointer-events: none;
+  background: var(--bg); opacity: 0; animation: veil var(--dur-3) var(--ease-out) backwards;
 }
-/* Screen change: the content area is re-keyed, its blocks rise one after another. */
-.content > :nth-child(2) { animation-delay: calc(var(--stagger) * 1); }
-.content > :nth-child(3) { animation-delay: calc(var(--stagger) * 2); }
-.content > :nth-child(4) { animation-delay: calc(var(--stagger) * 3); }
-.content > :nth-child(5) { animation-delay: calc(var(--stagger) * 4); }
-.content > :nth-child(6) { animation-delay: calc(var(--stagger) * 5); }
-.content > :nth-child(n + 7) { animation-delay: calc(var(--stagger) * 6); }
-.kpis > .kpi:nth-child(2) { animation-delay: 30ms; }
-.kpis > .kpi:nth-child(3) { animation-delay: 60ms; }
-.kpis > .kpi:nth-child(4) { animation-delay: 90ms; }
-.kpis > .kpi:nth-child(5) { animation-delay: 120ms; }
-.kpis > .kpi:nth-child(n + 6) { animation-delay: 150ms; }
-.toast { opacity: var(--enter); bottom: calc(20px - (1 - var(--enter)) * 8px); animation: enter var(--dur-3) var(--ease-spring) backwards; }
-.section[open] > :not(summary) { opacity: var(--enter); animation: enter var(--dur-2) var(--ease-out); }
+.toast { animation: toast-in var(--dur-3) var(--ease-spring) backwards; }
+/* Only a section the user opens fades in; the ones open from the start appear with their drawer. */
+.section.toggled[open] > :not(summary) { opacity: var(--enter); animation: enter var(--dur-2) var(--ease-out); }
+.badge.live .dot { animation: ping 1.6s var(--ease-out) 3; }
 
-/* Bars and meters grow from the left; the chart line draws itself, the area and the budget line fade in after it. */
+/* Bars and meters grow from the left; the chart line draws itself, the area and the budget line fade in with it. */
 .bar-track > span, .meter > span, .progress > span {
-  transform: scaleX(var(--grow)); animation: grow 700ms var(--ease-out) backwards; animation-delay: calc(120ms + var(--i, 0) * 50ms);
+  transform: scaleX(var(--grow)); animation: grow 600ms var(--ease-out) backwards; animation-delay: calc(80ms + var(--i, 0) * 40ms);
 }
-.chart .draw { stroke-dasharray: 1; animation: draw 900ms var(--ease-out) backwards; }
-.chart .reveal { animation: fade-in 700ms var(--ease-out) 250ms backwards; }
-.skeleton { opacity: var(--pulse); animation: breathe 1.4s var(--ease-in-out) infinite; }
+.chart .draw { stroke-dasharray: 1; animation: draw 700ms var(--ease-out) backwards; }
+.chart .reveal { animation: fade-in 500ms var(--ease-out) 200ms backwards; }
+/* A loading block breathes as a whole, not every bar of it on its own. */
+[aria-busy='true'] { opacity: var(--pulse); animation: breathe 1.4s var(--ease-in-out) infinite; }
 
 .drawer { animation: drawer-in var(--dur-3) var(--ease-out) backwards; }
 .drawer-backdrop { animation: fade-in var(--dur-3) var(--ease-out) backwards; }
@@ -677,5 +713,6 @@ table.data.import-table td { vertical-align: top; height: auto; padding-top: 8px
     transition-duration: 0.01ms !important;
     transition-delay: 0ms !important;
   }
-  .skeleton, .badge .dot::after { animation: none !important; }
+  [aria-busy='true'], .badge .dot { animation: none !important; }
+  .content::after { display: none; }
 }

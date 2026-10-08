@@ -71,7 +71,7 @@ function TaskDetailView({ id }: { id: string }) {
   const settings = useApi('settings');
   const allowed = allowedOrigins((settings.data?.youtrack ?? []).map(y => y.url));
   const [openFailed, setOpenFailed] = useState(false);
-  if (!t) return <Card>{error ? <ErrorState message={error.message} onRetry={reload} /> : <Loading />}</Card>;
+  if (!t) return <Card>{error ? <ErrorState title={`Úkol ${id} se nepodařilo načíst`} message={error.message} onRetry={reload} action={<button className="btn ghost" onClick={() => go('tasks')}>Zpět na úkoly</button>} /> : <Loading />}</Card>;
   const done = t.criteria.filter(c => c.checked).length;
   return (
     <>

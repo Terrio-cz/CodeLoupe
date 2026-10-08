@@ -64,7 +64,6 @@ export function CostChart({ points, hourly }: { points: CostPoint[]; hourly: boo
       <div className="legend" style={{ marginBottom: 8 }}>
         <span><span className="sw" aria-hidden="true" />Skutečnost <strong>{tokens(sumActual)}</strong></span>
         <span><span className="sw base" aria-hidden="true" />Baseline <strong>{tokens(sumBase)}</strong></span>
-        <span style={{ flex: 1 }} />
         <button className="btn ghost" aria-pressed={asTable} onClick={() => setAsTable(v => !v)}><Icon name={asTable ? 'chart' : 'table'} size={14} />{asTable ? 'Graf' : 'Tabulka'}</button>
       </div>
       {asTable ? (

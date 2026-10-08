@@ -39,12 +39,11 @@ function useIndicator(current: Screen) {
   return { nav, box };
 }
 
-export function Sidebar({ current, counts, daemon, settings, version }: {
+export function Sidebar({ current, counts, daemon, settings }: {
   current: Screen;
   counts: Partial<Record<Screen, ReactNode>>;
   daemon: DaemonState | null;
   settings: AppSettings | null;
-  version: string;
 }) {
   const { nav, box } = useIndicator(current);
   const link = (d: ScreenDef) => (
@@ -57,11 +56,6 @@ export function Sidebar({ current, counts, daemon, settings, version }: {
   const st = daemon?.status;
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <span className="brand-mark" aria-hidden="true"><Icon name="loupe" size={16} /></span>
-        <span className="label-text">CodeLoupe</span>
-        <small>{version && `v${version}`}</small>
-      </div>
       <nav ref={nav} className="nav" aria-label="Hlavní navigace">
         {box && (
           <span

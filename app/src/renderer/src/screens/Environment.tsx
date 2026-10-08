@@ -96,7 +96,7 @@ export function Environment({ route }: { route?: Route }) {
       {due > 0 && data && (
         <Banner>{due === 1 ? '1 klíč je' : `${due} klíčů je`} starších než {data.rotationDays} dní: čas je rotovat.</Banner>
       )}
-      <Card bodyClass="">
+      <Card title={data ? `Klíče (${rows.length})` : 'Klíče'} bodyClass="">
         {data ? <DataTable label="Klíče prostředí" rows={rows} columns={columns(data.rotationDays, actions)} rowKey={k => `${k.scope}:${k.scopeRef}:${k.name}`} empty="Žádné klíče. Přidejte první nebo importujte existující proměnné." />
           : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Nelze načíst prostředí.'} onRetry={reload} />}
       </Card>
