@@ -13,7 +13,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 
 class EnvImportScanCommand : CliktCommand(name = "scan") {
-    private val includeExcluded by option("--include-excluded", help = "Also enter folders of excluded systems (TNT/FoodRetailor by default)").flag()
+    private val includeExcluded by option("--include-excluded", help = "Also enter folders of excluded systems (the words of envImport.exclude)").flag()
     private val json by option("--json", help = "The report as JSON").flag()
 
     override fun help(context: Context) =

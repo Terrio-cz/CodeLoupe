@@ -13,8 +13,8 @@ import java.nio.file.Path
  */
 data class EnvImportConfig(val roots: List<ImportRoot>, val exclude: List<String> = DEFAULT_EXCLUDE) {
     companion object {
-        /** Systems the Terrio guardrails keep out of reach. */
-        val DEFAULT_EXCLUDE = listOf("tnt", "foodretailor", "food-retailor", "fr598", "productmanager", "news-native")
+        /** Nothing is left out unless the user names it: the words are theirs, in `envImport.exclude`. */
+        val DEFAULT_EXCLUDE: List<String> = emptyList()
 
         fun defaults(userHome: Path): List<ImportRoot> {
             val claude = Files.newDirectoryStream(userHome, ".claude*").use { it.toList() }.sorted().map { ImportRoot(it, ImportRoot.Kind.HOME) }

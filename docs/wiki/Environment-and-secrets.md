@@ -20,9 +20,9 @@ deny reading `*.env` cover it.
 | `codeloupe env import rollback <backup-id> [--force]`, `backups`, `forget <id>` | puts every replaced file back byte for byte (a file edited since is left alone unless `--force`); lists and drops the copies |
 | `GET /env/values?workspace=&repository=&names=A,B` | for a local MCP server or script: the values, in its own process. Needs `x-codeloupe-env-token` (the contents of `<home>/secrets/api-token.env`, made on first use, readable by this user only) and says who asks in `x-codeloupe-used-by` |
 
-The import looks under the roots of `envImport` in `<home>/config.json` (`{"roots":[{"path":"~/IdeaProjects","kind":"repositories"}],"exclude":["tnt"]}`; kind
+The import looks under the roots of `envImport` in `<home>/config.json` (`{"roots":[{"path":"~/IdeaProjects","kind":"repositories"}],"exclude":["other-system"]}`; kind
 `home`, `workspaces` or `repositories`). Without it: every `~/.claude*`, `~/Documents/Claude` (each folder one workspace, scope `workspace:<folder>`) and `~/IdeaProjects`
-(the nearest folder with `.git`, scope `repo:<folder>`). Folders whose name holds an `exclude` word (default: TNT, FoodRetailor and their sibling services) are listed, not
+(the nearest folder with `.git`, scope `repo:<folder>`). Folders whose name holds an `exclude` word (default: none, the words are yours) are listed, not
 entered, until `--include-excluded`. Templates (`.env.example`), build and dependency folders and the daemon's own home are never read. MCP `headers` and `args`,
 compose `environment:` blocks and shell profiles are not scanned.
 

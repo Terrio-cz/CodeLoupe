@@ -119,7 +119,7 @@ class ResourceClassifierTest {
             listOf(
                 obj(ResourceKind.CONTAINER, "terrio-postgres"),
                 obj(ResourceKind.VOLUME, "terrio-importer_terrio-postgres-data"),
-                obj(ResourceKind.CONTAINER, "recserving-activations-fr-437-manager-1"),
+                obj(ResourceKind.CONTAINER, "unrelated-service-manager-1"),
                 obj(ResourceKind.IMAGE, "terrio-importer-app:aot"),
                 obj(ResourceKind.VOLUME, "trivy-cache-t149"),
                 obj(ResourceKind.CONTAINER, "x", mapOf(Ownership.REPO to "R")),

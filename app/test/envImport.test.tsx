@@ -7,7 +7,7 @@ import type { EnvImportResult, EnvInventory } from '../src/shared/envActions';
 const source = (id: string, file: string, hash: string) => ({ id, file, kind: '.env file', locator: 'line 1', hash });
 const inventory: EnvInventory = {
   roots: ['C:/Users/dev'],
-  excluded: ['C:/Users/dev/Documents/Claude/tnt'],
+  excluded: ['C:/Users/dev/Documents/Claude/other'],
   counts: { files: 5, occurrences: 7, names: 5, groups: 5, sensitive: 4, duplicates: 1, conflicts: 1, inStore: 1, unreadable: 0, invalidNames: 0, empty: 0, references: 0, excludedFolders: 1 },
   variables: [
     { name: 'API_KEY', scope: 'repo:c:/work/app', sensitive: true, store: 'new', duplicate: false, conflict: true, sources: [source('aaaaaaaaaaaa', 'C:/work/app/.env', 'h1'), source('bbbbbbbbbbbb', 'C:/work/app/api/.env', 'h2')] },

@@ -100,7 +100,7 @@ export function Choose(p: ChooseProps) {
         {' '}{inv.counts.conflicts} have sources with different values, {inv.counts.inStore} already in the store.
       </p>
       {inv.excluded.length > 0 && !p.includeExcluded && (
-        <div className="banner info" role="note">Skipped {plural(inv.excluded.length, 'folder')} of other systems (TNT/FoodRetailor): {inv.excluded.slice(0, 3).join(', ')}{inv.excluded.length > 3 ? ', …' : ''}.</div>
+        <div className="banner info" role="note">Skipped {plural(inv.excluded.length, 'folder')} of other systems (left out by your settings): {inv.excluded.slice(0, 3).join(', ')}{inv.excluded.length > 3 ? ', …' : ''}.</div>
       )}
       <div className="filterbar">
         <label className="check"><input type="checkbox" checked={p.onlySensitive} onChange={e => p.setOnlySensitive(e.target.checked)} /> Only values that look sensitive</label>

@@ -150,7 +150,7 @@ class ReconcilePlannerTest {
 
     @Test
     fun `unowned resources are not in the plan at all`() {
-        val plan = planner().plan(listOf(resource(ResourceKind.VOLUME, "recserving-data", null, null, OwnershipClass.UNOWNED, repo = "")), registry())
+        val plan = planner().plan(listOf(resource(ResourceKind.VOLUME, "unrelated-data", null, null, OwnershipClass.UNOWNED, repo = "")), registry())
         assertTrue(plan.isEmpty())
     }
 

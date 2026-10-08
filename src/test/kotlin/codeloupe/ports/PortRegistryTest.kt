@@ -93,22 +93,22 @@ class PortRegistryTest {
         assertEquals(listOf(19000, 19001, 19002, 19003), listOf(app.port, db.port, web.port, idle.port))
 
         boxes += container("terrio-ter-5-app-1", "TER-5", 19000)
-        boxes += container("recserving-db", null, 19001)
+        boxes += container("unrelated-db", null, 19001)
         probe.listening[19002] = Listener(19002, 4242, "java -jar C:/ws/TER-5/app.jar")
         probe.listening[19004] = Listener(19004, 77, "node dev-server.js")
-        boxes += container("tnt-cache", null, 19005)
+        boxes += container("unrelated-cache", null, 19005)
 
         val report = registry.status()
         val byPort = report.allocations.associateBy { it.allocation.port }
         assertEquals(PortState.IN_USE, byPort.getValue(19000).state)
         assertEquals(PortState.CONFLICT, byPort.getValue(19001).state)
-        assertTrue(byPort.getValue(19001).usedBy!!.contains("recserving-db"), byPort.getValue(19001).usedBy)
+        assertTrue(byPort.getValue(19001).usedBy!!.contains("unrelated-db"), byPort.getValue(19001).usedBy)
         assertEquals(PortState.IN_USE, byPort.getValue(19002).state, "its command line names the workspace")
         assertEquals(PortState.FREE, byPort.getValue(19003).state)
         assertEquals(null, byPort.getValue(19003).usedBy)
         assertEquals(listOf(19004, 19005), report.foreign.map { it.port })
         assertTrue(report.foreign[0].usedBy.contains("pid 77"))
-        assertTrue(report.foreign[1].usedBy.contains("tnt-cache"))
+        assertTrue(report.foreign[1].usedBy.contains("unrelated-cache"))
 
         probe.listening[19003] = Listener(19003, 9, "python other.py")
         val owned = registry.status().allocations.first { it.allocation.port == 19003 }

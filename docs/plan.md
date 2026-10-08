@@ -822,7 +822,7 @@ rozhoduje launcher.
 
 - Skener (`codeloupe.secrets.imports`) prochází kořeny z `config.json` `envImport` (výchozí: `~/.claude*`, `~/Documents/Claude`, `~/IdeaProjects`) a čte `.env*`/`*.env`
   (docker env soubory podle složky/compose souseda), `settings*.json` v `.claude*`, `.mcp.json` a `env` objekty kdekoli v `~/.claude.json`. Šablony (`.env.example`),
-  `node_modules`/`build`/… a vlastní home daemona se nečtou; složky TNT/FoodRetailor se jen vypíšou (`--include-excluded` je pustí dovnitř).
+  `node_modules`/`build`/… a vlastní home daemona se nečtou; složky vyloučené v `envImport.exclude` se jen vypíšou (`--include-excluded` je pustí dovnitř).
 - Report nese jméno, navržený scope (home → global, `Documents/Claude/<x>` → workspace, nejbližší `.git` → repo), zdroje, duplicity a konflikty. Hash hodnoty je
   HMAC-SHA256 se solí, která žije jen v paměti jednoho reportu, zkrácený na 40 bitů: porovná dvě hodnoty uvnitř reportu, nedá se hádat offline ani spárovat s jiným reportem.
 - Import je idempotentní: hodnota, kterou store drží, se přeskočí; odlišná hodnota ve storu se nepřepíše (`--overwrite`), protože store mohl být rotován v aplikaci;
@@ -1252,7 +1252,7 @@ rozhoduje launcher.
   potřebuje jiné tahy). Reportový JSON se nezměnil (peníze se počítají z `runs`), takže starší reporty fungují.
 - **Test**: `MetricsMoneyTest` (dva modely v syntetických transkriptech, neznámý model, přepis cen z konfigurace, `compare`).
 - **Měření na transkriptech tohoto stroje** (od 2026-10-02, 2 001 běhů, ceny ze 2026-10-06; `main` 1 547 USD, `terrio-reviewer` 817,
-  `terrio-coder-high` 557, `general-purpose` 409, `terrio-planner` 330, `tnt-coder-high` 267, `terrio-coder` 262, `terrio-tester` 127,
+  `terrio-coder-high` 557, `general-purpose` 409, `terrio-planner` 330, `other-coder-high` 267, `terrio-coder` 262, `terrio-tester` 127,
   `terrio-suggester` 69, `terrio-changelog` 15,8, `terrio-steward` 15,5, `terrio-retro` 14,1). What-if týchž tokenů, horní mez:
   `terrio-steward` 15,45 USD → Haiku 5.5 0,77 (−95 %), Sonnet 5.5 15,45 (±0, už na něm běží); `terrio-changelog` 15,79 → 0,79 (−95 %);
   `terrio-retro` 14,12 → 1,41 (−90 %), na Sonnet 5.5 28,24 (+100 %, běží dnes na Haiku 4.5); `terrio-suggester` 68,60 → Haiku 5.5 2,52

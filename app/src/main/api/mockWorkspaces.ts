@@ -117,7 +117,7 @@ export class MockWorkspaces {
     add('volume', 'ter-420_pgdata', 'TerrioImporter', 'TER-420-old', { created: iso(this.now - 41 * DAY) });
     add('container', 'cl-43-daemon-1', 'CodeLoupe', 'CL-43', { publishedPorts: [19020] });
     add('volume', 'cl-56_cache', 'CodeLoupe', 'CL-56', { created: iso(this.now - 3 * DAY) });
-    for (const n of ['bytcheck-db-1', 'news-native-postgres', 'news-native-redis']) add('container', n, null, null, { publishedPorts: [25460] });
+    for (const n of ['sample-db-1', 'other-postgres', 'other-redis']) add('container', n, null, null, { publishedPorts: [25460] });
     for (let i = 0; i < 6; i++) add('volume', `unrelated_data_${i}`, null, null);
     for (let i = 0; i < 9; i++) add('image', `unrelated/image-${i}:latest`, null, null);
     if (stats) {

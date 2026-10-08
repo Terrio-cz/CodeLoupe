@@ -33,7 +33,7 @@ class EnvImportFlowTest {
         "API_KEY_OTHER" to "fake-api-key-other-6666",
         "POSTGRES_PASSWORD" to "fake-pg-password-7777",
         "HIDDEN" to "fake-hidden-8888",
-        "TNT_SECRET" to "fake-tnt-secret-9999",
+        "EXCLUDED_SECRET" to "fake-excluded-secret-9999",
         "OWN_SECRET" to "fake-own-secret-0000",
     )
 
@@ -51,6 +51,7 @@ class EnvImportFlowTest {
                 ImportRoot(home.resolve(".claude"), ImportRoot.Kind.HOME), ImportRoot(home.resolve(".claude.json"), ImportRoot.Kind.HOME),
                 ImportRoot(docs, ImportRoot.Kind.WORKSPACES), ImportRoot(repos, ImportRoot.Kind.REPOSITORIES),
             ),
+            exclude = listOf("other"),
         )
 
         init {
@@ -65,9 +66,9 @@ class EnvImportFlowTest {
             put(repos.resolve("app").resolve(".env.example"), "DB_PASSWORD=changeme\n")
             put(repos.resolve("app").resolve("docker").resolve("docker.env"), "POSTGRES_PASSWORD=${values["POSTGRES_PASSWORD"]}\n")
             put(repos.resolve("app").resolve("node_modules").resolve("x").resolve(".env"), "HIDDEN=${values["HIDDEN"]}\n")
-            put(repos.resolve("tnt-service").resolve(".git").resolve("HEAD"), "ref: refs/heads/main\n")
-            put(repos.resolve("tnt-service").resolve(".env"), "TNT_SECRET=${values["TNT_SECRET"]}\n")
-            put(repos.resolve("tnt2").resolve(".env"), "TNT_SECRET=${values["TNT_SECRET"]}\n")
+            put(repos.resolve("other-service").resolve(".git").resolve("HEAD"), "ref: refs/heads/main\n")
+            put(repos.resolve("other-service").resolve(".env"), "EXCLUDED_SECRET=${values["EXCLUDED_SECRET"]}\n")
+            put(repos.resolve("other2").resolve(".env"), "EXCLUDED_SECRET=${values["EXCLUDED_SECRET"]}\n")
             put(ownHome.resolve("stray.env"), "OWN_SECRET=${values["OWN_SECRET"]}\n")
         }
 
@@ -106,12 +107,12 @@ class EnvImportFlowTest {
         assertEquals(setOf(SourceKind.CLAUDE_JSON, SourceKind.MCP_CONFIG, SourceKind.CLAUDE_SETTINGS), byName.getValue("YOUTRACK_TOKEN").map { it.kind }.toSet())
         assertEquals(SourceKind.DOCKER_ENV, byName.getValue("POSTGRES_PASSWORD").single().kind)
         assertEquals(SourceKind.DOTENV, byName.getValue("DB_PASSWORD").single().kind)
-        assertEquals(setOf("tnt-service", "tnt2"), scan.excluded.map { it.fileName.toString() }.toSet())
+        assertEquals(setOf("other-service", "other2"), scan.excluded.map { it.fileName.toString() }.toSet())
         assertEquals(1, scan.empty)
         assertEquals(1, scan.references)
         assertEquals(8, scan.filesRead)
         val withExcluded = EnvScanner(f.config, f.ownHome, includeExcluded = true).scan()
-        assertTrue("TNT_SECRET" in withExcluded.found.map { it.name })
+        assertTrue("EXCLUDED_SECRET" in withExcluded.found.map { it.name })
         assertTrue(withExcluded.excluded.isEmpty())
     }
 
