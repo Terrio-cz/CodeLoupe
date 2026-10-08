@@ -8,6 +8,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermissions
 import java.time.Instant
+import java.util.Base64
 
 /**
  * The vault: `<home>/secrets/vault.env`, JSON with one encrypted value per (name, scope) and a data key that only the
@@ -68,6 +69,29 @@ class SecretStore(val file: Path, private val protector: KeyProtector, private v
         val values = picked.associate { entry -> entry.meta.name to Resolved(entry.meta, SecretCrypto.open(dataKey, SecretCrypto.Sealed(entry.nonce, entry.value), aad(entry.meta.name, SecretScope.parse(entry.meta.scope)))) }
         if (usedBy != null) touch(vault, picked, usedBy)
         return values
+    }
+
+    /** Whether (name, scope) holds exactly [value]; the answer is yes or no, the stored value stays inside. */
+    @Synchronized
+    fun holds(name: String, scope: SecretScope, value: String): Boolean {
+        val vault = read() ?: return false
+        val entry = vault.entries.firstOrNull { it.meta.name == name && it.meta.scope == scope.toString() } ?: return false
+        return SecretCrypto.open(key(vault), SecretCrypto.Sealed(entry.nonce, entry.value), aad(name, scope)) == value
+    }
+
+    /** Encrypts [data] under the vault key, bound to [label]: for a copy of a file that holds values, e.g. an import backup. */
+    @Synchronized
+    fun sealBlob(label: String, data: ByteArray): String {
+        val vault = read() ?: newVault().also { write(it) }
+        val sealed = SecretCrypto.seal(key(vault), Base64.getEncoder().encodeToString(data), "blob|$label")
+        return "${sealed.nonce}.${sealed.value}"
+    }
+
+    @Synchronized
+    fun openBlob(label: String, sealed: String): ByteArray {
+        val vault = checkNotNull(read()) { "no vault to open the copy with" }
+        val plain = SecretCrypto.open(key(vault), SecretCrypto.Sealed(sealed.substringBefore('.'), sealed.substringAfter('.')), "blob|$label")
+        return Base64.getDecoder().decode(plain)
     }
 
     /** Every stored value, for masking text that leaves the process; cached until the vault file changes. */

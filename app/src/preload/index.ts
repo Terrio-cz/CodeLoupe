@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { ACTION_CH } from '../shared/actions';
 import { CH, type CodeLoupeBridge, type DaemonState } from '../shared/ipc';
 
 // The renderer's only access to anything outside the page; every call is validated again in main.
@@ -24,6 +25,9 @@ const bridge: CodeLoupeBridge = {
     status: () => ipcRenderer.invoke(CH.claudeStatus),
     connect: kind => ipcRenderer.invoke(CH.claudeConnect, kind),
     manual: kind => ipcRenderer.invoke(CH.claudeManual, kind),
+  },
+  actions: {
+    gapsRefresh: () => ipcRenderer.invoke(ACTION_CH.gapsRefresh),
   },
   metrics: () => ipcRenderer.invoke(CH.metrics),
   open: {

@@ -116,6 +116,12 @@ Přehled                                             [24h|7d|30d]  ⟳
   (přepínač „Tabulka“). Jedna osa Y.
 - Úspora podle nástroje: vodorovné pruhy, jedna série, seřazeno sestupně, hodnota přímo u pruhu.
 - Daemon karta: z `/status` (reálný daemon i v mock režimu), tlačítka volají main proces (§ 8).
+- Řada **Latence · Paměť · CPU** (CL-40) pod grafem ceny: p95 latence volání podle nástroje z `/status` `latency`
+  (posledních 1 000 volání) s ryskou budgetu `p95Ms`; RSS daemonu z `GET /status/history` s ryskou `rssMb`;
+  zátěž CPU jako podíl jednoho jádra mezi dvěma odečty (rozdíl `cpuSec` / uplynulý čas, přes přestávku delší než
+  5 min bez čáry — daemon při nečinnosti žádné odečty nebere). Každý graf má tabulkový pohled a shrnutí v `aria-label`.
+- **Varování rozpočtů**: banner nad KPI, když `/status` `budgets.warnings` něco uvádí (p95, busy, čekání ve frontě,
+  RSS) nebo je překročen denní rozpočet tokenů; text varování je z daemonu, ikona ⚠ a slovo „překročeny“ nesou stav, ne barva.
 
 ### 3.2 Větve (worktree) + detail
 
@@ -233,6 +239,12 @@ Mezery                                      [Nástroj ▾] [Důvod ▾] [24h|7d|
 ```
 
 - Rozbalený řádek: jednotlivé výskyty (čas, důvod, náhrada, cíl, session a tah jako text — bez prokliku do běhu).
+- **Týdenní report** (CL-40) nahoře: výstup `codeloupe metrics gaps` (CL-22) po týdnech, nástroji a tvaru dotazu s druhem
+  mezery (`fallback` = agent sáhl po rg/cat/Read, `empty`, `busy`, `candidates`), počtem a několika hledanými identifikátory.
+  Čte ho daemon ze souboru `<home>/gaps-report.json` (`gaps.report`), protože čtení transkriptů trvá desítky sekund;
+  tlačítko „Přepočítat report“ pošle main procesu akci, ten spustí `<cli> metrics gaps --since <před 30 dny> --out <soubor>`
+  (pevné argumenty, bez shellu) a stránku obnoví. Rozsah 24h/7d/30d filtruje týdny, které do něj zasahují. Tabulka výskytů
+  z ingestu transkriptů (CL-62) se ukáže, až v ní něco je.
 
 ### 3.7 Prostředí (CL-54)
 
@@ -647,6 +659,11 @@ interface Gaps {
            fallback: 'rg' | 'grep' | 'sed' | 'cat' | 'Read' | 'other';
            reason: 'followup_read' | 'empty' | 'candidate_manual' | 'rollback';
            session: string; turn: number | null; target: string }[];   // session a tah jen jako text; nejvýš 200 nejnovějších
+  report: {                              // týdenní report jako `codeloupe metrics gaps`, posledních 30 dní (včetně „busy“); z ingestu, před prvním
+                                         // ingestem ze souboru `<home>/gaps-report.json` (`metrics gaps --out`); null, když není ani jedno
+    generatedAt: Iso | null; since: string | null; runs: number; calls: number;
+    rows: { week: string; tool: string; shape: string; kind: 'fallback' | 'empty' | 'busy' | 'candidates'; count: number; examples: string[] }[];
+  } | null;
 }
 ```
 
@@ -678,7 +695,10 @@ interface DaemonSettings {
   port: number; home: string; configFile: string; defaultRoot: string | null;
   repos: { id: string; path: string; baseRef: string }[];
   youtrack: { url: string; projects: string[]; tokenConfigured: boolean; pollSec: number }[];
-  budgets: { dailyWeighted: number | null; daemonRssMb: number; buildPeakRssMb: number };
+  budgets: {
+    dailyWeighted: number | null; daemonRssMb: number; buildPeakRssMb: number;
+    p95Ms: number; queueWaitMs: number; busyRate: number;   // limity z config.json `budgets`, podle kterých `/status` varuje
+  };
 }
 ```
 
@@ -745,7 +765,7 @@ webhooků (`budget.breach`, `gap.new`).
 | `worktrees/{id}` | `changes` ve strukturované podobě: deklarace, volající, testy | `index.layerFiles` = změněné indexované soubory, `parsedAt` null |
 | `tasks`, `tasks/{id}` | jen mirror (nikdy dotaz na tracker), kurzor = offset | `reads` 0, `mirror.lastReadAt` null (žádný čítač čtení) |
 | `index` | registr repozitářů, velikost a počty z indexu, sestavení z `build.done`/`overlay.refreshed` v `events.db` | `firstLine` chyb parseru 0, `kind` plného a inkrementálního buildu se neliší |
-| `gaps` | ingest transcriptů, detektor CL-22 s místem (tah, volání) a tím, po čem agent sáhl | volání „busy“ se vynechávají; týdenní report je `codeloupe metrics gaps` |
+| `gaps` | ingest transcriptů, detektor CL-22 s místem (tah, volání) a tím, po čem agent sáhl; `report` z téhož (30 dní), než je co ingestovat, ze souboru `<home>/gaps-report.json` (příklady projdou scrubberem) | volání „busy“ jsou jen v `report`, ne v `summary`/`items` |
 | `environment` | – | `keys: []`, `storeReady: false` do úložiště tajemství (CL-50) |
 | `settings` | konfigurace daemonu, mirror, `tokenConfigured` (hodnota se nikdy nečte ven), `budgets.dailyWeighted` | – |
 | `events` | `events.db` + `epoch` (tabulka `meta`): `build_finished`, `build_failed`, `budget_breach`, `gap_new` | – |

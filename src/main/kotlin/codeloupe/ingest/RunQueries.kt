@@ -114,6 +114,24 @@ class RunQueries(private val db: TranscriptDb) {
         }
     }
 
+    /** Every gap since [fromMs], busy ones included, for the weekly report: (week, tool, shape, kind, token). */
+    fun gapReport(fromMs: Long): List<List<String?>> = synchronized(db.reader) {
+        db.reader.prepareStatement("SELECT week, tool, shape, kind, token FROM gaps WHERE at_ms >= ?").use { s ->
+            s.setLong(1, fromMs)
+            s.executeQuery().use { r -> buildList { while (r.next()) add(listOf(r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getString(5))) } }
+        }
+    }
+
+    /** Runs that started since [fromMs] and the CodeLoupe calls in them. */
+    fun runsAndCalls(fromMs: Long): Pair<Int, Int> = synchronized(db.reader) {
+        val runs = db.reader.prepareStatement("SELECT count(*) FROM runs WHERE start_ms >= ?").use { s -> s.setLong(1, fromMs); s.executeQuery().use { it.next(); it.getInt(1) } }
+        val calls = db.reader.prepareStatement("SELECT count(*) FROM steps s JOIN runs r ON r.id = s.run_id WHERE s.category = 'codeloupe' AND r.start_ms >= ?").use { s ->
+            s.setLong(1, fromMs)
+            s.executeQuery().use { it.next(); it.getInt(1) }
+        }
+        runs to calls
+    }
+
     fun gapCount(fromMs: Long): Int = synchronized(db.reader) {
         db.reader.prepareStatement("SELECT count(*) FROM gaps WHERE at_ms >= ? AND kind != 'busy'").use { s -> s.setLong(1, fromMs); s.executeQuery().use { it.next(); it.getInt(1) } }
     }

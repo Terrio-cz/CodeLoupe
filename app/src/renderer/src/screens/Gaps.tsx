@@ -1,7 +1,9 @@
 import { Fragment, useState } from 'react';
-import { useApi } from '../api';
-import { Card, ErrorState, Loading, Select } from '../components/Parts';
-import { ago, dateTime, num } from '../format';
+import type { GapKind } from '../../../shared/contract';
+import { bridge, useApi } from '../api';
+import { Card, ErrorState, KpiTile, Loading, Select } from '../components/Parts';
+import { ago, dateTime, num, pct } from '../format';
+import { byWeek, filterRows, KIND_LABELS, totalOf } from '../gapReport';
 import { useRange } from '../hooks';
 
 const REASONS: Record<string, string> = {
@@ -14,20 +16,98 @@ const REASONS: Record<string, string> = {
 export function Gaps() {
   const [range] = useRange();
   const [tool, setTool] = useState('');
-  const [reason, setReason] = useState('');
+  const [kind, setKind] = useState('');
   const [open, setOpen] = useState<string | null>(null);
-  const { data, error, loading, reload } = useApi('gaps', undefined, { range, tool, reason });
-  const tools = [...new Set((data?.summary ?? []).map(s => s.tool))];
+  const [refreshing, setRefreshing] = useState(false);
+  const [outcome, setOutcome] = useState<{ ok: boolean; message: string } | null>(null);
+  const { data, error, loading, reload } = useApi('gaps', undefined, { range });
+
+  if (!data) return <Card>{loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst mezery.'} onRetry={reload} />}</Card>;
+
+  const report = data.report;
+  const rows = report ? filterRows(report, { range, tool, kind }) : [];
+  const tools = [...new Set([...(report?.rows ?? []).map(r => r.tool), ...data.summary.map(s => s.tool)])].sort();
+  const total = totalOf(rows);
+  const seenCalls = report?.calls ?? 0;
+
+  const refresh = async () => {
+    setRefreshing(true);
+    setOutcome(null);
+    try {
+      setOutcome(await bridge().actions.gapsRefresh());
+      reload();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <>
       <div className="filterbar">
         <Select label="Nástroj" value={tool} onChange={setTool} options={[{ value: '', label: 'Všechny nástroje' }, ...tools.map(t => ({ value: t, label: t }))]} />
-        <Select label="Důvod" value={reason} onChange={setReason} options={[{ value: '', label: 'Všechny důvody' }, ...Object.entries(REASONS).map(([v, l]) => ({ value: v, label: l }))]} />
-        <span className="muted">Mezera = agent po volání CodeLoupe sáhl po rg/sed/cat/Read na stejný cíl.</span>
+        <Select label="Druh" value={kind} onChange={setKind} options={[{ value: '', label: 'Všechny druhy' }, ...(Object.keys(KIND_LABELS) as GapKind[]).map(k => ({ value: k, label: KIND_LABELS[k] }))]} />
+        <span className="muted">Mezera = volání CodeLoupe, které nestačilo: agent sáhl po rg/sed/cat/Read na stejný cíl, nebo odpověď byla prázdná, busy či jen kandidáti.</span>
+        <span style={{ flex: 1 }} />
+        <button className="btn" onClick={() => void refresh()} disabled={refreshing} aria-describedby="gaps-refresh-hint">
+          {refreshing ? 'Počítám report…' : 'Přepočítat report'}
+        </button>
       </div>
-      <Card title="Podle nástroje a tvaru dotazu" bodyClass="">
-        {!data ? (loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst mezery.'} onRetry={reload} />) : (
+      {outcome && <div className={`banner${outcome.ok ? ' info' : ''}`} role="status">{outcome.message}</div>}
+
+      {!report ? (
+        <Card title="Týdenní report">
+          <div className="state">
+            <div>Report ještě nebyl spočítán. Projde transkripty Claude Code z posledních 30 dnů (<span className="mono">codeloupe metrics gaps</span>), trvá asi půl minuty.</div>
+            <button className="btn primary" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? 'Počítám report…' : 'Spočítat report'}</button>
+          </div>
+        </Card>
+      ) : (
+        <>
+          <section className="card" aria-label="Souhrn reportu">
+            <div className="kpis">
+              <KpiTile label="Mezery v rozsahu" value={num(total)} ctx={`${num(rows.length)} řádků reportu`} />
+              <KpiTile label="Volání CodeLoupe v reportu" value={num(seenCalls)} ctx={`${num(report.runs)} běhů agentů`} />
+              <KpiTile label="Podíl mezer" value={seenCalls ? pct((totalOf(report.rows) / seenCalls) * 100, 1) : '—'} ctx="mezery / volání, celý report" />
+              <KpiTile label="Report" value={ago(report.generatedAt)} ctx={report.since ? `od ${report.since}` : undefined} />
+            </div>
+          </section>
+          <Card title="Týdenní report podle nástroje a tvaru dotazu" bodyClass="">
+            <div className="table-wrap">
+              <table className="data" aria-label="Týdenní report mezer">
+                <thead>
+                  <tr>
+                    <th scope="col">Nástroj</th><th scope="col">Tvar dotazu</th><th scope="col">Druh</th>
+                    <th scope="col" className="num">Počet</th><th scope="col">Co se hledalo</th>
+                  </tr>
+                </thead>
+                {rows.length === 0 ? (
+                  <tbody><tr><td colSpan={5} className="muted">Žádné mezery v tomto rozsahu a filtru.</td></tr></tbody>
+                ) : byWeek(rows).map(([week, inWeek]) => (
+                  <tbody key={week}>
+                    <tr className="group">
+                      <th scope="rowgroup" colSpan={3}>{week}</th>
+                      <th scope="rowgroup" className="num">{num(totalOf(inWeek))}</th>
+                      <td />
+                    </tr>
+                    {inWeek.map(r => (
+                      <tr key={`${r.tool}|${r.shape}|${r.kind}`}>
+                        <td className="mono">{r.tool}</td><td className="mono">{r.shape}</td><td>{KIND_LABELS[r.kind]}</td>
+                        <td className="num">{num(r.count)}</td><td className="mono ellipsis">{r.examples.join(', ') || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                ))}
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
+      <p id="gaps-refresh-hint" className="muted" style={{ margin: 0 }}>
+        Report se počítá z transkriptů na tomto počítači jen na vyžádání; daemon ho pak servíruje ze souboru <span className="mono">gaps-report.json</span> ve svém home.
+      </p>
+
+      {data.summary.length > 0 && (
+        <Card title="Výskyty podle nástroje a tvaru dotazu (ingest transkriptů)" bodyClass="">
           <div className="table-wrap">
             <table className="data" aria-label="Mezery podle nástroje">
               <thead>
@@ -37,8 +117,7 @@ export function Gaps() {
                 </tr>
               </thead>
               <tbody>
-                {data.summary.length === 0 && <tr><td colSpan={6} className="muted">Žádné mezery v tomto rozsahu.</td></tr>}
-                {data.summary.map(s => {
+                {data.summary.filter(s => !tool || s.tool === tool).map(s => {
                   const key = `${s.tool}|${s.shape}`;
                   const expanded = open === key;
                   const items = data.items.filter(g => g.tool === s.tool && g.shape === s.shape);
@@ -68,8 +147,8 @@ export function Gaps() {
               </tbody>
             </table>
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
     </>
   );
 }

@@ -114,7 +114,7 @@ export function CostChart({ points, hourly }: { points: CostPoint[]; hourly: boo
   );
 }
 
-function niceStep(raw: number): number {
+export function niceStep(raw: number): number {
   const p = 10 ** Math.floor(Math.log10(raw || 1));
   const f = raw / p;
   return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;

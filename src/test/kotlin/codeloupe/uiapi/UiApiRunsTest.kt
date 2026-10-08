@@ -202,6 +202,11 @@ class UiApiRunsTest {
         assertEquals("s-gaps", fallback.text("session"))
         assertEquals("handle", fallback.text("target"))
         assertEquals(2, gaps["summary"]!!.jsonArray.size)
+        val report = gaps["report"]!!.jsonObject
+        assertEquals(4, report.number("runs"))
+        assertEquals(1, report.number("calls"), "the one CodeLoupe call of s-gaps")
+        assertEquals(setOf("empty", "fallback"), report["rows"]!!.jsonArray.map { it.jsonObject.text("kind") }.toSet())
+        assertTrue(report["rows"]!!.jsonArray.any { row -> row.jsonObject["examples"]!!.jsonArray.any { it.jsonPrimitive.content == "handle" } })
         assertEquals(1, items("gaps?reason=empty").size)
         assertEquals(0, items("gaps?tool=other").size)
         assertEquals(400, get("gaps?reason=nonsense").statusCode())

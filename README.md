@@ -42,20 +42,21 @@ divided by 3.16; method and every row in [docs/benchmarks.md](docs/benchmarks.md
 |---|---|---:|---:|---:|
 | Read a type | `symbol` | 326 | 789 | 322 |
 | Read a member | `symbol` | 117 | 1,746 | 118 |
-| Outline of a file | `outline` | 222 | 615 | 197 |
+| Outline of a file | `outline` | 206 | 615 | 197 |
 | Who uses a type | `usages` | 560 | 2,997 | 626 |
 | Who calls a member | `calls` | 169 | 1,352 | 286 |
-| Subtypes of a type | `hierarchy` | 179 | 464 | 102 |
+| Subtypes of a type | `hierarchy` | 127 | 464 | 102 |
 | Text search, 30 hits | `grep` | 1,298 | n/a | 1,497 |
-| What a branch changed | `changes` | 4,154 | 79,728 | 2,247 |
+| What a branch changed | `changes` | 2,938 | 79,728 | 2,247 |
 
 *grep + read* is what an agent without an index typically does: `rg` with context lines, a whole-file read, the full
 `git diff`. *grep, minimal* is a best case that assumes the agent never reads a line it does not need (for source
 lookups it is given the exact line range, for the branch `git diff --stat`). Against grep + read, CodeLoupe's answers
-are 5–41 % of the size (9 % summed over all questions) and take one call where grep needs two for source lookups.
-Against the best case they are about the same for source lookups, smaller for usages and callers, and larger for
-outline, subtypes and branch changes: CodeLoupe returns more per line (the enclosing declaration of every hit, exact
-against candidate marks, callers and tests of every changed declaration), and `git diff --stat` says less.
+are 4–41 % of the size (8 % summed over all questions) and take one call where grep needs two for source lookups.
+Against the best case they are about the same for source lookups and outlines, smaller for usages and callers, and
+larger for subtypes and branch changes: CodeLoupe returns more per line (the type itself and its direct supertypes, the
+enclosing declaration of every hit, exact against candidate marks, callers and tests of every changed declaration
+that was not added), and `git diff --stat` says less.
 
 Beyond navigation, and not part of the benchmark: worktrees of one repository share one index and each adds only its own
 edits; long commands run in the daemon so an agent's turn can end ([Jobs and events](#jobs-and-events)); a tracker mirror
@@ -79,14 +80,14 @@ Tokens read per question, median over 15–16 questions of each kind (2 for the 
 
 | Task | CodeLoupe | GitNexus | grep + read | grep, minimal |
 |---|---:|---:|---:|---:|
-| Read a type | 326 | 2,016 | 789 | 322 |
-| Read a member | 117 | 929 | 1,746 | 118 |
-| Outline of a file | 222 | n/a | 615 | 197 |
-| Who uses a type | 560 | 1,596 | 2,997 | 626 |
-| Who calls a member | 169 | 720 | 1,352 | 286 |
-| Subtypes of a type | 179 | 1,406 | 464 | 102 |
+| Read a type | 326 | 2,021 | 789 | 322 |
+| Read a member | 117 | 938 | 1,746 | 118 |
+| Outline of a file | 206 | n/a | 615 | 197 |
+| Who uses a type | 560 | 1,601 | 2,997 | 626 |
+| Who calls a member | 169 | 726 | 1,352 | 286 |
+| Subtypes of a type | 127 | 1,412 | 464 | 102 |
 | Text search, 30 hits | 1,298 | n/a | n/a | 1,497 |
-| What a branch changed | 4,154 | 21,767 | 79,728 | 2,247 |
+| What a branch changed | 2,938 | 21,769 | 79,728 | 2,247 |
 
 GitNexus 1.6.12 has no outline or text-search tool, so those rows are `n/a`. Its `context` answers are JSON cards (callers,
 callees, process membership), not the same content as CodeLoupe's, so the comparison is of what is read, not of what is
@@ -143,7 +144,7 @@ Another tool fits better when:
 - you ask conceptual questions ("how does checkout work"), want execution flows, blast-radius analysis or API route
   maps: GitNexus has tools for them, CodeLoupe has none;
 - you search text in files that are not Kotlin or `.kts`: `rg` searches every file type;
-- you want only the list of changed files: `git diff --stat` is smaller than `changes` (2,247 against 4,154 tokens);
+- you want only the list of changed files: `git diff --stat` is smaller than `changes` (2,247 against 2,938 tokens);
 - the repository is small enough that reading the files costs little.
 
 Both CodeLoupe and GitNexus are source-available under the PolyForm Noncommercial licence, so neither is a free choice
@@ -289,7 +290,16 @@ deny reading `*.env` cover it.
 | `codeloupe env unset NAME --scope …` | removes it |
 | `codeloupe env run [--workspace w] [--repo r] -- <command>` | the command's environment gets every secret that applies (global < workspace < repository, the narrowest wins); what it prints is masked line by line of every stored value |
 | MCP tool `env` | the same names, never a value; `workspace`, `repository`, `all` |
+| `codeloupe env import scan [--include-excluded] [--json]` | inventory of the variables in `.env` and docker env files, `.claude/settings*.json` `env`, `.mcp.json` and `~/.claude.json` MCP server `env` under the configured roots: name, suggested scope, every source, duplicates and conflicts (equal or different values, compared by a hash that is salted per report), what the store already holds. Never a value |
+| `codeloupe env import run --select <id>[=scope] … \| --all-sensitive [--replace] [--overwrite]` | copies the selected occurrences into the store inside the process and reports created / updated / skipped; rerunning changes nothing. Two selected sources with different values for one name and scope are a conflict, stored from neither. `--replace` then swaps each imported value in its source for a reference (a comment in dotenv files, `${NAME}` in JSON) after saving an encrypted copy of the file |
+| `codeloupe env import rollback <backup-id> [--force]`, `backups`, `forget <id>` | puts every replaced file back byte for byte (a file edited since is left alone unless `--force`); lists and drops the copies |
 | `GET /env/values?workspace=&repository=&names=A,B` | for a local MCP server or script: the values, in its own process. Needs `x-codeloupe-env-token` (the contents of `<home>/secrets/api-token.env`, made on first use, readable by this user only) and says who asks in `x-codeloupe-used-by` |
+
+The import looks under the roots of `envImport` in `<home>/config.json` (`{"roots":[{"path":"~/IdeaProjects","kind":"repositories"}],"exclude":["tnt"]}`; kind
+`home`, `workspaces` or `repositories`). Without it: every `~/.claude*`, `~/Documents/Claude` (each folder one workspace, scope `workspace:<folder>`) and `~/IdeaProjects`
+(the nearest folder with `.git`, scope `repo:<folder>`). Folders whose name holds an `exclude` word (default: TNT, FoodRetailor and their sibling services) are listed, not
+entered, until `--include-excluded`. Templates (`.env.example`), build and dependency folders and the daemon's own home are never read. MCP `headers` and `args`,
+compose `environment:` blocks and shell profiles are not scanned.
 
 Every text that leaves the daemon (events, webhooks, summaries, `run` answers, `doc path=job:<id>`) is masked of the stored values
 (six characters or more) before the pattern rules for other secret shapes, and a finished job's log file is rewritten with the
@@ -619,7 +629,7 @@ The `installer-smoke` CI job installs each installer on its OS, starts the app, 
 from the bundled runtime, runs `find` through the CLI and through the MCP endpoint on a PATH without Java, takes a
 screenshot of the app window (artifact `smoke-<os>`) and uninstalls (`node tools/installer-smoke.mjs <installer>`;
 it uses its own home, port and app data, so it is safe on a developer machine; screenshots only when `CI` is set).
-Not yet: signing and notarisation (CL-105, until then Windows shows an unknown publisher and macOS refuses the app),
+Not yet: signing and notarisation (CL-105, options and costs in [docs/code-signing.md](docs/code-signing.md); until the owner chooses, Windows shows an unknown publisher and macOS refuses the app),
 the release pipeline (CL-106), auto-update (CL-107). CI cost and runners: [docs/ci.md](docs/ci.md). Releasing (tag, checksums, SBOMs, draft release): [docs/release.md](docs/release.md).
 
 ## Develop

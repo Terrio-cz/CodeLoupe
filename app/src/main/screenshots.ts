@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { metrics } from './ipcHandlers';
 
-const ROUTES: [string, string][] = [
+const MOCK_ROUTES: [string, string][] = [
   ['overview', '#/overview'],
   ['branches', '#/branches'],
   ['branch-detail', '#/branches/a1f3c09e4b21'],
@@ -15,8 +15,33 @@ const ROUTES: [string, string][] = [
   ['settings', '#/settings'],
 ];
 
+// CODELOUPE_APP_SCREENSHOT_ROUTES='[["name","#/hash"], …]' replaces the list, e.g. with ids of a real daemon.
+const ROUTES: [string, string][] = (() => {
+  try {
+    const custom = JSON.parse(process.env.CODELOUPE_APP_SCREENSHOT_ROUTES ?? 'null') as unknown;
+    if (Array.isArray(custom) && custom.every(r => Array.isArray(r) && typeof r[0] === 'string' && /^#\/[\w/?=&.:-]*$/.test(String(r[1])))) return custom as [string, string][];
+  } catch { /* not set or not JSON: use the mock routes */ }
+  return MOCK_ROUTES;
+})();
+
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const go = (win: BrowserWindow, hash: string) => win.webContents.executeJavaScript(`location.hash = ${JSON.stringify(hash)}`);
+/**
+ * Opens a screen and resolves with the milliseconds until its data was shown: from the route change to the first moment
+ * no skeleton (`aria-busy`) is left, or -1 after 20 s. Two frames pass first so the loading state has appeared.
+ */
+const visit = (win: BrowserWindow, hash: string): Promise<number> =>
+  win.webContents.executeJavaScript(`new Promise(resolve => {
+    const t0 = performance.now();
+    location.hash = ${JSON.stringify(hash)};
+    const poll = () => {
+      if (!document.querySelector('[aria-busy="true"]')) resolve(Math.round(performance.now() - t0));
+      else if (performance.now() - t0 > 20000) resolve(-1);
+      else setTimeout(poll, 10);
+    };
+    requestAnimationFrame(() => requestAnimationFrame(poll));
+  })`);
+
 // Resolves after the page painted twice, so a capture never returns the previous frame.
 const painted = (win: BrowserWindow) =>
   win.webContents.executeJavaScript('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))');
@@ -45,11 +70,12 @@ export async function captureScreens(win: BrowserWindow, dir: string): Promise<v
   fs.mkdirSync(dir, { recursive: true });
   win.webContents.setBackgroundThrottling(false);
   const report: Record<string, unknown> = {};
+  const loadMs: Record<string, number> = {};
   for (const theme of ['light', 'dark'] as const) {
     nativeTheme.themeSource = theme;
     for (const [name, route] of ROUTES) {
-      await go(win, route);
-      await sleep(1200);
+      loadMs[`${theme}-${name}`] = await visit(win, route);
+      await sleep(900);
       win.webContents.invalidate();
       await painted(win);
       const img = await win.webContents.capturePage();
@@ -59,5 +85,6 @@ export async function captureScreens(win: BrowserWindow, dir: string): Promise<v
   }
   await sleep(2000);
   report.settled = metrics();
+  report.loadMs = loadMs;
   fs.writeFileSync(path.join(dir, 'metrics.json'), JSON.stringify(report, null, 2));
 }

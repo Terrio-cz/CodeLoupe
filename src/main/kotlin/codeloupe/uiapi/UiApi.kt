@@ -34,7 +34,7 @@ class UiApi(
     private val index = IndexViews(registry, catalog, events, queue, config.budgets.rssMb)
     private val transcripts = Transcripts(config, { type, data -> events.emit(type, data) }, scope, log, waitMs)
     private val runViews = RunViews(transcripts)
-    private val gapViews = GapViews(transcripts)
+    private val gapViews = GapScreen(transcripts, GapViews(config.home.resolve(GapViews.FILE)))
     private val feed = EventFeed(events, registry, transcripts)
     private val overview = OverviewViews(callLog, worktrees, transcripts)
     private val settings = SettingsViews(config, catalog, trackers, trackerPollSec)

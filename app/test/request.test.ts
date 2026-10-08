@@ -9,6 +9,12 @@ describe('validateRequest', () => {
     expect(o).toMatchObject({ ok: true, path: '/ui-api/v1/overview?range=30d' });
   });
 
+  it('reaches the daemon routes outside the UI API that a screen needs, and no others', () => {
+    expect(validateRequest({ resource: 'status/history' })).toMatchObject({ ok: true, path: '/status/history' });
+    expect(validateRequest({ resource: 'shutdown' }).ok).toBe(false);
+    expect(validateRequest({ resource: 'status' }).ok).toBe(false);
+  });
+
   it('drops empty and undefined query values', () => {
     const r = validateRequest({ resource: 'tasks', query: { q: '', state: undefined, limit: 200 } });
     expect(r).toMatchObject({ ok: true, path: '/ui-api/v1/tasks?limit=200' });

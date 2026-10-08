@@ -336,8 +336,9 @@ Z transcriptů: volání codeloupe, po kterém agent do 2 tahů sáhne po `rg`/`
 symbol nebo soubor = **mezera** (nástroj nestačil). Report seskupený podle nástroje a tvaru dotazu → backlog
 vylepšení. Plus: prázdné výsledky, `candidate` výsledky, které agent dál ručně rozhodoval, zápisy s rollbackem.
 Hotovo (CL-22): `codeloupe metrics gaps` — druhy `fallback`, `empty`, `busy`, `candidates`, týdně podle nástroje a
-tvaru dotazu (`name`, `qualified`, `overload`, `glob`, `path`); zápisy s rollbackem čekají na write nástroje, obrazovka
-Gaps v UI na CL-40.
+tvaru dotazu (`name`, `qualified`, `overload`, `glob`, `path`); zápisy s rollbackem čekají na write nástroje. Obrazovka
+Mezery v aplikaci (CL-40) ukazuje tento report z `<home>/gaps-report.json`, který daemon servíruje v `gaps.report` a který
+se přepočítá tlačítkem v aplikaci (CLI v samostatném procesu, asi 17 s na 3 000 běhů, měřeno 2026-10-08).
 
 **Scaffold šablony (CL-35): no-go.** Změřeno 2026-10-08 na 1 427 nových kódových souborech z transcriptů od 2026-09-23
 (`codeloupe metrics boilerplate`): kostra (package, importy, hlavičky typů, anotace, závorky, prázdné řádky) je **13,3 %**
@@ -739,6 +740,21 @@ rozhoduje launcher.
 - **Ověření (TerrioImporter, jen čtení, 10 přistálých + 10 otevřených TER):** viz příloha CL-91. Přistání 9/9 shodné s `git` (SHA prvního rodiče,
   počet commitů bez `merge origin/master`, počet souborů); TER-496 je Done bez jediného commitu → bez přistání, jen predikce. Nalezeno a opraveno:
   `+` pro cesty cizího repa (`src/views/Admin.jsx`), pro dvojici `a.md/b.md`, a `=` pro deklaraci podle zastaralého čísla řádku.
+
+### Výsledek CL-52 — import proměnných do storu (2026-10-08)
+
+- Skener (`codeloupe.secrets.imports`) prochází kořeny z `config.json` `envImport` (výchozí: `~/.claude*`, `~/Documents/Claude`, `~/IdeaProjects`) a čte `.env*`/`*.env`
+  (docker env soubory podle složky/compose souseda), `settings*.json` v `.claude*`, `.mcp.json` a `env` objekty kdekoli v `~/.claude.json`. Šablony (`.env.example`),
+  `node_modules`/`build`/… a vlastní home daemona se nečtou; složky TNT/FoodRetailor se jen vypíšou (`--include-excluded` je pustí dovnitř).
+- Report nese jméno, navržený scope (home → global, `Documents/Claude/<x>` → workspace, nejbližší `.git` → repo), zdroje, duplicity a konflikty. Hash hodnoty je
+  HMAC-SHA256 se solí, která žije jen v paměti jednoho reportu, zkrácený na 40 bitů: porovná dvě hodnoty uvnitř reportu, nedá se hádat offline ani spárovat s jiným reportem.
+- Import je idempotentní: hodnota, kterou store drží, se přeskočí; odlišná hodnota ve storu se nepřepíše (`--overwrite`), protože store mohl být rotován v aplikaci;
+  dva vybrané zdroje s různou hodnotou pro jedno jméno a scope jsou konflikt a neuloží se ani jeden (vyřeší se výběrem jednoho).
+- Náhrada zdrojů je volitelná. Dotenv výraz se změní na komentář (program, který soubor ještě čte, selže nahlas místo aby dostal placeholder), JSON řetězec na `${NAME}`;
+  zbytek souboru zůstane bajt po bajtu (pozice z vlastního JSON čtečky, CRLF a BOM zachovány). Před přepsáním se kopie souboru zapečetí klíčem vaultu do
+  `<home>/secrets/import-backups/<id>/` (manifest nese jen cesty a digesty); rollback vrátí každý soubor, soubor upravený po importu nechá být bez `--force`.
+- Na reálných kořenech tohoto počítače (jen jména, nic nebylo importováno ani přepsáno): 168 souborů, 712 výskytů, 113 jmen, 375 dvojic jméno+scope, 125 citlivých,
+  120 s duplicitní hodnotou, 57 s konfliktem, 3 vyloučené složky; sken trvá ~8 s včetně startu JVM.
 
 ### Výsledek CL-62 — ingest transcriptů, rozpočty a události pro aplikaci (2026-10-08)
 

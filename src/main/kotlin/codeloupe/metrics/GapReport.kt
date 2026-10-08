@@ -2,9 +2,14 @@ package codeloupe.metrics
 
 import kotlinx.serialization.Serializable
 
-/** The gaps of a period by week, tool and query shape, most frequent first within a week; [calls] counts every CodeLoupe call seen. */
+/**
+ * The gaps of a period by week, tool and query shape, most frequent first within a week; [calls] counts every CodeLoupe call seen.
+ * [since] and [generatedAt] say what the report covers and when it was made; the desktop app shows them.
+ */
 @Serializable
-data class GapReport(val runs: Int, val calls: Int, val rows: List<GapRow>) {
+data class GapReport(val runs: Int, val calls: Int, val rows: List<GapRow>, val since: String? = null, val generatedAt: String? = null) {
+    fun covering(since: String, generatedAt: String) = copy(since = since, generatedAt = generatedAt)
+
     fun render(): String {
         if (rows.isEmpty()) return "no gaps in $calls CodeLoupe calls of $runs runs"
         val lines = ArrayList<String>()

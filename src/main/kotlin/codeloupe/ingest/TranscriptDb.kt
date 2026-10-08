@@ -92,6 +92,7 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
                 "category TEXT NOT NULL, summary TEXT NOT NULL, chars INTEGER NOT NULL, ms INTEGER NOT NULL, err INTEGER NOT NULL, error TEXT, " +
                 "input TEXT, head TEXT, PRIMARY KEY (run_id, seq)) WITHOUT ROWID",
             "CREATE INDEX IF NOT EXISTS steps_chars ON steps(run_id, chars)",
+            "CREATE INDEX IF NOT EXISTS steps_codeloupe ON steps(run_id) WHERE category = 'codeloupe'",
             "CREATE TABLE IF NOT EXISTS usage_hours (run_id INTEGER NOT NULL, hour INTEGER NOT NULL, cost REAL NOT NULL, PRIMARY KEY (run_id, hour)) WITHOUT ROWID",
             "CREATE INDEX IF NOT EXISTS usage_hours_hour ON usage_hours(hour)",
             "CREATE TABLE IF NOT EXISTS gaps (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL, seq INTEGER NOT NULL, turn INTEGER NOT NULL, " +

@@ -1,6 +1,8 @@
 package codeloupe.changes
 
+import codeloupe.query.Format
 import codeloupe.query.PathOrder
+import codeloupe.query.SigText
 import codeloupe.query.View
 import codeloupe.query.usages.UsageFinder
 
@@ -10,7 +12,7 @@ import codeloupe.query.usages.UsageFinder
  * the changed declarations, not with the size of the files; files are compared one at a time.
  */
 object ChangesQuery {
-    data class Args(val bodies: Boolean = false, val limit: Int = 60)
+    data class Args(val bodies: Boolean = false, val limit: Int = 60, val callers: Boolean = false)
 
     /** [after] reads the worktree as it is now, [before] the merge-base version of the changed files. */
     fun run(set: ChangeSet, after: View, before: View?, args: Args): String {
@@ -19,6 +21,8 @@ object ChangesQuery {
         val shown = ArrayList<String>()
         val quiet = ArrayList<String>()
         var listed = 0
+        var previousDir = ""
+        var headed = ""
         for (file in set.files.sortedWith(compareBy(PathOrder) { it.path })) {
             val old = if (file.status == 'A' || before == null) emptyList() else versions(before, file.path)
             val new = if (file.status == 'D') emptyList() else versions(after, file.path)
@@ -30,9 +34,16 @@ object ChangesQuery {
             changes.forEach { counts.merge(it.mark, 1, Int::plus) }
             for ((change, nested) in collapse(changes)) {
                 if (listed++ >= args.limit) continue
-                if (shown.lastOrNull { !it.startsWith(" ") } != heading(file)) shown += heading(file)
-                shown += line(change) + note(change, nested)
-                details(change, callers).forEach { shown += "      $it" }
+                if (headed != file.path) {
+                    shown += heading(file, previousDir)
+                    headed = file.path
+                    previousDir = file.path.substringBeforeLast('/', "")
+                }
+                val (sig, was) = signatures(change)
+                shown += line(change, sig) + note(change, nested)
+                if (was != null) shown += "      was: $was"
+                // An added declaration has no callers yet that the change did not bring; `callers` asks for them anyway.
+                if (change.mark != DeclChange.ADDED || args.callers) callerLines(change, callers).forEach { shown += "      $it" }
                 if (args.bodies) body(change, old, new)?.let { shown += it }
             }
         }
@@ -80,17 +91,32 @@ object ChangesQuery {
         return "changes vs ${set.defaultRef} (merge-base ${set.mergeBase.take(7)}): ${set.files.size} source files, $summary"
     }
 
-    private fun heading(file: ChangedFile) = file.path + when (file.status) {
+    /** The path, as `./name` when the file above it is in the same directory. */
+    private fun heading(file: ChangedFile, previousDir: String): String {
+        val dir = file.path.substringBeforeLast('/', "")
+        val name = if (dir.isNotEmpty() && dir == previousDir) "./" + file.path.substringAfterLast('/') else file.path
+        return name + status(file)
+    }
+
+    private fun status(file: ChangedFile) = when (file.status) {
         'A' -> "  (new)"
         'D' -> "  (deleted)"
         else -> ""
     }
 
     /** `  ^ 120-140  [Container] signature` with the line range of the current version (the old one when removed). */
-    private fun line(change: DeclChange): String {
+    private fun line(change: DeclChange, sig: String): String {
         val row = change.current.row
         val container = if (row.container.isNotEmpty()) "[${row.container}] " else ""
-        return "  ${change.mark} ${row.startLine}-${row.endLine}  $container${row.sig}"
+        return "  ${change.mark} ${Format.range(row)}  $container$sig"
+    }
+
+    /** The signature to print and, for a changed one, the old one beside it: whole when short, else around the difference. */
+    private fun signatures(change: DeclChange): Pair<String, String?> {
+        val sig = SigText.plain(change.current.row.sig)
+        val old = change.before?.row?.sig?.let(SigText::plain)
+        if (change.mark != DeclChange.SIGNATURE || old == null) return SigWindow.clip(sig) to null
+        return SigWindow.around(sig, old)
     }
 
     private fun note(change: DeclChange, nested: Int): String = when {
@@ -99,13 +125,10 @@ object ChangesQuery {
         else -> ""
     }
 
-    private fun details(change: DeclChange, callers: Callers): List<String> = buildList {
-        if (change.mark == DeclChange.SIGNATURE) add("was: ${change.before!!.row.sig}")
-        when {
-            change.after == null -> addAll(callers.ofRemoved(change.before!!.row))
-            change.mark == DeclChange.SIGNATURE -> addAll(callers.ofChangedSignature(change.after.row, change.before!!.row))
-            else -> addAll(callers.of(change.after.row))
-        }
+    private fun callerLines(change: DeclChange, callers: Callers): List<String> = when {
+        change.after == null -> callers.ofRemoved(change.before!!.row)
+        change.mark == DeclChange.SIGNATURE -> callers.ofChangedSignature(change.after.row, change.before!!.row)
+        else -> callers.of(change.after.row)
     }
 
     // A type's own lines only: its members' changes are listed, and diffed, on their own.
