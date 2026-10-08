@@ -21,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import java.nio.file.Path
+import java.time.Instant
 import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
 import kotlin.test.Test
@@ -42,6 +43,7 @@ class TaskCodeTest {
     private val mirrorStore = MirrorStore(TestRepos.tmpDir("tasks").resolve("t.db"))
     private val instance = TrackerInstance("t", "youtrack", "https://t.example", listOf("CL"), TokenSource.Env("UNUSED") { emptyMap() })
     private val trackers: Trackers
+    private var clock = Instant.now().epochSecond
     private val merge: String
     private val plain: String
 
@@ -70,9 +72,9 @@ class TaskCodeTest {
         write(repo, "docs/notes.md", "notes\n")
         commit(repo, "CL-56 document UTF-8 handling")
         git(repo, "checkout", "-q", "CL-17")
-        git(repo, "merge", "-q", "--no-edit", "-m", "CL-17 merge main", "main")
+        git(repo, "merge", "-q", "--no-edit", "-m", "CL-17 merge main", "main", env = nextTime())
         git(repo, "checkout", "-q", "main")
-        git(repo, "merge", "-q", "--no-ff", "-m", "Merge CL-17 add discount", "CL-17")
+        git(repo, "merge", "-q", "--no-ff", "-m", "Merge CL-17 add discount", "CL-17", env = nextTime())
         merge = git(repo, "rev-parse", "HEAD")
     }
 
@@ -123,7 +125,7 @@ class TaskCodeTest {
         write(worktree, USE, USE_TEXT.replace("total(1)", "total(2)"))
         val text = answer("CL-91")
         assertTrue(text.startsWith("CL-91 To do · Feature · Major ‹CL-4› Task ↔ code links"), text)
-        assertContains(text, "in progress: ${worktree.toString().replace('\\', '/')} (branch CL-91), 1 files changed against the merge-base: $USE")
+        assertContains(text, "in progress: ${worktree.toRealPath().toString().replace('\\', '/')} (branch CL-91), 1 files changed against the merge-base: $USE")
         assertContains(text, "predicted from the issue text (= sure · ~ likely · ? guess · + new):")
         assertContains(text, Regex("= $BILLING:4-6  \\[Billing] fun total\\(a: Int\\): Int +← `Billing.total` in Context"))
         assertContains(text, Regex("= $USE +← `src/main/kotlin/demo/Use.kt` in Context"))
@@ -146,7 +148,7 @@ class TaskCodeTest {
         commit(repo, "CL-26 use more")
         val first = git(repo, "rev-parse", "HEAD")
         assertContains(answer("CL-26"), "landed ${first.take(7)} ")
-        git(repo, "commit", "-q", "--amend", "-m", "CL-27 use more, renamed")
+        git(repo, "commit", "-q", "--amend", "-m", "CL-27 use more, renamed", env = nextTime())
         val amended = git(repo, "rev-parse", "HEAD")
         assertContains(answer("CL-27"), "landed ${amended.take(7)} ")
         assertFalse("landed" in answer("CL-26"), "the amended-away commit is forgotten")
@@ -173,8 +175,11 @@ class TaskCodeTest {
 
     private fun commit(root: Path, message: String) {
         git(root, "add", "-A")
-        git(root, "commit", "-q", "-m", message)
+        git(root, "commit", "-q", "-m", message, env = nextTime())
     }
+
+    /** Every commit gets its own second: with equal times the newest-first order of a landing list is a coin toss. */
+    private fun nextTime(): Map<String, String> = "${++clock} +0000".let { mapOf("GIT_AUTHOR_DATE" to it, "GIT_COMMITTER_DATE" to it) }
 
     private companion object {
         const val BILLING = "src/main/kotlin/demo/Billing.kt"

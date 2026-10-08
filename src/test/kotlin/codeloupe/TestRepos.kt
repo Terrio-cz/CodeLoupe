@@ -12,9 +12,9 @@ object TestRepos {
 
     fun tmpDir(prefix: String): Path = Files.createTempDirectory("codeloupe-$prefix-")
 
-    fun git(dir: Path, vararg args: String): String {
+    fun git(dir: Path, vararg args: String, env: Map<String, String> = emptyMap()): String {
         val command = listOf("git", "-C", dir.toString(), "-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "core.autocrlf=false") + args
-        val process = ProcessBuilder(command).redirectErrorStream(true).start()
+        val process = ProcessBuilder(command).redirectErrorStream(true).apply { environment().putAll(env) }.start()
         val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
         check(process.waitFor() == 0) { "git ${args.joinToString(" ")}: $out" }
         return out.trim()
