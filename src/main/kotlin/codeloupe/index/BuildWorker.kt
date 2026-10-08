@@ -10,15 +10,16 @@ import kotlin.system.exitProcess
 
 /**
  * Child process of the daemon that does the heavy parsing, one JSON line on stdout:
- * - `BuildWorker <repoDir> <commit> <outFile>` builds a base index;
+ * - `BuildWorker <repoDir> <commit> <outFile>` builds a base index at normal priority: it is the first build of a
+ *   repository, a query is waiting for it and a lowered priority starves on a busy machine (CL-80);
  * - `BuildWorker update <repoDir> <commit|-> <dbFile> <updateFile>` applies a [StoreUpdate] (JSON) to a base copy
- *   (with a commit) or to a worktree overlay (`-`).
+ *   (with a commit) or to a worktree overlay (`-`), at lowered priority: it is background work.
  * Parsing many files is the only heavy work; doing it here keeps the daemon small.
  */
 object BuildWorker {
     @JvmStatic
     fun main(args: Array<String>) {
-        ProcessPriority.lower()
+        if (isBackground(args)) ProcessPriority.lower()
         val result = try {
             run(args).copy(peakRssMb = ProcessMemory.peakRssMb())
         } catch (e: Throwable) {
@@ -29,6 +30,9 @@ object BuildWorker {
         // The PSI environment keeps non-daemon threads alive; the work is done.
         exitProcess(if (result.ok) 0 else 1)
     }
+
+    /** Only an update is background work; the first build of a repository is waited for. */
+    internal fun isBackground(args: Array<String>) = args.firstOrNull() == UPDATE
 
     private fun run(args: Array<String>): BuildResult {
         if (args.firstOrNull() != UPDATE) {

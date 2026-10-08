@@ -13,6 +13,7 @@ import codeloupe.overlay.Overlays
 import codeloupe.platform.Sha1
 import codeloupe.query.View
 import codeloupe.query.ViewPool
+import codeloupe.taskcode.TaskCodes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -42,6 +43,9 @@ class Registry(
     private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, views::release, log, emit)
     private val builds = BaseBuilds(queue, launcher, log, release = views::release, swapped = ::collectOverlays, emit = emit)
     private val mergeBases = MergeBases(queue, launcher, config.queryTimeoutMs)
+
+    /** Commits of the default branch by task, for `task_code`. */
+    val taskCodes = TaskCodes(queue, config.queryTimeoutMs, log)
 
     /** Read from the `.git` files on every call (well under a millisecond), so a moved or removed worktree is never served from a cache. */
     fun locate(root: String): RepoLocation {
@@ -111,6 +115,15 @@ class Registry(
         return query(root, speculative = false) { after -> set.beforeFile?.let(::View).use { before -> read(set, after, before) } }
     }
 
+    /** The files [root]'s worktree changed against the merge-base with the default branch, without their old versions. */
+    suspend fun changedFiles(root: String): ChangeSet {
+        val location = locate(root)
+        return mergeBases.changes(repo(location.commonDir), location.worktree, withBefore = false)
+    }
+
+    /** The main worktree of the repository whose git common dir is [commonDir]. */
+    fun mainWorktree(commonDir: String): Path = Path.of(if (commonDir.endsWith("/.git")) commonDir.removeSuffix("/.git") else commonDir)
+
     /**
      * Runs [read] on the base index of [root]'s repository with [root]'s worktree overlay on top. A [speculative] read
      * starts while the worktree is checked and is thrown away when the check changed something: worth it for cheap
@@ -156,6 +169,7 @@ class Registry(
     /** Closes the open read views and git repositories; the next query opens them again. */
     fun close() {
         views.closeAll()
+        taskCodes.close()
         JGitRepos.closeIdle()
     }
 
