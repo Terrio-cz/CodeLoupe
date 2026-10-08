@@ -26,8 +26,6 @@ the app without a manual override, and macOS cannot update itself silently (CL-1
 - **No free certificate fits**: SignPath Foundation signs open-source projects with an OSI-approved licence for free;
   CodeLoupe's PolyForm Noncommercial 1.0.0 is not OSI-approved. If the licence ever changes, apply there.
 
-## Options that cost money (not chosen)
-
 ## What each platform needs for a clean install
 
 | Platform | Needed for a clean install | What happens without it |
@@ -36,7 +34,7 @@ the app without a manual override, and macOS cannot update itself silently (CL-1
 | macOS | A Developer ID Application certificate, the hardened runtime, notarisation by Apple and stapling. Only a paid Apple Developer Program membership can issue it. | Gatekeeper refuses the app; the user must remove the quarantine flag by hand. Auto-update on macOS needs a signed, notarised app. |
 | Linux | Nothing required. AppImage and `.deb` ship with `SHA256SUMS.txt` from the release pipeline, see [release.md](release.md). | — |
 
-## Options and costs (prices from vendor pages, checked 2026-10-08; they vary by reseller and date)
+## Options that cost money, not chosen (prices from vendor pages, checked 2026-10-08; they vary by reseller and date)
 
 ### Windows
 
@@ -54,35 +52,16 @@ the app without a manual override, and macOS cannot update itself silently (CL-1
 |---|---|---|
 | **Apple Developer Program** | 99 USD/year (no waiver for individuals or one-person businesses) | The only way to get a Developer ID certificate and notarise. Notarisation itself is free and takes minutes. `electron-builder` signs and notarises with `notarytool` from environment variables: an App Store Connect API key (`APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`) is preferred over an app-specific password. The hardened runtime and entitlements for the Electron helper processes must be configured (the daemon is a separate bundled executable and has to be signed with the same identity). |
 
-## Recommendation
+## If the decision changes
 
-1. **macOS: enrol in the Apple Developer Program (99 USD/year)** — there is no cheaper route, and without it the macOS
-   installer cannot be opened normally.
-2. **Windows: Azure Artifact Signing Basic (about 10 USD/month) if the publisher is an organisation in the USA, Canada, the
-   EU or the UK** (Terrio-cz as a registered company qualifies if it is one); otherwise an OV certificate with a cloud HSM
-   from SSL.com or a similar CA (about 130–220 USD/year plus the signing fee). Do not buy EV.
-3. Total running cost for both platforms is about 220–330 USD/year with Artifact Signing, 230–450 USD/year with an OV
-   certificate. Expect Windows SmartScreen warnings to continue on the first releases whatever is chosen: reputation
-   builds per file hash.
-4. Secrets live only in GitHub environment secrets of a protected `release` environment (required reviewers, tag-only
-   deployments), never in the repository; Windows signing with Artifact Signing needs none (OIDC federation).
-
-## What the owner has to decide and provide
-
-- Whether to sign at all for 1.0, and which Windows route (legal entity: who is the publisher named in the certificate).
-- An Apple Developer account (the team ID and an App Store Connect API key stored as environment secrets) and, for
-  Windows, the Azure subscription or the certificate vendor account.
-
-## What is prepared in the repository
-
-- `app/electron-builder.yml` has no certificate configured (`identity: null` for macOS); the release job in
-  [release.md](release.md) builds unsigned installers and checksums.
-- Once the secrets exist, signing is configuration, not code: `win.azureSignOptions` (Artifact Signing) or
-  `win.signtoolOptions`, `mac.hardenedRuntime`, `mac.notarize`, the entitlements file, and a signing step in the release
-  workflow guarded by the protected environment. The daemon's bundled `java` runtime and launcher must be signed with the
-  same macOS identity or Gatekeeper rejects the app.
-- Acceptance run after signing: install on clean Windows and macOS machines, SmartScreen/Gatekeeper pass, then CL-107
-  (auto-update) can verify updates.
+- macOS needs the Apple Developer Program (99 USD/year); there is no cheaper route. Windows: Azure Artifact Signing Basic
+  (about 10 USD/month) for an organisation in the USA, Canada, the EU or the UK, otherwise an OV certificate with a cloud HSM
+  (about 130–220 USD/year plus the signing fee); EV is not worth it. Together roughly 220–450 USD/year.
+- Signing is then configuration, not code: `win.azureSignOptions` or `win.signtoolOptions`, `mac.hardenedRuntime`,
+  `mac.notarize`, an entitlements file, and a signing step in the release workflow behind a protected `release`
+  environment (required reviewers, tag-only deployments) holding the secrets; the bundled `java` runtime and launcher
+  must be signed with the same macOS identity. `app/electron-builder.yml` now sets `identity: null` on macOS.
+- After signing: install on clean Windows and macOS machines, then macOS can update itself silently.
 
 Sources: [Azure Artifact Signing pricing](https://azure.microsoft.com/pricing/details/artifact-signing/),
 [Artifact Signing FAQ](https://learn.microsoft.com/azure/trusted-signing/faq),
