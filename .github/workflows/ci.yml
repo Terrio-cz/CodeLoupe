@@ -53,7 +53,12 @@ jobs:
           for n in win-x64.exe mac-arm64.dmg mac-x64.dmg; do echo "$n" > "fixture/CodeLoupe-1.2.3-$n"; done
           (cd fixture && shasum -a 256 CodeLoupe-* > SHA256SUMS.txt)
           node tools/packaging-manifests.mjs --dir fixture --version 1.2.3 --out manifests
-          brew style --cask manifests/homebrew/Casks/codeloupe.rb
+          # Homebrew only styles casks that live in a tap: a throwaway local one.
+          brew tap-new --no-git local/codeloupe
+          tap=$(brew --repository local/codeloupe)
+          mkdir -p "$tap/Casks"
+          cp manifests/homebrew/Casks/codeloupe.rb "$tap/Casks/"
+          brew style --cask local/codeloupe/codeloupe
 
   test:
     name: test (${{ matrix.os }})
