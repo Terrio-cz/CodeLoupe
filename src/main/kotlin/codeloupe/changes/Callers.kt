@@ -38,12 +38,15 @@ internal class Callers(private val finder: UsageFinder, private val maxRefs: Int
     /** A removed declaration: references with its name that do not surely resolve to another one may still mean it ("by name" says how sure). */
     fun ofRemoved(decl: DeclRow): List<String> {
         tooCommon(decl)?.let { return listOf(it) }
+        return lines(removedSites(decl).map { site(it) }, "still referenced by name")
+    }
+
+    /** The references with the name of the removed [decl] that do not surely resolve to another declaration. */
+    fun removedSites(decl: DeclRow): List<RefRow> {
         val kinds = KINDS[decl.kind] ?: return emptyList()
-        val sites = finder.cache.refsNamed(decl.name)
+        return finder.cache.refsNamed(decl.name)
             .filter { it.kind in kinds }
             .filter { ref -> finder.resolve(ref).let { it.decls.isEmpty() || !it.complete } }
-            .map { site(it) }
-        return lines(sites, "still referenced by name")
     }
 
     private fun sites(decl: DeclRow): List<Site> =

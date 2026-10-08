@@ -1057,6 +1057,29 @@ rozhoduje launcher.
 - **Kontext**: definice nástroje `find` v `tools/list` 919 → 1 078 znaků (+159, ≈ 50 tokenů při 3,16 znaku/token; 1,2 % ze 13 047 znaků
   všech 14 nástrojů). Dotaz přes CLI trvá stejně jako hledání jménem (1,85–1,97 s na vytíženém stroji, téměř vše je start JVM CLI).
 
+### Výsledek CL-138 — výběr testů ze změn (2026-10-09)
+
+- **Rozhodnutí**: `changes tests=true` (CLI `changes --tests`), nový nástroj nepřibyl. Z každé změněné deklarace (bez členů přidaného či odebraného
+  typu, ty patří typu) se jdou po odkazech nejvýš 3 kroky: test najde-li se přímo, vybere se jeho třída; jinak se pokračuje deklarací, která
+  odkaz drží (soukromý pomocník → veřejná funkce → její test). Třída v testovacích zdrojích bez metody s `@Test` (pomocná třída) se nikdy
+  nejmenuje, jde se dál k jejím uživatelům. `hashCode`/`equals`/`toString`/`compareTo`, konstruktory a `init` se berou za testy svého typu.
+  Nejisté (`?`) odkazy se používají jen tehdy, když žádný není jistý (jinak by obecné jméno jako `normalize` přitáhlo nesouvisející testy).
+- **Filtr**: `./gradlew :modul:test --tests 'pkg.Třída' …` po modulech; cesta modulu = adresář (`importers/chmi` → `:importers:chmi`), zdrojová
+  sada jiná než `test` je vlastní úloha. Úroveň třídy, ne metody: test, který používá změnu přes pomocnou metodu své třídy, by metodový filtr minul.
+  Třída s vnořeným testem dostane `*`. Metody se ukazují jen v řádku „proč“ (`Třída <- Deklarace`).
+- **Rozšíření (vždy s důvodem)**: změna build souboru (`*.gradle(.kts)`, `gradle.properties`, `*.versions.toml`, `buildSrc/`, `gradle/`) → plný
+  `./gradlew test`; změněný nekódový soubor pod `src` → úloha modulu; deklarace, na kterou žádný test nedosáhne („no test uses it“) nebo
+  jejíž jméno je příliš časté na sledování → úloha celého modulu. Mimo `src` (docs, CI, skripty) se ignoruje. Odkazy přes reflexi, DI a
+  generovaný kód nejsou vidět (věta v odpovědi).
+- **Měření** (klon TerrioImporter v `%TEMP%`, `gradlew --no-daemon`, Docker běží): (a) čtyři drobné úpravy v `accounts` a `domain` →
+  18 tříd v 5 úlohách; z toho část `accounts`+`domain` s filtrem **30 s**, celé `:accounts:test :domain:test` **112 s**; (b) záměrně rozbitá
+  regulární hodnota v `PhoneNumber` → filtr (3 třídy, 28 testů) selhal na `PhoneNumberTest`, **33 s** proti **74 s** pro celý `:accounts:test`
+  (256 testů), stejný jediný pád; (c) úprava `PublishedMd5Verifier` v `common` → 9 tříd, z nich 8 integračních v `:app` (Testcontainers):
+  **224 s** (včetně kompilace `:app`) proti **80 s** pro `:common:test`, který testy z `:app` vůbec neviděl; celý `gradlew test` (1 817 testů,
+  Docker) jsem nespouštěl. Logy: 4 kB proti 3 kB u úspěšných běhů (log úspěšného běhu je malý v obou případech, rozdíl je v čase).
+- **Pokyn testerovi**: místo celé sady spustit příkaz z `changes tests=true`; při „full suite“ nebo „whole module“ v odpovědi spustit právě to;
+  před landem jednou celou sadu (kandidát na land). Výstup ≤ 40 řádků (test se 20 deklaracemi).
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
