@@ -915,7 +915,11 @@ rozhoduje launcher.
   ověřenou a zazálohovanou aktualizaci 13,1 s (přes loopback, na internetu rozhoduje rychlost linky), běh instalátoru 22,6 s,
   nový daemon odpovídá 7,1 s po startu nové aplikace, rozbitý daemon → předchozí odpovídá 4,1 s po startu. Prošlo všech 24 kontrol
   včetně: podvržený instalátor (stejná velikost, jeden změněný bajt) odmítnut, při vypnutých aktualizacích žádný požadavek,
-  nastavení a tajemství přežily, starší formát indexu přebudován.
+  nastavení a tajemství přežily, starší formát indexu přebudován. CI (`update-test` job, tři sestavení + test, ≈ 12 minut na OS,
+  rc.1 → rc.2 → rozbité rc.3): Windows runner (instalátor 231 MB) stažení a záloha 6 s, instalátor 25,9 s, nový daemon 3 s po startu,
+  návrat na předchozí 4 s; Ubuntu (AppImage 261 MB) 7,1 s, výměna souboru 0,3 s, nový daemon 5 s (starý daemon AppImage nezastaví,
+  nová aplikace ho restartuje), návrat z rozbitého rc.3 16 s. macOS se neaktualizuje samo: instalační smoke test na obou macOS
+  runnerech i na `.deb` ověří jen oznámení (falešný seznam vydání na 127.0.0.1 nabídne v99.0.0).
 - **Neověřeno**: skutečný feed na GitHubu (vyžaduje zveřejněné vydání), relaunch aplikace po instalaci (`--force-run`: instalátor ji spouští
   s prostředím uživatele, test ji spouští sám), macOS (jen oznámení, testováno jednotkově).
 
