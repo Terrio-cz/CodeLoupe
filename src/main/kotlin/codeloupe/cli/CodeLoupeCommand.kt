@@ -1,8 +1,10 @@
 package codeloupe.cli
 
+import codeloupe.CodeLoupe
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.parameters.options.versionOption
 
 /**
  * `codeloupe` — on-demand code index for AI coding agents. Root defaults to the current directory.
@@ -13,6 +15,7 @@ import com.github.ajalt.clikt.core.subcommands
  */
 class CodeLoupeCommand(requested: String? = null) : CliktCommand(name = "codeloupe") {
     init {
+        versionOption(CodeLoupe.VERSION, names = setOf("--version"))
         subcommands(COMMANDS.filter { it.first == requested }.ifEmpty { COMMANDS }.map { it.second() })
     }
 

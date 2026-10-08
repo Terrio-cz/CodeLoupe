@@ -1,0 +1,127 @@
+name: Release
+
+# A tag `v<major>.<minor>.<patch>[-suffix]` builds everything (the whole of ci.yml with that version, so the unit tests and
+# the installer smoke tests gate it), adds checksums, SBOMs and release notes, and creates a DRAFT GitHub Release.
+# Publishing it is a decision of a person (CL-99: who may download). `workflow_dispatch` is a dry run: the same files as
+# an artifact, no release.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build without a tag, e.g. 0.0.1-rc1 (dry run: files as an artifact, no release)"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      # The tag name goes through the environment, never into the script text.
+      - name: Read and check the version
+        id: v
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$EVENT" = push ]; then raw=${REF_NAME#v}; else raw=$INPUT_VERSION; fi
+          if ! printf '%s' "$raw" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "not a release version: $raw" >&2
+            exit 1
+          fi
+          echo "version=$raw" >> "$GITHUB_OUTPUT"
+
+  ci:
+    name: ci
+    needs: version
+    uses: ./.github/workflows/ci.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  release:
+    name: release
+    needs: [version, ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # Installers and the bundle zips of every OS built by the ci job.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: "{installer,bundle}-{ubuntu,windows,macos}-*"
+          path: assets
+          merge-multiple: true
+
+      # CycloneDX: the daemon and CLI (Gradle runtime classpath) and what the app ships from npm. Electron and Chromium
+      # come inside the installer with their own LICENSES files and are not in the npm SBOM.
+      - name: SBOMs
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          ./gradlew cyclonedxDirectBom -PreleaseVersion="$VERSION" --console=plain --no-daemon
+          cp build/reports/cyclonedx-direct/bom.json "assets/codeloupe-$VERSION-daemon-sbom.cdx.json"
+          (cd app && npm ci --ignore-scripts && npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --omit dev --output-format JSON --output-file "../assets/codeloupe-$VERSION-app-sbom.cdx.json")
+
+      - name: Checksums
+        run: (cd assets && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Release notes
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT" = push ]; then node tools/release-notes.mjs "$REF_NAME" > notes.md; else node tools/release-notes.mjs HEAD > notes.md; fi
+          cat notes.md
+
+      - name: Upload the release files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-files
+          path: |
+            assets/
+            notes.md
+          retention-days: 14
+
+      - name: Create the draft release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          flags=(--draft --verify-tag --title "CodeLoupe $VERSION" --notes-file notes.md)
+          case "$VERSION" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "$TAG" "${flags[@]}" assets/*

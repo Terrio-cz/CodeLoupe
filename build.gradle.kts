@@ -4,11 +4,14 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.license.report)
+    alias(libs.plugins.cyclonedx)
     application
 }
 
 group = "dev.codeloupe"
-version = "0.1.0"
+// A release build takes the version from its tag (-PreleaseVersion=1.2.3, CL-106); it ends up in the jar, build.properties,
+// the CLI, /status and the bundle name.
+version = providers.gradleProperty("releaseVersion").getOrElse("0.1.0")
 
 repositories {
     mavenCentral()
@@ -104,4 +107,9 @@ licenseReport {
         com.github.jk1.license.render.CsvReportRenderer("licenses.csv"),
     )
     allowedLicensesFile = file("gradle/allowed-licenses.json")
+}
+
+// CycloneDX SBOM of what ships: the runtime classpath (`./gradlew cyclonedxDirectBom`, build/reports/cyclonedx-direct).
+tasks.cyclonedxDirectBom {
+    includeConfigs.set(listOf("runtimeClasspath"))
 }
