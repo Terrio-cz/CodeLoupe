@@ -1151,6 +1151,23 @@ rozhoduje launcher.
 - Pravidla psaní: odkaz na stránku je `[text](Page-Name#nadpis)`, na soubor repozitáře plná adresa `github.com/.../blob/main/...`
   (relativní cesty ve wiki nefungují). Nová funkce = nový řádek v README jen u nástroje; popis patří na stránku wiki.
 
+### Výsledek CL-139 — chyby překladu a testů s deklarací (2026-10-09)
+
+- **Rozhodnutí**: souhrn `run` po neúspěšném příkazu (exit ≠ 0) projde `triage`: chyby `e:` Gradlu/Kotlinu, `kotlinc` a `javac` se seskupí
+  podle nejvnitřnější nelokální deklarace (`path:od-do  [Kontejner] fun x(…)  · symbol Kontejner.x hash=…`, pod tím `řádek:sloupec  zpráva`,
+  stejné zprávy v jedné deklaraci sloučené `×n`). Zpráva, která se opakuje ve 3 a více deklaracích (kaskáda z jednoho chybějícího symbolu), se
+  řekne jednou: `same error ×3 in 3 declarations` s první deklarací. Neúspěšný test: první selhání jako `expected <a>, was <b>` (jiná výjimka
+  se jen zkrátí o balíček) a rámce vlastního kódu; první rámec v produkčním kódu nese deklaraci a volání `symbol`, bez něj první rámec
+  (test). Jméno v zpětných apostrofech `symbol` nepřečte, proto se adresuje `Soubor.kt:řádek`. Co index nezná (jiný repozitář, generovaný
+  soubor), zůstává řádek po řádku jako dosud. Souhrn nikdy neroste o víc než 15 % (jinak se vrátí původní).
+- **Fixtury**: skutečné výstupy `./gradlew compileKotlin`, `compileJava` (javac) a `test` z malého projektu s chybami
+  (`src/test/resources/outputs/triage`, cesty a jména přepsané, zdroje v `fixtures/triage`), test `TriageTest` (4 testy).
+- **Velikost souhrnu** (end-to-end přes daemon, stejné výstupy dřív → teď): Kotlin chyby 727 → 818 znaků (+12,5 %), javac 629 → 684 (+8,7 %),
+  neúspěšné testy 662 → 583 (−12 %).
+- **Mezery**: kontextové řádky `javac` (`symbol:`, `location:`) zůstávají za seskupenými chybami; `kotlinc` mimo Gradle má stejný formát
+  řádků, ale nemá zachycený výstup. Počet následných čtení v transkriptech (ověření karty) nebyl měřen: transkripty nenesou pár „souhrn →
+  další čtení“ spolehlivě; měřím proto jen velikost a pokrytí.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
