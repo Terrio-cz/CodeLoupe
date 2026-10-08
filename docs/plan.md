@@ -173,6 +173,9 @@ jeden soubor.
   - `args` — počet argumentů volání (trailing lambda se počítá, spread = −1), pro rozlišení overloadů.
 - object expression (`object : I { … }`) je lokální deklarace `object` se jménem `<anonymous>` a svými nadtypy
   (formát `2/kotlin-psi-4`, CL-81): je to implementace pro `hierarchy`, její členy jsou její děti.
+- Java (CL-11, formát `2/kotlin-java-psi-5`): stejná fakta ze stejného parseru; mapování viz „Výsledek CL-11“ — metoda = `fun`, pole =
+  `property`, konstruktor = `constructor` se jménem třídy, enum konstanta = `enum_entry`, `@interface` = `annotation`, record = `class`
+  + jeho komponenty jako `property` hned za ním, `new I() { … }` = lokální `object` `<anonymous>`, inicializační blok = `init`.
 - `decls.returns` bez deklarovaného typu = typový spec inicializátoru, `by lazy { … }` nebo těla výrazem;
   parametry nesou příznaky `default` a `vararg`.
 - typový spec (`lang/TypeSpec`): text typu (`Foo`, `List<Foo>`), `@řádek:sloupec` = deklarovaný typ toho, na co
@@ -365,7 +368,7 @@ takže tento řízený benchmark agentů zůstává nespuštěný.
 |---|---|---|
 | 0 Spike + baseline | parser, RAM, chybovost; `codemetrics` + baseline | ✅ hotovo (§ 1, § 3) |
 | 1 Core + daemon ✅ | repo, daemon (single instance, HTTP MCP, fronta, `/status`), registry repozitářů, Kotlin adaptér, store, plný build v podprocesu, CLI `find/outline/symbol` | fixtury § 7 (Kotlin) zelené; build Terrio ≤ 10 s, DB ≤ 100 MB; restart daemonu okno přežije (jinak shim) |
-| 2 Čtení + resolver | ✅ `usages`, `calls` (callers/callees), `hierarchy` (CL-13/14/20); `grep` a `context` ✅ (CL-15, CL-18); zbývá `modules`, `check`; Java adaptér | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
+| 2 Čtení + resolver | ✅ `usages`, `calls` (callers/callees), `hierarchy` (CL-13/14/20); `grep` a `context` ✅ (CL-15, CL-18); Java adaptér ✅ (CL-11); zbývá `modules`, `check` | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
 | 3 Vrstvy worktree | delta, vrstvy, líný sync, `changes`, úklid vrstev | změna/nový/smazaný soubor vidět v dalším dotazu; výchozí větev posunutá o 500 souborů → správné odpovědi, sync v P3 |
 | 4 Zápis *(podmíněná, po fázi 7)* | zápisové nástroje + pojistky + `rename_symbol` — jen když detektor mezer ukáže, že coder po `symbol` stejně čte celý soubor kvůli `Edit`, nebo když chybí rename bez IDEA | round-trip bajtově stejný (CRLF i LF); fuzz 200 zápisů + compile zelený; rename na 10 symbolech = compile zelený |
 | 5 Zátěž a platformy | 10 klientů paralelně (dotazy 8 worktree + sync + zápisy); testy na Linuxu (WSL/Docker) | budgety § 2; P0 p95 drží během P3; testy zelené na Windows i Linuxu |
@@ -741,6 +744,38 @@ rozhoduje launcher.
   počet commitů bez `merge origin/master`, počet souborů); TER-496 je Done bez jediného commitu → bez přistání, jen predikce. Nalezeno a opraveno:
   `+` pro cesty cizího repa (`src/views/Admin.jsx`), pro dvojici `a.md/b.md`, a `=` pro deklaraci podle zastaralého čísla řádku.
 
+### Výsledek CL-11 — Java adaptér (2026-10-08)
+
+- **Cesta**: Java PSI je ve stejném `kotlin-compiler-embeddable` jako Kotlin PSI (kompilátor čte Java zdroje) — žádná nová závislost, licence
+  beze změny (`checkLicense` zelený), žádný nativní kód, stejné prostředí `PsiEnvironment` pro oba jazyky. `lang/java`: `JavaAdapter`,
+  `JavaExtractor` (průchod stromem), `JavaShapes` (druhy deklarací), `JavaReferences` (druhy referencí), `JavaLocalTypes` a `JavaLambdaTypes`
+  (typové specy), společné s Kotlinem zůstaly `Source`, `LocalScopes`, `Reference`, `Span`, `Kdoc`, `Modifiers`.
+- **Mapování na fakta**: třída/rozhraní/enum/`@interface`/record → `class`/`interface`/`enum`/`annotation`/`class`; vnořené typy a lokální
+  třídy jako Kotlin; metoda → `fun` (parametry se jmény a typy, `...` = `vararg`, návrat `void` zapsán), konstruktor → `constructor`
+  (kompaktní konstruktor recordu dostane komponenty), pole → `property` (`int a, b;` sdílí typ a modifikátory), komponenta recordu →
+  `property` za deklarací recordu, konstanta enumu → `enum_entry` (její tělo je její děti), blok inicializace → `init`; `@Override` přidá
+  modifikátor `override` (dispatch pro `hierarchy` a `usages` stojí na něm, bez anotace se přepis nepozná); `sig` = slova modifikátorů +
+  hlavička až do těla. Reference: volání metody a `new T(…)` = `call` (konstruktor přes třídu, jako `T(…)` v Kotlinu), `a.b` = `nav`,
+  `T::m` = `callable_ref`, typy a anotace = `type` (každý segment `a.b.C`), prvek anotace = `named_arg`. Metody a proměnné jsou v Javě
+  oddělené jmenné prostory: volání se na lokální vazbu nikdy nenaváže. Importy včetně `static` a `.*` jsou `ImportFact` (hvězdička =
+  `star`), takže statický import řeší stejný `Visibility` jako import objektu v Kotlinu. `Type.member` pro `static` člen (i zděděný)
+  najde nově `MemberLookup.static`; `X[]`, `Optional<T>`, `Stream<T>` a Java kolekce mají prvek jako Kotlinské `List<T>`.
+- **Lambdy a typy**: parametr lambdy dostane typ prvku receiveru u `forEach/filter/map/anyMatch/ifPresent …` (i přes `stream()`), nebo
+  první typový argument deklarovaného `Consumer<T>/Predicate<T>/Function<T,R>`; pattern proměnná (`o instanceof Circle c`) je vazba.
+  Nepodporováno (zůstane `candidate`): lambda předaná metodě z indexu (parametr volaného se čte až při dotazu), `this(…)`/`super(…)`
+  nejsou reference, soubor `Xyz.kt` volaný z Javy jako `XyzKt.f()`, Kotlin přístup k vlastnosti přes `getX()` Javy.
+- **Testy** (stejné otázky jako u Kotlinu): `JavaExtractorTest` (fakta `Constructs.java`, CRLF+BOM, chybný soubor, Java 21 syntaxe),
+  `JavaUsagesTest` (13 testů: receivery, overloady, statické importy, vnořené typy, anonymní třídy, lambdy, `rg -w` nadmnožina, `usages` /
+  `calls` / `context` / `hierarchy`), `JavaQueryTest` (`find`/`outline`/`symbol`), `JavaToolsTest` (`grep`, mapa repozitáře, vrstva
+  worktree), `JavaChangesTest` (`changes`, Kotlin volající Javy), `MixedLanguageTest` (smíšený repozitář přes build worker).
+  Fixtury `fixtures/java/{sample,usages}`, `fixtures/mixed`. Golden test Terrio (44 symbolů) beze změny: nadmnožina 100 %, exact přesnost 100 %.
+- **Paměť a čas** (JBR 25.0.3, `tools/rss-mix.mjs`, 50 dotazů vč. `changes bodies` v task worktree s úpravami Java i Kotlin souborů, nový
+  daemon): Terrio samotné (2 212 `.kt`) **193 MB** RSS; JDK `java.base`+`java.xml`+`java.sql`+`java.logging`+`java.net.http`+`java.desktop/java`
+  (5 992 `.java`) **200 MB**; smíšený repozitář (Terrio + 706 `.java` z JDK, 2 917 souborů) **209 MB** (Metaspace 47–48 MB, heap 54–76 MB;
+  Java parser přidá do daemonu ~1 MB tříd, nárůst je velikost indexu). Plný build z git objektů: smíšený 2 917 souborů **11,2 s, peak
+  workeru 400 MB**; jen Java 5 992 souborů 23,9 s, 351 MB; Terrio 8,9 s, 376 MB. Jediný soubor JDK s chybou parseru je
+  `NormalizerImpl.java` (`for (a(), b(); …)` — IntelliJ parser ho nepřijme), zůstane v degradovaném režimu.
+
 ### Výsledek CL-52 — import proměnných do storu (2026-10-08)
 
 - Skener (`codeloupe.secrets.imports`) prochází kořeny z `config.json` `envImport` (výchozí: `~/.claude*`, `~/Documents/Claude`, `~/IdeaProjects`) a čte `.env*`/`*.env`
@@ -763,6 +798,18 @@ rozhoduje launcher.
   soubor se jen připisuje a po 4 MB přejde do `audit.log.1` (zůstane zhruba 8 MB historie). Maskování hodnot a čtení metadat se nezapisuje.
 - Stáří klíče = od rotace, jinak od vytvoření; `secrets.rotationDays` (výchozí 90, 0 = vypnuto) označí klíč `ROTATE` v `env list`, v nástroji `env` a ve sloupci Stáří obrazovky Prostředí.
 - `GET /ui-api/v1/environment` vrací klíče z metadat vaultu (bez dešifrování) se spotřebiteli z auditu a stářím, `GET /ui-api/v1/environment/audit` posledních až 500 událostí.
+
+### Výsledek CL-54 — obrazovka Prostředí v aplikaci (2026-10-08)
+
+- Zápisy jdou jen přes main proces: stránka pošle hodnotu jednou z pole `type=password` (pole se vyprázdní při odeslání, hodnota není ve stavu Reactu), main ji
+  zvaliduje (jméno, rozsah, ≤ 16 KB) a předá CLI `env set` na stdin; do argumentu, logu ani odpovědi se nedostane a chybová hláška se od ní čistí. Store tak zapisuje jediný
+  kód (formát, ochrana klíče OS, audit), aplikace žádnou kryptografii nemá.
+- Průvodce importem spouští tok CL-52 (inventář → výběr zdroje u konfliktů → import → volitelné nahrazení zdrojů odkazem → vrácení) a okno vidí jen jména, cesty a počty.
+  Mazání, nahrazení zdrojů a návrat potvrzuje nativní dialog main procesu se jménem klíče a jeho spotřebiteli.
+- „Kopírovat“ je jen s OS re-autentizací (macOS Touch ID); na Windows a Linuxu Electron žádný dotaz na uživatele nemá, takže tlačítko tam není. Hodnota jde do schránky,
+  nikdy do okna, čtení je v auditu jako „CodeLoupe app (kopie do schránky)“ a schránka se po 60 s vyčistí, jen když ji nikdo mezitím nepřepsal.
+- Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu a fixture stromu: přidání, rotace, import s nahrazením zdrojů,
+  návrat bajt po bajtu a smazání; po každém kroku se hledá každá z testovacích hodnot v DOM stránky i v odpovědích daemona (nenašla se).
 
 ### Výsledek CL-62 — ingest transcriptů, rozpočty a události pro aplikaci (2026-10-08)
 
@@ -794,6 +841,24 @@ rozhoduje launcher.
 - **Rozhodnutí**: baseline po rolích daemon nemá, takže `baselineRange` a úspory zůstávají 0 (nevymýšlí se odhad); `busy` volání
   nejsou mezera pro UI (je to zátěž daemonu). Seznam běhů a kroky vystavuje API, i když obrazovka Běhy z UI vypadla (§ 3.3):
   data jsou potřeba pro Přehled a pro případnou obrazovku v aplikaci.
+
+### Výsledek distribuce zdarma (CL-105, CL-130, 2026-10-08)
+
+- **Rozhodnutí vlastníka**: nic se neplatí, instalátory zůstávají nepodepsané ([docs/code-signing.md](code-signing.md)). Co to
+  zlevňuje: Windows nese SmartScreen jen soubor s Mark of the Web, takže winget a Scoop (stahují bez něj) varování nemají;
+  macOS potřebuje na Apple Silicon aspoň ad hoc podpis; Homebrew cask po instalaci smaže karanténní atribut.
+- **macOS ad hoc podpis**: `afterPack` hook `app/scripts/ad-hoc-sign.mjs` (s `identity: null` electron-builder `afterSign` vůbec
+  nevolá). Nejdřív podepíše volné Mach-O soubory v `Resources` (java z jlinku a její knihovny, `codesign --deep` na ně nedosáhne),
+  pak celou aplikaci. Cizí `cafebabe` (třídy Javy) od univerzálních binárek rozliší počet architektur. CI: `codesign -dv` ukazuje
+  `Signature=adhoc` a `--verify --deep --strict` prochází na obou macOS runnerech (arm64, Intel), instalační smoke test totéž
+  ověří na nainstalované kopii, takže aplikace po podpisu i naběhne.
+- **Manifesty** (`tools/packaging-manifests.mjs`, výstup `packaging-manifests.zip` u draft release): winget (3 YAML, schéma 1.6.0,
+  `nullsoft`, `/S`), Scoop (NSIS instalátor se rozbalí jako archiv `#/dl.7z`, aplikace je pak přenosná a aktualizuje ji jen Scoop),
+  Homebrew cask (`arch arm:/intel:`, `postflight` s `xattr -dr com.apple.quarantine`, `binary` na CLI). URL a hashe z
+  `SHA256SUMS.txt`; přítomný instalátor se proti sumě ještě ověří. Ověřeno: `winget validate` prošel na vygenerovaných souborech
+  (první verze spadla na dvojtečce v popisu, proto se popis cituje), `brew style --cask` v CI proti lokálnímu tapu (našel dlouhý
+  popis a chybějící `depends_on :macos`), testy v `tools/`. Neověřeno: instalace přes skutečný winget/Scoop/Homebrew, ta vyžaduje
+  publikaci manifestů a vydání; to je krok vlastníka.
 
 ## 10. Rizika
 

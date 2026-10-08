@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { ACTION_CH } from '../shared/actions';
+import { ENV_CH } from '../shared/envActions';
 import { JOB_CH, type LiveEvent } from '../shared/jobs';
 import { CH, type CodeLoupeBridge, type DaemonState } from '../shared/ipc';
 
@@ -44,6 +45,15 @@ const bridge: CodeLoupeBridge = {
         void ipcRenderer.invoke(JOB_CH.liveStop);
       };
     },
+  },
+  env: {
+    capabilities: () => ipcRenderer.invoke(ENV_CH.capabilities),
+    set: input => ipcRenderer.invoke(ENV_CH.set, input),
+    remove: key => ipcRenderer.invoke(ENV_CH.remove, key),
+    scan: includeExcluded => ipcRenderer.invoke(ENV_CH.scan, includeExcluded),
+    importRun: input => ipcRenderer.invoke(ENV_CH.importRun, input),
+    rollback: id => ipcRenderer.invoke(ENV_CH.rollback, id),
+    reveal: key => ipcRenderer.invoke(ENV_CH.reveal, key),
   },
   metrics: () => ipcRenderer.invoke(CH.metrics),
   open: {

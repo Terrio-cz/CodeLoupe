@@ -16,6 +16,7 @@ import { JOB_CH } from '../shared/jobs';
 import { JobLogReader } from './jobs/JobLogReader';
 import { EventStream } from './live/EventStream';
 import { registerLive } from './live/registerLive';
+import { registerEnv } from './env/registerEnv';
 
 export interface IpcContext {
   store: SettingsStore;
@@ -45,6 +46,7 @@ export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
     for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(JOB_CH.livePush, e);
   });
   const live = registerLive(stream, new JobLogReader(ctx.client, () => ctx.home.dir), handle, () => ctx.source().kind === 'daemon' && ctx.manager.trusted);
+  registerEnv({ settings: () => ctx.store.get(), homeDir: () => ctx.home.dir, port: () => ctx.manager.port(), source: ctx.source }, handle);
   handle(CH.api, (req: unknown) => callApi(ctx, req));
   handle(CH.daemonState, () => ctx.manager.check());
   handle(CH.daemonStart, () => ctx.manager.start());
