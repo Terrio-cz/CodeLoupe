@@ -1,3 +1,5 @@
+import type { PortReport, ReconcilePlan, ReleaseStatus, ResourceReport, WorkspaceList } from './workspaces';
+
 // Read-only UI API of the CodeLoupe daemon (docs/ui-spec.md § 9, YouTrack CL-39).
 // This file is the app's copy of the contract: a change to the spec changes both.
 
@@ -312,6 +314,11 @@ export interface ResourceMap {
   settings: DaemonSettings;
   events: Events;
   'status/history': ResourceSample[];
+  workspaces: WorkspaceList;
+  resources: ResourceReport;
+  reconcile: ReconcilePlan;
+  releases: { items: ReleaseStatus[] };
+  ports: PortReport;
 }
 export type Resource = keyof ResourceMap;
 
