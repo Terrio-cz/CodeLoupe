@@ -146,7 +146,7 @@ class Daemon private constructor(
     private val reconciler = Reconciler(
         reconcileConfig, { workspaces.list() }, { resources.report(it) }, ReconcilePlanner(reconcileConfig, releases::releasedAt),
         ReconcileExecutor({ DockerApi.connect() }, ProcessStopper(processSource))::execute, ReconcileState(config.home.resolve("reconcile-state.json"), reconcileConfig), releases, ::log,
-        { processes.report(it) }, ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
+        { processes.report(it) }, { workspaces.recent() }, workspaces::invalidate, ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
     )
     private val ports = PortRegistry(
         config.workspaces.ports, PortStore(config.home.resolve("ports.json")), LocalPorts(),
@@ -198,6 +198,7 @@ class Daemon private constructor(
     private fun released(ref: WorkspaceRef) {
         log("workspace ${ref.workspace} of ${ref.repo} released")
         ports.free(ref)
+        workspaces.invalidate()
         scope.launch { runCatching { reconciler.run("release", auto = reconcileConfig.auto) } }
         // The verdict comes from transcripts: worked out once the daemon has settled, and only when the cached one is old.
         if (writeGate.stale()) scope.launch(Dispatchers.IO) { delay(GATE_DELAY_MS); runCatching { writeGate.refresh() } }

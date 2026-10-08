@@ -75,6 +75,16 @@ describe('MockApi follows the read-only contract', () => {
     expect(p2.items[0].id).not.toBe(p1.items[0].id);
   });
 
+  it('lists the runs of exactly one task', async () => {
+    const all = await get<{ items: { ter: string | null }[]; total: number }>({ resource: 'runs', query: { range: '30d', limit: 200 } });
+    const task = all.items.find(r => r.ter)!.ter!;
+    const one = await get<{ items: { ter: string | null }[]; total: number }>({ resource: 'runs', query: { range: '30d', ter: task.toLowerCase(), limit: 200 } });
+    expect(one.total).toBeGreaterThan(0);
+    expect(one.items.every(r => r.ter === task)).toBe(true);
+    const prefix = await get<{ total: number }>({ resource: 'runs', query: { range: '30d', ter: task.slice(0, -1) } });
+    expect(prefix.total).toBe(0);
+  });
+
   it('gaps carry session text, never a link to an agent run', async () => {
     const g = await get<Gaps>({ resource: 'gaps', query: { range: '30d' } });
     expect(g.items.length).toBeGreaterThan(0);

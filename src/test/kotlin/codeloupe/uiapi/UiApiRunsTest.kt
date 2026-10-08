@@ -116,6 +116,8 @@ class UiApiRunsTest {
         assertEquals("subagent", reviewer.text("kind"))
         assertEquals("TER-5", reviewer.text("ter"))
         assertEquals(listOf("s-big"), items("runs?q=work%20on").map { it.text("file") })
+        assertEquals(2, json("runs?ter=ter-5")["total"]!!.jsonPrimitive.content.toInt(), "the task filter is exact and ignores case")
+        assertEquals(0, items("runs?ter=TER-").size, "a prefix of a task is not that task")
         assertEquals(setOf("main", "terrio-reviewer"), json("runs")["roles"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet())
 
         val first = json("runs?sort=turns&limit=2")

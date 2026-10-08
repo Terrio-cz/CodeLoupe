@@ -1,0 +1,20 @@
+query/Like.kt	escape wildcard characters in a LIKE pattern
+query/NamedSql.kt	rewrite named SQL parameters to JDBC placeholders
+query/PathOrder.kt	compare paths for display order
+query/ViewPool.kt	reuse read views between queries in a pool
+index/StoreCopier.kt	copy the facts of unchanged files from an earlier base without parsing
+index/ParseWorkerClient.kt	parser worker process that ends when idle
+index/BaseBuilder.kt	build the base index from the git objects of one commit
+overlay/Overlay	overlay of the files a worktree changed
+cli/ReposAddCommand.kt	add repository folders to the config
+cli/McpConfigCommand.kt	write the MCP client configuration for the daemon
+query/SigText.kt	signature text without comments on one line
+compress/GradleFamily.kt	compress Gradle output into a summary
+compress/TestRunnerFamily.kt	summary of test runner output with failing tests
+compress/Ansi.kt	strip ANSI escape sequences from output
+events/	deliver events to webhooks with retries
+events/Scrubber.kt	scrub secrets from event payloads
+metrics/TranscriptParser.kt	parse a Claude Code transcript file into tool calls
+metrics/Categorizer.kt	categorize shell commands that read code
+metrics/GapDetector.kt	detect gaps where an agent searched with grep instead of the index
+changes/DeclDiff.kt	compare declarations before and after a change

@@ -8,25 +8,19 @@ object FindQuery {
         val module: String? = null,
         val test: Boolean? = null,
         val locals: Boolean = false,
-        val limit: Int = 30,
-    )
+        val limit: Int? = null,
+        /** `search` ranks declarations for the words of [q]; `name` (the default) looks a name up. Words with spaces mean `search`. */
+        val mode: String? = null,
+    ) {
+        val searching get() = mode == "search" || (mode == null && q != null && q.any(Char::isWhitespace) && '(' !in q)
+    }
 
     fun run(view: View, args: Args): String {
-        val conds = ArrayList<String>()
-        val params = HashMap<String, Any?>()
-        if (!args.kind.isNullOrEmpty()) {
-            conds += "d.kind = :kind"
-            params["kind"] = args.kind
-        }
-        if (!args.module.isNullOrEmpty()) {
-            conds += "(f.module = :module OR f.module LIKE :modulePrefix ESCAPE '\\')"
-            params["module"] = args.module
-            params["modulePrefix"] = Like.escape(args.module) + "/%"
-        }
-        if (args.test == true) conds += "f.source_set LIKE '%test%'"
-        if (args.test == false) conds += "f.source_set NOT LIKE '%test%'"
-        if (!args.locals) conds += "d.local = 0"
-        val extra = if (conds.isEmpty()) "" else " AND " + conds.joinToString(" AND ")
+        if (args.searching) return SearchQuery.run(view, args)
+        val limit = args.limit ?: 30
+        val filter = DeclFilter.of(args.kind, args.module, args.test, args.locals)
+        val extra = filter.sql
+        val params = HashMap(filter.params)
         val q = QueryName.parse(args.q)
         val name = q.name
         // A pattern no index can seek scans the narrow name index (covering) instead of every declaration row: 3x faster.
@@ -39,7 +33,7 @@ object FindQuery {
         }
         rows = rows.filter { DeclMatch.qualifier(it, q.qualifier) }.sortedWith(Resolver.BY_PATH_AND_LINE)
         if (rows.isEmpty()) return "no declaration matches \"${args.q}\""
-        return rows.take(args.limit).joinToString("\n", transform = Format::head) +
-            Format.more(rows.size, args.limit, " (narrow with kind/module or a qualified name)")
+        return rows.take(limit).joinToString("\n", transform = Format::head) +
+            Format.more(rows.size, limit, " (narrow with kind/module or a qualified name)")
     }
 }

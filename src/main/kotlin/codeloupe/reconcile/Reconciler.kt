@@ -10,7 +10,8 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Brings the Docker resources and orphan directories of released workspaces to the state the registry wants: gone.
- * Every run starts from a fresh read of the registry and of Docker, so it is idempotent and needs no memory of earlier
+ * Every run starts from a fresh read of the registry and of Docker (only the dry run [plan] may use the scan the read-only
+ * routes share, [planRegistry]), so it is idempotent and needs no memory of earlier
  * runs except the backoff of what could not be removed ([ReconcileState]). Runs never overlap.
  *
  * What may be removed is decided by [ReconcilePlanner] alone: `auto` entries by themselves (when asked to), `confirm`
@@ -28,6 +29,10 @@ class Reconciler(
     private val log: (String) -> Unit = {},
     /** The build tools working in workspace directories; the reconciler stops the ones the plan allows. */
     private val processes: suspend (WorkspaceList) -> ProcessReport = { ProcessReport(IsoTime.now()) },
+    /** The registry for the dry run, which may be a scan shared with other reads; a run never uses it. */
+    private val planRegistry: suspend () -> WorkspaceList = registry,
+    /** Called when a run changed something, so that scans kept for the read-only routes are dropped. */
+    private val changed: () -> Unit = {},
     /** Called for every attempt with its trigger: the log, the event stream. */
     private val record: (ActionResult, String) -> Unit,
 ) {
@@ -37,14 +42,14 @@ class Reconciler(
     @Volatile private var latest: List<PlanEntry>? = null
 
     /** What would be done now. Reads, removes nothing. */
-    suspend fun plan(): ReconcilePlan = lock.withLock { snapshot().plan }
+    suspend fun plan(): ReconcilePlan = lock.withLock { snapshot(planRegistry).plan }
 
     /**
      * Attempts what is allowed: the `auto` entries when [auto], the `confirm` entries named by [confirm] (keys) or
      * [workspaces] (names, any repo). Entries whose backoff has not run out wait, unless [confirm] names them.
      */
     suspend fun run(trigger: String, auto: Boolean, confirm: Set<String> = emptySet(), workspaces: Set<String> = emptySet()): ReconcileRun = lock.withLock {
-        val first = snapshot()
+        val first = snapshot(registry)
         val entries = first.entries
         val wanted = workspaces.mapTo(HashSet()) { it.lowercase() }
         val results = ArrayList<ActionResult>()
@@ -69,7 +74,9 @@ class Reconciler(
             record(result, trigger)
             results += result
         }
-        val after = if (results.any { it.outcome != ActionOutcome.SKIPPED }) snapshot() else first
+        val attempted = results.any { it.outcome != ActionOutcome.SKIPPED }
+        if (attempted) changed()
+        val after = if (attempted) snapshot(registry) else first
         completeReleases(after)
         ReconcileRun(IsoTime.now(), trigger, results, after.plan)
     }
@@ -104,8 +111,8 @@ class Reconciler(
     // The plan with the backoff state merged in; also forgets the state of what is no longer planned.
     private class Snapshot(val entries: List<PlanEntry>, val plan: ReconcilePlan, val dockerOk: Boolean)
 
-    private suspend fun snapshot(): Snapshot {
-        val list = registry()
+    private suspend fun snapshot(read: suspend () -> WorkspaceList): Snapshot {
+        val list = read()
         val report = inventory(list)
         val running = processes(list)
         val entries = planner.plan(report.resources, list, running.processes).map { entry ->

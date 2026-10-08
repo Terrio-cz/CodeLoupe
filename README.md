@@ -158,8 +158,8 @@ for commercial use; the IDE-based server follows the IDE's licence.
 - **Syntax-level resolution**: no classpath, no compiler. Overloads are told apart by argument count, receivers by the
   types syntax shows, so some references stay `candidate` and a name shared by unrelated declarations must be
   qualified (`Type.member`). `usages` counts resolved references, not every line that holds the word.
-- **Search**: no semantic or conceptual search, no execution-flow or impact analysis; `find`, `grep`, `usages`, `calls`,
-  `hierarchy` work on names.
+- **Search**: no semantic search and no execution-flow or impact analysis. `find mode=search` ranks declarations for the
+  words of a question (names, KDoc, signatures, paths: lexical, not meaning); `grep`, `usages`, `calls`, `hierarchy` work on names.
 - **Runtime**: git ≥ 2.31, and the bundle or JDK 25. One daemon of about 200 MB; a repository's first query builds its
   index (seconds for the repositories measured, longer for larger ones; the largest measured has 802 Kotlin files including tests).
 - **Licence**: source-available under [PolyForm Noncommercial 1.0.0](LICENSE), not open source in the OSI sense. It
@@ -244,7 +244,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 
 | Tool | Returns |
 |---|---|
-| `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature` |
+| `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature`; `mode=search` (or a `q` with spaces) ranks declarations for the words of a question (`find q="where is the token limit computed" mode=search`): names split into words, KDoc/Javadoc, signatures and directories, BM25 over SQLite FTS5 with a boost for names and for declarations that are referenced a lot, top 10 by default, each hit followed by the words it matched. Undocumented members of a type are looked up by name, not by words. Worktree edits show in the next search |
 | `outline` | members of a file or type with line ranges, no bodies; without a target a map of the repository: files ranked by how much the rest of the code refers to them (PageRank over name references), their types as one-line signatures, cut to `budget` tokens (default 1500); `focus` (files or symbols) puts them first and ranks their neighbourhood, references counted both ways |
 | `symbol` | one declaration's source (KDoc, annotations, body) by `Type.member`, `member(ParamType)`, `pkg.Type` or `File.kt:line`; large types collapse to header + members |
 | `grep` | text search in the indexed source (Kotlin, `.kts` and Java files, worktree edits included) for string literals, SQL, annotation arguments, config keys: literal by default (`regex=true`, `ignoreCase=true`), hits grouped by file and enclosing declaration, one code line each; `module`, `test`, `limit` narrow it |
@@ -447,6 +447,11 @@ no `git` process runs. The first call in a repository waits for the scan of its 
 
 Repositories also come from a tracker's `repos` and from the repositories the daemon has served; `<repo name>-worktrees`
 beside a repository is always a root.
+
+The read-only routes that need the registry (`/workspaces` without `repo` and `size`, `/resources`, `/processes`, the dry run `GET /reconcile`,
+`/ports`) share one scan for `workspaces.recentScanMs` (default 2000, 0 = every read scans for itself), so the desktop app's Workspaces
+screen, which asks four of them at once, costs one scan. What decides something never uses it: `POST /reconcile/run`, the reconcile
+scheduler and a release read the registry and Docker afresh, and a release or a run that changed something drops the shared scan.
 
 ### Docker resources
 
