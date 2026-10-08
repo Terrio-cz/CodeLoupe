@@ -6,8 +6,8 @@ Every number below was produced by that script; [benchmarks.json](benchmarks.jso
 
 ## Setup
 
-- **Machine**: Windows_NT 10.0.26200, 13th Gen Intel(R) Core(TM) i7-13700F (24 threads), 64 GB RAM, Node v20.6.1; ripgrep 14.1.1 (rev eecfd55deb); git version 2.51.0.windows.1.
-- **CodeLoupe**: 0.1.0 built from commit `b2a695ed4c`; a fresh daemon on its own port with a throwaway `CODELOUPE_HOME`.
+- **Machine**: Windows_NT 10.0.26200, 13th Gen Intel(R) Core(TM) i7-13700F (24 threads), 64 GB RAM, Node v20.6.1; ripgrep 15.0.0 (rev 3a612f88b8); git version 2.51.0.windows.1.
+- **CodeLoupe**: 0.1.0 built from commit `815671eae3`; a fresh daemon on its own port with a throwaway `CODELOUPE_HOME`.
 - **GitNexus**: npm package `gitnexus@1.6.12` (PolyForm-Noncommercial-1.0.0), run with Node 22.23.3 (it requires Node 22 or newer), its home redirected into the scratch directory, MCP over stdio. `GITNEXUS_LBUG_BUFFER_POOL_SIZE` set to 2 GiB for `analyze` (the MCP server runs with the default): with the default pool (428 MiB here) the first `analyze` of the Exposed checkout failed with "Buffer manager exception ... buffer pool is full" and its own message names this setting.
 
 | Repository | Commit indexed (`main`) | Branch tip for "what changed" | Kotlin files / lines (without tests) | Licence |
@@ -33,37 +33,37 @@ Median over the questions of each kind, both repositories pooled. Lower is bette
 
 | Question | n | grep, minimal | grep + read | CodeLoupe | GitNexus | CodeLoupe vs minimal | CodeLoupe vs grep + read | calls (minimal / read / CodeLoupe / GitNexus) |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| Source of a type | 16 | 322 | 789 | 326 | 2,016 (16/16 answered) | 101 % | 41 % | 2 / 2 / 1 / 1 |
-| Source of a member | 16 | 118 | 1,746 | 117 | 929 (16/16 answered) | 99 % | 7 % | 2 / 2 / 1 / 1 |
-| Outline of a file | 15 | 197 | 615 | 222 | n/a | 113 % | 36 % | 1 / 1 / 1 / n/a |
-| Usages of a type | 16 | 626 | 2,997 | 560 | 1,596 (16/16 answered) | 89 % | 19 % | 1 / 1 / 1 / 1 |
-| Callers of a member | 16 | 286 | 1,352 | 169 | 720 (16/16 answered) | 59 % | 12 % | 1 / 1 / 1 / 1 |
-| Subtypes of a type | 16 | 102 | 464 | 179 | 1,406 (16/16 answered) | 175 % | 39 % | 1 / 1 / 1 / 1 |
+| Source of a type | 16 | 322 | 789 | 326 | 2,021 (16/16 answered) | 101 % | 41 % | 2 / 2 / 1 / 1 |
+| Source of a member | 16 | 118 | 1,746 | 117 | 938 (16/16 answered) | 99 % | 7 % | 2 / 2 / 1 / 1 |
+| Outline of a file | 15 | 197 | 615 | 206 | n/a | 105 % | 33 % | 1 / 1 / 1 / n/a |
+| Usages of a type | 16 | 626 | 2,997 | 560 | 1,601 (16/16 answered) | 89 % | 19 % | 1 / 1 / 1 / 1 |
+| Callers of a member | 16 | 286 | 1,352 | 169 | 726 (16/16 answered) | 59 % | 12 % | 1 / 1 / 1 / 1 |
+| Subtypes of a type | 16 | 102 | 464 | 127 | 1,412 (16/16 answered) | 124 % | 27 % | 1 / 1 / 1 / 1 |
 | Text search, 30 hits | 6 | 1,497 | n/a | 1,298 | n/a | 87 % | n/a | 1 / n/a / 1 / n/a |
-| What a branch changed | 2 | 2,247 | 79,728 | 4,154 | 21,767 (2/2 answered) | 185 % | 5 % | 1 / 1 / 1 / 1 |
+| What a branch changed | 2 | 2,247 | 79,728 | 2,938 | 21,769 (2/2 answered) | 131 % | 4 % | 1 / 1 / 1 / 1 |
 
-Sum over all 103 questions: grep minimal 85,677 tokens, CodeLoupe 60,581 (71 %); over the 97 questions that have a grep + read variant: grep + read 600,626, CodeLoupe 52,743 (9 %).
+Sum over all 103 questions: grep minimal 85,677 tokens, CodeLoupe 55,913 (65 %); over the 97 questions that have a grep + read variant: grep + read 600,626, CodeLoupe 48,075 (8 %).
 
 ### By repository
 
 | Question | Repository | n | grep, minimal | grep + read | CodeLoupe | GitNexus |
 |---|---|---:|---:|---:|---:|---:|
-| Source of a type | exposed | 8 | 389 | 3,211 | 392 | 4,016 |
-| Source of a type | codeloupe | 8 | 304 | 317 | 304 | 1,462 |
-| Source of a member | exposed | 8 | 123 | 3,343 | 138 | 630 |
-| Source of a member | codeloupe | 8 | 118 | 740 | 108 | 1,342 |
-| Outline of a file | exposed | 7 | 950 | 1,917 | 785 | n/a |
-| Outline of a file | codeloupe | 8 | 162 | 296 | 198 | n/a |
-| Usages of a type | exposed | 8 | 910 | 4,911 | 738 | 3,887 |
-| Usages of a type | codeloupe | 8 | 527 | 2,768 | 469 | 904 |
-| Callers of a member | exposed | 8 | 231 | 1,233 | 200 | 551 |
-| Callers of a member | codeloupe | 8 | 568 | 1,821 | 133 | 1,175 |
-| Subtypes of a type | exposed | 8 | 96 | 546 | 200 | 4,149 |
-| Subtypes of a type | codeloupe | 8 | 112 | 463 | 91 | 956 |
+| Source of a type | exposed | 8 | 389 | 3,211 | 392 | 4,022 |
+| Source of a type | codeloupe | 8 | 304 | 317 | 304 | 1,468 |
+| Source of a member | exposed | 8 | 123 | 3,343 | 138 | 636 |
+| Source of a member | codeloupe | 8 | 118 | 740 | 108 | 1,354 |
+| Outline of a file | exposed | 7 | 950 | 1,917 | 750 | n/a |
+| Outline of a file | codeloupe | 8 | 162 | 296 | 186 | n/a |
+| Usages of a type | exposed | 8 | 910 | 4,911 | 738 | 3,893 |
+| Usages of a type | codeloupe | 8 | 527 | 2,768 | 469 | 910 |
+| Callers of a member | exposed | 8 | 231 | 1,233 | 200 | 557 |
+| Callers of a member | codeloupe | 8 | 568 | 1,821 | 133 | 1,186 |
+| Subtypes of a type | exposed | 8 | 96 | 546 | 146 | 4,155 |
+| Subtypes of a type | codeloupe | 8 | 112 | 463 | 68 | 962 |
 | Text search, 30 hits | exposed | 4 | 1,520 | n/a | 1,401 | n/a |
 | Text search, 30 hits | codeloupe | 2 | 1,315 | n/a | 1,117 | n/a |
-| What a branch changed | exposed | 1 | 2,730 | 81,467 | 4,445 | 21,848 |
-| What a branch changed | codeloupe | 1 | 1,764 | 77,989 | 3,863 | 21,686 |
+| What a branch changed | exposed | 1 | 2,730 | 81,467 | 3,379 | 21,850 |
+| What a branch changed | codeloupe | 1 | 1,764 | 77,989 | 2,497 | 21,688 |
 
 ### Usages: lines against references
 
@@ -88,12 +88,12 @@ Minimal grep is a best case for grep (the agent never reads a line it does not n
 
 - Source of a type: CodeLoupe's median answer is about the same (326 against 322 tokens); smaller than minimal grep in 9 of 16 answers, smaller than grep + read in 16 of 16.
 - Source of a member: CodeLoupe's median answer is about the same (117 against 118 tokens); smaller than minimal grep in 8 of 16 answers, smaller than grep + read in 16 of 16.
-- Outline of a file: CodeLoupe's median answer is **larger** (222 against 197 tokens); smaller than minimal grep in 7 of 15 answers, smaller than grep + read in 14 of 15.
+- Outline of a file: CodeLoupe's median answer is about the same (206 against 197 tokens); smaller than minimal grep in 7 of 15 answers, smaller than grep + read in 14 of 15.
 - Usages of a type: CodeLoupe's median answer is **smaller** (560 against 626 tokens); smaller than minimal grep in 15 of 16 answers, smaller than grep + read in 16 of 16.
 - Callers of a member: CodeLoupe's median answer is **smaller** (169 against 286 tokens); smaller than minimal grep in 13 of 16 answers, smaller than grep + read in 16 of 16.
-- Subtypes of a type: CodeLoupe's median answer is **larger** (179 against 102 tokens); smaller than minimal grep in 3 of 16 answers, smaller than grep + read in 15 of 16.
+- Subtypes of a type: CodeLoupe's median answer is **larger** (127 against 102 tokens); smaller than minimal grep in 6 of 16 answers, smaller than grep + read in 16 of 16.
 - Text search, 30 hits: CodeLoupe's median answer is **smaller** (1,298 against 1,497 tokens); smaller than minimal grep in 4 of 6 answers.
-- What a branch changed: CodeLoupe's median answer is **larger** (4,154 against 2,247 tokens); smaller than minimal grep in 0 of 2 answers, smaller than grep + read in 2 of 2.
+- What a branch changed: CodeLoupe's median answer is **larger** (2,938 against 2,247 tokens); smaller than minimal grep in 0 of 2 answers, smaller than grep + read in 2 of 2.
 
 Where the CodeLoupe answer is larger it carries more than the grep lines: usages and callers name the enclosing declaration of every hit and mark exact against candidate references, `changes` lists the changed declarations with their callers and tests where `git diff --stat` lists files, subtypes include supertypes and transitive links.
 
@@ -103,16 +103,16 @@ Warm calls, median over the questions of each kind (CodeLoupe: median of 5 calls
 
 | Question | grep, minimal | CodeLoupe | GitNexus |
 |---|---:|---:|---:|
-| Source of a type | 244 ms | 11 ms | 213 ms |
-| Source of a member | 246 ms | 10 ms | 167 ms |
-| Outline of a file | 40 ms | 11 ms | n/a |
-| Usages of a type | 250 ms | 11 ms | 182 ms |
-| Callers of a member | 278 ms | 11 ms | 155 ms |
-| Subtypes of a type | 276 ms | 10 ms | 190 ms |
-| Text search, 30 hits | 474 ms | 26 ms | n/a |
-| What a branch changed | 76 ms | 750 ms | 214 ms |
+| Source of a type | 388 ms | 12 ms | 188 ms |
+| Source of a member | 400 ms | 13 ms | 150 ms |
+| Outline of a file | 22 ms | 11 ms | n/a |
+| Usages of a type | 434 ms | 11 ms | 210 ms |
+| Callers of a member | 416 ms | 10 ms | 171 ms |
+| Subtypes of a type | 383 ms | 9 ms | 197 ms |
+| Text search, 30 hits | 563 ms | 23 ms | n/a |
+| What a branch changed | 46 ms | 540 ms | 253 ms |
 
-A CodeLoupe CLI call (a new process that talks to the running daemon): 307 ms median. A GitNexus CLI call (`gitnexus context`, a new Node process that opens the database): 914 ms median. Agents normally use MCP, where the process is already running.
+A CodeLoupe CLI call (a new process that talks to the running daemon): 220 ms median. A GitNexus CLI call (`gitnexus context`, a new Node process that opens the database): 749 ms median. Agents normally use MCP, where the process is already running.
 
 ## Tool definitions in the agent's context
 
@@ -120,14 +120,14 @@ What an MCP client holds in context for each connected server: the JSON of `tool
 
 | | Tools | Characters | Tokens | Largest tool |
 |---|---:|---:|---:|---|
-| CodeLoupe | 13 | 11,844 | 3,749 | `job` (1,503 characters) |
+| CodeLoupe | 14 | 12,986 | 4,110 | `job` (1,503 characters) |
 | GitNexus | 17 | 69,962 | 22,140 | `impact` (21,116 characters) |
 
 CodeLoupe serves more tools when a tracker is configured (`issue`, `tasks`, `update`, …); the figure is for a daemon without one. IDE-based MCP servers cannot be started by a script (they need a running IDE with the project open): not measured here; [context-audit.md](context-audit.md) has a one-off measurement of one such server (25 tools, about 12.4k tokens).
 
 <details><summary>Per tool (characters of the tool definition)</summary>
 
-**CodeLoupe**: find 919, grep 1,023, outline 1,152, symbol 702, context 615, usages 685, calls 592, hierarchy 490, changes 794, task_code 897, doc 1,153, run 1,305, job 1,503
+**CodeLoupe**: find 919, grep 1,023, outline 1,152, symbol 702, context 615, usages 685, calls 592, hierarchy 625, changes 974, task_code 897, doc 1,153, run 1,305, env 826, job 1,503
 
 **GitNexus**: list_repos 1,851, query 3,596, cypher 4,773, context 7,724, detect_changes 3,007, check 2,121, rename 2,021, impact 21,116, explain 4,026, pdg_query 3,752, route_map 1,602, tool_map 1,067, shape_check 1,748, api_impact 2,738, group_list 507, group_sync 3,462, trace 4,833
 
@@ -139,16 +139,16 @@ One CodeLoupe daemon served both repositories; GitNexus indexed each repository 
 
 | | CodeLoupe | GitNexus |
 |---|---|---|
-| First index, exposed | 7.3 s (first query, index built by a child JVM) | 127.8 s (`analyze`, the tool reports 111.1 s; 41409 nodes, 79980 edges) |
-| Peak memory while indexing, exposed | 517 MB (daemon + child JVM) | 2583 MB |
-| First index, codeloupe | 2.7 s (first query, index built by a child JVM) | 67.6 s (`analyze`, the tool reports 53.1 s; 12641 nodes, 26251 edges) |
-| Peak memory while indexing, codeloupe | 452 MB (daemon + child JVM) | 1431 MB |
-| First `changes` in a new worktree of each repository | exposed 5.9 s, codeloupe 1.1 s | not measured (GitNexus's README describes worktrees sharing one store, with a copy updated incrementally for uncommitted changes; this script does not exercise it) |
-| Resident memory, idle | 206 MB daemon (213 MB with children) | 3325 MB MCP server after 82 queries, default buffer pool (114 MB right after it started; one Node process, the working set grows with the database pages it touches) |
-| CPU while idle, 30 s | 0 ms | 15 ms |
+| First index, exposed | 5.7 s (first query, index built by a child JVM) | 251.6 s (`analyze`, the tool reports 104.6 s; 41409 nodes, 79980 edges) |
+| Peak memory while indexing, exposed | 503 MB (daemon + child JVM) | 2219 MB |
+| First index, codeloupe | 2.6 s (first query, index built by a child JVM) | 60.9 s (`analyze`, the tool reports 47.3 s; 12641 nodes, 26251 edges) |
+| Peak memory while indexing, codeloupe | 436 MB (daemon + child JVM) | 1245 MB |
+| First `changes` in a new worktree of each repository | exposed 4.6 s, codeloupe 1.4 s | not measured (GitNexus's README describes worktrees sharing one store, with a copy updated incrementally for uncommitted changes; this script does not exercise it) |
+| Resident memory, idle | 196 MB daemon (204 MB with children) | 3334 MB MCP server after 82 queries, default buffer pool (112 MB right after it started; one Node process, the working set grows with the database pages it touches) |
+| CPU while idle, 30 s | 0 ms | 125 ms |
 | Files written into the repository checkout by indexing (GitNexus: by default, `--skip-agents-md` and `--skip-skills` turn it off) | 0 (exposed), 0 (codeloupe) | 8 (exposed: CLAUDE.md, .claude, AGENTS.md), 8 (codeloupe: .claude, AGENTS.md, CLAUDE.md) |
 | Index on disk | 62 MB (both repositories, whole home) | exposed 1067 MB, codeloupe 141 MB |
-| Daemon / server start | 3,867 ms (`codeloupe start`) | the MCP server starts with the client |
+| Daemon / server start | 2,832 ms (`codeloupe start`) | the MCP server starts with the client |
 
 ## Questions a tool did not answer
 

@@ -23,7 +23,8 @@ object OutlineQuery {
             .map { Format.member(it, if (it.container.isEmpty()) 0 else it.container.split('.').size).removePrefix("  ") }
         val facts = buildString {
             append("${file.content.orEmpty().split('\n').size} lines")
-            if (file.packageName.isNotEmpty()) append(", package ${file.packageName}")
+            // The package is the directory path in the usual layout; it is named only where it is not.
+            if (file.packageName.isNotEmpty() && !path.contains(file.packageName.replace('.', '/'))) append(", package ${file.packageName}")
             if (file.errors != 0) append(", ${file.errors} parse errors")
         }
         return "$path  ($facts)\n" + lines.joinToString("\n")

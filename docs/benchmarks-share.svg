@@ -14,9 +14,9 @@
 <text x="610" y="195" font-size="11" font-weight="700" fill="#3A6600">7 %</text>
 <text x="656" y="195" font-size="11" fill="#0C0F14">117 of 1,746</text>
 <text x="180" y="252" text-anchor="end" font-weight="700" fill="#0C0F14">Outline of a file</text><text x="180" y="268" text-anchor="end" font-size="11" fill="#4A5260">n = 15</text>
-<rect x="196" y="240" width="400" height="14" rx="2" fill="#7A8478"/><rect x="196" y="240" width="144.4" height="14" rx="2" fill="#3A6600"/>
-<text x="610" y="251" font-size="11" font-weight="700" fill="#3A6600">36 %</text>
-<text x="656" y="251" font-size="11" fill="#0C0F14">222 of 615</text>
+<rect x="196" y="240" width="400" height="14" rx="2" fill="#7A8478"/><rect x="196" y="240" width="134.0" height="14" rx="2" fill="#3A6600"/>
+<text x="610" y="251" font-size="11" font-weight="700" fill="#3A6600">33 %</text>
+<text x="656" y="251" font-size="11" fill="#0C0F14">206 of 615</text>
 <text x="180" y="308" text-anchor="end" font-weight="700" fill="#0C0F14">Usages of a type</text><text x="180" y="324" text-anchor="end" font-size="11" fill="#4A5260">n = 16</text>
 <rect x="196" y="296" width="400" height="14" rx="2" fill="#7A8478"/><rect x="196" y="296" width="74.7" height="14" rx="2" fill="#3A6600"/>
 <text x="610" y="307" font-size="11" font-weight="700" fill="#3A6600">19 %</text>
@@ -26,17 +26,17 @@
 <text x="610" y="363" font-size="11" font-weight="700" fill="#3A6600">12 %</text>
 <text x="656" y="363" font-size="11" fill="#0C0F14">169 of 1,352</text>
 <text x="180" y="420" text-anchor="end" font-weight="700" fill="#0C0F14">Subtypes of a type</text><text x="180" y="436" text-anchor="end" font-size="11" fill="#4A5260">n = 16</text>
-<rect x="196" y="408" width="400" height="14" rx="2" fill="#7A8478"/><rect x="196" y="408" width="154.0" height="14" rx="2" fill="#3A6600"/>
-<text x="610" y="419" font-size="11" font-weight="700" fill="#3A6600">39 %</text>
-<text x="656" y="419" font-size="11" fill="#0C0F14">179 of 464</text>
+<rect x="196" y="408" width="400" height="14" rx="2" fill="#7A8478"/><rect x="196" y="408" width="109.2" height="14" rx="2" fill="#3A6600"/>
+<text x="610" y="419" font-size="11" font-weight="700" fill="#3A6600">27 %</text>
+<text x="656" y="419" font-size="11" fill="#0C0F14">127 of 464</text>
 <text x="180" y="476" text-anchor="end" font-weight="700" fill="#0C0F14">What a branch changed</text><text x="180" y="492" text-anchor="end" font-size="11" fill="#4A5260">n = 2</text>
-<rect x="196" y="464" width="400" height="14" rx="2" fill="#7A8478"/><rect x="196" y="464" width="20.8" height="14" rx="2" fill="#3A6600"/>
-<text x="610" y="475" font-size="11" font-weight="700" fill="#3A6600">5 %</text>
-<text x="656" y="475" font-size="11" fill="#0C0F14">4,154 of 79,728</text>
+<rect x="196" y="464" width="400" height="14" rx="2" fill="#7A8478"/><rect x="196" y="464" width="14.7" height="14" rx="2" fill="#3A6600"/>
+<text x="610" y="475" font-size="11" font-weight="700" fill="#3A6600">4 %</text>
+<text x="656" y="475" font-size="11" fill="#0C0F14">2,938 of 79,728</text>
 <line x1="28" y1="508" x2="852" y2="508" stroke="#D3D8CF"/>
 <text x="180" y="536" text-anchor="end" font-weight="700" fill="#0C0F14">All, summed</text><text x="180" y="552" text-anchor="end" font-size="11" fill="#4A5260">n = 97</text>
-<rect x="196" y="524" width="400" height="14" rx="2" fill="#7A8478"/><rect x="196" y="524" width="35.1" height="14" rx="2" fill="#3A6600"/>
-<text x="610" y="535" font-size="11" font-weight="700" fill="#3A6600">9 %</text>
-<text x="656" y="535" font-size="11" fill="#0C0F14">52,743 of 600,626</text>
+<rect x="196" y="524" width="400" height="14" rx="2" fill="#7A8478"/><rect x="196" y="524" width="32.0" height="14" rx="2" fill="#3A6600"/>
+<text x="610" y="535" font-size="11" font-weight="700" fill="#3A6600">8 %</text>
+<text x="656" y="535" font-size="11" fill="#0C0F14">48,075 of 600,626</text>
 <text x="28" y="598" font-size="11" fill="#4A5260">Run of 2026-10-08; tokens are characters / 3.16; text search has no grep + read variant and is left out</text>
 </svg>
