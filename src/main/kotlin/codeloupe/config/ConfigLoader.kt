@@ -16,7 +16,7 @@ object ConfigLoader {
     fun load(env: Map<String, String> = System.getenv(), os: String = System.getProperty("os.name")): Config {
         val home = env["CODELOUPE_HOME"]?.takeIf { it.isNotEmpty() }?.let { Path.of(it) } ?: defaultHome(env, os)
         val file = readFile(home.resolve("config.json"))
-        fun number(key: String): Long? = (file[key] as? JsonPrimitive)?.content?.toDoubleOrNull()?.toLong()?.takeIf { it != 0L }
+        fun number(key: String): Long? = number(file, key)
         fun text(key: String): String? = (file[key] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotEmpty() }
         return Config(
             home = home,
@@ -30,7 +30,11 @@ object ConfigLoader {
         )
     }
 
-    private fun defaultHome(env: Map<String, String>, os: String): Path {
+    /** The `port` in the default home's `config.json`, or null when it sets none. */
+    fun defaultHomePort(env: Map<String, String> = System.getenv(), os: String = System.getProperty("os.name")): Int? =
+        number(readFile(defaultHome(env, os).resolve("config.json")), "port")?.toInt()
+
+    fun defaultHome(env: Map<String, String> = System.getenv(), os: String = System.getProperty("os.name")): Path {
         val userHome = Path.of(System.getProperty("user.home"))
         val name = os.lowercase()
         return when {
@@ -40,6 +44,9 @@ object ConfigLoader {
             else -> (env["XDG_CACHE_HOME"]?.let { Path.of(it) } ?: userHome.resolve(".cache")).resolve(CodeLoupe.NAME)
         }
     }
+
+    private fun number(file: JsonObject, key: String): Long? =
+        (file[key] as? JsonPrimitive)?.content?.toDoubleOrNull()?.toLong()?.takeIf { it != 0L }
 
     private fun readFile(file: Path): JsonObject =
         runCatching { Json.parseToJsonElement(Files.readString(file)).jsonObject }.getOrDefault(JsonObject(emptyMap()))

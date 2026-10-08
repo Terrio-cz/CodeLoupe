@@ -5,6 +5,7 @@ import codeloupe.daemon.Daemon
 import codeloupe.platform.JobObjects
 import codeloupe.platform.TerminalSignals
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
@@ -31,6 +32,8 @@ class DaemonCommand : CliktCommand(name = "daemon") {
             if (DaemonClient(config).status() == null) throw e
             echo("already running on 127.0.0.1:${config.port}")
             return
+        } catch (e: IllegalStateException) {
+            throw CliktError(e.message)
         }
         Thread.currentThread().join()
     }
