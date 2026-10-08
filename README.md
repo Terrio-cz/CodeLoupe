@@ -135,7 +135,7 @@ read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-s
 | | Default | Override |
 |---|---|---|
 | State and indexes | `%LOCALAPPDATA%\codeloupe`, `~/Library/Caches/codeloupe`, `$XDG_CACHE_HOME/codeloupe` | `CODELOUPE_HOME` |
-| Port | 47391 | `CODELOUPE_PORT` or `<home>/config.json` `{ "port": … }` |
+| Port | 47391 | `CODELOUPE_PORT` or `<home>/config.json` `{ "port": … }`. A daemon with another `CODELOUPE_HOME` refuses 47391 and the port configured in the default home: it needs a port of its own (MCP clients find the daemon by port alone). |
 | Default root for tools without `root` | — | `CODELOUPE_ROOT` or `config.json` `defaultRoot` |
 | Base branch of a repository | `origin/HEAD`, else `origin/main`, `origin/master`, `main`, `master` | `.codeloupe.json` `{ "baseBranch": "origin/master" }` in the main worktree |
 | Build worker heap, timeouts | 512 MB, query wait 10 s, build 10 min | `config.json` `buildHeapMb`, `queryTimeoutMs`, `buildTimeoutMs` |
