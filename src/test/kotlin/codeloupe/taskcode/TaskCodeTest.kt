@@ -5,7 +5,9 @@ import codeloupe.TestRepos.git
 import codeloupe.config.Config
 import codeloupe.daemon.JobQueue
 import codeloupe.repo.Registry
+import codeloupe.doc.DocMemory
 import codeloupe.tools.TaskCodeTool
+import codeloupe.tools.TaskContextTool
 import codeloupe.tools.ToolArgs
 import codeloupe.tracker.RecordedYouTrack
 import codeloupe.tracker.TokenSource
@@ -163,6 +165,68 @@ class TaskCodeTest {
         assertTrue(text.startsWith("CL-56\nlanded "), text)
         assertContains(text, "other files: docs/notes.md")
         assertContains(answer("UTF-8", TaskCodeTool(alone)), "no declaration or file matches \"UTF-8\"")
+    }
+
+    @Test
+    fun `task_context gives the planner's pack in one call and a repeated call costs one line`() {
+        val text = context("CL-91")
+        assertContains(text, "## issue\nCL-91 Task ↔ code links from git history and descriptions")
+        assertContains(text, "Criteria 0/3:")
+        assertContains(text, "## touch")
+        assertContains(text, Regex("= $BILLING:4-6 .*`Billing.total` in Context"))
+        assertContains(text, "## declarations\n$BILLING\n  3-13  class Billing\n  4-6  [Billing] fun total(a: Int): Int")
+        assertContains(text, "## prior\nCL-17 landed ${merge.take(7)} ")
+        assertContains(text, "CL-16 landed ${plain.take(7)} ")
+        assertTrue(text.indexOf("CL-17 landed") < text.indexOf("CL-16 landed"), "newest landing first: $text")
+        assertContains(text, "‹Billing.kt")
+        assertFalse("CL-91 landed" in text, "the task itself is not its own prior task")
+
+        val again = context("CL-91")
+        assertTrue(again.startsWith("context:CL-91 unchanged since your read at "), again)
+        assertTrue(again.length < 300, "${again.length} chars")
+        assertContains(context("CL-91", session = repo.resolve("src").toString()), "## declarations", message = "another caller gets the pack")
+        assertContains(context("CL-91", "since" to "none"), "## declarations")
+    }
+
+    @Test
+    fun `a changed task gets only the sections that changed, and sections can be picked`() {
+        val worktree = TestRepos.tmpDir("wt").resolve("cl91c")
+        git(repo, "worktree", "add", "-q", "-b", "CL-91", worktree.toString())
+        context("CL-91")
+        write(worktree, USE, USE_TEXT.replace("total(1)", "total(5)"))
+        val delta = context("CL-91")
+        assertContains(delta, "changed sections in full, unchanged omitted (issue, ")
+        assertContains(delta, "in progress: ")
+        assertFalse("## prior" in delta, delta)
+        assertTrue(context("CL-91").startsWith("context:CL-91 unchanged"))
+
+        val picked = context("CL-91", "sections" to "prior", "since" to "none")
+        assertTrue(picked.startsWith("## prior\nCL-17 landed"), picked)
+        assertFalse("## issue" in picked)
+        assertTrue(context("CL-91", "sections" to "prior").startsWith("section prior unchanged since your read"))
+        val digest = context("CL-91", "view" to "digest", "since" to "none")
+        assertTrue(digest.length <= 1000, "${digest.length} chars")
+        assertContains(digest, "sections: issue(")
+    }
+
+    @Test
+    fun `a landed task's pack lists its own files' declarations and the tasks before it`() {
+        val text = context("CL-17")
+        assertContains(text, "landed ${merge.take(7)} ")
+        assertContains(text, "## declarations\n$BILLING")
+        assertContains(text, "fun discount(): Int")
+        assertContains(text, "CL-16 landed ${plain.take(7)} ")
+        assertFalse("CL-17 landed" in text)
+        assertTrue(runCatching { context("ABC-1") }.exceptionOrNull()?.message.orEmpty().startsWith("no tracker mirrors the project of 'ABC-1'"))
+    }
+
+    private val contextTool = TaskContextTool(trackers, DocMemory())
+
+    private fun context(id: String, vararg more: Pair<String, String>, session: String = repo.toString()): String = runBlocking {
+        contextTool.answer(registry, session, ToolArgs(buildJsonObject {
+            put("id", JsonPrimitive(id))
+            more.forEach { (k, v) -> put(k, JsonPrimitive(v)) }
+        }))
     }
 
     private fun answer(query: String, tool: TaskCodeTool = TaskCodeTool(trackers)): String = runBlocking {

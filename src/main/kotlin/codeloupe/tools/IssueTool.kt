@@ -22,9 +22,6 @@ class IssueTool(private val trackers: Trackers) : Tool {
     override suspend fun answer(registry: Registry, root: String, args: ToolArgs): String {
         val id = args.string("id")?.trim().orEmpty()
         val (mirror, canonical) = trackers.mirror(id) ?: return "no tracker mirrors the project of '$id'; mirrored: ${trackers.projects().joinToString(", ")}"
-        return trackers.reader.read(mirror, canonical, Parts.of(args.string("view"), args.strings("sections")), args.string("since"), session(root))
+        return trackers.reader.read(mirror, canonical, Parts.of(args.string("view"), args.strings("sections")), args.string("since"), Sessions.key(root))
     }
-
-    /** The caller's root is its session key: a window works in one worktree. */
-    private fun session(root: String) = root.trim().replace('\\', '/').trimEnd('/').lowercase()
 }
