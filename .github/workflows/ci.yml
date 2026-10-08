@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: "22"
 
-      - run: node --test tools/
+      - run: node --test tools/*.test.mjs
 
   test:
     name: test (${{ matrix.os }})
