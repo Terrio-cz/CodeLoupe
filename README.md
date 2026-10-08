@@ -20,7 +20,7 @@ With a tracker configured it also mirrors your issues (YouTrack first) and answe
   indexed, [measured](#benchmarks)).
 - **MCP** over Streamable HTTP (stateless) plus the same tools on a CLI.
 
-Languages: Kotlin (Java next). Status and roadmap: [docs/plan.md](docs/plan.md) (Czech).
+Languages: Kotlin and Java. Status and roadmap: [docs/plan.md](docs/plan.md) (Czech).
 
 [What it is good for](#what-it-is-good-for) · [Benchmarks](#benchmarks) · [How it differs](#how-it-differs) ·
 [Limitations](#limitations) · [Use](#use)
@@ -123,8 +123,8 @@ What the numbers do not show:
 | | CodeLoupe | GitNexus 1.6.12 | IDE-based MCP (IntelliJ IDEA's built-in server) |
 |---|---|---|---|
 | Needs a running IDE | No | No ([README](https://github.com/abhigyanpatwari/GitNexus#readme): CLI and MCP server, editors are clients) | Yes: the server is part of the IDE and serves "the projects opened in the IDE" ([JetBrains docs](https://www.jetbrains.com/help/idea/mcp-server.html)) |
-| Languages | Kotlin; Java planned | 16 listed in its README: TypeScript, JavaScript, Python, Java, Kotlin, C#, Go, Rust, PHP, Ruby, Swift, C, C++, Objective-C, Dart, Zig | Those the IDE supports |
-| How references are resolved | Syntax only (Kotlin compiler's parser, no classpath); unsure hits are marked `candidate`, never dropped | Graph built from tree-sitter parsers; answers carry an `epistemic` field (`exact` or `lower-bound`) and list unresolved boundaries | The IDE's own semantic model |
+| Languages | Kotlin and Java | 16 listed in its README: TypeScript, JavaScript, Python, Java, Kotlin, C#, Go, Rust, PHP, Ruby, Swift, C, C++, Objective-C, Dart, Zig | Those the IDE supports |
+| How references are resolved | Syntax only (the Kotlin compiler's parsers for Kotlin and Java, no classpath); unsure hits are marked `candidate`, never dropped | Graph built from tree-sitter parsers; answers carry an `epistemic` field (`exact` or `lower-bound`) and list unresolved boundaries | The IDE's own semantic model |
 | Index | SQLite; the default branch, built from git objects | Embedded graph database (LadybugDB), no database server; built by `gitnexus analyze` | The IDE's indexes |
 | Keeping it current | No watchers: the worktree is checked when a query arrives | Re-run `analyze`, or `analyze --watch`; running MCP servers reopen a new index (README) | The IDE |
 | Worktrees | One base index, an overlay per worktree; first `changes` in a new worktree took 1.1–5.9 s (measured) | README: linked worktrees share one store, a checkout with uncommitted changes gets its own incrementally updated graph (not measured) | Each opened project |
@@ -152,7 +152,9 @@ for commercial use; the IDE-based server follows the IDE's licence.
 
 ## Limitations
 
-- **Languages**: Kotlin (`.kt`, and `.kts` for text search) today; Java is next. Other files are not indexed.
+- **Languages**: Kotlin (`.kt`, and `.kts` for text search) and Java (`.java`). Other files are not indexed. In a mixed repository a Java
+  file's references to Kotlin top-level functions (`GreeterKt.polite(…)`, the file facade) and Kotlin's synthetic property access to
+  a Java getter (`x.name` for `getName()`) are not followed.
 - **Syntax-level resolution**: no classpath, no compiler. Overloads are told apart by argument count, receivers by the
   types syntax shows, so some references stay `candidate` and a name shared by unrelated declarations must be
   qualified (`Type.member`). `usages` counts resolved references, not every line that holds the word.
@@ -245,7 +247,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature` |
 | `outline` | members of a file or type with line ranges, no bodies; without a target a map of the repository: files ranked by how much the rest of the code refers to them (PageRank over name references), their types as one-line signatures, cut to `budget` tokens (default 1500); `focus` (files or symbols) puts them first and ranks their neighbourhood, references counted both ways |
 | `symbol` | one declaration's source (KDoc, annotations, body) by `Type.member`, `member(ParamType)`, `pkg.Type` or `File.kt:line`; large types collapse to header + members |
-| `grep` | text search in the indexed source (Kotlin and `.kts` files, worktree edits included) for string literals, SQL, annotation arguments, config keys: literal by default (`regex=true`, `ignoreCase=true`), hits grouped by file and enclosing declaration, one code line each; `module`, `test`, `limit` narrow it |
+| `grep` | text search in the indexed source (Kotlin, `.kts` and Java files, worktree edits included) for string literals, SQL, annotation arguments, config keys: literal by default (`regex=true`, `ignoreCase=true`), hits grouped by file and enclosing declaration, one code line each; `module`, `test`, `limit` narrow it |
 | `context` | a declaration's source, its direct callers and the declarations it calls in one answer (`symbol` + `calls` depth 1) instead of three calls |
 | `usages` | every reference to a declaration, grouped by file and enclosing declaration, one code line each, `=` exact or `?` candidate; a superset of what `rg -w` finds in code, references that resolve elsewhere only counted (`all=true` lists them) |
 | `calls` | callers (default) or callees as a tree, depth ≤ 3; below the first level only exact links |
@@ -705,7 +707,7 @@ accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram
 
 | Package | Role |
 |---|---|
-| `lang`, `lang.kotlin` | file → facts (declarations, imports, references) via Kotlin PSI |
+| `lang`, `lang.kotlin`, `lang.java` | file → facts (declarations, imports, references) via the Kotlin compiler's PSI (Kotlin and Java) |
 | `index` | SQLite store, base build from git objects, build worker entry point |
 | `repo` | repositories and worktrees → base index, base syncs, child-process builds |
 | `overlay` | per-worktree overlays: change checks, refreshes, cleanup of removed worktrees |
