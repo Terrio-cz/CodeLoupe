@@ -807,7 +807,7 @@ rozhoduje launcher.
 - Průvodce importem spouští tok CL-52 (inventář → výběr zdroje u konfliktů → import → volitelné nahrazení zdrojů odkazem → vrácení) a okno vidí jen jména, cesty a počty.
   Mazání, nahrazení zdrojů a návrat potvrzuje nativní dialog main procesu se jménem klíče a jeho spotřebiteli.
 - „Kopírovat“ je jen s OS re-autentizací (macOS Touch ID); na Windows a Linuxu Electron žádný dotaz na uživatele nemá, takže tlačítko tam není. Hodnota jde do schránky,
-  nikdy do okna, čtení je v auditu jako „CodeLoupe app (kopie do schránky)“ a schránka se po 60 s vyčistí, jen když ji nikdo mezitím nepřepsal.
+  nikdy do okna, čtení je v auditu jako „CodeLoupe app (clipboard copy)“ a schránka se po 60 s vyčistí, jen když ji nikdo mezitím nepřepsal.
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu a fixture stromu: přidání, rotace, import s nahrazením zdrojů,
   návrat bajt po bajtu a smazání; po každém kroku se hledá každá z testovacích hodnot v DOM stránky i v odpovědích daemona (nenašla se).
 
@@ -859,6 +859,19 @@ rozhoduje launcher.
   (první verze spadla na dvojtečce v popisu, proto se popis cituje), `brew style --cask` v CI proti lokálnímu tapu (našel dlouhý
   popis a chybějící `depends_on :macos`), testy v `tools/`. Neověřeno: instalace přes skutečný winget/Scoop/Homebrew, ta vyžaduje
   publikaci manifestů a vydání; to je krok vlastníka.
+
+### Výsledek CL-63 — účty Claude a YouTrack (2026-10-08)
+
+- `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`, `default`) a YouTrack instance (`url`, `projects`, `token` = jméno
+  globálního tajemství `YOUTRACK_TOKEN_<ID>` ve storu). Bez souboru je jediným účtem `~/.claude`. Ingest čte `projects` každého vypsaného účtu a přiřazuje transcripty podle cesty
+  (`runs.path LIKE <configDir>/projects/%`), takže cena 7 d na účet je jeden SQL přes `usage_hours`; filtr Přehledu (`overview?account=`) používá stejný předpona v `hours` a `gapCount`.
+- Okna účtu: pracovní složka, která za 15 min volala CodeLoupe, patří účtu, jehož `projects/<ProjectDirName>` existuje (u dvou účtů tomu s novější změnou). E-mail účtu je jediné, co se čte z `.claude.json`.
+- YouTrack účty se k trackeru přidávají v `TrackerSettingsLoader` (token `TokenSource.Stored`, cache 30 s, spotřebitel „tracker mirror: <id>“ v auditu); mirror se staví při startu, proto přidání a odebrání
+  účtu restartuje daemon. Tracker z `config.json` je v tabulce jen ke čtení.
+- Souběh: aplikace (CLI), daemon (poznamenání použití) i test zapisují do téhož vaultu; `SecretStore` teď čte-mění-zapisuje pod zámkem `vault.env.lock` (zámek souboru + zámek JVM),
+  test se čtyřmi zapisovateli a dvěma čtenáři na samostatných instancích neztratil žádný záznam.
+- Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu, fixture složkám dvou účtů a lokálnímu fake YouTrack: přidání účtu, přejmenování, výchozí,
+  filtr Přehledu (390 → 130), přidání YouTrack účtu s tokenem, test spojení (fake instance dostala uložený token), rotace (dostala nový), odebrání (token ze storu pryč); token se nikdy neobjevil v DOM ani v odpovědích daemona.
 
 ## 10. Rizika
 

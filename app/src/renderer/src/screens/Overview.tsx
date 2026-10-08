@@ -1,14 +1,15 @@
+import { useEffect } from 'react';
 import type { ToolCalls } from '../../../shared/contract';
 import { bridge, useApi } from '../api';
 import { BarList, CostChart } from '../components/Charts';
 import { DataTable, type Column } from '../components/DataTable';
 import { LatencyBars } from '../components/LatencyBars';
-import { Card, Delta, ErrorState, KpiTile, Loading, rangeLabel } from '../components/Parts';
+import { Card, Delta, ErrorState, KpiTile, Loading, rangeLabel, Select } from '../components/Parts';
 import { PhaseBadge } from '../components/StatusBadge';
 import { TimeChart } from '../components/TimeChart';
 import { ago, ms, num, pct, time, tokens } from '../format';
 import { cpuPoints, rssPoints } from '../history';
-import { useDaemon, useRange } from '../hooks';
+import { useAccount, useDaemon, useRange } from '../hooks';
 
 const callColumns: Column<ToolCalls>[] = [
   { key: 'tool', header: 'Nástroj', render: t => <span className="mono">{t.tool}</span> },
@@ -26,7 +27,11 @@ const cpu = (v: number) => `${num(Math.round(v * 10) / 10)} %`;
 
 export function Overview() {
   const [range] = useRange();
-  const { data, error, loading, reload } = useApi('overview', undefined, { range });
+  const [account, setAccount] = useAccount();
+  const accounts = useApi('accounts');
+  // An account that was removed meanwhile is no filter any more.
+  useEffect(() => { if (account && accounts.data && !accounts.data.claude.some(a => a.id === account)) setAccount(''); }, [account, accounts.data]);
+  const { data, error, loading, reload } = useApi('overview', undefined, { range, account });
   const daemon = useDaemon();
   const history = useApi('status/history');
   const settings = useApi('settings');
@@ -46,6 +51,12 @@ export function Overview() {
 
   return (
     <>
+      {(accounts.data?.claude.length ?? 0) > 1 && (
+        <div className="filterbar">
+          <Select label="Účet" value={account} onChange={setAccount}
+            options={[{ value: '', label: 'Všechny účty' }, ...(accounts.data?.claude ?? []).map(a => ({ value: a.id, label: a.label }))]} />
+        </div>
+      )}
       {warnings.length > 0 && (
         <div className="banner" role="status">
           <strong>⚠ Rozpočty překročeny</strong>

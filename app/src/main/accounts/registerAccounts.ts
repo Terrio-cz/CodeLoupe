@@ -18,7 +18,7 @@ export function registerAccounts(ctx: AccountsContext, handle: <A extends unknow
     userHome: () => os.homedir(),
     run: cliRunner(ctx.settings, ctx.homeDir),
     confirm: nativeConfirm,
-    fetchStored: name => fetchValue(ctx, { name, scope: 'global' }, 'CodeLoupe app (test spojení)'),
+    fetchStored: name => fetchValue(ctx, { name, scope: 'global' }, 'CodeLoupe app (connection test)'),
     // Redirects are not followed: the bearer token goes to the instance the user named and nowhere else.
     http: async (url, headers) => {
       const r = await fetch(url, { headers, redirect: 'manual', signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });

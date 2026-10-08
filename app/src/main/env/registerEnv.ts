@@ -29,7 +29,7 @@ export function registerEnv(ctx: EnvContext, handle: <A extends unknown[], R>(ch
       return env.keys.find(k => k.name === key.name && k.scope === kind && (k.scopeRef ?? '').toLowerCase() === ref.toLowerCase())?.consumers ?? [];
     },
     reauth: touchId(),
-    fetchValue: key => fetchValue(ctx, key, 'CodeLoupe app (kopie do schránky)'),
+    fetchValue: key => fetchValue(ctx, key, 'CodeLoupe app (clipboard copy)'),
     clipboard: { write: text => clipboard.writeText(text), read: () => clipboard.readText() },
     schedule: (fn, ms) => { setTimeout(fn, ms).unref(); },
   });
@@ -65,27 +65,34 @@ function touchId(): (() => Promise<boolean>) | undefined {
   };
 }
 
+/** The token a local caller presents to `/env/values`; the daemon makes it on first use, so one unauthenticated request creates it. */
+async function readToken(ctx: EnvContext): Promise<string | null> {
+  const file = path.join(ctx.homeDir(), 'secrets', 'api-token.env');
+  const read = () => { try { return fs.readFileSync(file, 'utf8').trim() || null; } catch { return null; } };
+  return read() ?? (await get(ctx, '/env/values', {}), read());
+}
+
 /** One value through the daemon's token-guarded route, as the consumer [usedBy] named in the audit. */
-export function fetchValue(ctx: EnvContext, key: { name: string; scope: string }, usedBy: string): Promise<string | null> {
+export async function fetchValue(ctx: EnvContext, key: { name: string; scope: string }, usedBy: string): Promise<string | null> {
+  const token = await readToken(ctx);
+  if (!token) return null;
+  const [kind, ...rest] = key.scope.split(':');
+  const query = new URLSearchParams({ names: key.name });
+  if (kind === 'workspace') query.set('workspace', rest.join(':'));
+  if (kind === 'repo') query.set('repository', rest.join(':'));
+  const body = await get(ctx, `/env/values?${query.toString()}`, { 'x-codeloupe-env-token': token, 'x-codeloupe-used-by': usedBy });
+  try {
+    const values = (JSON.parse(body ?? '') as { values?: Record<string, string> }).values ?? {};
+    return typeof values[key.name] === 'string' ? values[key.name] : null;
+  } catch { return null; }
+}
+
+function get(ctx: EnvContext, requestPath: string, headers: Record<string, string>): Promise<string | null> {
   return new Promise(resolve => {
-    let token: string;
-    try { token = fs.readFileSync(path.join(ctx.homeDir(), 'secrets', 'api-token.env'), 'utf8').trim(); } catch { return resolve(null); }
-    const [kind, ...rest] = key.scope.split(':');
-    const query = new URLSearchParams({ names: key.name });
-    if (kind === 'workspace') query.set('workspace', rest.join(':'));
-    if (kind === 'repo') query.set('repository', rest.join(':'));
-    const req = http.get({
-      host: '127.0.0.1', port: ctx.port(), path: `/env/values?${query.toString()}`, timeout: 10_000,
-      headers: { 'x-codeloupe': '1', 'x-codeloupe-env-token': token, 'x-codeloupe-used-by': usedBy },
-    }, res => {
+    const req = http.get({ host: '127.0.0.1', port: ctx.port(), path: requestPath, timeout: 10_000, headers: { 'x-codeloupe': '1', ...headers } }, res => {
       const chunks: Buffer[] = [];
       res.on('data', c => chunks.push(c as Buffer));
-      res.on('end', () => {
-        try {
-          const values = (JSON.parse(Buffer.concat(chunks).toString('utf8')) as { values?: Record<string, string> }).values ?? {};
-          resolve(typeof values[key.name] === 'string' ? values[key.name] : null);
-        } catch { resolve(null); }
-      });
+      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     });
     req.on('error', () => resolve(null));
     req.on('timeout', () => { req.destroy(); resolve(null); });

@@ -76,7 +76,7 @@ export class AccountsManager {
     const id = slug(label, 'ucet', new Set(data.claude.map(c => c.id)));
     data.claude.push({ id, label, configDir, default: false });
     writeAccounts(this.deps.homeDir(), this.withDefault(data));
-    return ok(`Účet ${label} přidán.`);
+    return ok(`Účet „${label}“ přidán.`);
   }
 
   async claudeRename(id: string, label: string): Promise<AccountOutcome> {

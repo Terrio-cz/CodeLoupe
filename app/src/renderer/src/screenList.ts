@@ -23,6 +23,7 @@ export const SCREEN_DEFS = [
   { id: 'index', title: 'Index', icon: '▤', group: 'index', key: 'i' },
   { id: 'gaps', title: 'Mezery', icon: '⚑', group: 'index', key: 'g', range: true },
   { id: 'environment', title: 'Prostředí', icon: '⚿', group: 'system', key: 'e' },
+  { id: 'accounts', title: 'Účty', icon: '☺', group: 'system', key: 'u' },
   { id: 'settings', title: 'Nastavení', icon: '⚙', group: 'system', key: 's' },
 ] as const satisfies readonly ScreenDef[];
 

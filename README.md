@@ -314,6 +314,15 @@ split over lines) is not covered. A value on a command line is visible to this u
 or the API instead. The Terrio workspace guard (`.claude/hooks/guard.ps1`) should deny reads of `…/codeloupe/secrets/` (add it to its
 `SecretFiles` pattern); until then only the `Read(**/*.env)` rule of `settings.json` covers the Read tool.
 
+## Accounts
+
+`<home>/accounts.json` lists the Claude Code accounts of this machine (each a config directory, `CLAUDE_CONFIG_DIR`) and the YouTrack instances to mirror; the
+desktop app writes it, the daemon reads it afresh on every call. Without it the one account is `~/.claude`. The transcripts of every listed account are ingested
+(`<configDir>/projects/*`) and attributed to it by the folder they lie in, so `GET /ui-api/v1/accounts` shows each account's cost for 7 days, last use and working directories
+that called CodeLoupe in the last 15 minutes, and `GET /ui-api/v1/overview?account=<id>` narrows the Overview to one. A YouTrack account is `{ id, label, url, projects, token }` where
+`token` is the name of a global secret in the store (`YOUTRACK_TOKEN_<ID>`); the daemon mirrors it like a tracker of `config.json` (a tracker of that file wins a name clash), reading the
+token from the store at most every 30 seconds. The API never returns a token, only whether one is stored.
+
 ## Documents
 
 One layer serves every large text an agent would otherwise read twice: `doc` (plans, brain notes, persisted tool outputs)
