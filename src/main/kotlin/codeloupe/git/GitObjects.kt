@@ -48,6 +48,32 @@ object GitObjects {
         { Git.run(commonDir, "merge-base", a, b, allowFail = true)?.trim()?.ifEmpty { null } },
     )
 
+    /** How many commits [tip] has that [base] lacks, counted up to [limit]; 0 means [tip] is already part of [base]. */
+    fun ahead(commonDir: String, tip: String, base: String, limit: Int = 1_000): Int = jgitOr(
+        commonDir,
+        { repo ->
+            RevWalk(repo).use { walk ->
+                walk.isRetainBody = false
+                walk.markStart(walk.parseCommit(ObjectId.fromString(tip)))
+                walk.markUninteresting(walk.parseCommit(ObjectId.fromString(base)))
+                var n = 0
+                while (n < limit && walk.next() != null) n++
+                n
+            }
+        },
+        { Git.run(commonDir, "rev-list", "--count", "--max-count=$limit", "$base..$tip")!!.trim().toInt() },
+    )
+
+    /** Commit time and subject line of [commit]; null when the repository does not have it. */
+    fun commitInfo(commonDir: String, commit: String): CommitInfo? = jgitOr(
+        commonDir,
+        { repo -> missingAsNull { RevWalk(repo).use { walk -> walk.parseCommit(ObjectId.fromString(commit)).let { CommitInfo(it.commitTime.toLong(), it.shortMessage) } } } },
+        {
+            Git.run(commonDir, "log", "-1", "--format=%ct%n%s", commit, allowFail = true)?.lines()?.takeIf { it.size >= 2 }
+                ?.let { CommitInfo(it[0].toLong(), it[1]) }
+        },
+    )
+
     /**
      * Size in bytes of each blob the repository has; missing ones are left out. Blobs JGit does not find locally go to
      * git, which fetches them in a partial clone.

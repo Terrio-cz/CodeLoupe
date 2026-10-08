@@ -38,21 +38,24 @@ object GitLayout {
     }.getOrNull()
 
     /**
-     * Paths of every worktree of the repository at [commonDir], the main one first, as `git worktree list` gives them;
-     * null when the layout is not the plain one (a bare repository).
+     * Every worktree the repository at [commonDir] has registered, the main one first, as `git worktree list` gives them
+     * (a worktree whose directory is gone is still listed); null when the layout is not the plain one (a bare repository).
      */
-    fun worktrees(commonDir: String): List<String>? = runCatching {
+    fun registrations(commonDir: String): List<WorktreeRegistration>? = runCatching {
         val common = Path.of(commonDir)
         if (common.name != ".git" || BARE.containsMatchIn(config(common))) return null
         val admin = common.resolve("worktrees")
-        val linked = if (!admin.isDirectory()) emptyList() else admin.listDirectoryEntries().mapNotNull { entry ->
+        val linked = if (!admin.isDirectory()) emptyList() else admin.listDirectoryEntries().sortedBy { it.name }.mapNotNull { entry ->
             // `gitdir` names the worktree's .git file, absolute or (worktree.useRelativePaths) relative to this entry.
             val pointer = entry.resolve("gitdir").takeIf { it.isRegularFile() } ?: return@mapNotNull null
-            entry.resolve(pointer.readText().trim()).normalize().parent
+            WorktreeRegistration(real(entry.resolve(pointer.readText().trim()).normalize().parent), entry)
         }
         // Real paths, as locate() gives them: a worktree reached through a junction is still the same worktree.
-        (listOf(common.parent) + linked).map { unix(runCatching { it.toRealPath() }.getOrDefault(it)) }
+        listOf(WorktreeRegistration(real(common.parent), common)) + linked
     }.getOrNull()
+
+    /** Paths of every worktree of the repository at [commonDir], the main one first. */
+    fun worktrees(commonDir: String): List<String>? = registrations(commonDir)?.map { it.path }
 
     /** The git dir of the worktree rooted at [worktree]: `.git` itself, or what a `.git` file points to. */
     fun gitDir(worktree: Path): Path? {
@@ -78,6 +81,8 @@ object GitLayout {
     }
 
     private fun config(commonDir: Path): String = commonDir.resolve("config").takeIf { it.isRegularFile() }?.readText().orEmpty()
+
+    private fun real(path: Path) = unix(runCatching { path.toRealPath() }.getOrDefault(path))
 
     private fun unix(path: Path) = path.toString().replace('\\', '/')
 }

@@ -21,6 +21,8 @@ import codeloupe.tracker.TrackerSettingsLoader
 import codeloupe.tracker.Trackers
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
+import codeloupe.workspace.Workspaces
+import codeloupe.workspace.workspaceRoutes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -82,6 +84,7 @@ class Daemon private constructor(
     val jobs = JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
     private val trackers = Trackers.open(TrackerSettingsLoader.load(config.home), config.home, scope, ::log)
     private val tools = Tools.catalog(trackers)
+    private val workspaces = Workspaces(config, registry, trackers)
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = trackers::touch)
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
@@ -180,6 +183,7 @@ class Daemon private constructor(
                 call.respondJson(HttpStatusCode.OK, ToolOutcome.serializer(), runner.run(tool, ToolArgs(args), "api"))
             }
             jobRoutes(jobs)
+            workspaceRoutes(workspaces)
             eventRoutes(events, webhooks, webhookKey)
             post("/shutdown") {
                 val pending = jobs.pending()

@@ -133,6 +133,24 @@ stored. `GET /events?since=<seq>`; `GET /events/stream` is a server-sent-events 
 1 min, 5 min and 30 min (also after a daemon restart), logged (`webhook deliveries`). Targets are this machine only, any
 port but the daemon's, unless `remoteWebhooks` lists the https origin; redirects are not followed.
 
+## Workspaces
+
+`codeloupe workspaces [--repo <path>] [--state orphan] [--size] [--json]` and `GET /workspaces?repo=&size=1` (JSON, for the
+app) list every worktree of the configured repositories: role, branch, task id (from the branch name, else the directory
+name, by the repository's task pattern), commits ahead of the default branch, the task's state from the tracker mirror,
+last activity (newer of the HEAD commit and the last git operation in the worktree) and, with `size`, disk size.
+State: `active`; `landed` (everything is on the default branch and the task is resolved or has commits there);
+`abandoned` (unmerged work, idle for more than `abandonedDays`); `orphan` (a directory under a worktree root git has no
+worktree for, or a worktree whose directory is gone). Nothing is removed: orphans are only reported. Git is read in-process,
+no `git` process runs. The first call in a repository waits for the scan of its history (`task_code` shares it).
+
+```json
+{ "workspaces": { "abandonedDays": 14, "repos": [ { "path": "C:/ws/Terrio", "roots": ["C:/ws/terrio-worktrees"] } ] } }
+```
+
+Repositories also come from a tracker's `repos` and from the repositories the daemon has served; `<repo name>-worktrees`
+beside a repository is always a root.
+
 ## Desktop app
 
 `app/` holds the Electron desktop app (tray, notifications, daemon start/stop, screens over the daemon's
@@ -224,6 +242,7 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |
 | `jobs` | commands run for agents: policy hook, slots, processes, summaries, completion actions, `job` tool |
+| `workspace` | `GET /workspaces`: worktrees, branches, tasks, merge and tracker state, orphan directories |
 | `events` | event log, server-sent-events stream, webhook subscriptions and deliveries |
 | `cli` | `codeloupe` commands and the daemon client |
 
