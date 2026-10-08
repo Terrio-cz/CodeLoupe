@@ -12,10 +12,11 @@ import codeloupe.query.usages.UsageFinder
  * the changed declarations, not with the size of the files; files are compared one at a time.
  */
 object ChangesQuery {
-    data class Args(val bodies: Boolean = false, val limit: Int = 60, val callers: Boolean = false)
+    data class Args(val bodies: Boolean = false, val limit: Int = 60, val callers: Boolean = false, val tests: Boolean = false)
 
     /** [after] reads the worktree as it is now, [before] the merge-base version of the changed files. */
     fun run(set: ChangeSet, after: View, before: View?, args: Args): String {
+        if (args.tests) return TestSelection.run(set, after, before)
         val callers = Callers(UsageFinder(after))
         val counts = LinkedHashMap(MARKS.associateWith { 0 })
         val shown = ArrayList<String>()
@@ -24,8 +25,7 @@ object ChangesQuery {
         var previousDir = ""
         var headed = ""
         for (file in set.files.sortedWith(compareBy(PathOrder) { it.path })) {
-            val old = if (file.status == 'A' || before == null) emptyList() else versions(before, file.path)
-            val new = if (file.status == 'D') emptyList() else versions(after, file.path)
+            val (old, new) = versions(file, after, before)
             val changes = DeclDiff.of(old, new).sortedBy { it.current.row.startLine }
             if (changes.isEmpty()) {
                 quiet += file.path
@@ -60,7 +60,7 @@ object ChangesQuery {
      * The changes to list, each with the number of nested ones it stands for: the members of an added (removed) type
      * that were added (removed) with it are part of it, not news of their own.
      */
-    private fun collapse(changes: List<DeclChange>): List<Pair<DeclChange, Int>> {
+    internal fun collapse(changes: List<DeclChange>): List<Pair<DeclChange, Int>> {
         val byRow = changes.filter { it.mark == DeclChange.ADDED || it.mark == DeclChange.REMOVED }.associateBy { it.mark to it.current.row.id }
         val nested = HashMap<DeclChange, Int>()
         val hidden = HashSet<DeclChange>()
@@ -77,6 +77,13 @@ object ChangesQuery {
             }
         }
         return changes.filter { it !in hidden }.map { it to (nested[it] ?: 0) }
+    }
+
+    /** The declarations of [file] before the change and now. */
+    internal fun versions(file: ChangedFile, after: View, before: View?): Pair<List<DeclVersion>, List<DeclVersion>> {
+        val old = if (file.status == 'A' || before == null) emptyList() else versions(before, file.path)
+        val new = if (file.status == 'D') emptyList() else versions(after, file.path)
+        return old to new
     }
 
     private fun versions(view: View, path: String): List<DeclVersion> {

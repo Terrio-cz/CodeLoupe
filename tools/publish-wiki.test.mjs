@@ -88,7 +88,7 @@ test('an empty wiki repository gets its first commit on master', () => {
   const bare = wiki(null);
   assert.equal(run(source({ 'Home.md': 'Home\n' }), bare).status, 'published');
   assert.deepEqual(Object.keys(pagesOf(bare)), ['Home.md']);
-  assert.equal(git(bare, 'branch', '--list').replace('*', '').trim(), 'master');
+  assert.equal(git(bare, 'for-each-ref', '--format=%(refname:short)', 'refs/heads'), 'master');
 });
 
 test('refuses sources without Home.md and leaves the wiki alone', () => {
