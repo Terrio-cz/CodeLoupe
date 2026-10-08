@@ -163,6 +163,9 @@ Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hle
 - Změny: značky `+` přidaná, `~` upravené tělo, `^` změněná signatura, `-` odstraněná (stejné jako `changes()`
   v plan.md § 6), vždy s textovým popiskem v `title`/`aria-label`.
 - Sekce draweru jsou sbalitelné; dlouhé seznamy po 20 + „zobrazit dalších N“.
+- **Běhy agentů na úkolu** (CL-41): pět nejdražších běhů za 30 dní, které úkol větve zmiňují (z `runs?q=<úkol>`), každý s
+  proklikem do detailu běhu (`#/runs/<id>`), a „Všechny běhy úkolu“ (`#/runs?q=<úkol>`). Úkol větve má vlastní tlačítko
+  a sekci, i když ho mirror ještě nemá („v mirroru zatím není“). Detail běhu má zpětný odkaz na úkol.
 - „Otevřít složku“ = IPC `open.worktree(id)`: main vezme cestu z daemonu a otevře ji jen jako adresář s `.git` (§ 10).
 
 ### 3.3 Běhy (CL-40, nad API z CL-62)

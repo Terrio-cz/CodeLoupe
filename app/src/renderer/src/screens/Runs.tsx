@@ -50,7 +50,8 @@ export function Runs({ route }: { route: Route }) {
   const [range] = useRange();
   const [role, setRole] = useState('');
   const [sort, setSort] = useState<RunSortKey>('start');
-  const [q, setQ] = useState('');
+  // `#/runs?q=TER-1` (from a branch or a task) starts with that search.
+  const [q, setQ] = useState(route.params.get('q') ?? '');
   const text = useDebounced(q);
   const [settings] = useSettings();
   const query = { range, sort, role, q: text, limit: 50 };
@@ -133,6 +134,7 @@ function RunDrawer({ id, onClose }: { id: string; onClose(): void }) {
             <dt>Peak kontext</dt><dd>{tokens(run.peakContext)} tokenů</dd>
             <dt>Podíl výsledků nástrojů</dt><dd>{pct(run.toolResultShare * 100)} ceny je držení výsledků v kontextu</dd>
             <dt>Volání nástrojů</dt><dd>{num(run.toolCalls)}{run.toolErrors ? `, z toho ${num(run.toolErrors)} s chybou` : ''}</dd>
+            {run.ter && <><dt>Úkol</dt><dd><button className="link" onClick={() => go('tasks', run.ter)}>{run.ter} →</button></dd></>}
             <dt>Sezení · soubor</dt><dd className="mono">{run.session} · {run.file}</dd>
           </dl>
 
