@@ -27,4 +27,6 @@ class EventBus(private val store: EventStore, private val webhooks: Webhooks) {
     fun since(seq: Long, limit: Int): List<Event> = store.since(seq, limit)
 
     fun lastSeq(): Long = store.lastSeq()
+
+    fun epoch(): String = store.epoch()
 }

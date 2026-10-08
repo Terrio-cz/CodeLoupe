@@ -28,19 +28,69 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
     private val predictions = ConcurrentHashMap<String, Pair<String, TouchPrediction.Result>>()
     private val mentions = ConcurrentHashMap<String, Pair<Long, List<Mention>>>()
 
-    suspend fun answer(root: String, query: String, limit: Int): String {
+    /** Everything `task_code` knows of one task, before it is rendered; [store] and [repo] let a caller ask the history more. */
+    class Facts(val answer: TaskCodeRender.TaskAnswer, val store: TaskCodeStore, val repo: RepoState, val worktree: Path, val note: String?)
+
+    private class Prelude(val dir: Path, val repo: RepoState, val pattern: TaskPattern, val store: TaskCodeStore, val note: String?)
+
+    private suspend fun prelude(root: String): Prelude {
         val location = registry.locate(root)
         val repo = registry.repo(location.commonDir)
         val pattern = TaskPattern.of(registry.mainWorktree(repo.commonDir), trackers.projects())
         val store = registry.taskCodes.current(repo, pattern)
         // Rows, predictions and open tasks come from the mirror: a first load is waited for, a stale one noted.
         val note = if (trackers.configured) trackers.current(initialWaitMs, staleWaitMs) else null
-        val dir = Path.of(location.worktree)
-        val answer = if (pattern.isId(query)) task(root, dir, repo, store, query.trim(), limit) else code(root, dir, repo, store, query.trim(), limit)
-        return if (note == null) answer else "$answer\n$note"
+        return Prelude(Path.of(location.worktree), repo, pattern, store, note)
     }
 
-    private suspend fun task(root: String, dir: Path, repo: RepoState, store: TaskCodeStore, query: String, limit: Int): String {
+    suspend fun answer(root: String, query: String, limit: Int): String {
+        val p = prelude(root)
+        val answer = if (p.pattern.isId(query)) TaskCodeRender.task(taskAnswer(root, p.dir, p.repo, p.store, query.trim()), limit) else code(root, p.dir, p.repo, p.store, query.trim(), limit)
+        return if (p.note == null) answer else "$answer\n${p.note}"
+    }
+
+    /** The code facts of the task [id]: landed, in a worktree, predicted. */
+    suspend fun facts(root: String, id: String): Facts {
+        val p = prelude(root)
+        return Facts(taskAnswer(root, p.dir, p.repo, p.store, id.trim()), p.store, p.repo, p.dir, p.note)
+    }
+
+    /** Where a task touches the code: [files] path → mark (`=` sure, `~` likely, `?` guess, `+` new); landed work counts as sure. */
+    class Touch(val id: String, val files: Map<String, Char>, val landed: Boolean)
+
+    /** A worktree on a branch other than the main one: the tasks its branch names and the files it changed against the merge-base. */
+    class LiveWindow(val branch: String, val path: String, val tasks: List<String>, val changed: Set<String>)
+
+    /** The touch sets of [ids] (landed files, else predicted from the issue text); a task the mirror does not hold has none. */
+    suspend fun touches(root: String, ids: List<String>): Map<String, Touch> {
+        val p = prelude(root)
+        val issues = ids.associateWith { id -> trackers.mirror(id)?.let { (mirror, canonical) -> Triple(mirror, canonical, mirror.store.issue(canonical)) } }
+        val landed = withContext(Dispatchers.IO) { ids.associateWith { LandedTask.of(p.store, trackers.mirror(it)?.second ?: it.uppercase()) } }
+        val open = ids.filter { landed.getValue(it).commits.isEmpty() && issues[it]?.third != null }
+        val predicted = if (open.isEmpty()) emptyMap() else registry.query(root, speculative = false) { view ->
+            open.associateWith { id ->
+                val (mirror, canonical, issue) = issues.getValue(id)!!
+                predict(view, p.dir, p.repo, mirror, canonical, issue!!.updated).predictions
+            }
+        }
+        return ids.associateWith { id ->
+            val task = landed.getValue(id)
+            if (task.commits.isNotEmpty()) Touch(id, withContext(Dispatchers.IO) { task.files(p.store) }.mapValues { '=' }, true)
+            else Touch(id, predicted[id].orEmpty().filter { it.path != null }.groupBy { it.path!! }.mapValues { (_, list) -> list.minBy { Prediction.ORDER.indexOf(it.mark) }.mark }, false)
+        }
+    }
+
+    /** Every worktree of the repository of [root] that is on a branch and is not the main worktree. */
+    suspend fun liveWindows(root: String): List<LiveWindow> {
+        val p = prelude(root)
+        val main = registry.mainWorktree(p.repo.commonDir).toString().replace('\\', '/')
+        return WorktreeBranches.of(p.repo.commonDir).filterValues { !it.equals(main, ignoreCase = true) }.map { (branch, path) ->
+            val set = runCatching { registry.changedFiles(path) }.getOrNull()
+            LiveWindow(branch, path, p.pattern.idsIn(branch), set?.let { s -> (s.files.map { it.path } + s.otherFiles).toSet() }.orEmpty())
+        }
+    }
+
+    private suspend fun taskAnswer(root: String, dir: Path, repo: RepoState, store: TaskCodeStore, query: String): TaskCodeRender.TaskAnswer {
         val mirrored = trackers.mirror(query)
         val id = mirrored?.second ?: query.uppercase()
         val note = mirrored?.first?.refresh(id)?.takeIf { it.startsWith("(") }
@@ -55,7 +105,7 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
         } else {
             null
         }
-        return TaskCodeRender.task(TaskCodeRender.TaskAnswer(id, row, landed, files, decls, worktree, prediction, note), limit)
+        return TaskCodeRender.TaskAnswer(id, row, landed, files, decls, worktree, prediction, note)
     }
 
     /** The worktree whose branch names [id], with what it changed against the merge-base. */

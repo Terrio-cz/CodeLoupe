@@ -25,12 +25,16 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 | What did my branch change | `changes` (by declaration against the merge-base, with callers and tests; `bodies=true` for line diffs) | `git diff` of whole files |
 | Which task touched this code, or which code a task touched | `task_code` (`query` = a task id, a declaration or a path) | `git log --grep` and guessing |
 | Read an issue | `issue` (`id`; `view=brief` first, then `sections=[…]`) | opening the tracker |
+| Start planning a task: issue, linked tasks, open criteria, touched code, earlier tasks on the same files | `task_context` (`id`; one call instead of `issue` + `tasks` + `task_code` + search; `sections=[…]` to pick) | four calls and a search |
+| Decide which tasks run in which window without two windows on the same code | `dispatch_plan` (`candidates`, `epic` or `query`, `slots`; windows with the shared code, per-task keys, what waits and why) | predicting collisions by hand with grep |
+| Read a plan, a brain note or a large saved tool output | `doc` (`path`; digest first, then `section=[handle or L120-160]`; `view=full` for all) | reading the whole file again |
 | Find or plan tasks | `tasks` (`mode=list` with a query, `graph`, `ready`, `progress`) | tracker search by hand |
+| Before creating an issue | `similar` (`summary`, `description`: tasks that already talk about it; extend or link one instead of a duplicate) | creating first, finding the duplicate later |
 | Change an issue's state or add a comment | `update` (`id`, `set={State: …}`, `comment`) | the tracker's UI |
 | A test or build that takes a while | `job` (`action=start`, `command` = argv array, `cwd`, `slot` for shared resources; then `action=status`) | a blocking shell call |
 
-`issue`, `tasks` and `update` work only when a tracker is configured for the daemon; `task_code` also works without one
-(it reads the default branch's history).
+`issue`, `task_context`, `dispatch_plan`, `tasks`, `similar` and `update` work only when a tracker is configured for the daemon; `task_code` also works without one
+(it reads the default branch's history), and `doc` needs no repository or tracker.
 
 ## Working rules
 
@@ -39,7 +43,8 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 - `usages` marks unsure hits with `?` instead of dropping them. A name shared by unrelated declarations must be
   qualified (`Type.member`) or the answer is a superset.
 - The index follows the working tree: edits in a worktree show up on the next query, no refresh step.
-- A repeated `issue` read from the same `root` answers `unchanged since …` or only the difference.
+- A repeated `issue`, `task_context` or `doc` read from the same `root` answers `unchanged since …` or only the difference;
+  `since=none` sends it again (do that after the context was cleared). Read a large file with `doc` digest first, then only the sections you need.
 - Long commands go to `job`: start it, end the turn when there is nothing else to do, and read `status` when you
   continue. Do not hold a turn open on a slow build.
 

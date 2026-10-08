@@ -8,7 +8,7 @@ import codeloupe.tracker.mirror.MirrorStore
  * counts as open (`?`): nothing proves it done.
  */
 object ReadyTasks {
-    private const val LEAF = "i.resolved IS NULL AND NOT EXISTS (SELECT 1 FROM issues s WHERE s.parent = i.id)"
+    const val LEAF = "i.resolved IS NULL AND NOT EXISTS (SELECT 1 FROM issues s WHERE s.parent = i.id)"
     private const val LISTED = 8
 
     fun render(store: MirrorStore, filter: TaskFilter, held: Map<String, String>, limit: Int): String {

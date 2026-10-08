@@ -28,6 +28,7 @@ export function App() {
   const [settings] = useSettings();
   const [range, setRange] = useRange();
   const [gapsSince] = useState(() => lastVisit());
+  const [appVersion, setAppVersion] = useState('');
   const nav = useApi('nav', undefined, { gapsSince });
   const main = useRef<HTMLElement>(null);
 
@@ -39,6 +40,7 @@ export function App() {
   }, [settings?.theme]);
 
   useEffect(() => bridge().onNavigate(h => { location.hash = h; }), []);
+  useEffect(() => { void bridge().metrics().then(m => setAppVersion(m.version)); }, []);
   useEffect(() => { document.title = `${TITLES[route.screen]} · CodeLoupe`; }, [route.screen]);
   useEffect(() => {
     if (route.screen === 'gaps') try { localStorage.setItem('codeloupe.gapsSeen', new Date().toISOString()); } catch { /* storage blocked */ }
@@ -104,7 +106,7 @@ export function App() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand"><span aria-hidden="true">◎</span><span className="label-text">CodeLoupe</span><small>v0.4</small></div>
+        <div className="brand"><span aria-hidden="true">◎</span><span className="label-text">CodeLoupe</span><small>{appVersion && `v${appVersion}`}</small></div>
         <nav aria-label="Hlavní navigace" style={{ display: 'contents' }}>
           {link('overview')}
           <div className="nav-group">Práce</div>

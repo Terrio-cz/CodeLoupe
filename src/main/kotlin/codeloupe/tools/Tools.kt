@@ -1,5 +1,6 @@
 package codeloupe.tools
 
+import codeloupe.doc.DocMemory
 import codeloupe.tracker.Trackers
 import kotlinx.serialization.json.JsonObject
 
@@ -13,9 +14,13 @@ object Tools {
 
     fun named(name: String): Tool? = ALL.firstOrNull { it.name == name }
 
-    /** The daemon's catalog: the code tools, the tracker tools when a tracker is configured, and task_code (history alone without one). */
-    fun catalog(trackers: Trackers): List<Tool> =
-        ALL + (if (trackers.configured) listOf(IssueTool(trackers), TasksTool(trackers), UpdateTool(trackers)) else emptyList()) + TaskCodeTool(trackers)
+    /** The daemon's catalog: the code tools, the tracker tools when a tracker is configured, and task_code (history alone without one) and doc (text files). */
+    fun catalog(trackers: Trackers): List<Tool> {
+        // The document reader's memory is shared: `doc` and `task_context` tell a caller the same "you already have this".
+        val docs = DocMemory()
+        val tracked = if (trackers.configured) listOf(IssueTool(trackers), TaskContextTool(trackers, docs), DispatchPlanTool(trackers, docs), TasksTool(trackers), SimilarTool(trackers), UpdateTool(trackers)) else emptyList()
+        return ALL + tracked + TaskCodeTool(trackers) + DocTool(docs)
+    }
 
     /** Tools that need no repository take `root` only as the caller's identity. */
     private val CALLER: JsonObject = Schema.string("Your worktree or repository (absolute): remembers what you already read.")

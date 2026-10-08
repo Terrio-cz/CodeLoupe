@@ -679,6 +679,23 @@ nim nemá časovač (plan.md § 5.1).
 - Rozpočet < 1 s na obrazovku (CL-40) se měří na ingestovaném baseline (2 651 sessions). Daemon neposkytuje
   žádné API běhů ani kroků agentů.
 
+**Stav implementace (CL-39, balíček `codeloupe.uiapi`, `GET /ui-api/v1/<zdroj>`):** všechny zdroje výše odpovídají, jen
+`GET` (jinak 405), `Cache-Control: no-store`, chyby `{ error: { code, message } }`; kontrakt aplikace
+(`app/src/shared/contract.ts`) se ověřuje typovou kontrolou skutečných odpovědí.
+
+| Zdroj | Z čeho | Zatím prázdné nebo nepřesné |
+|---|---|---|
+| `nav` | workspace scan, mirror, stav indexu | `newGaps` 0 |
+| `overview` | `calls.jsonl` (nově s `root` volání): `toolCalls`, p50, `activeWindows` (různé rooty za 15 min), `queriedWorktrees` | cena, baseline, úspory, `costSeries`, `savingsByTool`, `gaps`: 0/prázdné do ingestu transcriptů (CL-62) |
+| `worktrees` | workspace scan, `ahead`/`behind` z gitu, změněné soubory proti merge-base, stav vrstvy (`Overlays.layer`), počet volání za 24 h | `changedDecls` se počítá na pozadí (první odpověď ho může mít 0); první odpověď po startu u desítek worktrees trvá vteřiny, další jsou okamžité (poslední stav + obnova na pozadí) |
+| `worktrees/{id}` | `changes` ve strukturované podobě: deklarace, volající, testy | `index.layerFiles` = změněné indexované soubory, `parsedAt` null |
+| `tasks`, `tasks/{id}` | jen mirror (nikdy dotaz na tracker), kurzor = offset | `reads` 0, `mirror.lastReadAt` null (žádný čítač čtení) |
+| `index` | registr repozitářů, velikost a počty z indexu, sestavení z `build.done`/`overlay.refreshed` v `events.db` | `firstLine` chyb parseru 0, `kind` plného a inkrementálního buildu se neliší |
+| `gaps` | – | prázdné do ingestu (CL-62); týdenní report je `codeloupe metrics gaps` |
+| `environment` | – | `keys: []`, `storeReady: false` do úložiště tajemství (CL-50) |
+| `settings` | konfigurace daemonu, mirror, `tokenConfigured` (hodnota se nikdy nečte ven) | `budgets.dailyWeighted` null |
+| `events` | `events.db` + `epoch` (nová tabulka `meta`): `build_finished`, `build_failed` | `budget_breach`, `gap_new` se zatím nevysílají |
+
 ## 10. Bezpečnost aplikace
 
 - `BrowserWindow`: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`,

@@ -56,6 +56,39 @@ class DockerCliIntegrationTest {
     }
 
     @Test
+    fun `compose up takes an env file and a project directory from elsewhere, as the Terrio task stacks do`() {
+        val docker = DockerTestSupport.open("CODELOUPE_DOCKER_CLI_TESTS") ?: return
+        val notes = ArrayList<String>()
+        try {
+            val project = TestRepos.tmpDir("compose-project")
+            project.resolve("compose.yaml").writeText(
+                """
+                services:
+                  web:
+                    image: ${'$'}{CLT_IMAGE}
+                    command: ["sleep", "120"]
+                    volumes: ["data:/data"]
+                volumes:
+                  data: {}
+                """.trimIndent(),
+            )
+            val elsewhere = TestRepos.tmpDir("compose-env")
+            val envFile = elsewhere.resolve("task.env").also { it.writeText("CLT_IMAGE=$base\n") }
+            val exit = ComposeUp(DockerCli(), { docker.api }, notes::add).up(
+                elsewhere, docker.ownership, listOf(project.resolve("compose.yaml").toString()), docker.name, emptyList(), listOf("-d"),
+                envFiles = listOf(envFile.toString()), projectDirectory = project.toString(),
+            )
+            assertEquals(0, exit, notes.toString())
+            val all = docker.api.snapshot().filter { it.project == docker.name }
+            docker.assertOwned(all, ResourceKind.CONTAINER, "${docker.name}-web-1")
+            docker.assertOwned(all, ResourceKind.VOLUME, "${docker.name}_data")
+            assertTrue(notes.isEmpty(), notes.toString())
+        } finally {
+            docker.cleanUp()
+        }
+    }
+
+    @Test
     fun `run labels the container and creates the named volume labelled`() {
         val docker = DockerTestSupport.open("CODELOUPE_DOCKER_CLI_TESTS") ?: return
         val notes = ArrayList<String>()

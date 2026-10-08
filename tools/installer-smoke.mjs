@@ -5,6 +5,7 @@
 // without Java and with its own CODELOUPE_HOME, port and app data, so a developer's own daemon is never touched.
 //
 //   node tools/installer-smoke.mjs <installer file or the directory holding it> [--shots <dir>] [--out report.json]
+//                                  [--expect-version <version>]   (a release build: installer name, daemon, /status and CLI must say so)
 //
 // Windows: NSIS installer, silent, into a temporary directory. Linux: the .deb through apt (needs sudo), the app on a
 // virtual display. macOS: the .dmg, the app copied to a temporary directory.
@@ -189,6 +190,15 @@ try {
   const exe = executableOf(daemon.pid);
   report.daemonExecutable = exe;
   if (!exe.replaceAll('\\', '/').toLowerCase().includes('/resources/codeloupe/runtime/bin/java')) throw new Error(`the daemon does not run from the installed runtime: ${exe}`);
+
+  const expected = opt('expect-version');
+  if (expected) {
+    if (!path.basename(installer).includes(expected)) throw new Error(`the installer ${path.basename(installer)} does not carry version ${expected}`);
+    if (daemon.version !== expected) throw new Error(`/status says version ${daemon.version}, expected ${expected}`);
+    const v = cli(['--version'], tmp);
+    if (!`${v.stdout}`.includes(expected)) throw new Error(`the CLI says "${v.stdout.trim()}", expected version ${expected}`);
+    report.expectedVersion = expected;
+  }
 
   await step('cli find', async () => {
     const r = cli(['find', 'greet'], repo);

@@ -40,6 +40,8 @@ build/install/codeloupe/bin/codeloupe issue ABC-5 --section scope   # with a tra
 build/install/codeloupe/bin/codeloupe tasks "epic: ABC-1" --mode ready
 build/install/codeloupe/bin/codeloupe task_code ABC-5            # its landed or predicted code
 build/install/codeloupe/bin/codeloupe code_tasks OrderService.handle   # the tasks that touched it
+build/install/codeloupe/bin/codeloupe task_context ABC-5         # a planner's whole starting pack; asked again: what changed
+build/install/codeloupe/bin/codeloupe doc plan.md --section goal # a text file by digest, section or line window
 build/install/codeloupe/bin/codeloupe status
 ```
 
@@ -104,11 +106,16 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `changes` | what the worktree changed against the merge-base with the default branch (committed and uncommitted), by declaration: `+` added, `~` body changed, `^` signature changed (with the old one), `-` removed; each with its callers and tests; `bodies=true` adds a line diff per declaration |
 | `task_code` | links between tasks and code, from the default branch's history (works without a tracker). `query` = a task id (`TER-5`): its landing commit, files and changed declarations (`+ ~ ^ -`), the worktree whose branch names it, and for an open task the touch set predicted from its text — `=` sure · `~` likely · `?` guess · `+` new file, each with the issue text it comes from. `query` = a declaration (`Type.member`) or a file path: the tasks that changed it, newest first, with landing commits (`code_tasks <symbol\|path>` on the command line), plus open tasks whose text points at it. Task ids follow the tracker projects, or `taskPattern` (a regular expression) in `.codeloupe.json` |
 
-With a tracker configured (see Configuration) three more tools work on a local mirror of its projects:
+`doc` works without a tracker and reads a text file (a plan, a brain note, a large persisted tool output) without re-reading it; see [Documents](#documents).
+
+With a tracker configured (see Configuration) more tools work on a local mirror of its projects:
 
 | Tool | Returns |
 |---|---|
 | `issue` | one issue as compact markdown: `view=brief` (fields, links, criteria checklist, section index), `full`, or `sections=[…]` (description headings by prefix, `criteria`, `fields`, `links`, `comments`, `attachments`, `history`). A second read from the same `root` answers `unchanged since …` or only what changed; `since=<ISO time>` diffs against that time, `since=none` shows it again |
+| `similar` | before creating an issue: the open (or last 90 days resolved) tasks that talk about the same thing as a draft `summary` / `description`, best full-text match first (bm25, summary weighs most), each with the words it shares; extend or link one instead of creating a duplicate. From the mirror, in well under 100 ms |
+| `task_context` | a planner's starting pack for a task in one call instead of `issue` + `tasks` + `task_code` + search: sections `issue` (brief with criteria), `linked` (dependencies and relations with state), `open-criteria` (what related open tasks still owe), `touch` (landed, in a worktree, or predicted code), `declarations` (outline lines of those files, no bodies), `prior` (earlier tasks that changed the same files, each with its landing commit). `sections=[…]` picks some, `view=digest` lists them with sizes. The same `root` asking again gets `unchanged since …` in one line, or only the sections that changed; `since=none` sends everything again |
+| `dispatch_plan` | which ready tasks get a window now so that no two windows touch the same code. Candidates: `candidates=[ids]`, `epic=<id>` (its open leaf tasks), `query=<filters>`, or none (the 15 most urgent open leaf tasks). Each task's touch set is its landed files, else what its text names (as in `task_code`); sets are compared with each other and with every live worktree (the files it changed plus what its task is predicted to touch). Answer: `windows` — a batch of up to 3 light tasks, a chain of up to 3 steps (dependencies first), or one task, each with the shared code that put its tasks together and per-task keys (`file:`, `dir:`); `waiting` — fights with a live worktree (file and worktree cited), unmet dependency, no free slot (`slots`, default 4), rest of a long chain; `live`. A task whose text names no code is listed as unproven. `width=dir` (default) counts one directory as a clash, `file` only one file; markdown never blocks. Same `sections` / `view` / `since` as `task_context`. The caller keeps the final judgment |
 | `tasks` | one line per task (`id state · type · priority ‹epic› title ⛔blockers`). `mode=list` with a YouTrack-like `query` (`project: TER state: -Done #unresolved epic: TER-1 type: Bug {Fix versions}: 1.0 sort: id` plus full-text words), `graph` (an issue's epic, dependencies, subtasks, relations; `depth` ≤ 3), `ready` (open tasks without open subtasks whose dependencies are resolved and that no git worktree branch holds), `progress` (an epic: counts by state, criteria, blockers, open tasks) |
 | `update` | writes to the tracker: `set={Field: value}` (State, Assignee, Priority, Type, `summary`, `description` or any custom field; comma-separated for multi-value fields; an empty value clears) and/or `comment=<text>`. Answers one line of at most 300 characters — the fields that changed (`State: To do→Done`), `+comment <id>`, and the state when it did not change — instead of the issue. The mirror stores the tracker's own answer to the write, so the next `issue` read needs no request |
 
@@ -117,6 +124,26 @@ type where syntax tells it (declared types, `Type(…)`, what a call returns, co
 overloads by argument count. Unsure hits are marked, never dropped. One heuristic: on a receiver of unknown type,
 a name the index declares only once (and no library declares, judging by the core API and the files' imports) is
 taken as exact. A name that matches several unrelated declarations must be qualified (`Type.member`).
+
+## Documents
+
+One layer serves every large text an agent would otherwise read twice: `doc` (plans, brain notes, persisted tool outputs)
+and `task_context` (the planner's pack) both split their text into **sections with handles** (markdown headings and
+`=== title ===` banners; an output without headings is cut into line windows `L1-60`, `L61-120`, …), hash each section and remember,
+per caller (`root`), what that caller was shown.
+
+| Call | Answer |
+|---|---|
+| `doc path` | a digest of at most 1000 characters: size, hash, the sections as `handle(lines)`, the lines that look like errors as `L118-124 "FAILED: …"`, and how to fetch |
+| `doc path --section goal --section L118-124` | those sections (handle or heading prefix, with their sub-sections) or line windows (at most 300 lines, 20 000 characters) |
+| `doc path --view outline` / `--view full` | every section with its line; the whole text |
+| the same call again | one line, `plan.md unchanged since your read at … (#hash, 9 sections)`, under 100 tokens |
+| after the file changed | the digest becomes a delta (`~ steps(12)`, `+ notes(3)`, `- old`); `--view full` sends only the changed sections in full and names the omitted ones; a fetched section that did not change answers `section steps unchanged` |
+| `--since none` | forget what the caller has; read it again |
+
+`doc` reads only files under the caller's `root` or under the agent harness's folders (`~/.claude`, `<tmp>/claude`), with links
+resolved first, and never a secret store (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `credentials*`, `.ssh`, `.aws`, …), a binary file or one over 8 MB.
+The memory is per daemon and per `root`; it is not saved over a daemon restart (the next read is a full one).
 
 ## Jobs and events
 
@@ -198,7 +225,7 @@ Every container, image, volume and network that is made through CodeLoupe carrie
 another), found through the registry above.
 
 ```
-codeloupe ws up [-f compose.yaml] [-p project] [--profile x] [-- up-args]   # default: -d
+codeloupe ws up [-f compose.yaml] [-p project] [--profile x] [--env-file f] [--project-directory d] [-- up-args]   # default: -d
 codeloupe ws run [--dir d] <docker run arguments>
 codeloupe ws build [--dir d] <docker build arguments>
 codeloupe ws volume create <name>
@@ -404,10 +431,10 @@ Settings stays on its default and is resolved at start-up, so an update never le
 
 The `installer-smoke` CI job installs each installer on its OS, starts the app, waits for the daemon the app starts
 from the bundled runtime, runs `find` through the CLI and through the MCP endpoint on a PATH without Java, takes a
-screenshot of the app window (artifact `installer-smoke-<os>`) and uninstalls (`node tools/installer-smoke.mjs <installer>`;
+screenshot of the app window (artifact `smoke-<os>`) and uninstalls (`node tools/installer-smoke.mjs <installer>`;
 it uses its own home, port and app data, so it is safe on a developer machine; screenshots only when `CI` is set).
 Not yet: signing and notarisation (CL-105, until then Windows shows an unknown publisher and macOS refuses the app),
-the release pipeline (CL-106), auto-update (CL-107). CI cost and runners: [docs/ci.md](docs/ci.md).
+the release pipeline (CL-106), auto-update (CL-107). CI cost and runners: [docs/ci.md](docs/ci.md). Releasing (tag, checksums, SBOMs, draft release): [docs/release.md](docs/release.md).
 
 ## Develop
 
@@ -436,7 +463,8 @@ accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram
 | `taskcode` | `task_code`: history of the default branch by task id, changed declarations per landing, touch-set prediction from issue text |
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
 | `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
-| `tracker`, `tracker.youtrack`, `tracker.mirror`, `tracker.read` | tracker adapter (YouTrack REST), SQLite mirror and watcher, `issue` / `tasks` answers |
+| `tracker`, `tracker.youtrack`, `tracker.mirror`, `tracker.read` | tracker adapter (YouTrack REST), SQLite mirror and watcher, `issue` / `tasks` / `similar` answers |
+| `doc` | documents as sections with handles: digest, outline, section and line-window fetch, hash and the per-caller delta memory behind `doc` and `task_context` |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |
 | `jobs` | commands run for agents: policy hook, slots, processes, summaries, completion actions, `job` tool |
