@@ -14,32 +14,32 @@
 <rect x="190" y="58" width="226.0771465890361" height="12" fill="#8b949e"/><text x="421.0771465890361" y="68" fill="#1f2328" font-size="11">322</text>
 <rect x="190" y="74" width="284.52025464973826" height="12" fill="#d4a72c"/><text x="479.52025464973826" y="84" fill="#1f2328" font-size="11">789</text>
 <rect x="190" y="90" width="226.98264001019083" height="12" fill="#0969da"/><text x="421.98264001019083" y="100" fill="#1f2328" font-size="11">326</text>
-<rect x="190" y="106" width="345.67357916602305" height="12" fill="#8250df"/><text x="540.673579166023" y="116" fill="#1f2328" font-size="11">2,016</text>
+<rect x="190" y="106" width="345.8349470272956" height="12" fill="#8250df"/><text x="540.8349470272956" y="116" fill="#1f2328" font-size="11">2,021</text>
 <text x="180" y="158" text-anchor="end" fill="#1f2328" font-weight="600">Source of a member</text>
 <rect x="190" y="132" width="160.50567999116322" height="12" fill="#8b949e"/><text x="355.5056799911632" y="142" fill="#1f2328" font-size="11">118</text>
 <rect x="190" y="148" width="336.2879779725297" height="12" fill="#d4a72c"/><text x="531.2879779725297" y="158" fill="#1f2328" font-size="11">1,746</text>
 <rect x="190" y="164" width="159.94888880430562" height="12" fill="#0969da"/><text x="354.9488888043056" y="174" fill="#1f2328" font-size="11">117</text>
-<rect x="190" y="180" width="295.20235709904625" height="12" fill="#8250df"/><text x="490.20235709904625" y="190" fill="#1f2328" font-size="11">929</text>
+<rect x="190" y="180" width="295.79569145996345" height="12" fill="#8250df"/><text x="490.79569145996345" y="190" fill="#1f2328" font-size="11">938</text>
 <text x="180" y="232" text-anchor="end" fill="#1f2328" font-weight="600">Outline of a file</text>
 <rect x="190" y="206" width="194.16993392423893" height="12" fill="#8b949e"/><text x="389.16993392423893" y="216" fill="#1f2328" font-size="11">197</text>
 <rect x="190" y="222" width="268.33126736631255" height="12" fill="#d4a72c"/><text x="463.33126736631255" y="232" fill="#1f2328" font-size="11">615</text>
-<rect x="190" y="238" width="201.95294616759583" height="12" fill="#0969da"/><text x="396.9529461675958" y="248" fill="#1f2328" font-size="11">222</text>
+<rect x="190" y="238" width="197.080083055373" height="12" fill="#0969da"/><text x="392.080083055373" y="248" fill="#1f2328" font-size="11">206</text>
 <text x="194" y="264" fill="#8c959f" font-size="11">n/a</text>
 <text x="180" y="306" text-anchor="end" fill="#1f2328" font-weight="600">Usages of a type</text>
 <rect x="190" y="280" width="269.48614998156444" height="12" fill="#8b949e"/><text x="464.48614998156444" y="290" fill="#1f2328" font-size="11">626</text>
 <rect x="190" y="296" width="371.49214230487553" height="12" fill="#d4a72c"/><text x="566.4921423048755" y="306" fill="#1f2328" font-size="11">2,997</text>
 <rect x="190" y="312" width="262.17001362965533" height="12" fill="#0969da"/><text x="457.17001362965533" y="322" fill="#1f2328" font-size="11">560</text>
-<rect x="190" y="328" width="330.4345212794294" height="12" fill="#8250df"/><text x="525.4345212794294" y="338" fill="#1f2328" font-size="11">1,596</text>
+<rect x="190" y="328" width="330.658699787895" height="12" fill="#8250df"/><text x="525.658699787895" y="338" fill="#1f2328" font-size="11">1,601</text>
 <text x="180" y="380" text-anchor="end" fill="#1f2328" font-weight="600">Callers of a member</text>
 <rect x="190" y="354" width="218.34091688728006" height="12" fill="#8b949e"/><text x="413.34091688728006" y="364" fill="#1f2328" font-size="11">286</text>
 <rect x="190" y="370" width="319.6465037408426" height="12" fill="#d4a72c"/><text x="514.6465037408426" y="380" fill="#1f2328" font-size="11">1,352</text>
 <rect x="190" y="386" width="183.9899857811036" height="12" fill="#0969da"/><text x="378.9899857811036" y="396" fill="#1f2328" font-size="11">169</text>
-<rect x="190" y="402" width="278.5998744646903" height="12" fill="#8250df"/><text x="473.5998744646903" y="412" fill="#1f2328" font-size="11">720</text>
+<rect x="190" y="402" width="279.14049310501406" height="12" fill="#8250df"/><text x="474.14049310501406" y="412" fill="#1f2328" font-size="11">726</text>
 <text x="180" y="454" text-anchor="end" fill="#1f2328" font-weight="600">Subtypes of a type</text>
 <rect x="190" y="428" width="151.29002576428763" height="12" fill="#8b949e"/><text x="346.29002576428763" y="438" fill="#1f2328" font-size="11">102</text>
 <rect x="190" y="444" width="249.9074607720774" height="12" fill="#d4a72c"/><text x="444.9074607720774" y="454" fill="#1f2328" font-size="11">464</text>
-<rect x="190" y="460" width="187.74573306723175" height="12" fill="#0969da"/><text x="382.74573306723175" y="470" fill="#1f2328" font-size="11">179</text>
-<rect x="190" y="476" width="322.1977981025707" height="12" fill="#8250df"/><text x="517.1977981025707" y="486" fill="#1f2328" font-size="11">1,406</text>
+<rect x="190" y="460" width="165.31357882677548" height="12" fill="#0969da"/><text x="360.3135788267755" y="470" fill="#1f2328" font-size="11">127</text>
+<rect x="190" y="476" width="322.4521323724407" height="12" fill="#8250df"/><text x="517.4521323724407" y="486" fill="#1f2328" font-size="11">1,412</text>
 <text x="180" y="528" text-anchor="end" fill="#1f2328" font-weight="600">Text search, 30 hits</text>
 <rect x="190" y="502" width="326.28327005145786" height="12" fill="#8b949e"/><text x="521.2832700514579" y="512" fill="#1f2328" font-size="11">1,497</text>
 <text x="194" y="528" fill="#8c959f" font-size="11">n/a</text>
@@ -48,6 +48,6 @@
 <text x="180" y="602" text-anchor="end" fill="#1f2328" font-weight="600">What a branch changed</text>
 <rect x="190" y="576" width="352.7404608628693" height="12" fill="#8b949e"/><text x="547.7404608628693" y="586" fill="#1f2328" font-size="11">2,247</text>
 <rect x="190" y="592" width="585.2416304740473" height="12" fill="#d4a72c"/><text x="780.2416304740473" y="602" fill="#1f2328" font-size="11">79,728</text>
-<rect x="190" y="608" width="392.769973829862" height="12" fill="#0969da"/><text x="587.769973829862" y="618" fill="#1f2328" font-size="11">4,154</text>
-<rect x="190" y="624" width="500.6697865893375" height="12" fill="#8250df"/><text x="695.6697865893375" y="634" fill="#1f2328" font-size="11">21,767</text>
+<rect x="190" y="608" width="370.20776871813564" height="12" fill="#0969da"/><text x="565.2077687181356" y="618" fill="#1f2328" font-size="11">2,938</text>
+<rect x="190" y="624" width="500.6757719046932" height="12" fill="#8250df"/><text x="695.6757719046932" y="634" fill="#1f2328" font-size="11">21,769</text>
 </svg>
