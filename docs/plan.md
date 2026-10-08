@@ -618,6 +618,12 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   0 s CPU za 20 s v klidu, build báze 27 s. Malé repozitáře (Terrio, 2 200 zdrojů) jedou po staré cestě beze změny. Ztráta:
   soubor, který se liší od báze jen konci řádků, se v tomto režimu nepozná porovnáním textu (git ho ale při `autocrlf` většinou
   za změněný nepovažuje); rychlé čtení z předchozí báze po landu (CL-124) se pro velké repozitáře nepoužije (stál by průchod).
+- CL-117 (2026-10-08): toolchain aplikace na Vite 8.3, plugin-react 6, vitest 5 a `electron-vite` 6.0.0-beta.7 (první řada
+  s peer `vite ^8`; stabilní 5.0.0 končí u Vite 7, proto beta, přibitá přesně, Dependabot ji povýší na stabilní). Vite 8 přináší
+  `lightningcss` (MPL-2.0, 12 balíčků pro platformy): povolen úzkým pravidlem v `tools/npm-licenses.mjs`, protože jde o
+  nezměněnou build-time závislost, která se do instalátorů nedostává (renderer se builduje). `@types/node` zůstává na 24
+  (Node v Electronu 44), proto jeden `ignore` v dependabot.yml. Lockfile je z npm 10 (jako v CI): npm 9 ani `--legacy-peer-deps`
+  nezapisují licenční pole a peer záznamy, se kterými `npm ci` počítá.
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
   Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.
