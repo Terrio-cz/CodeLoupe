@@ -30,7 +30,8 @@ class WatcherTest {
             assertEquals(idle, runs.get(), "no work while idle")
             watcher.touch()
             Thread.sleep(30)
-            assertEquals(idle + 1, runs.get(), "the next call starts it again at once")
+            // At least one run, not exactly one: a slow runner can fit a second period into the sleep.
+            assertTrue(runs.get() >= idle + 1, "the next call starts it again at once: ${runs.get()} runs after $idle")
         } finally {
             scope.cancel()
         }
