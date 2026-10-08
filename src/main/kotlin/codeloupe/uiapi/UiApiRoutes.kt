@@ -33,6 +33,7 @@ fun Route.uiApiRoutes(api: UiApi) {
         get("index") { call.answer(IndexHealth.serializer()) { api.index() } }
         get("gaps") { call.answer(Gaps.serializer()) { api.gaps() } }
         get("environment") { call.answer(EnvironmentView.serializer()) { api.environment() } }
+        get("environment/audit") { call.answer(EnvironmentAuditView.serializer()) { api.environmentAudit(call.query("name"), call.query("scope"), call.query("limit")) } }
         get("settings") { call.answer(SettingsView.serializer()) { api.settings() } }
         get("events") { call.answer(EventsView.serializer()) { api.events(call.query("since"), call.query("limit")) } }
         route("{...}") {

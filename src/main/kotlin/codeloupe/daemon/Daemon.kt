@@ -110,10 +110,10 @@ class Daemon private constructor(
     val jobs = JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
     private val trackerSettings = TrackerSettingsLoader.load(config.home)
     private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
-    private val secrets = SecretAccess(config.home, preset = secretStore)
+    private val secrets = SecretAccess(config.home, preset = secretStore, rotationDays = config.secrets.rotationDays)
     private val tools = Tools.catalog(trackers, jobs, secrets)
     private val workspaces = Workspaces(config, registry, trackers)
-    private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope)
+    private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets)
     private val resources = ResourceInventory(config, workspaces)
     private val reconcileConfig = config.workspaces.reconcile
     private val releases = ReleaseStore(config.home.resolve("releases.json"))

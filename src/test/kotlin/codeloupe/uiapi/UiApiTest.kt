@@ -5,6 +5,8 @@ import codeloupe.TestRepos
 import codeloupe.config.Config
 import codeloupe.config.WorkspacesConfig
 import codeloupe.daemon.Daemon
+import codeloupe.secrets.PassphraseProtector
+import codeloupe.secrets.SecretStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -45,6 +47,7 @@ class UiApiTest {
     private val home = TestRepos.tmpDir("ui-home")
     private val daemon = Daemon.start(
         Config(home, port, 60_000, 120_000, 512, null, workspaces = WorkspacesConfig(repos = listOf(WorkspacesConfig.Repo(repo.toString())))),
+        secretStore = SecretStore(home.resolve("secrets").resolve("vault.env"), PassphraseProtector("pw".toCharArray(), iterations = 1_000)),
     )
     private val http = HttpClient.newHttpClient()
 
@@ -172,7 +175,8 @@ class UiApiTest {
         val settings = json("/ui-api/v1/settings").toString()
         assertTrue(settings.contains("\"port\":$port"), settings)
         assertTrue(settings.contains(repo.fileName.toString()), settings)
-        assertEquals("{\"keys\":[],\"storeReady\":false}", json("/ui-api/v1/environment").toString())
+        assertEquals("{\"keys\":[],\"storeReady\":true,\"rotationDays\":90}", json("/ui-api/v1/environment").toString())
+        assertEquals("{\"events\":[]}", json("/ui-api/v1/environment/audit").toString())
         assertEquals("{\"summary\":[],\"items\":[]}", json("/ui-api/v1/gaps").toString())
         assertEquals(404, get("/ui-api/v1/tasks/CL-1").statusCode())
     }

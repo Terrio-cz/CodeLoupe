@@ -17,7 +17,5 @@ internal class SettingsViews(private val config: Config, private val catalog: Re
         budgets = SettingsView.Budgets(null, config.budgets.rssMb, IndexViews.BUILD_PEAK_BUDGET_MB),
     )
 
-    fun environment() = EnvironmentView(emptyList(), storeReady = false)
-
     fun gaps() = Gaps(emptyList(), emptyList())
 }

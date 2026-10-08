@@ -32,6 +32,7 @@ object ConfigLoader {
             workspaces = WorkspacesConfig.parse(file),
             metrics = MetricsConfig.parse(file),
             budgets = BudgetsConfig.parse(file),
+            secrets = SecretsConfig.parse(file),
         )
     }
 
