@@ -28,6 +28,15 @@ class UsageFinder(view: View) {
         }
     }
 
+    /**
+     * True when [ref], which the index could not place exactly, can only denote one of [targets]: every declaration of its name that it may
+     * mean is theirs, no library is known to declare the name, and no other use of the name surely leaves the index.
+     */
+    fun denotesOnly(ref: RefRow, targets: Collection<DeclRow>): Boolean {
+        val r = resolve(ref)
+        return r.decls.isNotEmpty() && r.decls.all { it in targets } && !libraryNames.contains(ref.name) && !declaredOutside(ref.name)
+    }
+
     /** What one reference may denote. */
     internal fun resolve(ref: RefRow): Resolution {
         val key = Triple(ref.path, ref.line, ref.col)

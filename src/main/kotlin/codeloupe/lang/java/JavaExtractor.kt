@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiJavaFile
 import org.jetbrains.kotlin.com.intellij.psi.PsiLambdaExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiLocalVariable
 import org.jetbrains.kotlin.com.intellij.psi.PsiMethod
+import org.jetbrains.kotlin.com.intellij.psi.PsiNameIdentifierOwner
 import org.jetbrains.kotlin.com.intellij.psi.PsiMethodCallExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiMethodReferenceExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiNameValuePair
@@ -113,6 +114,8 @@ internal class JavaExtractor(private val source: Source) {
 
     private fun classLike(element: PsiClass) {
         stack += declare(element, shapes.classLike(element))
+        decls[innermost()].bodyOpen = element.lBrace?.textRange?.startOffset ?: -1
+        decls[innermost()].bodyClose = element.rBrace?.textRange?.startOffset ?: -1
         // Record components follow their class directly, before its members.
         for (component in element.recordComponents) declare(component, shapes.recordComponent(component))
         scopes.inClassBody { walkChildren(element) }
@@ -231,6 +234,7 @@ internal class JavaExtractor(private val source: Source) {
         val span = JavaSpan.of(element)
         val lines = source.lines
         val declStart = lines.line(span.start)
+        val documentation = Kdoc.offset(element, span, source)
         decls += DeclFact(
             kind = shape.kind,
             name = shape.name,
@@ -240,7 +244,7 @@ internal class JavaExtractor(private val source: Source) {
             returns = shape.returns,
             modifiers = shape.modifiers.texts,
             supertypes = shape.supertypes,
-            start = Kdoc.line(element, span, source) ?: declStart,
+            start = documentation?.let(lines::line) ?: declStart,
             declStart = declStart,
             end = lines.endLine(span.start, span.end),
             sig = shape.sig ?: shape.name,
@@ -248,7 +252,11 @@ internal class JavaExtractor(private val source: Source) {
             // An anonymous class and all inside it are code, wherever the expression stands.
             local = shape.name == JavaShapes.ANONYMOUS || stack.lastOrNull()?.let { decls[it].local || decls[it].kind in CODE_KINDS } == true,
             parent = innermost(),
-        )
+        ).also {
+            it.startOffset = documentation ?: span.start
+            it.endOffset = span.end
+            it.nameOffset = (element as? PsiNameIdentifierOwner)?.nameIdentifier?.textRange?.startOffset ?: -1
+        }
         return decls.size - 1
     }
 

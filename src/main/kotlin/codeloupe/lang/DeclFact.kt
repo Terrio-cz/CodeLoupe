@@ -21,4 +21,15 @@ data class DeclFact(
     val hash: String,
     val local: Boolean,
     val parent: Int,
-)
+) {
+    /**
+     * Offsets into the text of the file the facts were read from, for the writing tools; the index does not store them. [startOffset]
+     * is the first character of the documentation comment, else of the declaration, [endOffset] the end of the declaration,
+     * [nameOffset] the start of its name, [bodyOpen] and [bodyClose] the braces of a type's body; -1 where there is none.
+     */
+    var startOffset = -1
+    var endOffset = -1
+    var nameOffset = -1
+    var bodyOpen = -1
+    var bodyClose = -1
+}

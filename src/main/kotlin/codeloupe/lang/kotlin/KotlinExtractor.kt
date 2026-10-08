@@ -10,6 +10,7 @@ import codeloupe.platform.Sha1
 import org.jetbrains.kotlin.com.intellij.psi.PsiComment
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiErrorElement
+import org.jetbrains.kotlin.com.intellij.psi.PsiNameIdentifierOwner
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtAnonymousInitializer
 import org.jetbrains.kotlin.psi.KtBlockExpression
@@ -114,6 +115,10 @@ internal class KotlinExtractor(private val source: Source) {
     // Constructor properties follow their class directly, before its members.
     private fun classLike(element: KtClassOrObject) {
         stack += declare(element, shapes.classLike(element))
+        element.body?.let { body ->
+            decls[innermost()].bodyOpen = body.lBrace?.textRange?.startOffset ?: -1
+            decls[innermost()].bodyClose = body.rBrace?.textRange?.startOffset ?: -1
+        }
         for (parameter in element.primaryConstructorParameters) {
             if (parameter.hasValOrVar()) declare(parameter, shapes.constructorProperty(parameter))
         }
@@ -244,6 +249,7 @@ internal class KotlinExtractor(private val source: Source) {
         val span = Span.of(element)
         val lines = source.lines
         val declStart = lines.line(span.start)
+        val documentation = Kdoc.offset(element, span, source)
         decls += DeclFact(
             kind = shape.kind,
             name = JsText.bare(shape.name),
@@ -253,7 +259,7 @@ internal class KotlinExtractor(private val source: Source) {
             returns = shape.returns,
             modifiers = shape.modifiers.texts,
             supertypes = shape.supertypes,
-            start = Kdoc.line(element, span, source) ?: declStart,
+            start = documentation?.let(lines::line) ?: declStart,
             declStart = declStart,
             end = lines.endLine(span.start, span.end),
             sig = shape.sig ?: Signature.of(element, span, shape.modifiers, source),
@@ -261,7 +267,11 @@ internal class KotlinExtractor(private val source: Source) {
             // An object expression and all inside it are code, wherever the expression stands.
             local = shape.name == DeclShapes.ANONYMOUS || stack.lastOrNull()?.let { decls[it].local || decls[it].kind in CODE_KINDS } == true,
             parent = innermost(),
-        )
+        ).also {
+            it.startOffset = documentation ?: span.start
+            it.endOffset = span.end
+            it.nameOffset = (element as? PsiNameIdentifierOwner)?.nameIdentifier?.textRange?.startOffset ?: -1
+        }
         return decls.size - 1
     }
 
