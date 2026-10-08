@@ -59,7 +59,7 @@ function summary(name, runs) {
   const tool = part('tool');
   const rest = Math.max(0, tool - Math.max(part('check'), part('git') + part('jgit') + part('scan')) - part('open') - part('sql'));
   return {
-    name, n: runs.length, p50: pct(runs.map(r => r.ms), 50), p95: pct(runs.map(r => r.ms), 95), mean: mean(r => r.ms),
+    name, n: runs.length, samples: runs.map(r => Math.round(r.ms)), p50: pct(runs.map(r => r.ms), 50), p95: pct(runs.map(r => r.ms), 95), mean: mean(r => r.ms),
     spawns: mean(r => r.spawns), git: part('git'), jgit: part('jgit'), scan: part('scan'), check: part('check'), refresh: part('refresh'),
     open: part('open'), sql: part('sql'), tool, rest, http: mean(r => r.ms) - tool, rss: Math.max(...runs.map(r => r.rss ?? 0)),
   };
@@ -110,13 +110,15 @@ async function main() {
     const full = path.join(clone, file), original = fs.readFileSync(full);
     const edits = [], reverts = [];
     try {
-      for (let i = 0; i < EDITS; i++) {
+      // The first cycles start the parse worker and warm the JIT: not counted.
+      for (let i = 0; i < WARMUP + EDITS; i++) {
         fs.writeFileSync(full, Buffer.concat([original, Buffer.from(`\nfun profileEdit${i}() = ${i}\n`)]));
         await sleep(1100);
-        edits.push(await measured('find', { root: clone, q: `profileEdit${i}` }));
+        const edited = await measured('find', { root: clone, q: `profileEdit${i}` });
         fs.writeFileSync(full, original);
         await sleep(1100);
-        reverts.push(await measured('find', { root: clone, q: 'LoginFailures' }));
+        const reverted = await measured('find', { root: clone, q: 'LoginFailures' });
+        if (i >= WARMUP) { edits.push(edited); reverts.push(reverted); }
       }
     } finally { fs.writeFileSync(full, original); }
     rows.push(summary('overlay refresh: file edited (clone)', edits));
