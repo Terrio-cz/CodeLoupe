@@ -39,7 +39,7 @@ class OutputCompressorTest {
         val text = compress("git-status.txt", "git", "status").text
         assertEquals("main", text.lines().first())
         assertContains(text, "staged 2: deleted src/m1/F10.kt, modified src/m2/F11.kt")
-        assertContains(text, "unstaged 9: modified src/m0/F3.kt")
+        assertContains(text, "unstaged 9 modified: src/m0/F3.kt, src/m0/F6.kt")
         assertContains(text, "untracked 26: new1.txt")
         assertEquals(text.lines().size, compress("git-status-short.txt", "git", "status", "-sb").text.lines().size, "long and short formats say the same")
         val clean = OutputCompressor.compress(listOf("git", "status"), "On branch main\nYour branch is up to date with 'origin/main'.\n\nnothing to commit, working tree clean\n" + " ".repeat(600) + "\n")

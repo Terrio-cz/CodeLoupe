@@ -5,7 +5,7 @@ object GitStatusFamily : Family {
     private val COMMAND = Regex("""(^|[\s/\\])git(\.exe)?\s+(-\S+\s+(\S+\s+)?)*status\b""")
     private val ENTRY = Regex("""^\t(modified|new file|deleted|renamed|copied|typechange|both modified|both added|deleted by \w+|added by \w+):\s+(.+)$""")
     private val SHORT = Regex("""^([ MADRCU?!])([ MADRCU?!]) (.+)$""")
-    private const val NAMES = 6
+    private const val NAMES = 5
 
     override fun matches(line: String) = COMMAND.containsMatchIn(line)
 
@@ -59,6 +59,14 @@ object GitStatusFamily : Family {
         else -> code
     }
 
-    private fun group(name: String, items: List<String>): String? =
-        if (items.isEmpty()) null else "$name ${items.size}: " + items.take(NAMES).joinToString(", ") + if (items.size > NAMES) ", … +${items.size - NAMES}" else ""
+    /** `unstaged 9 modified: a, b, … +4` when every entry is the same kind of change, else each name keeps its kind. */
+    private fun group(name: String, items: List<String>): String? {
+        if (items.isEmpty()) return null
+        val kinds = items.map { item -> KINDS.firstOrNull { item.startsWith("$it ") }.orEmpty() }
+        val same = kinds.distinct().singleOrNull()?.takeIf { it.isNotEmpty() }
+        val names = items.take(NAMES).map { if (same != null) it.removePrefix("$same ") else it }
+        return "$name ${items.size}" + (same?.let { " $it" } ?: "") + ": " + names.joinToString(", ") + if (items.size > NAMES) ", … +${items.size - NAMES}" else ""
+    }
+
+    private val KINDS = listOf("modified", "new file", "deleted", "renamed", "copied", "typechange", "unmerged")
 }

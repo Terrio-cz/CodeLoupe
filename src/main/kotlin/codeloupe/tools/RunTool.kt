@@ -2,7 +2,6 @@ package codeloupe.tools
 
 import codeloupe.compress.OutputCompressor
 import codeloupe.events.Scrubber
-import codeloupe.jobs.CommandLine
 import codeloupe.jobs.JobReport
 import codeloupe.jobs.JobRequest
 import codeloupe.jobs.JobRunner
@@ -50,9 +49,10 @@ class RunTool(private val jobs: JobRunner) : Tool {
         val exit = ended.exit?.let { "exit $it" } ?: ended.status.name.lowercase()
         if (args.bool("raw") == true) return "$exit\n$text"
         val result = OutputCompressor.compress(command, text, cwd)
-        if (!result.shortened) return listOf(exit, result.text).filter { it.isNotEmpty() }.joinToString("\n")
+        // A command that succeeded and printed little is only its output: no header to cost more than it saves.
+        if (!result.shortened) return if (ended.exit == 0) result.text else listOf(exit, result.text).filter { it.isNotEmpty() }.joinToString("\n")
         val saved = 100 - result.text.length * 100 / text.length.coerceAtLeast(1)
-        return "${CommandLine.join(command).take(HEADER_COMMAND)} · $exit · ${text.length} → ${result.text.length} chars ($saved% less) · full output: doc path=job:${job.id}\n${result.text}"
+        return "$exit · ${text.length} → ${result.text.length} chars ($saved% less) · rest: doc path=job:${job.id}\n${result.text}"
     }
 
     /** The log, its newest [MAX_BYTES] when it is larger: the end of an output is where a build says what went wrong. */
@@ -70,6 +70,5 @@ class RunTool(private val jobs: JobRunner) : Tool {
         const val DEFAULT_WAIT = 120
         const val MAX_WAIT = 900
         const val MAX_BYTES = 4L * 1024 * 1024
-        const val HEADER_COMMAND = 80
     }
 }
