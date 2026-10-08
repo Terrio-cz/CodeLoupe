@@ -45,7 +45,10 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codeloupe-update-'));
 const dirs = { home: path.join(tmp, 'home'), userData: path.join(tmp, 'userdata'), local: path.join(tmp, 'local'), app: path.join(tmp, 'app'), feed: path.join(tmp, 'feed') };
 for (const d of [dirs.local, dirs.feed]) fs.mkdirSync(d, { recursive: true });
 const feedUrl = `http://127.0.0.1:${feedPort}/`;
-const report = { os: platform, from: vOld, to: vNew, bad: vBad ?? null, checks: {}, requests: [] };
+const report = { os: platform, from: vOld, to: vNew, bad: vBad ?? null, installerMb: Math.round(fs.statSync(newInstaller).size / 104857.6) / 10, timingsSec: {}, checks: {}, requests: [] };
+let clock = performance.now();
+/** Seconds since the previous lap, recorded under `name`. */
+const lap = name => { const now = performance.now(); report.timingsSec[name] = Math.round((now - clock) / 100) / 10; clock = now; };
 const check = (name, ok, detail = '') => {
   report.checks[name] = ok ? 'PASS' : `FAIL ${detail}`;
   log(`${ok ? 'PASS' : 'FAIL'} ${name} ${ok ? '' : detail}`);
@@ -278,17 +281,20 @@ try {
 
   // -- The real update.
   const mark = report.requests.length;
+  clock = performance.now();
   startApp();
   const pendingSeen = await waitFor('the downloaded update', () => fs.existsSync(updateFile('pending.json')) && JSON.parse(fs.readFileSync(updateFile('pending.json'), 'utf8')), 180);
+  lap('appStartToDownloadedAndBackedUp');
   check('previous daemon bundle kept before the install', fs.existsSync(path.join(dirs.userData, 'update', 'previous', 'codeloupe', '.complete')) && jarVersion(path.join(dirs.userData, 'update', 'previous', 'codeloupe')) === vOld);
   check('pending record names both versions', pendingSeen.from === vOld && pendingSeen.to === vNew, JSON.stringify(pendingSeen));
   await waitFor('the installer to replace the app', () => isInstalled(newInstaller, vNew) && !installerRunning(), 180);
+  lap('installerRun');
   await waitFor('the app to quit', () => !appAlive(), 60);
   await sleep(1500);
   const updateRequests = report.requests.slice(mark);
   const sums = updateRequests.filter(r => r.status === 200 || r.status === 206).map(r => r.path);
   report.updateRequests = updateRequests.map(r => ({ method: r.method, path: r.path, status: r.status, ua: r.headers['user-agent'], staging: r.headers['x-user-staging-id'], cookie: !!r.headers.cookie, auth: !!r.headers.authorization }));
-  check('the updater asked only the feed, for the feed file and the installer', updateRequests.length > 0 && updateRequests.every(r => r.headers.host === `127.0.0.1:${feedPort}` && (new URL(r.path, feedUrl).pathname === `/${ymlName}` || r.path.includes(`CodeLoupe-${vNew}`))), JSON.stringify(sums));
+  check('the updater asked only the feed, for the feed file and the installer', updateRequests.length > 0 && updateRequests.every(r => r.headers.host === `127.0.0.1:${feedPort}` && (new URL(r.path, feedUrl).pathname === `/${ymlName}` || /^\/CodeLoupe-[^/]+\.(exe|AppImage)(\.blockmap)?$/.test(r.path))), JSON.stringify(sums));
   // Standard HTTP headers (host, accept-encoding, sec-fetch-*) aside, nothing is sent but a bare User-Agent, an English
   // Accept-Language (not the system's) and a constant where electron-updater would put a per-installation id.
   const plain = new Set(['host', 'connection', 'accept', 'accept-encoding', 'accept-language', 'cache-control', 'user-agent', 'range', 'if-range', 'x-user-staging-id', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest']);
@@ -305,8 +311,10 @@ try {
     report.formatBefore = rec.format;
     fs.writeFileSync(repoFile, JSON.stringify({ ...rec, format: '1/older-extractor' }));
   }
+  clock = performance.now();
   startApp();
   const statusNew = await waitFor('the daemon of N+1', async () => { const s = await status(); return s?.name === 'codeloupe' && s; }, 120);
+  lap('newAppStartToDaemonUp');
   check('daemon runs the new version', statusNew.version === vNew, `/status says ${statusNew.version}`);
   const cmdline = daemonCommandLine(statusNew.pid);
   check('daemon runs from the new bundle', cmdline.includes(`codeloupe-${vNew}.jar`) && !cmdline.includes(`codeloupe-${vOld}.jar`), cmdline);
@@ -333,8 +341,10 @@ try {
     await waitFor('the update to the bad build', () => isInstalled(badInstaller, vBad) && !installerRunning(), 240);
     await waitFor('the app to quit', () => !appAlive(), 60);
     await sleep(1500);
+    clock = performance.now();
     startApp({ CODELOUPE_UPDATE_FEED: '' });
     const rolled = await waitFor('the previous daemon', async () => { const s = await status(); return s?.name === 'codeloupe' && s; }, 180);
+    lap('brokenBuildStartToPreviousDaemonUp');
     check('failed start rolled back to the previous daemon', rolled.version === vNew, `/status says ${rolled.version}`);
     const cl = daemonCommandLine(rolled.pid);
     check('the previous bundle runs', cl.includes(`codeloupe-${vNew}.jar`) && cl.replaceAll('\\', '/').includes('/update/previous/'), cl);
