@@ -49,7 +49,7 @@ class TaskCodeTest {
         fake.edit("CL-91", 1_791_500_000_000L) { issue ->
             issue["description"] = JsonPrimitive(
                 "## Context\nThe `Billing.total` path is read by `src/main/kotlin/demo/Use.kt` and served on `GET /v1/orders/{id}`.\n" +
-                    "Billing rules move to a new `src/main/kotlin/demo/Later.kt`; `Nonexistent.foo` is gone.\n\n" +
+                    "Billing rules move to a new `src/main/kotlin/demo/Later.kt`; `Nonexistent.foo` is gone. The page `src/views/Admin.jsx:320` and `notes.md/audit.md` are not ours.\n\n" +
                     "## Acceptance criteria\n- [ ] Routes keep answering\n- [ ] `useAll()` stays green\n- [ ] `docs/notes.md` says so\n",
             )
         }
@@ -131,6 +131,7 @@ class TaskCodeTest {
         assertContains(text, Regex("~ $ROUTES:4  holds `/v1/orders/` +← `GET /v1/orders/\\{id}` in Context"))
         assertContains(text, Regex("\\+ src/main/kotlin/demo/Later.kt  not in the repository: new\\? +← `src/main/kotlin/demo/Later.kt` in Context"))
         assertContains(text, "not in the index: `Nonexistent.foo`")
+        assertFalse(text.lines().any { it.startsWith("+ src/views") || it.startsWith("+ notes.md") }, "a path whose folder is missing is not a file to come: $text")
         assertContains(text, Regex("= docs/notes.md  \\(not indexed\\) +← `docs/notes.md` in criterion 3"))
         assertFalse("landed" in text, text)
 

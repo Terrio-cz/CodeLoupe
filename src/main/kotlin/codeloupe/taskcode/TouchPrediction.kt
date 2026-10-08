@@ -91,13 +91,13 @@ class TouchPrediction(private val view: View, private val worktree: Path) {
         val exact = Resolver.resolvePath(view, suffix)
         if (exact != null) {
             val decl = line?.let { Resolver.resolve(view, "$exact:$it").firstOrNull() }
-            return Outcome.Found(listOf(if (decl != null) declPrediction(Prediction.SURE, decl, m) else Prediction(Prediction.SURE, exact, exact, "", listOf(m.evidence))))
+            return Outcome.Found(listOf(if (decl != null) declPrediction(Prediction.LIKELY, decl, m) else Prediction(Prediction.SURE, exact, exact, "", listOf(m.evidence))))
         }
         val candidates = view.filesBySuffix(if (suffix.startsWith("/")) suffix else "/$suffix")
         if (candidates.isEmpty()) {
-            // The index holds source files only: a docs or build file is looked up on disk. A whole path neither has is probably a file to come.
+            // The index holds source files only: a docs or build file is looked up on disk. A path neither has is a file to come only where its folder exists: `src/views/Admin.jsx` is another repository's.
             if (onDisk(suffix)) return Outcome.Found(listOf(Prediction(Prediction.SURE, suffix, suffix, "(not indexed)", listOf(m.evidence))))
-            return if ('/' in suffix) Outcome.Found(listOf(Prediction(Prediction.NEW, suffix, suffix, "not in the repository: new?", listOf(m.evidence)))) else Outcome.Unresolved
+            return if (parentExists(suffix)) Outcome.Found(listOf(Prediction(Prediction.NEW, suffix, suffix, "not in the repository: new?", listOf(m.evidence)))) else Outcome.Unresolved
         }
         return Outcome.Found(listOf(Prediction(Prediction.GUESS, suffix, null, "${candidates.size} files: ${few(candidates)}", listOf(m.evidence))))
     }
@@ -157,6 +157,9 @@ class TouchPrediction(private val view: View, private val worktree: Path) {
         val fixed = route.split(Regex("\\{[^}]*}|:[A-Za-z_]+|\\*")).maxByOrNull { it.length }.orEmpty()
         return fixed.takeIf { it.length >= MIN_NEEDLE }
     }
+
+    private fun parentExists(path: String): Boolean =
+        '/' in path && !path.contains("..") && runCatching { Files.isDirectory(worktree.resolve(path.substringBeforeLast('/'))) }.getOrDefault(false)
 
     private fun onDisk(path: String): Boolean = !path.contains("..") && runCatching { Files.isRegularFile(worktree.resolve(path)) }.getOrDefault(false)
 

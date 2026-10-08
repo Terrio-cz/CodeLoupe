@@ -10,7 +10,7 @@ class CodeLoupeCommand : CliktCommand(name = "codeloupe") {
         subcommands(
             DaemonCommand(), StartCommand(), StopCommand(), StatusCommand(),
             FindCommand(), OutlineCommand(), SymbolCommand(), UsagesCommand(), CallsCommand(), HierarchyCommand(), ChangesCommand(),
-            IssueCommand(), TasksCommand(), TaskCodeCommand(), UpdateCommand(), JobCommand(), WebhookCommand(),
+            IssueCommand(), TasksCommand(), TaskCodeCommand(), CodeTasksCommand(), UpdateCommand(), JobCommand(), WebhookCommand(),
             McpConfigCommand(),
         )
     }
