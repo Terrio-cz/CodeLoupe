@@ -1,0 +1,9 @@
+{
+  "name": "codeloupe",
+  "version": "0.1.0",
+  "description": "CodeLoupe for Claude Code: exact declarations, outlines, usages, callers and branch changes from a local code index, plus tracker tasks and long jobs. Starts the daemon with the session.",
+  "author": { "name": "Terrio" },
+  "homepage": "https://github.com/Terrio-cz/CodeLoupe",
+  "repository": "https://github.com/Terrio-cz/CodeLoupe",
+  "keywords": ["code-index", "mcp", "kotlin", "tokens"]
+}

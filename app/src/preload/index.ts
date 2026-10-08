@@ -20,6 +20,11 @@ const bridge: CodeLoupeBridge = {
     set: s => ipcRenderer.invoke(CH.settingsSet, s),
     proposeCli: (command, args) => ipcRenderer.invoke(CH.settingsProposeCli, command, args),
   },
+  claude: {
+    status: () => ipcRenderer.invoke(CH.claudeStatus),
+    connect: kind => ipcRenderer.invoke(CH.claudeConnect, kind),
+    manual: kind => ipcRenderer.invoke(CH.claudeManual, kind),
+  },
   metrics: () => ipcRenderer.invoke(CH.metrics),
   open: {
     worktree: id => ipcRenderer.invoke(CH.openWorktree, id),

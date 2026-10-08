@@ -27,6 +27,25 @@ export interface AppMetrics {
   electron: string;
 }
 
+export type ClaudeConnectKind = 'mcp' | 'plugin';
+
+export interface ClaudeStatus {
+  /** The claude CLI was found and runs. */
+  cli: boolean;
+  /** A user-visible MCP server named codeloupe exists. */
+  mcp: boolean;
+  /** The codeloupe plugin is installed. */
+  plugin: boolean;
+}
+
+export interface ClaudeConnectResult {
+  ok: boolean;
+  /** One line for the user: what happened, or why not. */
+  message: string;
+  /** The same steps as shell commands, for doing it by hand. */
+  manual: string[];
+}
+
 /** The only surface the renderer gets (preload contextBridge). */
 export interface CodeLoupeBridge {
   api<T = unknown>(req: ApiRequest): Promise<ApiResult<T>>;
@@ -42,6 +61,13 @@ export interface CodeLoupeBridge {
     set(s: Partial<RendererSettings>): Promise<AppSettings>;
     /** Main asks the user in a native dialog; resolves with the settings after the answer. */
     proposeCli(command: string, args: string[]): Promise<AppSettings>;
+  };
+  claude: {
+    status(): Promise<ClaudeStatus>;
+    /** Main asks the user in a native dialog first; resolves with 'cancelled' when they decline. */
+    connect(kind: ClaudeConnectKind): Promise<ClaudeConnectResult | 'cancelled'>;
+    /** The commands for doing it by hand. */
+    manual(kind: ClaudeConnectKind): Promise<string[]>;
   };
   metrics(): Promise<AppMetrics>;
   open: {
@@ -63,6 +89,9 @@ export const CH = {
   settingsGet: 'cl:settings:get',
   settingsSet: 'cl:settings:set',
   settingsProposeCli: 'cl:settings:propose-cli',
+  claudeStatus: 'cl:claude:status',
+  claudeConnect: 'cl:claude:connect',
+  claudeManual: 'cl:claude:manual',
   metrics: 'cl:metrics',
   openWorktree: 'cl:open:worktree',
   openConfig: 'cl:open:config',

@@ -1,0 +1,12 @@
+{
+  "name": "codeloupe",
+  "owner": { "name": "Terrio" },
+  "metadata": { "description": "CodeLoupe: on-demand code index and tracker mirror for AI coding agents" },
+  "plugins": [
+    {
+      "name": "codeloupe",
+      "source": "./plugin",
+      "description": "MCP tools for declarations, outlines, usages, callers, branch changes, tasks and long jobs, served by the local CodeLoupe daemon."
+    }
+  ]
+}
