@@ -8,7 +8,7 @@ import { generate, parseChecksums } from './packaging-manifests.mjs';
 
 const VERSION = '1.2.3-rc1';
 const REPO = 'Terrio-cz/CodeLoupe';
-const NAMES = ['win-x64.exe', 'mac-arm64.dmg', 'mac-x64.dmg', 'linux-x64.AppImage'].map(s => `CodeLoupe-${VERSION}-${s}`);
+const NAMES = ['win-x64.exe', 'mac-arm64.dmg', 'mac-x64.dmg', 'linux-x86_64.AppImage'].map(s => `CodeLoupe-${VERSION}-${s}`);
 const sha = buf => crypto.createHash('sha256').update(buf).digest('hex');
 
 /** A release directory of small fixture files with a SHA256SUMS.txt in sha256sum's format. */

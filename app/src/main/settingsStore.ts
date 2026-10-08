@@ -21,10 +21,7 @@ export class SettingsStore {
     // Settings written before the onboarding existed belong to someone who has used the app: no first-run flow for them.
     if (stored && typeof stored === 'object' && Object.keys(stored).length > 0 && typeof (stored as Record<string, unknown>).onboardingDone !== 'boolean') (stored as Record<string, unknown>).onboardingDone = true;
     this.value = sanitizeSettings(stored, bundled ? { ...DEFAULT_SETTINGS, apiSource: 'daemon' } : DEFAULT_SETTINGS);
-    if (bundled && this.value.cliCommand === DEFAULT_SETTINGS.cliCommand && this.value.cliArgs.length === 0) {
-      this.overlay.cliCommand = bundled.command;
-      this.overlay.cliArgs = bundled.args;
-    }
+    this.setBundled(bundled);
     try {
       const cli: unknown = env.CODELOUPE_APP_CLI ? JSON.parse(env.CODELOUPE_APP_CLI) : null;
       if (Array.isArray(cli) && isValidCli(cli[0], cli.slice(1))) {
@@ -35,6 +32,16 @@ export class SettingsStore {
     // A scripted verification run (screenshots, tour, CODELOUPE_APP_ONBOARDING=skip) goes straight to the screens.
     if (env.CODELOUPE_APP_ONBOARDING === 'skip' || env.CODELOUPE_APP_SCREENSHOTS || env.CODELOUPE_APP_TOUR) this.overlay.onboardingDone = true;
     if (env.CODELOUPE_APP_API === 'mock' || env.CODELOUPE_APP_API === 'daemon') this.overlay.apiSource = env.CODELOUPE_APP_API;
+  }
+
+  /**
+   * Runs `bundled` as the daemon unless the user chose another CLI. Called again to switch to another bundle
+   * (the previous one, when the new daemon does not start: CL-107).
+   */
+  setBundled(bundled: BundledDaemon | null): void {
+    if (!bundled || this.value.cliCommand !== DEFAULT_SETTINGS.cliCommand || this.value.cliArgs.length > 0) return;
+    this.overlay.cliCommand = bundled.command;
+    this.overlay.cliArgs = bundled.args;
   }
 
   get(): AppSettings {

@@ -5,6 +5,8 @@ import path from 'node:path';
 export interface BundledDaemon {
   command: string;
   args: string[];
+  /** Version of the bundle, from the name of its jar: what `/status` of a daemon started from it reports. */
+  version: string;
 }
 
 // The launcher's flags for a short-lived CLI (gradle/start/codeloupe) without its class-data archive.
@@ -33,7 +35,8 @@ export function findBundledDaemon(resources: string, opts: BundleOptions = {}): 
   const java = path.join(root, 'runtime', 'bin', platform === 'win32' ? 'java.exe' : 'java');
   const jar = fs.readdirSync(path.join(root, 'lib')).filter(f => /^codeloupe-.+\.jar$/.test(f)).sort().pop();
   if (!jar || !isFile(java)) return null;
-  return { command: java, args: [...JVM_FLAGS, '-jar', path.join(root, 'lib', jar)] };
+  const version = /^codeloupe-(.+)\.jar$/.exec(jar)?.[1] ?? '';
+  return { command: java, args: [...JVM_FLAGS, '-jar', path.join(root, 'lib', jar)], version };
 }
 
 /**

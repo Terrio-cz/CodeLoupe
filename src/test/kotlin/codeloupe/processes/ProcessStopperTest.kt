@@ -14,8 +14,8 @@ class ProcessStopperTest {
 
     private fun stopper(children: ChildProcesses) = ProcessStopper(children.world(), probeMs = 400, graceMs = 10_000)
 
-    private fun stop(children: ChildProcesses, process: Process, path: java.nio.file.Path = workspace): ProcessStopper.Outcome {
-        val listed = children.awaitListed(process)
+    private fun stop(children: ChildProcesses, process: Process, path: java.nio.file.Path = workspace, settle: Boolean = true): ProcessStopper.Outcome {
+        val listed = children.awaitListed(process, settle = settle)
         return stopper(children).stop(listed.pid, listed.startMs, path.toString().replace('\\', '/'))
     }
 
@@ -32,7 +32,7 @@ class ProcessStopperTest {
     fun `a daemon that is working is left alone and reported as busy`() {
         ChildProcesses().use { children ->
             val daemon = children.start(workspace, GRADLE_DAEMON_MARKER, spinMs = 60_000)
-            val outcome = stop(children, daemon)
+            val outcome = stop(children, daemon, settle = false)
             assertIs<ProcessStopper.Outcome.Blocked>(outcome)
             assertTrue(outcome.reason.startsWith("busy"), outcome.reason)
             assertTrue(daemon.isAlive)
