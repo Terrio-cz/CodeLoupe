@@ -98,6 +98,14 @@ class DispatchTest {
     }
 
     @Test
+    fun `resolved tasks wait unless the plan is a replay of past work`() {
+        assertContains(plan(ids("CL-16", "CL-27")), Regex("CL-16 +already resolved"))
+        val replay = plan(ids("CL-16", "CL-27"), "replay" to JsonPrimitive(true))
+        assertContains(replay, "CL-16")
+        assertFalse("already resolved" in replay, replay)
+    }
+
+    @Test
     fun `an epic's open leaf tasks are the candidates and nothing to place says so`() {
         val text = plan("epic" to JsonPrimitive("CL-4"))
         assertContains(text, "dispatch plan: ")

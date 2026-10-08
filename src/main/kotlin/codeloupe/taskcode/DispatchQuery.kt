@@ -15,10 +15,11 @@ import codeloupe.tracker.read.TaskRows
  * of sections `windows`, `waiting` and `live` so a repeated call costs one line when nothing changed.
  */
 class DispatchQuery(private val trackers: Trackers, private val code: TaskCodeQuery) {
-    class Request(val candidates: List<String>, val epic: String?, val query: String?, val slots: Int, val width: DispatchPlan.Width)
+    class Request(val candidates: List<String>, val epic: String?, val query: String?, val slots: Int, val width: DispatchPlan.Width, val replay: Boolean = false)
 
     suspend fun build(root: String, request: Request): Doc {
-        val live = code.liveWindows(root)
+        // A replay plans past work again: resolved tasks count, with the files they landed, and no live window blocks.
+        val live = if (request.replay) emptyList() else code.liveWindows(root)
         val held = live.flatMap { w -> w.tasks.map { it to w.branch } }.toMap()
         val (rows, notes) = candidates(request, held)
         if (rows.isEmpty() && notes.isEmpty()) return Doc.of("dispatch:none", emptyList())
@@ -33,7 +34,7 @@ class DispatchQuery(private val trackers: Trackers, private val code: TaskCodeQu
         }
         val plan = DispatchPlan(request.width).plan(tasks, liveSets, request.slots)
         val byId = tasks.associateBy { it.id }
-        val spec = listOf(request.candidates.joinToString(","), request.epic.orEmpty(), request.query.orEmpty(), request.slots, request.width).joinToString("|")
+        val spec = listOf(request.candidates.joinToString(","), request.epic.orEmpty(), request.query.orEmpty(), request.slots, request.width, request.replay).joinToString("|")
         return Doc.of("dispatch:${DocHash.of(spec)}", listOf(
             Triple("windows", "windows", windows(plan, byId, request)),
             Triple("waiting", "waiting", waiting(plan, notes)),
@@ -53,7 +54,7 @@ class DispatchQuery(private val trackers: Trackers, private val code: TaskCodeQu
             trackers.mirrors.flatMap { TaskList.matching(it.store, TaskFilter.parse(words), ReadyTasks.LEAF) }
                 .let { if (request.epic == null && request.query == null) it.take(DEFAULT_POOL) else it }
         }
-        val (taken, free) = rows.partition { it.resolved || it.id.uppercase() in held }
+        val (taken, free) = rows.partition { (it.resolved && !request.replay) || it.id.uppercase() in held }
         taken.forEach { left += DispatchPlan.Waiting(it.id, if (it.resolved) "already resolved" else "in a worktree already (${held[it.id.uppercase()]})") }
         return free to left
     }
