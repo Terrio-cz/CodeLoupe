@@ -28,7 +28,7 @@ class CodeLoupeCommand(requested: String? = null) : CliktCommand(name = "codelou
             "calls" to ::CallsCommand, "hierarchy" to ::HierarchyCommand, "changes" to ::ChangesCommand,
             "issue" to ::IssueCommand, "tasks" to ::TasksCommand, "task_code" to ::TaskCodeCommand, "code_tasks" to ::CodeTasksCommand,
             "update" to ::UpdateCommand, "job" to ::JobCommand, "webhook" to ::WebhookCommand, "workspaces" to ::WorkspacesCommand, "ws" to ::WsCommand,
-            "mcp-config" to ::McpConfigCommand,
+            "metrics" to ::MetricsCommand, "mcp-config" to ::McpConfigCommand,
         )
     }
 }

@@ -18,6 +18,8 @@ data class PlanEntry(
     val workspaceState: WorkspaceState? = null,
     val verdict: Verdict,
     val reason: String,
+    /** The workspace was released (`ws release`): this entry goes without asking, whatever state the workspace is in. */
+    val released: Boolean = false,
     /** Failed or blocked attempts so far; the next one waits until [nextAttempt]. */
     val attempts: Int = 0,
     val nextAttempt: String? = null,

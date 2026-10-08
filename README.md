@@ -260,6 +260,17 @@ is retried without a second confirmation. With `auto` on the daemon runs the `au
 a job finished, every `intervalMinutes` while a client has called the daemon in the last 15 minutes, and whenever a retry
 falls due. Every attempt is written to `daemon.log` and `<home>/reconcile.jsonl` and emitted as a `reconcile.action` event.
 
+**Release instead of cleanup.** `codeloupe ws release <worktree directory | worktree name | task id> [--repo <path>]`
+(`POST /workspaces/release`) marks a workspace released and returns at once, whatever Docker or a lock is doing: it writes
+one small file (`<home>/releases.json`) and wakes the reconciler in the background. Every resource of that workspace,
+labelled or adopted, whatever state the workspace is in and whether its containers run, becomes an `auto` entry
+(`released` in the plan) and is removed with the usual retries, **also with `auto` off**: the release is the
+confirmation. A protect rule still wins. A mark covers what the workspace had created up to the release, so a new
+workspace of the same name is not cleaned by an old mark, and it goes when nothing of it is left (or after 30 days).
+`ws release --list` (and `releases` in `codeloupe status`) shows what is left of each release and what is retrying.
+The main worktree cannot be released. A close-out step calls `ws release` instead of `docker compose down` and the
+cleanup of leftovers.
+
 ```json
 { "workspaces": { "reconcile": { "auto": true, "intervalMinutes": 30, "graceMinutes": 60, "retryBaseMinutes": 1, "retryMaxMinutes": 360,
   "protect": [ { "match": "^terrio-importer(_|$)" }, { "match": "^terrio-importer_terrio-postgres-data$", "kinds": ["volume"] } ] } } }
@@ -267,6 +278,19 @@ falls due. Every attempt is written to `daemon.log` and `<home>/reconcile.jsonl`
 
 `auto` is off by default. `protect` patterns are regular expressions tried (case-insensitively, anywhere in the name,
 so anchor them) against each name of a resource and its compose project; without `kinds` they also cover directories.
+
+### Ports per workspace
+
+With `"ports": { "range": [19000, 19999] }` under `workspaces`, a workspace asks for a port by name:
+`codeloupe ws ports allocate app` prints the port of `app` in the workspace of the directory (the same name always gets the
+same one; `postgres`, `web`, … get others). A new port is one that nothing listens on (it is bound and connected to), no
+container publishes and no workspace has recorded, so it never collides with a live listener; the allocation is a record
+in `<home>/ports.json`, it holds nothing open. `codeloupe ws ports` (and `GET /ports`, for the app) lists every allocation
+with what holds it now: `free`; `in-use` by the workspace's own container or by a process whose command line names the
+workspace; or `conflict` with the owning container (and its workspace, or none) or the process (pid and command line, from
+`netstat` / `ss` / `lsof`). Ports of the range held by something that is no workspace's are listed as `foreign` (today
+the 19002 / 19003 slots with a foreign container). `ws ports free [name]` forgets a port, and `ws release` frees all of the
+workspace's. `codeloupe status` shows `portAllocations`.
 
 ## Desktop app
 
@@ -315,6 +339,28 @@ size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`.
 p95 chars, empty and busy rate of the last 1000 calls, per tool) and `budgets` (`ok` and the `warnings` for what exceeds
 `config.json` `budgets`); `/status/history` lists RSS, heap and CPU readings taken while the daemon is used (one a minute,
 the last 240).
+
+## Measuring agent runs
+
+`codeloupe metrics` reads Claude Code transcripts (`~/.claude/projects/<project>/*.jsonl`, subagent runs under
+`<session>/subagents/`) and needs no daemon. A run is one session (role `main`), one subagent or one phase-mode run.
+
+```bash
+codeloupe metrics collect --since 2026-09-23 --until 2026-10-02 --label baseline --dir ~/.claude/projects/<project>
+codeloupe metrics compare baseline-2026-10-08.json after-2026-10-20.json
+codeloupe metrics gaps --since 2026-10-01               # where CodeLoupe calls fell short, by week and query shape
+codeloupe metrics boilerplate --since 2026-09-23         # skeleton share of the new code files agents write
+```
+
+`collect` writes one JSON report with, per role, median / p75 / sum of cost (relative price units: input 1, 5 min cache
+write 1.25, 1 h write 2, read 0.1, output 5), peak context, turns, wall time, code reads and rereads, edit errors, and the
+tool categories ranked by what their results cost while they stay in context. The report has the field names of the Terrio
+workspace's `run/codemetrics.mjs`, and on the same transcripts the figures are identical. `gaps` counts a CodeLoupe call
+(MCP tool or `codeloupe` on a shell) followed within two turns by a code read, search or `rg`/`cat` naming the same
+symbol or file, and calls answered empty, busy or with candidates only. Large windows are read one run at a time; add
+`CODELOUPE_OPTS=-Xmx1g` when a single transcript holds huge lines. `config.json` `metrics`: `transcriptDirs`,
+`categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
+ones, which know the Terrio workspace's shell commands) and `defaultCategories` (false = only yours).
 
 ## Bundle
 

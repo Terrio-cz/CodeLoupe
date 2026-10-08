@@ -12,6 +12,8 @@ data class DockerObject(
     /** Containers: running, exited, …; nothing for the other kinds. */
     val state: String? = null,
     val created: String? = null,
+    /** Containers: the host ports it publishes. */
+    val publishedPorts: List<Int> = emptyList(),
 ) {
     /** The compose project that created it; its name is matched by adoption rules too. */
     val project: String? get() = labels[COMPOSE_PROJECT]?.takeIf { it.isNotBlank() }

@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * `"workspaces": { "abandonedDays": 14, "repos": [ { "path": "<repo>", "roots": ["<directory holding its worktrees>"] } ] }`.
  * A repository is also known when a tracker lists it in `repos`; `<repo name>-worktrees` next to the repository is
  * always a root. A repo entry may be just the path. `adoption` maps resources without CodeLoupe labels to workspaces,
- * see [AdoptionRule]; `reconcile` configures the cleanup of released workspaces, see [ReconcileConfig].
+ * see [AdoptionRule]; `reconcile` configures the cleanup of released workspaces, see [ReconcileConfig]; `ports` gives the range of the port registry, see [PortsConfig].
  */
 data class WorkspacesConfig(
     val repos: List<Repo> = emptyList(),
@@ -17,6 +17,7 @@ data class WorkspacesConfig(
     val abandonedDays: Int = 14,
     val adoption: List<AdoptionRule> = emptyList(),
     val reconcile: ReconcileConfig = ReconcileConfig(),
+    val ports: PortsConfig = PortsConfig(),
 ) {
     data class Repo(val path: String, val roots: List<String> = emptyList())
 
@@ -31,7 +32,7 @@ data class WorkspacesConfig(
                 }
             }
             val adoption = (section["adoption"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(AdoptionRule::parse) }
-            return WorkspacesConfig(repos, (section["abandonedDays"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it > 0 } ?: 14, adoption, ReconcileConfig.parse(section["reconcile"] as? JsonObject))
+            return WorkspacesConfig(repos, (section["abandonedDays"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it > 0 } ?: 14, adoption, ReconcileConfig.parse(section["reconcile"] as? JsonObject), PortsConfig.parse(section["ports"] as? JsonObject))
         }
 
         private fun text(element: Any?): String? = (element as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }

@@ -85,6 +85,45 @@ class ReconcilePlannerTest {
     }
 
     @Test
+    fun `a released workspace's resources go by themselves, labelled or adopted, active or not, running or not`() {
+        val at = Instant.parse("2026-10-08T11:00:00Z")
+        val released = ReconcilePlanner(ReconcileConfig(graceMinutes = 60), { repo, workspace -> at.takeIf { repo == "Terrio" && workspace == "TER-1" } }) { now }
+        val plan = released.plan(
+            listOf(
+                resource(ResourceKind.CONTAINER, "web", "TER-1", WorkspaceState.ACTIVE, containerState = "running", created = old),
+                resource(ResourceKind.VOLUME, "adopted-1", "TER-1", WorkspaceState.ACTIVE, OwnershipClass.ADOPTED),
+                resource(ResourceKind.VOLUME, "young-1", "TER-1", WorkspaceState.LANDED, created = "2026-10-08T10:59:00.000Z"),
+                resource(ResourceKind.VOLUME, "other-2", "TER-2", WorkspaceState.ACTIVE),
+            ),
+            registry(),
+        )
+        val byName = plan.associateBy { it.name }
+        listOf("web", "adopted-1", "young-1").forEach {
+            assertEquals(Verdict.AUTO, byName.getValue(it).verdict, it)
+            assertTrue(byName.getValue(it).released, it)
+        }
+        assertEquals(Verdict.KEEP, byName.getValue("other-2").verdict)
+        assertEquals(false, byName.getValue("other-2").released)
+    }
+
+    @Test
+    fun `a release covers what existed when it was made, not a workspace of the same name made later, and never a protected resource`() {
+        val at = Instant.parse("2026-10-08T11:00:00Z")
+        val released = ReconcilePlanner(ReconcileConfig(protect = listOf(ProtectRule(Regex("^keep")))), { _, _ -> at }) { now }
+        val v = released.plan(
+            listOf(
+                resource(ResourceKind.VOLUME, "before", "TER-1", WorkspaceState.ACTIVE, created = "2026-10-08T10:00:00.000Z"),
+                resource(ResourceKind.VOLUME, "after", "TER-1", WorkspaceState.ACTIVE, created = "2026-10-08T11:30:00.000Z"),
+                resource(ResourceKind.VOLUME, "keep-me", "TER-1", WorkspaceState.ACTIVE, created = "2026-10-08T10:00:00.000Z"),
+            ),
+            registry(),
+        ).associate { it.name to it.verdict }
+        assertEquals(Verdict.AUTO, v["before"])
+        assertEquals(Verdict.KEEP, v["after"])
+        assertEquals(Verdict.PROTECTED, v["keep-me"])
+    }
+
+    @Test
     fun `resources of a repository the registry does not know are kept`() {
         val v = verdicts(resource(ResourceKind.VOLUME, "other-repo", "X-1", null, repo = "Elsewhere"))
         assertEquals(Verdict.KEEP, v["other-repo"])

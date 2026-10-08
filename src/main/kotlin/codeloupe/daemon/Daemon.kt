@@ -5,6 +5,7 @@ import codeloupe.JsonFormat
 import codeloupe.config.Config
 import codeloupe.config.PortPolicy
 import codeloupe.docker.DockerApi
+import codeloupe.docker.ResourceKind
 import codeloupe.docker.ResourceInventory
 import codeloupe.docker.resourceRoutes
 import codeloupe.events.EventBus
@@ -16,11 +17,17 @@ import codeloupe.events.eventRoutes
 import codeloupe.jobs.JobRunner
 import codeloupe.jobs.JobTool
 import codeloupe.jobs.jobRoutes
+import codeloupe.ports.LocalPorts
+import codeloupe.ports.PortRegistry
+import codeloupe.ports.PortStore
+import codeloupe.ports.portRoutes
 import codeloupe.reconcile.ReconcileExecutor
 import codeloupe.reconcile.ReconcilePlanner
 import codeloupe.reconcile.ReconcileRecorder
 import codeloupe.reconcile.ReconcileScheduler
 import codeloupe.reconcile.ReconcileState
+import codeloupe.reconcile.ReleaseStore
+import codeloupe.reconcile.releaseRoutes
 import codeloupe.reconcile.Reconciler
 import codeloupe.reconcile.reconcileRoutes
 import codeloupe.platform.IsoTime
@@ -31,6 +38,7 @@ import codeloupe.tracker.TrackerSettingsLoader
 import codeloupe.tracker.Trackers
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
+import codeloupe.workspace.WorkspaceRef
 import codeloupe.workspace.Workspaces
 import codeloupe.workspace.workspaceRoutes
 import io.ktor.http.ContentType
@@ -98,10 +106,15 @@ class Daemon private constructor(
     private val workspaces = Workspaces(config, registry, trackers)
     private val resources = ResourceInventory(config, workspaces)
     private val reconcileConfig = config.workspaces.reconcile
+    private val releases = ReleaseStore(config.home.resolve("releases.json"))
     private val reconciler = Reconciler(
-        reconcileConfig, { workspaces.list() }, { resources.report(it) }, ReconcilePlanner(reconcileConfig),
-        ReconcileExecutor({ DockerApi.connect() })::execute, ReconcileState(config.home.resolve("reconcile-state.json"), reconcileConfig),
+        reconcileConfig, { workspaces.list() }, { resources.report(it) }, ReconcilePlanner(reconcileConfig, releases::releasedAt),
+        ReconcileExecutor({ DockerApi.connect() })::execute, ReconcileState(config.home.resolve("reconcile-state.json"), reconcileConfig), releases, ::log,
         ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
+    )
+    private val ports = PortRegistry(
+        config.workspaces.ports, PortStore(config.home.resolve("ports.json")), LocalPorts(),
+        { resources.report().takeIf { it.engine != null }?.resources?.filter { it.kind == ResourceKind.CONTAINER } },
     )
     @Volatile private var lastClientCall: Instant? = null
     private val history = ResourceHistory()
@@ -124,7 +137,7 @@ class Daemon private constructor(
             heapMb = (runtime.totalMemory() - runtime.freeMemory()) / MB, cpuSec = cpu,
             calls = runner.stats(), latency = latency, budgets = BudgetState.check(config.budgets, latency, rss, queueSnapshot.waitMsMax),
             queue = queueSnapshot, repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
-            gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(),
+            gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(), portAllocations = ports.allocated,
         )
     }
 
@@ -140,6 +153,13 @@ class Daemon private constructor(
             val info = JsonFormat.json.decodeFromString(DaemonInfo.serializer(), Files.readString(infoFile))
             if (info.pid == pid) Files.deleteIfExists(infoFile)
         }
+    }
+
+    // A workspace was released: its cleanup starts at once, in the background, whatever the request is waiting for.
+    private fun released(ref: WorkspaceRef) {
+        log("workspace ${ref.workspace} of ${ref.repo} released")
+        ports.free(ref)
+        scope.launch { runCatching { reconciler.run("release", auto = reconcileConfig.auto) } }
     }
 
     private fun log(message: String) = log.append("${IsoTime.now()} $message")
@@ -214,6 +234,8 @@ class Daemon private constructor(
             workspaceRoutes(workspaces)
             resourceRoutes(resources)
             reconcileRoutes(reconciler)
+            releaseRoutes(workspaces, releases, reconciler, ::released)
+            portRoutes(ports)
             eventRoutes(events, webhooks, webhookKey)
             post("/shutdown") {
                 val pending = jobs.pending()
