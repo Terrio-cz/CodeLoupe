@@ -21,6 +21,8 @@ const VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 const WINGET_SCHEMA = '1.6.0';
 const DESCRIPTION = 'On-demand code index for AI coding agents: declarations, outlines, usages and callers instead of whole files.';
+// Homebrew wants under 80 characters, no full stop and nothing but the product's own words.
+const CASK_DESCRIPTION = 'On-demand code index for AI coding agents';
 const LICENSE_ID = 'PolyForm-Noncommercial-1.0.0';
 
 /** `<hash>  <name>` lines of sha256sum (text or binary mode) as { name: lowercase hash }. */
@@ -137,13 +139,15 @@ export function caskManifest(c) {
 
   url "https://github.com/${c.repo}/releases/download/v#{version}/CodeLoupe-#{version}-mac-#{arch}.dmg"
   name "CodeLoupe"
-  desc "${DESCRIPTION}"
+  desc "${CASK_DESCRIPTION}"
   homepage "${c.homepage}"
 
   livecheck do
     url :url
     strategy :github_latest
   end
+
+  depends_on :macos
 
   app "CodeLoupe.app"
   binary "#{appdir}/CodeLoupe.app/Contents/Resources/codeloupe/bin/codeloupe"
