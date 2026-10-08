@@ -29,7 +29,20 @@ const mb = bytes => Math.round(bytes / 1048576 * 10) / 10;
 // A machine without Java: no JAVA_HOME-style variables, no PATH directory with a java executable.
 const javaName = windows ? 'java.exe' : 'java';
 const pathKey = Object.keys(process.env).find(k => k.toLowerCase() === 'path') ?? 'PATH';
-const keptPath = (process.env[pathKey] ?? '').split(path.delimiter).filter(d => d && !fs.existsSync(path.join(d, javaName)));
+// Unix keeps the other tools of such a directory (/usr/bin also holds git and tr) through a directory of symlinks
+// without java; on Windows the directory is dropped.
+const shims = fs.mkdtempSync(path.join(os.tmpdir(), "codeloupe-nojava-"));
+const keptPath = (process.env[pathKey] ?? "").split(path.delimiter).filter(Boolean).flatMap((d, i) => {
+  if (!fs.existsSync(path.join(d, javaName))) return [d];
+  if (windows) return [];
+  const shim = path.join(shims, String(i));
+  fs.mkdirSync(shim);
+  for (const entry of fs.readdirSync(d)) {
+    if (entry === javaName) continue;
+    try { fs.symlinkSync(path.join(d, entry), path.join(shim, entry)); } catch { /* an entry that cannot be linked is not needed */ }
+  }
+  return [shim];
+});
 const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(JAVA_HOME|JAVA_HOME_.*|JDK_HOME|JRE_HOME|CLASSPATH|JAVA_TOOL_OPTIONS|_JAVA_OPTIONS|JDK_JAVA_OPTIONS)$/i.test(k) && k.toLowerCase() !== 'path'));
 env[pathKey] = keptPath.join(path.delimiter);
 if (keptPath.some(d => fs.existsSync(path.join(d, javaName)))) throw new Error('a java executable is still on PATH');
@@ -90,5 +103,5 @@ const zip = opt('zip');
 if (zip) report.zipMb = mb(fs.statSync(zip).size);
 console.log(JSON.stringify(report, null, 2));
 if (opt('out')) fs.writeFileSync(opt('out'), JSON.stringify(report, null, 2) + '\n');
-try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* the stopped daemon may still hold a file on Windows */ }
+try { fs.rmSync(tmp, { recursive: true, force: true }); fs.rmSync(shims, { recursive: true, force: true }); } catch { /* the stopped daemon may still hold a file on Windows */ }
 if (failure) { console.error(failure.message); process.exit(1); }
