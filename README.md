@@ -316,6 +316,28 @@ p95 chars, empty and busy rate of the last 1000 calls, per tool) and `budgets` (
 `config.json` `budgets`); `/status/history` lists RSS, heap and CPU readings taken while the daemon is used (one a minute,
 the last 240).
 
+## Measuring agent runs
+
+`codeloupe metrics` reads Claude Code transcripts (`~/.claude/projects/<project>/*.jsonl`, subagent runs under
+`<session>/subagents/`) and needs no daemon. A run is one session (role `main`), one subagent or one phase-mode run.
+
+```bash
+codeloupe metrics collect --since 2026-09-23 --until 2026-10-02 --label baseline --dir ~/.claude/projects/<project>
+codeloupe metrics compare baseline-2026-10-08.json after-2026-10-20.json
+codeloupe metrics gaps --since 2026-10-01               # where CodeLoupe calls fell short, by week and query shape
+codeloupe metrics boilerplate --since 2026-09-23         # skeleton share of the new code files agents write
+```
+
+`collect` writes one JSON report with, per role, median / p75 / sum of cost (relative price units: input 1, 5 min cache
+write 1.25, 1 h write 2, read 0.1, output 5), peak context, turns, wall time, code reads and rereads, edit errors, and the
+tool categories ranked by what their results cost while they stay in context. The report has the field names of the Terrio
+workspace's `run/codemetrics.mjs`, and on the same transcripts the figures are identical. `gaps` counts a CodeLoupe call
+(MCP tool or `codeloupe` on a shell) followed within two turns by a code read, search or `rg`/`cat` naming the same
+symbol or file, and calls answered empty, busy or with candidates only. Large windows are read one run at a time; add
+`CODELOUPE_OPTS=-Xmx1g` when a single transcript holds huge lines. `config.json` `metrics`: `transcriptDirs`,
+`categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
+ones, which know the Terrio workspace's shell commands) and `defaultCategories` (false = only yours).
+
 ## Bundle
 
 ```bash

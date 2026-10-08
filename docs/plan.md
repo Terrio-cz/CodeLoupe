@@ -335,6 +335,14 @@ a `/status/history` s odečty RSS/heap/CPU (jednou za minutu při používání,
 Z transcriptů: volání codeloupe, po kterém agent do 2 tahů sáhne po `rg`/`sed`/`cat`/`Read` na stejný
 symbol nebo soubor = **mezera** (nástroj nestačil). Report seskupený podle nástroje a tvaru dotazu → backlog
 vylepšení. Plus: prázdné výsledky, `candidate` výsledky, které agent dál ručně rozhodoval, zápisy s rollbackem.
+Hotovo (CL-22): `codeloupe metrics gaps` — druhy `fallback`, `empty`, `busy`, `candidates`, týdně podle nástroje a
+tvaru dotazu (`name`, `qualified`, `overload`, `glob`, `path`); zápisy s rollbackem čekají na write nástroje, obrazovka
+Gaps v UI na CL-40.
+
+**Scaffold šablony (CL-35): no-go.** Změřeno 2026-10-08 na 1 427 nových kódových souborech z transcriptů od 2026-09-23
+(`codeloupe metrics boilerplate`): kostra (package, importy, hlavičky typů, anotace, závorky, prázdné řádky) je **13,3 %**
+znaků (main 12,4 %, test 14,1 %), psaní a nošení nových souborů je 1,0 % ceny běhů, kostra z toho 0,1 %. Práh
+pro `create_file(kind, name, members)` byl 30 %.
 
 ### 8.4 Kontrolovaný benchmark
 
@@ -374,7 +382,7 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
   Host/Origin/hlavička, single instance, MCP přes restart).
 - Home: `%LOCALAPPDATA%codeloupe` / `~/Library/Caches/codeloupe` / `$XDG_CACHE_HOME/codeloupe`
   (`CODELOUPE_HOME`), port 47391 (`CODELOUPE_PORT`), `config.json` v home.
-- Měření: `run/codemetrics.mjs` zatím v Terrio workspace; do balíčku jako `codeloupe metrics` ve fázi 6.
+- Měření: `codeloupe metrics collect|compare|gaps|boilerplate` (CL-21, CL-22, CL-35); `run/codemetrics.mjs` v Terrio workspace dává na stejných transcriptech stejná čísla.
 
 ### Výsledek portu na Kotlin/JVM (CL-56, 2026-10-07)
 
