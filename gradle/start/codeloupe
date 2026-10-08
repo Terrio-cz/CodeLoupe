@@ -1,0 +1,62 @@
+#!/bin/sh
+# Start script of the codeloupe CLI (replaces the one Gradle generates; build.gradle.kts copies it into bin/).
+#
+# The JVM maps a class-data archive kept under the CodeLoupe home instead of loading and verifying ~1500 classes on
+# every call. It creates the archive itself on the first run (that run is slower) and again whenever the jars or the
+# JDK change. One archive per install directory, so two installs do not keep replacing each other's.
+
+app_path=$0
+while
+    APP_HOME=${app_path%"${app_path##*/}"}
+    [ -h "$app_path" ]
+do
+    ls=$( ls -ld "$app_path" )
+    link=${ls#*' -> '}
+    case $link in
+      /*) app_path=$link ;;
+      *)  app_path=$APP_HOME$link ;;
+    esac
+done
+APP_HOME=$( cd -P "${APP_HOME:-./}.." > /dev/null && pwd -P ) || exit
+
+if [ -n "$JAVA_HOME" ]; then
+    JAVACMD=$JAVA_HOME/bin/java
+    if [ ! -x "$JAVACMD" ]; then
+        echo "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME" >&2
+        exit 1
+    fi
+else
+    JAVACMD=java
+fi
+
+# Same place as ConfigLoader.defaultHome.
+if [ -n "$CODELOUPE_HOME" ]; then
+    home=$CODELOUPE_HOME
+elif [ "$( uname )" = Darwin ]; then
+    home=$HOME/Library/Caches/codeloupe
+else
+    home=${XDG_CACHE_HOME:-$HOME/.cache}/codeloupe
+fi
+key=$( printf %s "$APP_HOME" | tr -c 'A-Za-z0-9' _ | tail -c 60 )
+mkdir -p "$home/cds" 2> /dev/null
+
+# A JVM that cannot write the archive it wants to create exits with 127, so without a writable directory it runs
+# without one.
+cds1=-Xshare:auto
+cds2=-Xshare:auto
+if [ -w "$home/cds" ]; then
+    # A JVM does not rebuild an archive whose jars changed, it just stops using it: every build has an archive of its own.
+    archive=$home/cds/$key-@BUILD@.jsa
+    for old in "$home/cds/$key"-*.jsa; do
+        [ "$old" = "$archive" ] || rm -f "$old"
+    done
+    cds1=-XX:+AutoCreateSharedArchive
+    cds2=-XX:SharedArchiveFile=$archive
+fi
+
+# The CLI is short-lived: small heap, no C2, serial GC. -Xlog:disable keeps JVM notes (an archive that no longer
+# fits) out of the output; the JVM then simply runs without it.
+# shellcheck disable=SC2086
+exec "$JAVACMD" -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xshare:auto -Xss512k -Xmx128m -XX:-UsePerfData \
+    "$cds1" "$cds2" -Xlog:disable \
+    $JAVA_OPTS $CODELOUPE_OPTS -jar "$APP_HOME/lib/@JAR@" "$@"

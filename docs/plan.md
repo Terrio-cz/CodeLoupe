@@ -634,6 +634,33 @@ rozhoduje launcher.
   5 628, TER-114 8 450; `yt_get_issue` stejného tvaru); `update` 31–52 zn. na živém CL (stav, komentář, stav + komentář),
   po každém zápisu mirror shodný s čerstvým čtením (stav, `updated`, komentáře, pole).
 
+### Výsledek startu CLI (CL-64, 2026-10-08)
+
+- `codeloupe find <q>` proti běžícímu daemonu, medián z 10 (throwaway daemon, bez zátěže nad běžný stroj):
+
+  | | před | po |
+  |---|---|---|
+  | Windows 11, `codeloupe.bat find` | 792 ms | **195 ms** |
+  | Windows 11, `codeloupe.bat status` | 791 ms | 218 ms |
+  | Linux (WSL2 Ubuntu, JDK 25), `codeloupe find` | 731 ms | **126 ms** |
+  | Linux (WSL2 Ubuntu, JDK 25), `codeloupe status` | 748 ms | 163 ms |
+
+- Kde se čas vzal (Windows): samotný AppCDS archiv na starém kódu 885 → 637 ms (přímý `java`); zbytek do 195 ms dalo
+  `HttpURLConnection` místo `java.net.http` (~250 tříd, `LocalHttp`), sestavení jen volaného subpříkazu clikt
+  (`CodeLoupeCommand(requested)`) a `-XX:-UsePerfData`; jednotlivě neměřeno.
+- Archiv: `-XX:+AutoCreateSharedArchive` v `bin/codeloupe[.bat]` (vlastní skripty v `gradle/start/`), soubor
+  `<home>/cds/<instalační adresář>-<otisk buildu>.jsa` (~8 MB), tedy pod CodeLoupe home, ne v install adresáři. První
+  volání po instalaci ho vytvoří (~1,4 s), další ho jen mapují. JVM archiv se změněnými jary **nepřestaví**, jen ho
+  přestane používat, proto má každý build vlastní soubor a starší skript maže. JVM, který archiv nemůže zapsat, končí
+  s exit kódem 127, proto se bez zapisovatelného `cds/` spustí bez archivu (ověřeno: `status` bez daemonu vrací 3).
+- `Enable-Native-Access` je v manifestu jaru (CLI se spouští `java -jar`, `Class-Path` v manifestu): příznak
+  `--enable-native-access` v příkazové řádce se s dynamickým archivem nesnese (hláška o neshodě modulové vlastnosti na
+  stdout). Příkazová řádka je krátká bez ohledu na cestu (classpath už není v ní). Daemon a build worker se
+  dál spouštějí `-cp <jar>`, bez archivu (CL-56: archiv po parseru jen přidal RSS).
+- Beze změny výstupu a exit kódů: 18 příkazů (find / outline / symbol / usages, chyby použití, `--help`, neznámý
+  příkaz, `status` bez daemonu, `job`, `webhook`, `mcp-config`, `stop`) dává na `base` i na novém buildu shodný
+  stdout, stderr i exit kód; 6 souběžných prvních volání bez archivu (3 kola) skončila 18× exit 0.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

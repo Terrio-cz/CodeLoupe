@@ -36,6 +36,10 @@ build/install/codeloupe/bin/codeloupe status
 The first query in a repository builds its index (seconds); later queries take milliseconds. The
 daemon starts on the first CLI call; `codeloupe start` / `stop` manage it explicitly.
 
+A CLI call against a running daemon takes ~0.2 s. The start script keeps a JVM class-data archive in
+`<home>/cds/` (about 8 MB per install and build); the first call after an install creates it (~1.5 s), and it is
+simply not used when that directory is not writable. `JAVA_OPTS` / `CODELOUPE_OPTS` add JVM flags.
+
 ### Claude Code
 
 `codeloupe mcp-config` prints the `.mcp.json` entry:
