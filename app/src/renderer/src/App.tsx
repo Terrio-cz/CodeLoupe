@@ -33,6 +33,16 @@ export function App() {
     if (route.screen === 'gaps') try { localStorage.setItem('codeloupe.gapsSeen', new Date().toISOString()); } catch { /* storage blocked */ }
   }, [route.screen]);
 
+  // The daemon answers the first list of worktrees after a start in seconds (it reads git for each) and every later one
+  // at once, so the list is asked for here, once per daemon, before anyone opens Větve.
+  const warmedPid = useRef<number | null>(null);
+  useEffect(() => {
+    const pid = daemon?.status?.pid ?? null;
+    if (pid === null || warmedPid.current === pid || !nav.data) return;
+    warmedPid.current = pid;
+    void bridge().api({ resource: 'worktrees' });
+  }, [daemon?.status?.pid, nav.data]);
+
   // Sidebar counts follow the daemon status tick, at most every 15 s.
   const lastNav = useRef(0);
   useEffect(() => {

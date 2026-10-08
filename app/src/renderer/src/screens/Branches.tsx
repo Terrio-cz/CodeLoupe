@@ -6,7 +6,7 @@ import { Drawer } from '../components/Drawer';
 import { Icon } from '../components/Icon';
 import { Card, ErrorState, Loading, Search, Section, Select } from '../components/Parts';
 import { ChangeMark, LayerBadge, StatusBadge, taskTone } from '../components/StatusBadge';
-import { ago, num } from '../format';
+import { ago, num, tokens } from '../format';
 import { useDebounced, useSettings } from '../hooks';
 import { go, type Route } from '../router';
 
@@ -56,6 +56,8 @@ export function Branches({ route }: { route: Route }) {
 
 function BranchDrawer({ id, onClose }: { id: string; onClose(): void }) {
   const { data: w, error, reload } = useApi('worktrees/:id', id);
+  // The costliest runs of the branch's task, from the transcripts: where the cost of the work went.
+  const runs = useApi(w?.taskId ? 'runs' : null, undefined, { q: w?.taskId ?? undefined, range: '30d', sort: 'weighted', limit: 5 });
   const [opened, setOpened] = useState<boolean | null>(null);
   const LIMIT = 20;
   const [more, setMore] = useState(false);
@@ -89,6 +91,23 @@ function BranchDrawer({ id, onClose }: { id: string; onClose(): void }) {
                   </>
                 ) : <span className="grow muted">v mirroru YouTrack zatím není</span>}
               </li></ul>
+            </Section>
+          )}
+
+          {w.taskId && (
+            <Section title="Běhy agentů na úkolu" count={runs.data?.total}>
+              {!runs.data ? (runs.error ? <div className="muted">{runs.error.message}</div> : <div className="muted">Načítám…</div>) : runs.data.items.length === 0 ? <div className="muted">Za posledních 30 dní žádný běh, který by úkol zmiňoval.</div> : (
+                <ul className="rows">
+                  {runs.data.items.map(r => (
+                    <li key={r.id}>
+                      <button className="link mono" onClick={() => go('runs', r.id)}>{r.role}</button>
+                      <span className="grow" title={r.title}>{r.title}</span>
+                      <span className="muted num">{tokens(r.weighted)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {runs.data && runs.data.total > runs.data.items.length && <button className="link" onClick={() => go('runs', null, { q: w.taskId! })}>Všechny běhy úkolu ({runs.data.total}) →</button>}
             </Section>
           )}
 

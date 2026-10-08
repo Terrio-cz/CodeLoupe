@@ -36,12 +36,30 @@ const SPECS: Record<Resource, ResourceSpec> = {
   'environment/audit': ui('environment/audit', ['name', 'scope', 'limit']),
   settings: ui('settings'),
   events: ui('events', ['since', 'limit']),
+  runs: ui('runs', ['range', 'sort', 'role', 'q', 'limit', 'cursor']),
+  'runs/:id': ui('runs/:id'),
+  'runs/:id/steps': ui('runs/:id/steps', ['sort', 'limit', 'cursor']),
   'status/history': daemon('/status/history'),
+  workspaces: daemon('/workspaces', ['repo', 'size']),
+  resources: daemon('/resources', ['stats']),
+  reconcile: daemon('/reconcile'),
+  releases: daemon('/workspaces/releases'),
+  ports: daemon('/ports'),
+  status: daemon('/status'),
+  jobs: daemon('/jobs', ['limit']),
+  'jobs/:id': daemon('/jobs/:id'),
+  webhooks: daemon('/webhooks'),
+  deliveries: daemon('/webhooks/deliveries', ['limit']),
 };
 
 // No `.` or `..` alone: the daemon would normalise them into another path.
 const ID = /^(?!\.{1,2}$)[A-Za-z0-9._:-]{1,100}$/;
 const MAX_VALUE = 200;
+
+/** How long the daemon may take: a reading that walks files (`size`) or asks Docker for each container (`stats`) takes seconds on a big repository. */
+export function timeoutMs(req: ApiRequest): number {
+  return req.query?.size || req.query?.stats ? 120_000 : 5_000;
+}
 
 export type Validated = { ok: true; path: string; request: ApiRequest } | { ok: false; error: string };
 

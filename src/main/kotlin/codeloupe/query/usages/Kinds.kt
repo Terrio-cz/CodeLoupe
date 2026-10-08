@@ -12,6 +12,9 @@ internal object Kinds {
     /** A private declaration is out of reach outside its own file. */
     fun accessible(d: DeclRow, path: String) = d.path == path || "private" !in d.modifiers.split(' ')
 
+    /** A Java `static` member, reached through its type. */
+    fun isStatic(d: DeclRow) = "static" in d.modifiers.split(' ')
+
     /** `T`, `K2`: a generic parameter, not a type the index can know. */
     fun isTypeParameter(name: String) = name.length <= 2 && name.first().isUpperCase() && name.all { it.isUpperCase() || it.isDigit() }
 

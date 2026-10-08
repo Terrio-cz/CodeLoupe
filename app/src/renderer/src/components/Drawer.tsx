@@ -52,7 +52,7 @@ export function Drawer({ title, subtitle, actions, wide, onClose, children }: Pr
   }, []);
 
   const state = closing ? ' closing' : '';
-  return createPortal(
+  const content = (
     <>
       <div className={`drawer-backdrop${state}`} onClick={() => requestClose.current()} aria-hidden="true" />
       <div ref={panel} className={`drawer${wide ? ' xl' : ''}${state}`} role="dialog" aria-modal="true" aria-labelledby="drawer-title">
@@ -66,7 +66,8 @@ export function Drawer({ title, subtitle, actions, wide, onClose, children }: Pr
         </div>
         <div className="drawer-body">{children}</div>
       </div>
-    </>,
-    document.body,
+    </>
   );
+  // Server rendering (tests) has no document; the markup is the same either way.
+  return typeof document === 'undefined' ? content : createPortal(content, document.body);
 }

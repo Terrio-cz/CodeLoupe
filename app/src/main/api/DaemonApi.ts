@@ -1,4 +1,4 @@
-import type { ApiRequest } from '../../shared/request';
+import { timeoutMs, type ApiRequest } from '../../shared/request';
 import type { DaemonClient } from '../daemon/DaemonClient';
 import type { ApiSource } from './ApiSource';
 
@@ -7,7 +7,7 @@ export class DaemonApi implements ApiSource {
 
   constructor(private readonly client: DaemonClient) {}
 
-  get(_req: ApiRequest, path: string): Promise<unknown> {
-    return this.client.get(path);
+  get(req: ApiRequest, path: string): Promise<unknown> {
+    return this.client.get(path, timeoutMs(req));
   }
 }

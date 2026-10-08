@@ -11,6 +11,9 @@ import type { ApiRequest, Query } from '../../shared/request';
 import { HttpError } from '../daemon/DaemonClient';
 import type { ApiSource } from './ApiSource';
 import { MockData } from './mockData';
+import { MockJobs } from './mockJobs';
+import { MockRuns } from './mockRuns';
+import { MockWorkspaces } from './mockWorkspaces';
 
 const DAY = 86_400_000;
 
@@ -28,9 +31,15 @@ const TOOL_CALLS: ToolCalls[] = [
 export class MockApi implements ApiSource {
   readonly kind = 'mock';
   private readonly data: MockData;
+  private readonly workspaces: MockWorkspaces;
+  private readonly jobs: MockJobs;
+  private readonly runs: MockRuns;
 
   constructor(now = Date.now()) {
     this.data = new MockData(now);
+    this.workspaces = new MockWorkspaces(now);
+    this.jobs = new MockJobs(now);
+    this.runs = new MockRuns(now);
   }
 
   async get(req: ApiRequest): Promise<unknown> {
@@ -54,6 +63,19 @@ export class MockApi implements ApiSource {
       case 'settings': return d.settings();
       case 'events': return d.events(q.since === undefined ? null : Number(q.since));
       case 'status/history': return d.statusHistory();
+      case 'workspaces': return this.workspaces.workspaces(q.size === '1' || q.size === 1);
+      case 'resources': return this.workspaces.resources(q.stats === '1' || q.stats === 1);
+      case 'reconcile': return this.workspaces.reconcile();
+      case 'releases': return this.workspaces.releases();
+      case 'ports': return this.workspaces.ports();
+      case 'runs': return this.runs.page(q);
+      case 'runs/:id': return found(this.runs.detail(req.id!));
+      case 'runs/:id/steps': return found(this.runs.steps(req.id!, q));
+      case 'status': return this.jobs.status({});
+      case 'jobs': return { items: this.jobs.list(Number(q.limit ?? 100) || 100) };
+      case 'jobs/:id': return found(this.jobs.chain(req.id!));
+      case 'webhooks': return this.jobs.webhooks();
+      case 'deliveries': return this.jobs.deliveries();
       default: return unreachable(req.resource);
     }
   }

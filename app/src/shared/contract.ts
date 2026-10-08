@@ -1,3 +1,7 @@
+import type { Delivery, JobChain, JobRecord, JobsSnapshot, Webhook } from './jobs';
+import type { RunDetail, RunPage, StepPage } from './runs';
+import type { PortReport, ReconcilePlan, ReleaseStatus, ResourceReport, WorkspaceList } from './workspaces';
+
 // Read-only UI API of the CodeLoupe daemon (docs/ui-spec.md § 9, YouTrack CL-39).
 // This file is the app's copy of the contract: a change to the spec changes both.
 
@@ -70,6 +74,8 @@ export interface DaemonStatus {
   budgets?: { ok: boolean; warnings: string[] };
   /** A build runs when heavy.running is set. */
   queue: { fast: Lane; heavy: Lane; [stat: string]: unknown };
+  /** Jobs of the daemon and the slots they hold or wait for. */
+  jobs?: JobsSnapshot;
   repos: { id: string; commonDir: string; defaultRef: string; baseCommit: string | null; lastBuild: LastBuild | null }[];
 }
 export interface CallLatency {
@@ -330,7 +336,20 @@ export interface ResourceMap {
   'environment/audit': EnvironmentAudit;
   settings: DaemonSettings;
   events: Events;
+  runs: RunPage;
+  'runs/:id': RunDetail;
+  'runs/:id/steps': StepPage;
   'status/history': ResourceSample[];
+  workspaces: WorkspaceList;
+  resources: ResourceReport;
+  reconcile: ReconcilePlan;
+  releases: { items: ReleaseStatus[] };
+  ports: PortReport;
+  status: DaemonStatus;
+  jobs: { items: JobRecord[] };
+  'jobs/:id': JobChain;
+  webhooks: { items: Webhook[] };
+  deliveries: { items: Delivery[] };
 }
 export type Resource = keyof ResourceMap;
 

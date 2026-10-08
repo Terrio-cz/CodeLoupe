@@ -444,7 +444,7 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 
 /* ── Bars ────────────────────────────────────────────────────────────────── */
 .bar-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.bar-list li { display: grid; grid-template-columns: minmax(120px, 200px) 1fr 72px 64px; gap: 12px; align-items: center; min-height: 24px; }
+.bar-list li { display: grid; grid-template-columns: minmax(120px, 200px) 1fr 72px var(--note-w, 64px); gap: 12px; align-items: center; min-height: 24px; }
 .bar-list li > .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-list.latency li { grid-template-columns: minmax(70px, 110px) 1fr 64px 88px; }
 .bar-track { height: 10px; position: relative; background: var(--surface-2); border-radius: var(--r-full); }
@@ -470,6 +470,7 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 .chart .tooltip .row { display: flex; align-items: center; gap: 6px; }
 .chart .tooltip .row .sw { margin: 0; }
 .legend { display: flex; gap: 16px; font-size: var(--fs-sm); color: var(--text-2); align-items: center; flex-wrap: wrap; }
+.legend > span { white-space: nowrap; }
 .legend .sw { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; background: var(--series-1); }
 .legend .sw.base { background: none; border-top: 2px dashed var(--series-baseline); height: 0; border-radius: 0; }
 .legend strong { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
@@ -580,6 +581,35 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 .form-row > .seg { justify-self: start; }
 .footnote { margin: 0; font-size: var(--fs-sm); }
 pre.mono { background: var(--surface-2); padding: 10px 12px; border-radius: var(--r-md); overflow: auto; }
+
+/* ── Jobs: slots, chains, logs (CL-89) ──────────────────────────────────── */
+.slots { list-style: none; margin: 0; padding: 0; }
+.slots li { display: grid; grid-template-columns: 130px 44px 120px 1fr; gap: 12px; align-items: center; min-height: 40px; padding: 4px 16px; border-bottom: 1px solid var(--border); }
+.slots li:last-child { border-bottom: 0; }
+.slots .meter { margin: 0; }
+.slots .holders { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.chain { list-style: none; margin: 0; padding: 0; }
+.chain li { display: flex; gap: 10px; align-items: baseline; min-height: 30px; border-bottom: 1px solid var(--border); padding: 4px 6px; border-radius: 0; }
+.chain li[aria-current='true'] { background: var(--accent-weak); box-shadow: inset 2px 0 0 var(--accent); }
+.chain .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+pre.cmd { margin: 0; padding: 10px 12px; background: var(--surface-2); border-radius: var(--r-md); white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: inset 0 0 0 1px var(--border); }
+pre.log { margin: 4px 0 0; padding: 10px 12px; background: var(--surface-2); border-radius: var(--r-md); overflow: auto; max-height: 220px; white-space: pre; font-size: var(--fs-sm); box-shadow: inset 0 0 0 1px var(--border); }
+pre.log.failures { color: var(--critical-text); background: var(--critical-weak); box-shadow: none; }
+pre.log.full { max-height: 420px; }
+
+/* ── Environment: add/rotate form and import wizard (CL-54) ─────────────── */
+.key-form { display: flex; flex-direction: column; gap: var(--s-3); }
+.drawer-actions { display: flex; gap: var(--s-2); margin-top: 4px; }
+.row-actions { display: inline-flex; gap: 6px; }
+.row-actions .btn { min-height: 24px; padding: 0 8px; font-size: var(--fs-sm); box-shadow: none; }
+.import-table { table-layout: fixed; width: 100%; }
+table.data.import-table th, table.data.import-table td { white-space: normal; overflow-wrap: anywhere; }
+table.data.import-table td { vertical-align: top; height: auto; padding-top: 8px; padding-bottom: 8px; }
+.import-table.choose th:first-child { width: 84px; }
+.import-table ul.sources { margin: 0; padding: 0; list-style: none; }
+.import-table ul.sources li { overflow-wrap: anywhere; }
+.import-options { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; margin: 0; }
+.flags { display: inline-flex; flex-direction: column; gap: 2px; }
 
 /* ── Motion ──────────────────────────────────────────────────────────────── */
 /*

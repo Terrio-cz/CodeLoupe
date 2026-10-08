@@ -154,7 +154,7 @@ export function Empty({ children, icon = 'inbox', action }: { children: ReactNod
 }
 
 /** Warning or note above the content: an icon, then the text. */
-export function Banner({ tone = 'warning', role = 'status', children }: { tone?: 'warning' | 'info'; role?: 'status' | 'note'; children: ReactNode }) {
+export function Banner({ tone = 'warning', role = 'status', children }: { tone?: 'warning' | 'info'; role?: 'status' | 'note' | 'alert'; children: ReactNode }) {
   return (
     <div className={`banner ${tone}`} role={role}>
       <Icon name={tone === 'info' ? 'info' : 'alert'} />

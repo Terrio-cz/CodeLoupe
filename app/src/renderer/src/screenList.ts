@@ -19,7 +19,10 @@ export interface ScreenDef {
 export const SCREEN_DEFS = [
   { id: 'overview', title: 'Přehled', icon: 'overview', group: 'top', key: 'o', range: true },
   { id: 'branches', title: 'Větve', icon: 'branches', group: 'work', key: 'b' },
+  { id: 'workspaces', title: 'Workspaces', icon: 'workspaces', group: 'work', key: 'w' },
   { id: 'tasks', title: 'Úkoly', icon: 'tasks', group: 'work', key: 't' },
+  { id: 'jobs', title: 'Joby', icon: 'jobs', group: 'work', key: 'j' },
+  { id: 'runs', title: 'Běhy', icon: 'runs', group: 'work', key: 'r', range: true },
   { id: 'index', title: 'Index', icon: 'index', group: 'index', key: 'i' },
   { id: 'gaps', title: 'Mezery', icon: 'gaps', group: 'index', key: 'g', range: true },
   { id: 'environment', title: 'Prostředí', icon: 'environment', group: 'system', key: 'e' },

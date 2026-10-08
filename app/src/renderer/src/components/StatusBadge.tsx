@@ -1,5 +1,6 @@
 import type { DeclChangeKind, LayerState, RepoIndexState } from '../../../shared/contract';
 import type { DaemonPhase } from '../../../shared/ipc';
+import type { Verdict, WorkspaceState } from '../../../shared/workspaces';
 
 export type Tone = 'ok' | 'warning' | 'serious' | 'critical' | 'neutral' | 'running';
 
@@ -61,3 +62,20 @@ export function ChangeMark({ change }: { change: DeclChangeKind }) {
     </span>
   );
 }
+
+const WORKSPACE: Record<WorkspaceState | 'gone', [Tone, string]> = {
+  active: ['running', 'aktivní'],
+  landed: ['ok', 'dokončený'],
+  abandoned: ['warning', 'opuštěný'],
+  orphan: ['serious', 'sirotek'],
+  gone: ['neutral', 'chybí v registru'],
+};
+export const WorkspaceBadge = ({ state }: { state: WorkspaceState | 'gone' }) => <StatusBadge tone={WORKSPACE[state][0]}>{WORKSPACE[state][1]}</StatusBadge>;
+
+const VERDICT: Record<Verdict, [Tone, string]> = {
+  auto: ['running', 'uklidí se samo'],
+  confirm: ['warning', 'čeká na potvrzení'],
+  keep: ['neutral', 'zůstane'],
+  protected: ['neutral', 'chráněný'],
+};
+export const VerdictBadge = ({ verdict }: { verdict: Verdict }) => <StatusBadge tone={VERDICT[verdict][0]}>{VERDICT[verdict][1]}</StatusBadge>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateRequest } from '../src/shared/request';
+import { timeoutMs, validateRequest } from '../src/shared/request';
 
 describe('validateRequest', () => {
   it('builds the daemon path from resource, id and allowed query keys', () => {
@@ -12,7 +12,10 @@ describe('validateRequest', () => {
   it('reaches the daemon routes outside the UI API that a screen needs, and no others', () => {
     expect(validateRequest({ resource: 'status/history' })).toMatchObject({ ok: true, path: '/status/history' });
     expect(validateRequest({ resource: 'shutdown' }).ok).toBe(false);
-    expect(validateRequest({ resource: 'status' }).ok).toBe(false);
+    expect(validateRequest({ resource: 'status' })).toMatchObject({ ok: true, path: '/status' });
+    expect(validateRequest({ resource: 'jobs/:id', id: 'J20261008-K2QF' })).toMatchObject({ ok: true, path: '/jobs/J20261008-K2QF' });
+    expect(validateRequest({ resource: 'jobs/:id', id: '../shutdown' }).ok).toBe(false);
+    expect(validateRequest({ resource: 'events/stream' }).ok).toBe(false);
   });
 
   it('drops empty and undefined query values', () => {
@@ -21,7 +24,7 @@ describe('validateRequest', () => {
   });
 
   it.each([
-    [{ resource: 'runs' }, 'unknown resource'],
+    [{ resource: 'agents' }, 'unknown resource'],
     [{ resource: '../status' }, 'unknown resource'],
     [{ resource: 'overview', id: 'x' }, 'id not allowed'],
     [{ resource: 'tasks/:id' }, 'id required'],
@@ -41,6 +44,13 @@ describe('validateRequest', () => {
     const r = validateRequest({ resource: 'worktrees', query: { q: 'a&layer=x#/../' } });
     expect(r).toMatchObject({ ok: true, path: '/ui-api/v1/worktrees?q=a%26layer%3Dx%23%2F..%2F' });
   });
+});
+
+it('gives the readings that walk files or ask Docker time to finish', () => {
+  expect(timeoutMs({ resource: 'workspaces', query: { size: 1 } })).toBe(120_000);
+  expect(timeoutMs({ resource: 'resources', query: { stats: 1 } })).toBe(120_000);
+  expect(timeoutMs({ resource: 'workspaces' })).toBe(5_000);
+  expect(timeoutMs({ resource: 'overview', query: { range: '7d' } })).toBe(5_000);
 });
 
 it('refuses dot-only ids that the daemon would normalise into another path', () => {
