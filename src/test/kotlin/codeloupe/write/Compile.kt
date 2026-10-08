@@ -38,5 +38,5 @@ object Compile {
     }
 
     private fun sources(root: Path, suffix: String): List<String> =
-        Files.walk(root).use { paths -> paths.filter { it.toString().endsWith(suffix) && !it.toString().contains("${Path.of(".git")}") }.map { it.toString() }.toList() }
+        SourceFiles.under(root) { it.toString().endsWith(suffix) }.map { it.toString() }
 }

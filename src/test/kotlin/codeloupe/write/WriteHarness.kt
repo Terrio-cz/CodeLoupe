@@ -78,10 +78,8 @@ class WriteHarness(
     fun registry(): Registry = registry
 
     /** Source files of the repository, relative, with `/`. */
-    fun sources(): List<String> = Files.walk(repo).use { paths ->
-        paths.filter { Files.isRegularFile(it) && Languages.languageOf(it.toString()) != null && !it.toString().contains("${Path.of(".git")}") }
-            .map { it.relativeTo(repo).toString().replace('\\', '/') }.sorted().toList()
-    }
+    fun sources(): List<String> =
+        SourceFiles.under(repo) { Languages.languageOf(it.toString()) != null }.map { it.relativeTo(repo).toString().replace('\\', '/') }.sorted()
 
     fun bytes(path: String): ByteArray = Files.readAllBytes(repo.resolve(path))
 
