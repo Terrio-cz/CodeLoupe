@@ -28,7 +28,6 @@ const bridge: CodeLoupeBridge = {
     manual: kind => ipcRenderer.invoke(CH.claudeManual, kind),
   },
   actions: {
-    gapsRefresh: () => ipcRenderer.invoke(ACTION_CH.gapsRefresh),
     workspaceRelease: req => ipcRenderer.invoke(ACTION_CH.workspaceRelease, req),
     reconcileRun: req => ipcRenderer.invoke(ACTION_CH.reconcileRun, req),
   },

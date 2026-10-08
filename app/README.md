@@ -58,7 +58,6 @@ Verification modes (development builds only):
 - All data goes through preload IPC. Main validates every request (resource, id and query allow-list) and calls only `http://127.0.0.1:<port>`, without an `Origin` header and with `x-codeloupe: 1`.
 - Workspaces actions (release a worktree, confirm a cleanup) change the real daemon only after main has checked the request against the daemon's own registry and plan and the user said yes in a native dialog that lists what goes; the page never sends a path to delete, only plan keys.
 - Job logs: the page names a job id; main reads only `<home>/jobs/<id>.log` of a finished job, strips terminal codes and masks credential-looking values. The live event stream is opened while the Jobs screen is open and passes on only the event type and job id.
-- The Gaps screen's "Přepočítat report" action runs `<cli> metrics gaps --since <30 days ago> --out <home>/gaps-report.json` with a fixed argument list and no shell; nothing in it comes from the page.
 - Settings → Claude Code runs the `claude` CLI (no shell, fixed argv: `mcp add|remove`, `plugin marketplace add`, `plugin install`) only after a native confirmation that lists the commands; the page cannot click it, and the app never writes Claude Code's files itself. See the root README, section Claude Code.
 - Main opens a folder only if it is an existing git worktree from the daemon. It opens a URL only if it is `https` and its origin matches a configured YouTrack instance.
 - Permissions, navigation, new windows and webviews are denied.

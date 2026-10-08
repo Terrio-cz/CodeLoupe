@@ -10,7 +10,9 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 - **Nepřidává práci agentům**: čte jen to, co daemon už ví (read-only API, § 9). Nic v UI nevolá MCP nástroje.
 - **Nemonitoruje agenty** (uživatel 2026-10-07): běhy agentů, jejich kroky a stav sleduje launcher. Aplikace
   ukazuje jen to, co CodeLoupe měří o sobě — spotřebu a úsporu tokenů proti baseline, telemetrii vlastních
-  volání, mezery, čtení issue přes mirror, index. Obrazovka „Běhy agentů“ a časová osa běhu (CL-42) proto nejsou.
+  volání, mezery, čtení issue přes mirror, index. Časová osa běhu (CL-42) proto není. Obrazovka Běhy (§ 3.3) je jen rozbor
+  nákladů hotových běhů z transkriptů (kolik stály a kde), ne sledování toho, co agent právě dělá. Je tu od CL-40
+  (2026-10-08) nad API z CL-62 a odebere se jedním řádkem v `screenList.ts`.
 - **Hustý developer-tool styl** (Browserbase, Mintlify, Vercel, Linear): levý sidebar, tabulky s 32px řádky,
   postranní detail panely, žádné dekorace, ilustrace ani gradienty. Čísla tabulková (`tabular-nums`).
 - **Světlý i tmavý režim** ze stejných tokenů (§ 6), výchozí = systém.
@@ -48,6 +50,7 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 | `#/overview` | Přehled | — | `overview`, `/status` |
 | `#/branches` · `#/branches/:id` | Větve | drawer (520 px) | `worktrees`, `worktrees/{id}` |
 | `#/workspaces` · `#/workspaces/<repo>%2F<name>` | Workspaces (CL-72) | drawer (520 px) | `/workspaces`, `/resources`, `/reconcile`, `/workspaces/releases`, `/ports` (§ 9.18) |
+| `#/runs` · `#/runs/:id` | Běhy (CL-40) | drawer (1040 px) | `runs`, `runs/{id}`, `runs/{id}/steps` |
 | `#/jobs` · `#/jobs/:id` | Joby (CL-89) | drawer (1040 px) | `/jobs`, `/jobs/{id}`, `/status` (sloty), `/webhooks`, `/webhooks/deliveries`, `/events/stream` (§ 9.18) |
 | `#/tasks` · `#/tasks/:id` | Úkoly | celá stránka s panelem vlastností vpravo | `tasks`, `tasks/{id}` |
 | `#/index` | Index | — | `index` |
@@ -162,9 +165,30 @@ Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hle
 - Sekce draweru jsou sbalitelné; dlouhé seznamy po 20 + „zobrazit dalších N“.
 - „Otevřít složku“ = IPC `open.worktree(id)`: main vezme cestu z daemonu a otevře ji jen jako adresář s `.git` (§ 10).
 
-### 3.3 (zrušeno) Běhy agentů
+### 3.3 Běhy (CL-40, nad API z CL-62)
 
-Obrazovka běhů a detail s časovou osou kroků (původně CL-42) byly vyřazeny rozhodnutím uživatele 2026-10-07:
+Seznam běhů agentů z transkriptů Claude Code a jejich detail: **kolik běh stál a kde**. Je to rozbor nákladů po skutečnosti,
+ne sledování agentů: aplikace neukazuje, co agent právě dělá, ani nic neřídí (to dělá launcher, viz níže).
+
+```
+Běhy                         [Role ▾] [Řazení ▾] [🔍 hledat zadání, úkol, roli]        [24h|7d|30d]
+┌ Běhy v rozsahu 2 044 ┬ Cena zobrazených 61M ┬ Nad rozpočet běhu 3 ┐
+│ Začátek     Role           Zadání                  Úkol     Délka  Tahy  Cena   Peak kontext  Podíl výsl.  Volání │
+│ 10-08 14:02 terrio-coder   Implement TER-671 …     TER-671  41 min  55   1,2M   142k          54 %         87    │
+└ [Načíst další]  50 z 2 044
+```
+
+- Seznam řadí daemon (`sort`: začátek, cena, tahy, peak kontext, podíl výsledků, délka; vždy sestupně), filtruje podle role,
+  textu a rozsahu a stránkuje po 50. První čtení transkriptů trvá asi minutu: seznam se v té době každé 3 s doplňuje a
+  nahoře je to řečeno.
+- Detail (drawer, široký): souhrn (role, model, doba, cena, peak kontext, podíl výsledků nástrojů), **z čeho se cena
+  skládá** (cache read × 0,1, cache write 1 h × 2, 5 min × 1,25, output × 5, input × 1), cena **podle kategorie nástroje**
+  (volání, velikost výsledků, výsledky držené v kontextu × tahy, cena, chyby) a **kroky** po 200 (pořadí, tah, nástroj,
+  kategorie, o čem volání bylo, velikost výsledku, doba, cena držení, chyba nebo mezera). Popis volání a zadání běhu jsou
+  zkrácené a maskované daemonem, nikdy obsah výsledku; aplikace je nic dalšího nenačítá.
+- Mezi kroky se mezera CodeLoupe (`fallback`, `empty`, `candidates`) ukáže slovy, takže se dá od kroku k Mezerám.
+
+Původně (CL-42) byly běhy agentů a časová osa kroků vyřazeny rozhodnutím uživatele 2026-10-07:
 monitorování agentů patří launcheru, ne CodeLoupe. Data z transcriptů daemon dál používá pro spotřebu a úsporu na
 Přehledu a pro detektor mezer. Seznam běhů a jejich kroky nově vystavuje i API (§ 9.7–9.8, CL-62), aby na něm šla
 postavit obrazovka Běhy (CL-40); samotná obrazovka je práce aplikace.
@@ -243,10 +267,9 @@ Mezery                                      [Nástroj ▾] [Důvod ▾] [24h|7d|
 - Rozbalený řádek: jednotlivé výskyty (čas, důvod, náhrada, cíl, session a tah jako text — bez prokliku do běhu).
 - **Týdenní report** (CL-40) nahoře: výstup `codeloupe metrics gaps` (CL-22) po týdnech, nástroji a tvaru dotazu s druhem
   mezery (`fallback` = agent sáhl po rg/cat/Read, `empty`, `busy`, `candidates`), počtem a několika hledanými identifikátory.
-  Čte ho daemon ze souboru `<home>/gaps-report.json` (`gaps.report`), protože čtení transkriptů trvá desítky sekund;
-  tlačítko „Přepočítat report“ pošle main procesu akci, ten spustí `<cli> metrics gaps --since <před 30 dny> --out <soubor>`
-  (pevné argumenty, bez shellu) a stránku obnoví. Rozsah 24h/7d/30d filtruje týdny, které do něj zasahují. Tabulka výskytů
-  z ingestu transkriptů (CL-62) se ukáže, až v ní něco je.
+  Vychází z ingestu transkriptů (`gaps.report`, CL-62; před prvním ingestem ze souboru `<home>/gaps-report.json`, který
+  zapíše `codeloupe metrics gaps --out`). Rozsah 24h/7d/30d filtruje týdny, které do něj zasahují, filtry nástroje a druhu
+  řádky reportu. Tabulka jednotlivých výskytů z ingestu se ukáže, když v ní něco je.
 
 ### 3.7 Prostředí (CL-54)
 
@@ -898,7 +921,7 @@ stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 
     `https:` a origin přesně shodný s některou instancí z nastavení daemonu (`new URL().origin`, žádné
     porovnání prefixu); jiné odkazy se zobrazí jen jako text.
   - **Akce** (`app/src/shared/actions.ts`, jediné zápisy aplikace kromě nastavení): `workspaceRelease({ repo, path })`,
-    `reconcileRun({ keys })`, `gapsRefresh()`. Stránka jen žádá; main ověří žádost proti vlastním datům daemonu
+    `reconcileRun({ keys })`. Stránka jen žádá; main ověří žádost proti vlastním datům daemonu
     (worktree musí být v registru, role `worktree`; klíče musí být v plánu s verdiktem `confirm`), ukáže nativní
     potvrzovací dialog s tím, co se změní, a teprve pak volá daemon (`POST` s hlavičkou `x-codeloupe`, bez `Origin`).
     Bez důvěryhodného daemonu a v mock režimu se neprovedou.
