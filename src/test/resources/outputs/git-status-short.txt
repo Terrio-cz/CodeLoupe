@@ -1,0 +1,38 @@
+## main
+ M src/m0/F3.kt
+ M src/m0/F6.kt
+ M src/m0/F9.kt
+ M src/m1/F1.kt
+D  src/m1/F10.kt
+ M src/m1/F4.kt
+ M src/m1/F7.kt
+M  src/m2/F11.kt
+ M src/m2/F2.kt
+ M src/m2/F5.kt
+ M src/m2/F8.kt
+?? new1.txt
+?? new10.txt
+?? new11.txt
+?? new12.txt
+?? new13.txt
+?? new14.txt
+?? new15.txt
+?? new16.txt
+?? new17.txt
+?? new18.txt
+?? new19.txt
+?? new2.txt
+?? new20.txt
+?? new21.txt
+?? new22.txt
+?? new23.txt
+?? new24.txt
+?? new25.txt
+?? new26.txt
+?? new3.txt
+?? new4.txt
+?? new5.txt
+?? new6.txt
+?? new7.txt
+?? new8.txt
+?? new9.txt

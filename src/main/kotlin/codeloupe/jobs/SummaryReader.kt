@@ -27,20 +27,24 @@ object SummaryReader {
 
     fun read(log: Path): JobSummary {
         if (!Files.exists(log)) return JobSummary()
+        // An InputStreamReader, not Files.newBufferedReader: bytes in the console code page read as U+FFFD instead of throwing.
+        return Files.newInputStream(log).reader(Charsets.UTF_8).buffered().use(::read)
+    }
+
+    /** The summary of an output already in memory or on another stream. */
+    fun read(source: Reader): JobSummary {
         val counts = Counts()
         val failures = LinkedHashSet<String>()
         val tail = ArrayDeque<String>()
-        // An InputStreamReader, not Files.newBufferedReader: bytes in the console code page read as U+FFFD instead of throwing.
-        Files.newInputStream(log).reader(Charsets.UTF_8).buffered().use { reader ->
-            while (true) {
-                val raw = readLine(reader) ?: break
-                val line = ANSI.replace(raw, "").trimEnd()
-                if (line.isBlank()) continue
-                // A count line ("412 tests completed, 2 failed") is a total, not a failure.
-                if (!counts.take(line) && failures.size < FAILURES && FAILURE.containsMatchIn(line)) failures += shorten(line.trim())
-                tail.addLast(shorten(line))
-                if (tail.size > TAIL) tail.removeFirst()
-            }
+        val reader = source.buffered()
+        while (true) {
+            val raw = readLine(reader) ?: break
+            val line = ANSI.replace(raw, "").trimEnd()
+            if (line.isBlank()) continue
+            // A count line ("412 tests completed, 2 failed") is a total, not a failure.
+            if (!counts.take(line) && failures.size < FAILURES && FAILURE.containsMatchIn(line)) failures += shorten(line.trim())
+            tail.addLast(shorten(line))
+            if (tail.size > TAIL) tail.removeFirst()
         }
         return counts.summary(failures.toList(), tail.toList())
     }

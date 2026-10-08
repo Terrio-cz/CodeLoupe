@@ -180,7 +180,13 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           npm ci --ignore-scripts
-          npm run dist -- ${RELEASE_VERSION:+-c.extraMetadata.version=$RELEASE_VERSION}
+          # dmgbuild sometimes cannot eject its disk image on a macOS runner ("Resource busy"): a second try works.
+          for attempt in 1 2 3; do
+            npm run dist -- ${RELEASE_VERSION:+-c.extraMetadata.version=$RELEASE_VERSION} && break
+            [ "$attempt" = 3 ] && exit 1
+            echo "installer build failed, trying again ($attempt)"
+            sleep 15
+          done
 
       # Unpacks the installer without installing it and runs the bundle inside on a PATH without Java: proves the
       # installer carries a working daemon with its runtime. Installing and starting the app is CL-108.

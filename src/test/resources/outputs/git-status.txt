@@ -1,0 +1,48 @@
+On branch main
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	deleted:    src/m1/F10.kt
+	modified:   src/m2/F11.kt
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   src/m0/F3.kt
+	modified:   src/m0/F6.kt
+	modified:   src/m0/F9.kt
+	modified:   src/m1/F1.kt
+	modified:   src/m1/F4.kt
+	modified:   src/m1/F7.kt
+	modified:   src/m2/F2.kt
+	modified:   src/m2/F5.kt
+	modified:   src/m2/F8.kt
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	new1.txt
+	new10.txt
+	new11.txt
+	new12.txt
+	new13.txt
+	new14.txt
+	new15.txt
+	new16.txt
+	new17.txt
+	new18.txt
+	new19.txt
+	new2.txt
+	new20.txt
+	new21.txt
+	new22.txt
+	new23.txt
+	new24.txt
+	new25.txt
+	new26.txt
+	new3.txt
+	new4.txt
+	new5.txt
+	new6.txt
+	new7.txt
+	new8.txt
+	new9.txt
+

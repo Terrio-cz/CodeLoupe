@@ -42,6 +42,7 @@ build/install/codeloupe/bin/codeloupe task_code ABC-5            # its landed or
 build/install/codeloupe/bin/codeloupe code_tasks OrderService.handle   # the tasks that touched it
 build/install/codeloupe/bin/codeloupe task_context ABC-5         # a planner's whole starting pack; asked again: what changed
 build/install/codeloupe/bin/codeloupe doc plan.md --section goal # a text file by digest, section or line window
+build/install/codeloupe/bin/codeloupe run -- git log -30         # a short command: its summary, the rest by handle (doc path=job:<id>)
 build/install/codeloupe/bin/codeloupe status
 ```
 
@@ -103,6 +104,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | `calls` | callers (default) or callees as a tree, depth ≤ 3; below the first level only exact links |
 | `hierarchy` | supertypes and subtypes of a type (object expressions included, and lambdas converted to a `fun interface`), or what a member overrides and what overrides it |
 | `job` | start a long command in the daemon (status, cancel); see [Jobs and events](#jobs-and-events); takes `cwd`, not `root` |
+| `run` | a command that ends soon (`command` = argv, `cwd`; `timeoutSec`, default 120) answered with a summary instead of its output, as a job (same policy hook, log and scrubbing as `job`). Header: `<command> · exit 0 · 8700 → 380 chars (96% less) · full output: doc path=job:<id>`. git status = branch and a count with names per kind; git log = one line per commit (a shared author or day said once); `git diff --stat` = totals and the 12 biggest files, a patch = one line per file with `+added -removed`; Gradle = the `BUILD` line, task counts, failed tasks, every failed test with its exception and first-party frames, every `e:` compiler error (working directory cut off), a few warnings, `What went wrong`; node:test, Jest, pytest, Maven = counts, failures and last lines; anything else = first 5 lines, every error line (more than 20 are counted) and the last 10, repeated lines folded. An output under 600 characters and 20 lines is returned as it is, `raw=true` returns everything. A command still running after the timeout answers with its job id. The recorded outputs behind the claims are in `src/test/resources/outputs` (about 88 % less over the set; git status, git log and a Gradle failure each at least 60 %) |
 | `changes` | what the worktree changed against the merge-base with the default branch (committed and uncommitted), by declaration: `+` added, `~` body changed, `^` signature changed (with the old one), `-` removed; each with its callers and tests; `bodies=true` adds a line diff per declaration |
 | `task_code` | links between tasks and code, from the default branch's history (works without a tracker). `query` = a task id (`TER-5`): its landing commit, files and changed declarations (`+ ~ ^ -`), the worktree whose branch names it, and for an open task the touch set predicted from its text — `=` sure · `~` likely · `?` guess · `+` new file, each with the issue text it comes from. `query` = a declaration (`Type.member`) or a file path: the tasks that changed it, newest first, with landing commits (`code_tasks <symbol\|path>` on the command line), plus open tasks whose text points at it. Task ids follow the tracker projects, or `taskPattern` (a regular expression) in `.codeloupe.json` |
 
@@ -137,6 +139,7 @@ per caller (`root`), what that caller was shown.
 | `doc path` | a digest of at most 1000 characters: size, hash, the sections as `handle(lines)`, the lines that look like errors as `L118-124 "FAILED: …"`, and how to fetch |
 | `doc path --section goal --section L118-124` | those sections (handle or heading prefix, with their sub-sections) or line windows (at most 300 lines, 20 000 characters) |
 | `doc path --view outline` / `--view full` | every section with its line; the whole text |
+| `doc job:<id>` | the full output a `run` or `job` kept, scrubbed of secrets, by the same digest (error windows `L118-124 "FAILED: …"` included), sections and line windows; the newest 8 MB of a larger log |
 | the same call again | one line, `plan.md unchanged since your read at … (#hash, 9 sections)`, under 100 tokens |
 | after the file changed | the digest becomes a delta (`~ steps(12)`, `+ notes(3)`, `- old`); `--view full` sends only the changed sections in full and names the omitted ones; a fetched section that did not change answers `section steps unchanged` |
 | `--since none` | forget what the caller has; read it again |
@@ -337,6 +340,7 @@ read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-s
 | Job slots | any name, one job each | `config.json` `slots` `{ "gradle-test": 2, "vps-test": 1 }` |
 | Policy for jobs | none (every command allowed) | `config.json` `policyHook` — argv of a PreToolUse hook, e.g. `["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/ws/.claude/hooks/guard.ps1"]`; `policyTimeoutMs` (30 s) |
 | Remote webhook targets | none (local only) | `config.json` `remoteWebhooks` `["https://hooks.example.com"]` |
+| Index reads at once | 2 (the rest wait their turn: ten windows asking together would hold ten reads' memory) | `config.json` `maxParallelQueries` |
 | Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
@@ -445,6 +449,13 @@ the release pipeline (CL-106), auto-update (CL-107). CI cost and runners: [docs/
 profiles a warm query, the first query in a worktree and (with `--clone`) an overlay refresh: client latency split
 by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktree walk, SQL, the rest of the tool and HTTP.
 
+`node tools/load-test.mjs --install build/install/codeloupe --source <repo>` clones the repository into a scratch directory, adds
+eight worktrees and runs ten client loops against a throwaway daemon; midway it commits a change to the default branch (a base
+sync) and edits files in four worktrees. It prints p95 latency before and during the sync, busy and failed calls, and RSS (steady,
+peak, series) against the budgets of `docs/plan.md` § 2. `node tools/rss-mix.mjs --install … --source <repo>` runs 50 mixed
+queries (`changes bodies`, `calls … callees depth 3`, `usages` included) and reports the resident memory with the JVM's own
+accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram` for the live heap).
+
 | Package | Role |
 |---|---|
 | `lang`, `lang.kotlin` | file → facts (declarations, imports, references) via Kotlin PSI |
@@ -456,6 +467,7 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
 | `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |
 | `tracker`, `tracker.youtrack`, `tracker.mirror`, `tracker.read` | tracker adapter (YouTrack REST), SQLite mirror and watcher, `issue` / `tasks` / `similar` answers |
+| `compress` | `run`: output families (git status / log / diff, Gradle, test runners, generic) that shorten a command's output and keep every error line |
 | `doc` | documents as sections with handles: digest, outline, section and line-window fetch, hash and the per-caller delta memory behind `doc` and `task_context` |
 | `tools` | the tool catalog shared by MCP, HTTP API and CLI |
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |

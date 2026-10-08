@@ -1,0 +1,401 @@
+diff --git a/src/main/kotlin/codeloupe/tools/DispatchPlanTool.kt b/src/main/kotlin/codeloupe/tools/DispatchPlanTool.kt
+new file mode 100644
+index 0000000..599fce8
+--- /dev/null
++++ b/src/main/kotlin/codeloupe/tools/DispatchPlanTool.kt
+@@ -0,0 +1,56 @@
++package codeloupe.tools
++
++import codeloupe.doc.DocMemory
++import codeloupe.doc.DocReader
++import codeloupe.repo.Registry
++import codeloupe.taskcode.DispatchPlan
++import codeloupe.taskcode.DispatchQuery
++import codeloupe.taskcode.TaskCodeQuery
++import codeloupe.tracker.Trackers
++
++/** `dispatch_plan`: which ready tasks get a window now so that no two windows touch the same code. */
++class DispatchPlanTool(
++    private val trackers: Trackers,
++    memory: DocMemory,
++    private val initialWaitMs: Long = 10_000,
++    private val staleWaitMs: Long = 3_000,
++) : Tool {
++    private val reader = DocReader(memory)
++    override val name = "dispatch_plan"
++    override val description = "Plan the next windows of work: from candidates=[ids], epic=<id>, or query=<filters> (none: the most urgent open leaf " +
++        "tasks) it predicts each task's touch set (landed files, else the code its text names), compares them with each other and with the " +
++        "live worktrees, and answers windows — a batch of up to 3 light tasks, a chain of up to 3 steps, or one task — each with the shared " +
++        "code that put its tasks together and per-task keys (file:/dir:), then what waits and why (fights with a live worktree, unmet " +
++        "dependency, no free slot) and the live windows. slots = free windows (default 4); width=dir (default) also treats one directory as a " +
++        "clash, file only one file. replay=true plans past work again (resolved tasks with their landed files, no live windows) to check a recorded dispatch. Asking again answers 'unchanged' or only the changed sections. You keep the final judgment."
++    override val properties = Schema.properties(
++        "candidates" to Schema.strings("Task ids to place, e.g. [TER-5, TER-6]"),
++        "epic" to Schema.string("Epic id: its open leaf tasks are the candidates"),
++        "query" to Schema.string("Tracker filters like the tasks tool, e.g. 'project: TER priority: Major'"),
++        "slots" to Schema.integer(0, 8),
++        "width" to Schema.enum(listOf("dir", "file")),
++        "replay" to Schema.boolean("Plan past work again: resolved tasks count with the files they landed, live worktrees are ignored"),
++        "sections" to Schema.strings("windows, waiting, live"),
++        "view" to Schema.enum(listOf("full", "digest")),
++        "since" to Schema.string("none: send everything again"),
++    )
++    override val required = emptyList<String>()
++
++    private var query: DispatchQuery? = null
++
++    override suspend fun answer(registry: Registry, root: String, args: ToolArgs): String {
++        val built = synchronized(this) { query ?: DispatchQuery(trackers, TaskCodeQuery(registry, trackers, initialWaitMs, staleWaitMs)).also { query = it } }
++        val request = DispatchQuery.Request(
++            args.strings("candidates").map { it.uppercase() }, args.string("epic")?.trim()?.takeIf { it.isNotEmpty() }?.uppercase(), args.string("query")?.trim()?.takeIf { it.isNotEmpty() },
++            args.int("slots") ?: DEFAULT_SLOTS, if (args.string("width") == "file") DispatchPlan.Width.FILE else DispatchPlan.Width.DIR, args.bool("replay") == true,
++        )
++        val doc = built.build(root, request)
++        val view = if (args.string("view") == "digest") DocReader.View.DIGEST else DocReader.View.FULL
++        if (doc.sections.isEmpty()) return "dispatch plan: nothing to place (no open leaf task matches)"
++        return reader.read(Sessions.key(root), doc, view, args.strings("sections"), forget = args.string("since") == "none")
++    }
++
++    private companion object {
++        const val DEFAULT_SLOTS = 4
++    }
++}
+diff --git a/src/main/kotlin/codeloupe/tools/DocTool.kt b/src/main/kotlin/codeloupe/tools/DocTool.kt
+new file mode 100644
+index 0000000..707dfbe
+--- /dev/null
++++ b/src/main/kotlin/codeloupe/tools/DocTool.kt
+@@ -0,0 +1,36 @@
++package codeloupe.tools
++
++import codeloupe.doc.DocFiles
++import codeloupe.doc.DocMemory
++import codeloupe.doc.DocReader
++import codeloupe.repo.Registry
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++
++/** `doc`: a text file (a plan, a brain note, a persisted tool output) by digest, by section or line window, and as the delta since the caller last read it. */
++class DocTool(memory: DocMemory, private val files: DocFiles = DocFiles(DocFiles.defaultRoots())) : Tool {
++    private val reader = DocReader(memory)
++    override val name = "doc"
++    override val description = "A text file without re-reading it: the default is a digest of at most 1000 characters — size, hash, the sections " +
++        "by handle with their line counts, the lines that look like errors — then section=[handle or heading prefix, L<from>-<to>] fetches " +
++        "just those parts, view=outline lists every section, view=full the whole text. A repeated read with the same root answers " +
++        "'unchanged' in one line, or only what changed; since=none reads it again. For plans, brain notes and large persisted tool outputs."
++    override val properties = Schema.properties(
++        "path" to Schema.string("File, absolute or relative to root; under root or the agent harness's folders"),
++        "view" to Schema.enum(listOf("digest", "outline", "full")),
++        "section" to Schema.strings("Section handles or heading prefixes, or line windows like L120-160"),
++        "since" to Schema.string("none: read again whatever you already have"),
++    )
++    override val required = listOf("path")
++    override val needsRoot = false
++
++    override suspend fun answer(registry: Registry, root: String, args: ToolArgs): String {
++        val doc = withContext(Dispatchers.IO) { files.load(root, args.string("path").orEmpty()) }
++        val view = when (args.string("view")) {
++            "full" -> DocReader.View.FULL
++            "outline" -> DocReader.View.OUTLINE
++            else -> DocReader.View.DIGEST
++        }
++        return reader.read(Sessions.key(root), doc, view, args.strings("section"), forget = args.string("since") == "none")
++    }
++}
+diff --git a/src/main/kotlin/codeloupe/tools/IssueTool.kt b/src/main/kotlin/codeloupe/tools/IssueTool.kt
+index 1a4d75a..dc42f58 100644
+--- a/src/main/kotlin/codeloupe/tools/IssueTool.kt
++++ b/src/main/kotlin/codeloupe/tools/IssueTool.kt
+@@ -22,9 +22,6 @@ class IssueTool(private val trackers: Trackers) : Tool {
+     override suspend fun answer(registry: Registry, root: String, args: ToolArgs): String {
+         val id = args.string("id")?.trim().orEmpty()
+         val (mirror, canonical) = trackers.mirror(id) ?: return "no tracker mirrors the project of '$id'; mirrored: ${trackers.projects().joinToString(", ")}"
+-        return trackers.reader.read(mirror, canonical, Parts.of(args.string("view"), args.strings("sections")), args.string("since"), session(root))
++        return trackers.reader.read(mirror, canonical, Parts.of(args.string("view"), args.strings("sections")), args.string("since"), Sessions.key(root))
+     }
+-
+-    /** The caller's root is its session key: a window works in one worktree. */
+-    private fun session(root: String) = root.trim().replace('\\', '/').trimEnd('/').lowercase()
+ }
+diff --git a/src/main/kotlin/codeloupe/tools/OutlineTool.kt b/src/main/kotlin/codeloupe/tools/OutlineTool.kt
+index 3a39410..35509f9 100644
+--- a/src/main/kotlin/codeloupe/tools/OutlineTool.kt
++++ b/src/main/kotlin/codeloupe/tools/OutlineTool.kt
+@@ -1,16 +1,26 @@
+ package codeloupe.tools
+ 
+ import codeloupe.query.OutlineQuery
++import codeloupe.query.RepoMap
+ import codeloupe.query.View
+ 
+ object OutlineTool : ViewTool {
+     override val name = "outline"
+     override val description = "Members of a file or a type with line ranges and signatures, no bodies. Read this before reading a file; " +
+-        "then fetch only the members you need with `symbol`."
++        "then fetch only the members you need with `symbol`. Without target: a map of the repository's types, files ranked by how " +
++        "much the rest of the code refers to them, within a token budget; focus (files or symbols) ranks their neighbourhood first. " +
++        "Start with the map in a repository you do not know."
+     override val properties = Schema.properties(
+-        "target" to Schema.string("File path (or unique suffix like \"shop/OrderService.kt\") or type name (Type, pkg.Type, Outer.Inner)"),
++        "target" to Schema.string("File path (or unique suffix like \"shop/OrderService.kt\") or type name (Type, pkg.Type, Outer.Inner); omit for the repository map"),
++        "focus" to Schema.strings("Map only: files or symbols the map is centred on, e.g. [\"shop/OrderService.kt\", \"Registry\"]"),
++        "budget" to Schema.integer(100, 8000),
++        "test" to Schema.boolean("Map only: true = include test sources (default: only when a focus is in them)"),
+     )
+-    override val required = listOf("target")
++    override val required = emptyList<String>()
+ 
+-    override fun run(view: View, args: ToolArgs): String = OutlineQuery.run(view, args.string("target"))
++    override fun run(view: View, args: ToolArgs): String {
++        val target = args.string("target")
++        if (!target.isNullOrBlank()) return OutlineQuery.run(view, target)
++        return RepoMap.run(view, RepoMap.Args(focus = args.strings("focus"), budget = args.int("budget") ?: RepoMap.DEFAULT_BUDGET, test = args.bool("test")))
++    }
+ }
+diff --git a/src/main/kotlin/codeloupe/tools/Sessions.kt b/src/main/kotlin/codeloupe/tools/Sessions.kt
+new file mode 100644
+index 0000000..9417bce
+--- /dev/null
++++ b/src/main/kotlin/codeloupe/tools/Sessions.kt
+@@ -0,0 +1,6 @@
++package codeloupe.tools
++
++/** The key a tool remembers a caller's reads under: the caller's root, since a window works in one worktree. */
++object Sessions {
++    fun key(root: String): String = root.trim().replace('\\', '/').trimEnd('/').lowercase()
++}
+diff --git a/src/main/kotlin/codeloupe/tools/SimilarTool.kt b/src/main/kotlin/codeloupe/tools/SimilarTool.kt
+new file mode 100644
+index 0000000..c5a4c72
+--- /dev/null
++++ b/src/main/kotlin/codeloupe/tools/SimilarTool.kt
+@@ -0,0 +1,37 @@
++package codeloupe.tools
++
++import codeloupe.repo.Registry
++import codeloupe.tracker.Trackers
++import codeloupe.tracker.read.Similar
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++
++/** `similar`: tasks of the local mirror that look like a draft issue; call it before creating one. */
++class SimilarTool(private val trackers: Trackers, private val initialWaitMs: Long = 10_000, private val staleWaitMs: Long = 3_000) : Tool {
++    override val name = "similar"
++    override val description = "Before you create an issue: the tasks of the local tracker mirror (open, or resolved in the last 90 days) that talk about " +
++        "the same thing as your draft summary and description, best full-text match first, with the words they share. If one is the same work, " +
++        "extend or comment on it, or link the new issue with 'relates to'. Answers in well under 100 ms from the mirror."
++    override val properties = Schema.properties(
++        "summary" to Schema.string("Title of the issue you are about to create"),
++        "description" to Schema.string("Its description or scope, if you have one"),
++        "project" to Schema.string("Only this project's mirror, e.g. TER"),
++        "limit" to Schema.integer(1, 20),
++    )
++    override val required = listOf("summary")
++    override val needsRoot = false
++
++    override suspend fun answer(registry: Registry, root: String, args: ToolArgs): String {
++        val summary = args.string("summary")?.trim().orEmpty()
++        if (summary.isEmpty()) return "pass the draft summary"
++        val project = args.string("project")?.trim()?.takeIf { it.isNotEmpty() }
++        val mirrors = trackers.mirrors.filter { m -> project == null || m.instance.projects.any { it.equals(project, ignoreCase = true) } }
++        if (mirrors.isEmpty()) return "no tracker mirrors ${project ?: "any project"}; mirrored: ${trackers.projects().joinToString(", ")}"
++        val note = trackers.current(initialWaitMs, staleWaitMs)
++        val limit = args.int("limit") ?: 5
++        val answer = withContext(Dispatchers.IO) {
++            Similar.render(mirrors.flatMap { Similar.find(it.store, summary, args.string("description").orEmpty(), limit, project = project) }.take(limit))
++        }
++        return if (note == null) answer else "$answer\n$note"
++    }
++}
+diff --git a/src/main/kotlin/codeloupe/tools/TaskContextTool.kt b/src/main/kotlin/codeloupe/tools/TaskContextTool.kt
+new file mode 100644
+index 0000000..b3282d7
+--- /dev/null
++++ b/src/main/kotlin/codeloupe/tools/TaskContextTool.kt
+@@ -0,0 +1,42 @@
++package codeloupe.tools
++
++import codeloupe.doc.DocMemory
++import codeloupe.doc.DocReader
++import codeloupe.repo.Registry
++import codeloupe.taskcode.TaskCodeQuery
++import codeloupe.taskcode.TaskContext
++import codeloupe.tracker.Trackers
++
++/** `task_context`: the planner's starting pack for a task in one call, and on a repeated call only what changed. */
++class TaskContextTool(
++    private val trackers: Trackers,
++    memory: DocMemory,
++    private val initialWaitMs: Long = 10_000,
++    private val staleWaitMs: Long = 3_000,
++) : Tool {
++    private val reader = DocReader(memory)
++    override val name = "task_context"
++    override val description = "Everything to start planning a task, in one call instead of issue + tasks + task_code + search: sections " +
++        "issue (brief with criteria), linked (dependencies and relations with state), open-criteria (what related open tasks still owe), " +
++        "touch (landed, in a worktree, or predicted code), declarations (outline lines of those files), prior (earlier tasks that changed them, with " +
++        "landing commit). sections=[…] picks some; view=digest lists them with sizes. The same root asking again gets 'unchanged' in " +
++        "one line, or only the sections that changed; since=none sends everything again."
++    override val properties = Schema.properties(
++        "id" to Schema.string("e.g. TER-5"),
++        "sections" to Schema.strings("issue, linked, open-criteria, touch, declarations, prior"),
++        "view" to Schema.enum(listOf("full", "digest")),
++        "since" to Schema.string("none: send everything again"),
++    )
++    override val required = listOf("id")
++
++    private var context: TaskContext? = null
++
++    override suspend fun answer(registry: Registry, root: String, args: ToolArgs): String {
++        val id = args.string("id")?.trim().orEmpty()
++        if (id.isEmpty()) return "pass id: a task id like TER-5"
++        val built = synchronized(this) { context ?: TaskContext(registry, trackers, TaskCodeQuery(registry, trackers, initialWaitMs, staleWaitMs)).also { context = it } }
++        val doc = built.build(root, id)
++        val view = if (args.string("view") == "digest") DocReader.View.DIGEST else DocReader.View.FULL
++        return reader.read(Sessions.key(root), doc, view, args.strings("sections"), forget = args.string("since") == "none")
++    }
++}
+diff --git a/src/main/kotlin/codeloupe/tools/Tools.kt b/src/main/kotlin/codeloupe/tools/Tools.kt
+index 2a53e25..c425203 100644
+--- a/src/main/kotlin/codeloupe/tools/Tools.kt
++++ b/src/main/kotlin/codeloupe/tools/Tools.kt
+@@ -1,5 +1,6 @@
+ package codeloupe.tools
+ 
++import codeloupe.doc.DocMemory
+ import codeloupe.tracker.Trackers
+ import kotlinx.serialization.json.JsonObject
+ 
+@@ -13,9 +14,13 @@ object Tools {
+ 
+     fun named(name: String): Tool? = ALL.firstOrNull { it.name == name }
+ 
+-    /** The daemon's catalog: the code tools, the tracker tools when a tracker is configured, and task_code (history alone without one). */
+-    fun catalog(trackers: Trackers): List<Tool> =
+-        ALL + (if (trackers.configured) listOf(IssueTool(trackers), TasksTool(trackers), UpdateTool(trackers)) else emptyList()) + TaskCodeTool(trackers)
++    /** The daemon's catalog: the code tools, the tracker tools when a tracker is configured, and task_code (history alone without one) and doc (text files). */
++    fun catalog(trackers: Trackers): List<Tool> {
++        // The document reader's memory is shared: `doc` and `task_context` tell a caller the same "you already have this".
++        val docs = DocMemory()
++        val tracked = if (trackers.configured) listOf(IssueTool(trackers), TaskContextTool(trackers, docs), DispatchPlanTool(trackers, docs), TasksTool(trackers), SimilarTool(trackers), UpdateTool(trackers)) else emptyList()
++        return ALL + tracked + TaskCodeTool(trackers) + DocTool(docs)
++    }
+ 
+     /** Tools that need no repository take `root` only as the caller's identity. */
+     private val CALLER: JsonObject = Schema.string("Your worktree or repository (absolute): remembers what you already read.")
+diff --git a/src/main/kotlin/codeloupe/tracker/read/ReadyTasks.kt b/src/main/kotlin/codeloupe/tracker/read/ReadyTasks.kt
+index bdc3a97..ac8768a 100644
+--- a/src/main/kotlin/codeloupe/tracker/read/ReadyTasks.kt
++++ b/src/main/kotlin/codeloupe/tracker/read/ReadyTasks.kt
+@@ -8,7 +8,7 @@ import codeloupe.tracker.mirror.MirrorStore
+  * counts as open (`?`): nothing proves it done.
+  */
+ object ReadyTasks {
+-    private const val LEAF = "i.resolved IS NULL AND NOT EXISTS (SELECT 1 FROM issues s WHERE s.parent = i.id)"
++    const val LEAF = "i.resolved IS NULL AND NOT EXISTS (SELECT 1 FROM issues s WHERE s.parent = i.id)"
+     private const val LISTED = 8
+ 
+     fun render(store: MirrorStore, filter: TaskFilter, held: Map<String, String>, limit: Int): String {
+diff --git a/src/main/kotlin/codeloupe/tracker/read/Similar.kt b/src/main/kotlin/codeloupe/tracker/read/Similar.kt
+new file mode 100644
+index 0000000..d0d8faa
+--- /dev/null
++++ b/src/main/kotlin/codeloupe/tracker/read/Similar.kt
+@@ -0,0 +1,63 @@
++package codeloupe.tracker.read
++
++import codeloupe.JsonFormat
++import codeloupe.tracker.TrackerIssue
++import codeloupe.tracker.mirror.MirrorStore
++import codeloupe.tracker.mirror.query
++import java.time.Duration
++
++/**
++ * `similar(summary, description)`: the tasks of the mirror that talk about the same thing as a draft issue, so an agent
++ * extends or links one instead of creating a duplicate. Full-text ranking (bm25, the summary weighs most) over the
++ * open tasks and those resolved in the last [RECENT_DAYS] days, then the words each hit really shares with the draft.
++ * A hit is real when the title shares two of the draft's title words (one if the title has one), or when it shares at least
++ * three words and two fifths of everything searched; a task that only happens to contain "write" and "updates" is not.
++ */
++object Similar {
++    const val RECENT_DAYS = 90L
++    private const val CANDIDATES = 60
++
++    data class Hit(val row: TaskRow, val shared: List<String>)
++
++    fun find(
++        store: MirrorStore,
++        summary: String,
++        description: String = "",
++        limit: Int = 5,
++        nowMs: Long = System.currentTimeMillis(),
++        /** Only this project's tasks (a mirror holds several), or null. */
++        project: String? = null,
++    ): List<Hit> {
++        val terms = SimilarTerms.of(summary, description)
++        if (terms.isEmpty()) return emptyList()
++        val match = terms.joinToString(" OR ") { "\"$it\"" }
++        val since = nowMs - Duration.ofDays(RECENT_DAYS).toMillis()
++        val titleTerms = SimilarTerms.of(summary, "").toSet()
++        val needTitle = minOf(2, titleTerms.size)
++        val needAll = maxOf(3, Math.ceil(terms.size * 0.4).toInt())
++        return store.read { db ->
++            val ids = db.query(
++                "SELECT i.id FROM issues_fts f JOIN issues i ON i.rowid = f.rowid WHERE issues_fts MATCH ? AND (i.resolved IS NULL OR i.resolved > ?) AND (? IS NULL OR i.project = ? COLLATE NOCASE) " +
++                    "ORDER BY bm25(issues_fts, 10.0, 1.0, 0.4) LIMIT $CANDIDATES",
++                match, since, project, project,
++            ) { it.getString(1) }
++            if (ids.isEmpty()) return@read emptyList()
++            val rows = TaskRows.select(db, "i.id IN (${ids.joinToString(",") { "?" }})", "i.num", ids).associateBy { it.id.uppercase() }
++            val json = db.query("SELECT id, json FROM issues WHERE id IN (${ids.joinToString(",") { "?" }})", *ids.toTypedArray()) { it.getString(1).uppercase() to it.getString(2) }.toMap()
++            ids.mapNotNull { id ->
++                val row = rows[id.uppercase()] ?: return@mapNotNull null
++                val issue = json[id.uppercase()]?.let { runCatching { JsonFormat.json.decodeFromString(TrackerIssue.serializer(), it) }.getOrNull() }
++                val theirs = SimilarTerms.words(row.summary + " " + issue?.description.orEmpty()).toSet()
++                Hit(row, terms.filter { it in theirs })
++            }.filter { hit -> hit.shared.count { it in titleTerms } >= needTitle && titleTerms.isNotEmpty() || hit.shared.size >= needAll }
++                .take(limit)
++        }
++    }
++
++    fun render(hits: List<Hit>): String {
++        if (hits.isEmpty()) return "no similar task (open or resolved in the last $RECENT_DAYS days): create the issue"
++        val lines = hits.map { "${it.row.line(withParent = true)}  ≈ ${it.shared.take(6).joinToString(", ")}" }
++        return (listOf("${hits.size} similar tasks (best first):") + lines +
++            "Same work? Extend or comment on that task, or link the new one with `relates to`, instead of creating a duplicate.").joinToString("\n")
++    }
++}
+diff --git a/src/main/kotlin/codeloupe/tracker/read/SimilarTerms.kt b/src/main/kotlin/codeloupe/tracker/read/SimilarTerms.kt
+new file mode 100644
+index 0000000..faa14e8
+--- /dev/null
++++ b/src/main/kotlin/codeloupe/tracker/read/SimilarTerms.kt
+@@ -0,0 +1,28 @@
++package codeloupe.tracker.read
++
++/** The distinctive words of a draft issue: what `similar` searches the mirror for. */
++object SimilarTerms {
++    private const val MAX_TERMS = 16
++    private const val MIN_LENGTH = 3
++
++    // Words that open a task title or glue a sentence, in English and Czech: they match everything and say nothing.
++    private val STOP = setOf(
++        "the", "and", "for", "with", "from", "into", "that", "this", "these", "those", "are", "was", "were", "not", "but", "can", "will", "should", "must",
++        "has", "have", "had", "its", "their", "when", "then", "than", "also", "only", "each", "every", "any", "all", "one", "per", "via", "out", "off",
++        "add", "use", "using", "used", "make", "new", "get", "set", "fix", "support", "allow", "need", "needs", "instead", "after", "before", "over", "under",
++        "issue", "task", "tasks", "context", "scope", "criteria", "acceptance", "verification", "todo",
++        "pro", "nebo", "jako", "kdy", "kdyz", "aby", "ale", "bez", "mezi", "pri", "pod", "nad", "jen", "tak", "tento", "tato", "toto", "jsou", "byt", "ktery",
++    )
++
++    /** Summary words first (they weigh most), then description words by how often they occur; at most 16 distinct. */
++    fun of(summary: String, description: String): List<String> {
++        val ordered = LinkedHashSet<String>()
++        words(summary).forEach { ordered += it }
++        words(description).groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.forEach { ordered += it.key }
++        return ordered.take(MAX_TERMS)
++    }
++
++    /** The searchable words of [text], lower case, in order; what `similar` also uses to see which terms an issue shares. */
++    fun words(text: String): List<String> = text.lowercase().split(Regex("[^\\p{L}\\p{N}]+"))
++        .filter { it.length >= MIN_LENGTH && it !in STOP && !it.all(Char::isDigit) }
++}
