@@ -1,0 +1,75 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main, "CL-*"]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1"
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Code scanning results can only be uploaded to GitHub from a public repository or one with GitHub Code Security.
+# Until then the SARIF stays an artifact and tools/sarif-gate.mjs fails the job on a high-severity finding.
+# To switch to the Security tab: set the repository variable CODEQL_UPLOAD to "always" and add
+# `security-events: write` to the permissions of the analyze job.
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Kotlin needs a build that CodeQL traces (build-mode none skips Kotlin); the compile tasks only,
+          # uncached and in-process so every Kotlin and Java file goes through the traced compiler.
+          - language: java-kotlin
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: matrix.language == 'java-kotlin'
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Compile
+        if: matrix.language == 'java-kotlin'
+        run: ./gradlew compileKotlin compileTestKotlin --rerun-tasks --no-daemon --no-build-cache --console=plain -Dkotlin.compiler.execution.strategy=in-process
+
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        id: analyze
+        with:
+          category: /language:${{ matrix.language }}
+          output: sarif-results
+          upload: ${{ vars.CODEQL_UPLOAD || 'never' }}
+
+      - name: Upload SARIF
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: sarif-results/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Fail on high-severity findings
+        run: node tools/sarif-gate.mjs sarif-results

@@ -1,0 +1,34 @@
+version: 2
+
+# Weekly, grouped: one pull request per ecosystem and week instead of one per package. Security updates are not
+# grouped by this file and open immediately once Dependabot alerts are on for the repository.
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    groups:
+      gradle:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    groups:
+      npm:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    groups:
+      actions:
+        patterns: ["*"]

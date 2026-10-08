@@ -3,6 +3,7 @@ import java.security.MessageDigest
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.license.report)
     application
 }
 
@@ -92,4 +93,15 @@ tasks.processResources {
     val version = project.version.toString()
     inputs.property("version", version)
     filesMatching("codeloupe/build.properties") { expand("version" to version) }
+}
+
+licenseReport {
+    // What ships to users: the runtime classpath. Test and build tooling is not distributed.
+    configurations = arrayOf("runtimeClasspath")
+    filters = arrayOf(com.github.jk1.license.filter.LicenseBundleNormalizer())
+    renderers = arrayOf(
+        com.github.jk1.license.render.JsonReportRenderer("licenses.json", false),
+        com.github.jk1.license.render.CsvReportRenderer("licenses.csv"),
+    )
+    allowedLicensesFile = file("gradle/allowed-licenses.json")
 }
