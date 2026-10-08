@@ -1,6 +1,7 @@
 import type { DaemonStatus } from './contract';
 import type { AppSettings, RendererSettings } from './settings';
 import type { ActionsBridge } from './actions';
+import type { JobsBridge, LiveBridge } from './jobs';
 import type { ApiRequest } from './request';
 
 export type DaemonPhase = 'unknown' | 'starting' | 'running' | 'stopping' | 'stopped' | 'down' | 'error';
@@ -71,6 +72,8 @@ export interface CodeLoupeBridge {
     manual(kind: ClaudeConnectKind): Promise<string[]>;
   };
   actions: ActionsBridge;
+  jobs: JobsBridge;
+  live: LiveBridge;
   metrics(): Promise<AppMetrics>;
   open: {
     worktree(id: string): Promise<boolean>;
