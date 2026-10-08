@@ -119,6 +119,11 @@ class Overlays(
     /** The overlay as the last check left it, without checking again; null when it was never checked against [baseCommit]. */
     fun known(worktree: String, baseCommit: String): OverlayVersion? = states[key(worktree)]?.view?.takeIf { it.base == baseCommit }
 
+    /** The next query of [worktree] checks it, however recently it did: a file was written under the overlay. */
+    fun invalidate(worktree: String) {
+        states[key(worktree)]?.mustCheck = true
+    }
+
     /** Overlays of a repository that hold files. */
     /**
      * How a worktree's layer stands against [baseCommit]: `none` (never checked), `building` (a refresh runs), `error` (the last

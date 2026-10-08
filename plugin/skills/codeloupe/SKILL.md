@@ -30,10 +30,13 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 | Read a plan, a brain note or a large saved tool output | `doc` (`path`; digest first, then `section=[handle or L120-160]`; `view=full` for all) | reading the whole file again |
 | Find or plan tasks | `tasks` (`mode=list` with a query, `graph`, `ready`, `progress`) | tracker search by hand |
 | Before creating an issue | `similar` (`summary`, `description`: tasks that already talk about it; extend or link one instead of a duplicate) | creating first, finding the duplicate later |
+| Change one declaration, add a member or an import, delete a declaration, rename a symbol (only when `edit` is on offer) | `edit` (`op` = `replace`, `insert_after`, `insert_before`, `insert_member`, `delete`, `add_imports`, `create_file`, `rename`; `name` as for `symbol`, `hash` = the `hash=` it printed; `rename` with `dry_run=true` first) | `Edit` with the old text, search and replace over files |
 | Change an issue's state or add a comment | `update` (`id`, `set={State: …}`, `comment`) | the tracker's UI |
 | `git status` / `git log` / `git diff --stat`, a quick gradle build or test run, any CLI with a long output | `run` (`command` = argv; a summary with every error line and a handle `job:<id>`; `doc path=job:<id>` reads the rest; `raw=true` for the whole output) | the raw Bash output |
 | Which environment variables or secrets a workspace has | `env` (names, scopes, last use — never a value; start a process with them via `codeloupe env run -- <cmd>`) | reading `.env` files |
 | A test or build that takes a while | `job` (`action=start`, `command` = argv array, `cwd`, `slot` for shared resources; then `action=status`) | a blocking shell call |
+
+`edit` is on offer only where the write policy allows it (`write.mode` in the daemon's `config.json`); read the declaration with `symbol` first, pass its `hash`, and read it again after a refusal. Claude Code's own `Edit` refuses a file that changed since it was read: after an `edit` write, `Read` the file again before using `Edit` on it.
 
 `issue`, `task_context`, `dispatch_plan`, `tasks`, `similar` and `update` work only when a tracker is configured for the daemon; `task_code` also works without one
 (it reads the default branch's history), and `doc` needs no repository or tracker.

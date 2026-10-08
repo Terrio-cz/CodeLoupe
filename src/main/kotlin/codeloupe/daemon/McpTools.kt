@@ -15,13 +15,13 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 
 /** An MCP server exposing the tool catalog; stateless HTTP builds one per request. */
-internal class McpTools(private val runner: ToolRunner, private val tools: List<Tool>, private val jobTool: JobTool? = null) {
+internal class McpTools(private val runner: ToolRunner, private val tools: () -> List<Tool>, private val jobTool: JobTool? = null) {
     fun server(): Server {
         val server = Server(
             Implementation(name = CodeLoupe.NAME, version = CodeLoupe.VERSION),
             ServerOptions(capabilities = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = true))),
         )
-        for (tool in tools) {
+        for (tool in tools()) {
             server.addTool(
                 name = tool.name,
                 description = tool.description,

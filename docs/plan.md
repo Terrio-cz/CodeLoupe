@@ -285,23 +285,51 @@ tracker v konfiguraci) + `job` (start/status/cancel jedním nástrojem, CL-84).
 | `modules()` | moduly a jejich závislosti |
 | `check(file)` | syntaktické chyby (ERROR uzly) — rychlá náhrada IDEA `get_file_problems`; typy dál ověřuje build |
 
-### Zápis
+### Zápis (CL-37 ✅)
 
-| Nástroj | Dělá |
-|---|---|
-| `replace_symbol(name, code, hash)` | nahradí deklaraci |
-| `insert_after` / `insert_before(name, code, hash)` | vloží vedle symbolu |
-| `insert_member(type, code, position, hash)` | `start`, `end`, `after_properties` |
-| `delete_symbol(name, hash)` | smaže deklaraci i s KDocem a anotacemi |
-| `add_imports(file, [fqn])` | přidá, seřadí, bez duplicit |
-| `create_file(path, code)` | jen nový soubor; package = složka |
-| `rename_symbol(name, newName, hash)` | přejmenuje deklaraci a všechny `exact` výskyty; `candidate` výskyty vrátí k ručnímu rozhodnutí; náhrada IDEA `rename_refactoring` |
+Jeden nástroj `edit(op, …)` místo sedmi (strop 14 platí: výchozí katalog má dál 14 nástrojů; `edit` je 15. a nabízí se jen, když to dovolí
+brána níže — nástroj navíc by stál tokeny v každém okně i těm, kdo nepíšou). Samostatný nástroj, ne `op` u `symbol`: klient povoluje nástroje po
+jménech a čtecí `symbol` by pak povoloval i zápis.
 
-Pojistky: hash zámek; zápisová politika z `.codeloupe.json` (Terrio: jen linked worktree, nikdy hlavní
-checkout; všude deny `.env`, klíče, soubory s konfliktními značkami); po zápisu přeparsovat — ERROR uzly
-nesmí přibýt a symbol musí jít najít, jinak rollback; zachovat EOL/BOM/koncový newline; přeindentovat;
-atomický zápis s retry; journal zápisů; synchronní obnova vrstvy. Po zápisu přes codeloupe chce Claude Code
-před `Edit` stejného souboru nové `Read` — v skillu.
+| `op` | Argumenty | Dělá |
+|---|---|---|
+| `replace` | `name`, `code`, `hash` | nahradí deklaraci (s KDocem a anotacemi); `code` shodný s textem = beze změny |
+| `insert_after` / `insert_before` | `name`, `code`, `hash` | vloží vedle symbolu (prázdný řádek jako sousedé; jednořádkové vlastnosti těsně) |
+| `insert_member` | `name` = typ, `code`, `position` `start`/`end`/`after_properties`, `hash` | člen do těla typu; typ bez těla dostane tělo, enum dostane `;` za konstanty |
+| `delete` | `name`, `hash` | smaže deklaraci i s KDocem a anotacemi a jeden sousední prázdný řádek (insert → delete vrátí soubor beze změny bajtu) |
+| `add_imports` | `file`, `imports` | přidá, seřadí do skupiny (Java: statické zvlášť), bez duplicit a bez toho, co jazyk importuje sám |
+| `create_file` | `path`, `code` | jen nový soubor; package = složka (`src/<set>/kotlin|java/…`), veřejný typ Javy = jméno souboru; EOL podle sousedů |
+| `rename` | `name`, `to`, `hash`, `dry_run` | deklarace + co přepisuje a co ji přepisuje + třída s konstruktory + každý `exact` výskyt + importy + soubor veřejného typu Javy; `candidate` vrátí k ručnímu rozhodnutí |
+
+Pojistky (všechny v kódu a pod testem):
+- **hash zámek**: `hash` z `symbol` musí sedět na deklaraci, jak je v souboru na disku (dotaz do indexu jen najde místo; deklarace se znovu najde ve
+  faktech čerstvě načteného souboru, takže zaostalý overlay nevadí); zastaralý hash = odmítnutí s novým hashem.
+- **offsety místo řádků**: extraktory dávají `DeclFact.startOffset/endOffset/nameOffset/bodyOpen/bodyClose` (jen v paměti, do indexu nejdou, formát
+  se nemění); edit mění jen rozsah deklarace, zbytek souboru zůstává bajt po bajtu (BOM, smíšené konce řádků, chybějící koncový newline, tabulátory).
+- **validace**: po úpravě se soubor znovu rozparsuje — ERROR uzlů nesmí přibýt, deklarace mimo upravený rozsah musí být přesně tytéž (druh, kontejner,
+  jméno, typy parametrů), rozsah musí obsahovat deklaraci a žádnou nesmí mít dvakrát. Jinak se nezapíše nic (rollback = soubor se nikdy nedotkl).
+- **atomický zápis**: dočasný soubor vedle cíle a jedno přejmenování, retry 10–600 ms při zablokování editorem/antivirem; více souborů (rename) se zamkne v
+  pořadí cest, porovná s tím, z čeho se edit dělal, a při chybě v půlce se vrátí zapsané soubory.
+- **zápisová politika** (`WritePolicy`): jen `.kt`/`.java` uvnitř worktree (odkaz ven se odmítne), nikdy `.git`, `.codeloupe.json`, `.env`/klíče, soubor s
+  konfliktními značkami; `config.json` `write.linkedWorktreesOnly`, `write.deny` (globy); `.codeloupe.json` repozitáře smí totéž **jen přidat** (Terrio:
+  `{"write": {"linkedWorktreesOnly": true}}`), nikdy zápis povolit.
+- **journal** `<home>/writes.jsonl`: čas, `op`, root, soubory se SHA-1 před/po. **Synchronní obnova vrstvy**: zápis označí overlay worktree k povinné kontrole
+  (`Overlays.invalidate`), takže další dotaz vidí změnu i při `overlayCheckMs`.
+- Po zápisu přes codeloupe chce Claude Code před `Edit` stejného souboru nové `Read` — v skillu.
+
+**Rename** (bez IDE a překladače): plán z indexu (`RenamePlanner`) → texty ze souborů na disku (`RenameEdits`: kontrola, že na každé pozici je ve skutečnosti
+staré jméno) → **kontrola, která nahrazuje překladač** (`RenameCheck`): worktree po přejmenování se naindexuje do dočasného overlaye vedle ostatního a každé
+přejmenované místo musí podle týchž pravidel jako `usages` vést na přejmenovanou deklaraci (zachycení jiným symbolem téhož jména, ztráta deklarace) → teprve pak
+se zapíše. Odmítne: jméno, které už existuje (člen téhož kontejneru, top-level téhož balíčku), lokál/parametr téhož jména u přejmenovaného nekvalifikovaného
+použití, `override` člena mimo index, operátory a konvence čtené podle jména (`toString`, `compareTo`, `main`, `invoke`, …). Upozorní na serializační anotace a
+na typy s nadtypy mimo index. Neřeší (vypíše jako `candidate`): getter Javy ↔ vlastnost Kotlinu, Java `XyzKt.f()` na top-level funkci Kotlinu; řetězce, komentáře a
+generovaný kód se nemění. Pojmenované argumenty konstruktoru (`Owner(x = 1)`) se přepíšou, je-li jméno majitele v indexu jediné.
+
+**Brána (`WriteGate`)** — titulek karty „gated by gap detector“: `write.mode` `off` | `on` | `auto` (výchozí). `auto` = pravidlo karty: nástroj se nabídne,
+jen když detektor mezer v transkriptech posledních `windowDays` (30) ukáže, že koderi dál čtou celé soubory kvůli `Edit` (≥ 20 čtení celého kódového souboru, po kterém
+do 3 tahů následuje `Edit`/`MultiEdit` téhož souboru) nebo chybí rename (≥ 3 běhy, v nichž se jeden identifikátor ručně vyměnil za jiný ve ≥ 3 souborech; `ManualEdits`).
+Prahy v `write.gate`. Verdikt se počítá mimo požadavek 60 s po startu daemonu, drží 6 h v `<home>/write-gate.json`, do prvního výpočtu je brána zavřená;
+`codeloupe metrics gaps` ho tiskne. Data k rozhodnutí existují jen tam, kde se sbírají transkripty — bez nich platí `mode: on` jako výslovné rozhodnutí.
 
 ## 7. Konstrukce, které musí projít testy
 
@@ -951,6 +979,34 @@ rozhoduje launcher.
 - Dotaz zkoušky je `outline` bez cíle (mapa repozitáře), ne `find *`: Java launcher ve Windows rozbaluje `*` v argumentech na soubory aktuální složky, takže glob v argv se do CLI nedostane.
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools) na čistém profilu: první start ukáže průvodce, přidání repozitáře (jedna složka přijata, jedna odmítnuta) a zachování klíče v `config.json`,
   účet YouTrack s tokenem (token jen ve storu, fake instance ho dostala), skutečný dotaz vrátil mapu fixture repozitáře, dokončení se zapamatovalo, z Nastavení se otevřel znovu, druhý start jde rovnou do aplikace.
+
+### Výsledek CL-37 — zápisové nástroje a rename (2026-10-08)
+
+- **Nástroj**: `edit(op, …)`, kód v `codeloupe.write` (`WriteService` orchestruje, `SymbolEditor` / `ImportEditor` / `NewSource` dělají textové úpravy, `EditVerifier` ověřuje,
+  `WriteApplier` zapisuje, `WritePolicy` + `WriteGate` rozhodují, `Rename*` plánují a kontrolují přejmenování), `EditTool` jen mapuje argumenty. CLI `codeloupe edit <op> …`
+  (`--code-file`, `--dry-run`), `metrics gaps` tiskne verdikt brány. Katalog: výchozí 14 nástrojů (`DaemonTest`), s `edit` 15 (`EditToolDaemonTest`).
+- **Testy a harness** (`src/test/kotlin/codeloupe/write`, fixtury `fixtures/write/{kotlin,java}`, oba projekty se překládají skutečným `kotlinc` a `javac` v procesu):
+  `RoundTripTest` — *každá* deklarace obou projektů přepsaná vlastním textem nechá soubor beze změny bajtu v šesti rozloženích (LF, CRLF, BOM+CRLF, smíšené konce
+  řádků, bez koncového newline, tabulátory) a změna → zpětná změna vrátí soubor s jednotnými konci řádků; `WriteFuzzTest` — **200 zápisů** (replace, insert_member/after/before
+  na všech druzích typů, delete, add_imports, create_file, rename) × 4 (Kotlin LF, Java LF, Kotlin BOM+CRLF, Java CRLF), překlad po každých 50 zápisech a na konci zelený, žádné
+  neočekávané odmítnutí; `RenameTest` — 13 symbolů Kotlinu a 12 Javy po sobě (třída s konstruktory a soubor, rozhraní + implementace + anonymní třída, vlastnost
+  v konstruktoru, enum konstanta, top-level funkce s importy a aliasem, vnořená třída, statický import, přetížení, record, import sdílený víc funkcemi téhož jména, labely
+  `this@f`/`return@f`), po nich překlad zelený; dále `WriteServiceTest` (hash zámek, rollback, politika, journal, souběh, čerstvost vrstvy), `SymbolEditorTest`, `SmallPartsTest`,
+  `WriteGateTest`, `EditToolDaemonTest`, `FixturesCompileTest`.
+- **Rename na TerrioImporter** (scratch klon `git clone --local` v %TEMP%, zdroj jen čten; `TerrioWriteCheck` s `CODELOUPE_WRITE_CLONE` + soubor jmen z golden testu, pak
+  `gradlew compileKotlin compileTestKotlin` = hlavní i testovací zdroje všech modulů; commit `32f82d92`): **3 dávky, 34 přejmenování** (10 + 10 + 14; 37 deklarací, 307 použití,
+  66 importů, 192 úprav souborů), po každé dávce překlad zelený. Dávka 2 a 3 našly čtyři chyby, všechny opravené a pod testem: (1) `import pkg.toResponse` slouží všem extension funkcím
+  téhož jména — import zůstane a přibude nový; (2) labely `this@toVersion` / `return@loop` nejsou reference indexu; (3) kandidát, který jde číst jen jako použití přejmenované
+  rodiny (jméno nic jiného v indexu nedeklaruje a žádná knihovna ho nezná), se přejmenuje také (`UsageFinder.denotesOnly`, stejná heuristika jako `promoted`, golden test beze změny);
+  (4) kontrola po přejmenování hlídá i použití *jiných* deklarací téhož jména. Co nástroj nechá na volajícím, vypíše: `AcceptStep.Done.accepted` (3 místa přes smart cast, jméno
+  má v repu víc deklarací) a `RuianVfrElement.text` (22 míst) bez ručního zásahu nepřeloží — nástroj je vypsal řádek po řádku. Přejmenování, které by změnilo význam jiného místa, odmítla
+  kontrola (`LocationSearchKindVersion.rowCount`: použití by po přejmenování nevedlo na deklaraci).
+- **Brána na skutečných datech** (`codeloupe metrics gaps`, transkripty tohoto stroje, 3 066 běhů za posledních 30 dní, 1 min 8 s): **46** čtení celého kódového souboru následovaných
+  `Edit` téhož souboru (práh 20) → brána `auto` by se otevřela; **0** běhů s ruční výměnou identifikátoru ve 3 souborech (práh 3) — rename je tu pokrytý IDEA `rename_refactoring`, nástroj ho
+  nepotřebuje kvůli datům, ale kvůli worktree bez IDE.
+- **Mezery a rozhodnutí**: rename nenahrazuje IDE pro odkazy mimo index (reflexe, řetězce, generovaný kód, `getX()` Javy ↔ vlastnost Kotlinu — vypsané jako kandidáti);
+  `Terrio` doplní `{"write": {"linkedWorktreesOnly": true}}` do vlastního `.codeloupe.json` (mimo tento repozitář); brána `auto` je bez transkriptů zavřená a výslovně se otevírá
+  `write.mode: on`.
 
 ## 10. Rizika
 

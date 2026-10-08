@@ -270,6 +270,31 @@ With a tracker configured (see Configuration) more tools work on a local mirror 
 | `tasks` | one line per task (`id state · type · priority ‹epic› title ⛔blockers`). `mode=list` with a YouTrack-like `query` (`project: TER state: -Done #unresolved epic: TER-1 type: Bug {Fix versions}: 1.0 sort: id` plus full-text words), `graph` (an issue's epic, dependencies, subtasks, relations; `depth` ≤ 3), `ready` (open tasks without open subtasks whose dependencies are resolved and that no git worktree branch holds), `progress` (an epic: counts by state, criteria, blockers, open tasks) |
 | `update` | writes to the tracker: `set={Field: value}` (State, Assignee, Priority, Type, `summary`, `description` or any custom field; comma-separated for multi-value fields; an empty value clears) and/or `comment=<text>`. Answers one line of at most 300 characters — the fields that changed (`State: To do→Done`), `+comment <id>`, and the state when it did not change — instead of the issue. The mirror stores the tracker's own answer to the write, so the next `issue` read needs no request |
 
+### Editing by declaration (`edit`)
+
+`edit` changes source by declaration instead of by text, one tool for every write (the tool count is capped, so it is one tool with an
+`op`): `replace` (the whole declaration, its KDoc and annotations, becomes `code`), `insert_after` / `insert_before` (beside the anchor), `insert_member`
+(into a type: `position` `start`, `end` or `after_properties`), `delete`, `add_imports` (`file`, `imports`: sorted into their group, none twice),
+`create_file` (`path`, `code`: new files only; the package must be the folder's, a public Java type the file's name) and `rename` (`name`, `to`; `dry_run`
+plans only). The name is the one `symbol` takes and the `hash` is the `hash=` it printed: a declaration changed since is refused. Behind
+every write: the declaration is looked up again in the file as it is on disk; the code is re-indented and gets the file's line ends (a byte order mark, mixed
+line ends, a missing final newline and tabs are kept - writing a declaration back as it was changes no byte); the result is parsed again and nothing is
+written unless the file has no more syntax errors than before, declares exactly what it declared outside the edited range, and declares what the code
+declares; the file is replaced atomically (retried when an editor holds it); every write goes to `<home>/writes.jsonl` (operation, files, SHA-1
+before and after); the next query sees the change at once.
+
+`rename` carries the declaration, what it overrides and what overrides it, a class with its constructors, every usage the index is sure of (`exact`),
+the imports of it, and the file of a public Java type; what the index only suspects (`candidate`) is listed for you, not changed (unless it can only be a use of the renamed declarations: nothing else of that name is declared in the index and no library is known to declare it). It refuses a name that exists
+already or would be captured by a local, a member that overrides something outside the index, operators and conventions read by name
+(`toString`, `compareTo`, `main`, ...). Before writing, the renamed worktree is indexed beside the rest and every place that is renamed must resolve to the renamed
+declaration: that check stands in for a compiler. Strings, comments and generated code are not changed.
+
+The write policy: only `.kt` and `.java` files inside the worktree, never `.git`, `.codeloupe.json`, secrets and keys (`.env`, `*.pem`, `*.key`...), or a file with merge-conflict markers.
+`config.json` `write` adds `linkedWorktreesOnly` (no writes in the main checkout) and `deny` globs; a repository's own `.codeloupe.json` `write` can add the
+same two and cannot enable anything. `write.mode` is `off`, `on` or `auto` (the default): `auto` offers `edit` only when the transcripts of the last 30 days show the gaps it closes - at
+least 20 reads of a whole code file followed by an edit of it, or 3 runs that renamed one identifier by hand in three files or more (`codeloupe metrics gaps` prints the verdict; thresholds under `write.gate`).
+Without the tool on offer the catalog stays at 14 tools; with it, 15.
+
 Usages are resolved without an IDE or compiler: the scopes, imports and aliases a file sees, the receiver's
 type where syntax tells it (declared types, `Type(…)`, what a call returns, collection elements in lambdas), and
 overloads by argument count. Unsure hits are marked, never dropped. One heuristic: on a receiver of unknown type,
@@ -576,6 +601,7 @@ and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
 | Index reads at once | 2 (the rest wait their turn: ten windows asking together would hold ten reads' memory) | `config.json` `maxParallelQueries` |
 | Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
 | Weighted-token budgets of a day and of one agent run (events for the desktop app) | none | `config.json` `budgets` `{ "dailyWeighted": 150000000, "runWeighted": 20000000 }` |
+| Writing by declaration (`edit`) | `auto`: offered when the gap detector shows the need; no write in `.git`, secrets, conflicted files | `config.json` `write` `{ "mode": "on", "linkedWorktreesOnly": true, "deny": ["**/generated/**"], "gate": { "wholeFileReads": 20, "manualRenames": 3, "windowDays": 30 } }` |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
 
@@ -752,6 +778,7 @@ accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram
 
 | Package | Role |
 |---|---|
+| `write` | the `edit` tool: text edits of declarations, rename, verification, atomic writes, journal, policy and gate |
 | `lang`, `lang.kotlin`, `lang.java` | file → facts (declarations, imports, references) via the Kotlin compiler's PSI (Kotlin and Java) |
 | `index` | SQLite store, base build from git objects, build worker entry point |
 | `repo` | repositories and worktrees → base index, base syncs, child-process builds |

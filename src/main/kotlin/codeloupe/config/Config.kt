@@ -20,4 +20,5 @@ data class Config(
     val metrics: MetricsConfig = MetricsConfig(),
     val budgets: BudgetsConfig = BudgetsConfig(),
     val secrets: SecretsConfig = SecretsConfig(),
+    val write: WriteConfig = WriteConfig(),
 )

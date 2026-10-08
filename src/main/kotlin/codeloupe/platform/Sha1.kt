@@ -11,6 +11,9 @@ object Sha1 {
     private const val LF = '\n'.code
     private val BOM = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
 
+    /** Lowercase hex SHA-1 of [bytes]. */
+    fun hex(bytes: ByteArray): String = MessageDigest.getInstance("SHA-1").digest(bytes).toHexString()
+
     /** Lowercase hex SHA-1 of the UTF-8 bytes of [text]. */
     fun hex(text: String): String = MessageDigest.getInstance("SHA-1").digest(text.toByteArray(Charsets.UTF_8)).toHexString()
 

@@ -33,6 +33,7 @@ object ConfigLoader {
             metrics = MetricsConfig.parse(file),
             budgets = BudgetsConfig.parse(file),
             secrets = SecretsConfig.parse(file),
+            write = WriteConfig.parse(file),
         )
     }
 
