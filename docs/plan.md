@@ -879,6 +879,31 @@ rozhoduje launcher.
   byla stejná i před změnou. Worker přidá ~8 ms na obnovu; hranice 100 ms ovšem neplatí pro celý p50 (založeno na průchodu worktree, ne na parsu), viz nová karta.
 - Cena: dokud worker žije (5 min po poslední editaci) drží ~100 MB RSS vedle daemonu; pak zmizí. Celková paměť stroje při editaci tedy roste, jen ne trvale.
 
+### Výsledek CL-134 — rychlejší kontrola worktree po editaci (2026-10-09)
+
+- **Kde se čas ztrácel** (dočasné značky v `Overlays.fresh`/`OverlayPlanner.incremental`/`StoreUpdater`, TerrioImporter klon, daemon s flagy `DaemonJvm`, klidnější okamžik, p50 klienta 81 ms):
+  průchod worktree 41 ms, porovnání s bází 3, předání jobu + otevření overlay storu 7, parse ve workeru 12, SQL zápis 1, commit se snapshotem 3, zbytek
+  dotazu a HTTP ~20. Druhý průchod při editaci není (okno `overlayCheckMs` a `stale()` se uplatní jen mimo tento tok), čtení souboru a otevření báze stojí ~1 ms.
+  Průchod je tedy dvě třetiny kontroly a sám nejde zkrátit přeskakováním adresářů: mtime adresáře se při úpravě obsahu souboru nemění a na NTFS ho výpis rodiče
+  uvádí se zpožděním, takže by se musel každý adresář otevřít zvlášť, což stojí stejně jako jeho vypsání.
+- **Co se změnilo**: (1) na Windows vypisuje adresáře `FindFirstFileExW` přes FFM (`WindowsListing`: `FindExInfoBasic` bez hledání krátkých 8.3 jmen,
+  `FIND_FIRST_EX_LARGE_FETCH`, bez `Path` a atributového objektu na položku; `\?\` tvar pro cesty přes 240 znaků); co je neobvyklé (chyba uprostřed výpisu,
+  zmizelý adresář) vrátí null a ten adresář vypíše JDK (`JdkListing`) jako dřív. Symbolický odkaz není adresář ani soubor, junction je adresář, stejně jako u JDK;
+  test porovnává oba výpisy (jména, druhy, mtime, velikosti, cesta přes 260 znaků). (2) Pool průchodu má `clamp(jader / 2, 2, 4)` vláken místo dvou a vlákna po 30 s
+  nečinnosti zaniknou (v klidu žádné vlákno navíc). Více než 4 vlákna nepomohla (24 jader: 6–8 vláken 14–27 ms, 4 vlákna 17–19 ms). Záruky se nemění: žádné watchery,
+  nulové CPU v klidu, stejné stampy (mtime v µs, velikost), velké repozitáře dál jdou přes git (CL-79).
+- **Měření průchodu** (jen `WorktreeScan.scan`, TerrioImporter klon, 1 215 adresářů, 2 212 zdrojů, 200 průchodů, JVM flagy daemonu, střídavě staré a nové sestavení,
+  stroj zatížený ostatními okny): p50 55–68 ms → **21–30 ms** (tři páry; nejmenší hodnoty 41–45 → 17–19). Mikrobenchmark samotného výpisu na 4 vláknech: JDK 48 ms, nativní 17–19.
+- **Měření obnovy** (`tools/profile.mjs --only edit --edits 12`, nově s 2 nezapočítanými zahřívacími cykly; střídavě staré/nové, tři páry, p50 klienta; stroj zatížen
+  desítkami buildů, proto jsou absolutní čísla vyšší než v klidu): edit souboru **253 / 253 / 186 ms → 122 / 152 / 107 ms** (poměr 0,48 / 0,60 / 0,58), průchod (`walk`) 195 / 232 / 138 → 75 / 92 / 62 ms,
+  vrácení editace analogicky. `tools/load-test.mjs --seconds 90 --sync-files 12` (8 worktrees, 10 klientů): p95 **198 → 101 ms**, p95 po přistání v ostatních worktrees nově
+  prochází rozpočtem (staré sestavení 300 ms překročilo), nejpomalejší worktree po přistání 2 128 → 916 ms, 2 264 → 2 876 volání za stejný čas, RSS ustáleně 179 → 183 MB (špička 186 → 187),
+  0 busy, 0 failed.
+- **Hranice**: absolutních 100 ms p50 na tomto stroji pod zátěží nedosáhneme (107–152 ms; staré sestavení tu měří 186–253 ms, v době CL-125 130 ms), v klidu vychází
+  server ~50 ms + HTTP a dotaz ~20 ms. Zbývá otevření overlay storu (~6 ms), parse ve workeru (~12 ms), zápis snapshotu (~3 ms), viz nová karta.
+  Zamítnuto: odložený zápis snapshotu na pozadí (testy restartu Registry v jednom JVM by závodily o soubor kvůli 3 ms), trvale otevřené spojení overlay storu
+  (stránková cache 2 MB na worktree × 16, soubor držený při `collect`), čtení souboru pro porovnání a parse jedním čtením (ušetří čtení z cache OS, ~0,2 ms).
+
 ### Výsledek CL-71 — build daemony a procesy po workspacech (2026-10-08)
 
 - **Procesy po workspacech** (`codeloupe.processes`, `GET /processes`, `ws processes`, `workspaces --ram`): proces patří workspace,
@@ -1167,6 +1192,20 @@ rozhoduje launcher.
   `tools/check-wiki-links.mjs` (stránky, nadpisy, soubory repozitáře, obrázky, README → wiki, sidebar) v CI i před publikací.
 - Pravidla psaní: odkaz na stránku je `[text](Page-Name#nadpis)`, na soubor repozitáře plná adresa `github.com/.../blob/main/...`
   (relativní cesty ve wiki nefungují). Nová funkce = nový řádek v README jen u nástroje; popis patří na stránku wiki.
+
+### Výsledek CL-141 — seznam nástrojů MCP bajt po bajtu stejný (2026-10-09)
+
+
+- **Proč**: klient dává `tools/list` do předpony promptu a prompt cache ji drží; změna jediného bajtu seznamu nebo popisu zneplatní cache celé relace (zápis 1 h stojí 2, čtení 0,1 váhy tokenu, tedy
+  20× víc). Seznam má při 15 nástrojích **15 398 bajtů** (≈ 4 800 tokenů při 3,2 znaku na token), 14 nástrojů bez `edit`. Při mediánu 58 tahů a kontextu 100 tisíc tokenů stojí jedna změna seznamu
+  uprostřed relace přepsání cache ≈ 200 tisíc jednotek místo 10 tisíc čtených.
+- **Co se mohlo měnit**: `edit` se nabízel podle brány `auto` při každém požadavku (`tools()` volané z MCP i z `/api`), a brána se mění na pozadí po uvolnění workspace; popisy jsou konstanty. **Opraveno**:
+  `OfferedTools` rozhodne o `edit` jednou při startu daemona (`write.mode` `on`/`off` je rozhodnuto vždy, `auto` podle verdiktu z `write-gate.json` v tu chvíli) a seznam se už nemění; `ServerCapabilities.tools.listChanged`
+  je `false`. Nový verdikt brány se projeví při dalším startu. Seznam dál závisí na startu jen ve dvou věcech, obě zdokumentované: `edit` (nastavení + verdikt) a nástroje trackeru (jen s nakonfigurovaným trackerem).
+- **Otisk**: `/status` `toolList` = `fingerprint` (SHA-1 z verze a ze serializovaných definic nástrojů seřazených podle jména: jméno, popis, schéma), `tools`, `editOffered`. Dva restarty téhož daemona na stejné konfiguraci:
+  `bddfaa6a…` ×2 (14 nástrojů), s `write.mode: on` `362626c9…` (15).
+- **Testy** (`ToolListStabilityTest`): seznam z MCP klienta je bajt po bajtu stejný před a po práci daemona (indexace repozitáře, volání) a na druhém daemonu s jinou domovinou, bez repozitáře a s jinými rozpočty; otisk přežije dva restarty
+  a změní se s `edit`; `auto` bez verdiktu = `off`; brána, která se otevře po startu, seznam nezmění. Popis, který by závisel na stavu, test shodí.
 
 ### Výsledek CL-139 — chyby překladu a testů s deklarací (2026-10-09)
 

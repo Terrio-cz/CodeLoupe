@@ -136,8 +136,10 @@ class Daemon private constructor(
     }
     private val editTool = EditTool(WriteService(registry, WritePolicy(config.write), WriteJournal(config.home.resolve("writes.jsonl"))))
 
-    /** The tools on offer now: the catalog, and `edit` while the write gate is open. */
-    private fun tools(): List<Tool> = if (writeGate.open()) baseTools + editTool else baseTools
+    /** The tools on offer: the catalog, and `edit` if the write gate was open when the daemon started (it stays so until the next start). */
+    private val offered = OfferedTools(baseTools, editTool, writeGate::open)
+
+    private fun tools(): List<Tool> = offered.tools
     private val workspaces = Workspaces(config, registry, trackers)
     private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets, ::log)
     private val resources = ResourceInventory(config, workspaces)
@@ -157,6 +159,8 @@ class Daemon private constructor(
     @Volatile private var lastClientCall: Instant? = null
     private val history = ResourceHistory()
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = { trackers.touch(); history.sample() })
+    private val mcp = McpTools(runner, ::tools, JobTool(jobs))
+    private val toolListFingerprint = mcp.fingerprint()
     private val hooks = Hooks.create(config, registry, runner::callsOn) { trackers.projects() }
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
@@ -177,7 +181,7 @@ class Daemon private constructor(
             calls = runner.stats(), latency = latency, budgets = BudgetState.check(config.budgets, latency, rss, queueSnapshot.waitMsMax),
             queue = queueSnapshot, repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
             gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(), portAllocations = ports.allocated,
-            hooks = hooks.stats(),
+            hooks = hooks.stats(), toolList = ToolListStatus(toolListFingerprint, mcp.server().tools.size, offered.editOffered),
         )
     }
 
@@ -269,7 +273,6 @@ class Daemon private constructor(
                 if (!call.response.isCommitted) call.respondJson(HttpStatusCode.InternalServerError, error(reason))
             }
         }
-        val mcp = McpTools(runner, ::tools, JobTool(jobs))
         mcpStatelessStreamableHttp(path = "/mcp") { mcp.server() }
         routing {
             get("/status") { call.respondJson(HttpStatusCode.OK, DaemonStatus.serializer(), status()) }

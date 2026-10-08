@@ -20,6 +20,7 @@ operating systems; see [Packaging and releasing](Packaging-and-releasing).
 `node tools/profile.mjs --cli build/install/codeloupe/bin/codeloupe --home <tmp> --root <repo> --worktree <worktree>`
 profiles a warm query, the first query in a worktree and (with `--clone`) an overlay refresh: client latency split
 by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktree walk, SQL, the rest of the tool and HTTP.
+`--only edit` runs just the refresh rows, after `--warmup` (2) cycles that are not counted.
 
 `node tools/benchmark.mjs --work <scratch dir>` reproduces [docs/benchmarks.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/docs/benchmarks.md) after `./gradlew installDist`
 (needs git, ripgrep and network; about 25 minutes). It clones the public repositories at pinned commits into the scratch

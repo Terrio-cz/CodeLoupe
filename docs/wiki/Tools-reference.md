@@ -59,7 +59,9 @@ The write policy: only `.kt` and `.java` files inside the worktree, never `.git`
 `config.json` `write` adds `linkedWorktreesOnly` (no writes in the main checkout) and `deny` globs; a repository's own `.codeloupe.json` `write` can add the
 same two and cannot enable anything. `write.mode` is `off`, `on` or `auto` (the default): `auto` offers `edit` only when the transcripts of the last 30 days show the gaps it closes - at
 least 20 reads of a whole code file followed by an edit of it, or 3 runs that renamed one identifier by hand in three files or more (`codeloupe metrics gaps` prints the verdict; thresholds under `write.gate`).
-Without the tool on offer the catalog stays at 14 tools; with it, 15.
+Without the tool on offer the catalog stays at 14 tools; with it, 15. Whether `edit` is on offer is decided when the daemon starts and stays so while it runs: a client caches the tool list in its prompt prefix, so a list that changed under a session would cost that session its cache. A verdict of the `auto` gate that arrives later (it is worked out in the background) takes effect at the next start.
+
+`/status` `toolList` holds a `fingerprint` of the list (version, and every tool's name, description and schema), the number of tools and whether `edit` is offered: equal fingerprints mean byte-equal lists, whatever the daemon was asked or how often it restarted.
 
 ## Commands that are not tools
 

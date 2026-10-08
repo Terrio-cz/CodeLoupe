@@ -5,16 +5,16 @@
 // its worktree is checked. Starts its own daemon in --home on --port and stops it at the end.
 //
 //   node tools/profile.mjs --cli build/install/codeloupe/bin/codeloupe.bat --home <tmp> --port 47471 \
-//     --root <repo> --worktree <linked worktree> [--clone <scratch clone to edit>] [--n 60] [--out profile.json]
+//     --root <repo> --worktree <linked worktree> [--clone <scratch clone to edit>] [--n 60] [--edits 5] [--warmup 2] [--only edit] [--out profile.json]
 //
-// --root and --worktree are only read. --clone gets a line appended to one of its .kt files and restored afterwards.
+// --only edit runs just the overlay-refresh rows (needs --clone). --root and --worktree are only read. --clone gets a line appended to one of its .kt files and restored afterwards.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 
 const args = {}; for (let i = 2; i < process.argv.length; i++) if (process.argv[i].startsWith('--')) args[process.argv[i].slice(2)] = process.argv[i + 1]?.startsWith('--') ? true : process.argv[++i] ?? true;
 const port = Number(args.port || 47471), base = `http://127.0.0.1:${port}`;
-const N = Number(args.n || 60), PAUSED = Number(args.paused || 10), RESTARTS = Number(args.restarts || 5), EDITS = Number(args.edits || 5);
+const N = Number(args.n || 60), PAUSED = Number(args.paused || 10), RESTARTS = Number(args.restarts || 5), EDITS = Number(args.edits || 5), WARMUP = Number(args.warmup ?? 2);
 const env = { ...process.env, CODELOUPE_HOME: args.home, CODELOUPE_PORT: String(port) };
 const QUERIES = [
   ['find', { q: '*Routes', limit: 10 }], ['outline', { target: 'PasswordHasher' }],
@@ -59,7 +59,7 @@ function summary(name, runs) {
   const tool = part('tool');
   const rest = Math.max(0, tool - Math.max(part('check'), part('git') + part('jgit') + part('scan')) - part('open') - part('sql'));
   return {
-    name, n: runs.length, p50: pct(runs.map(r => r.ms), 50), p95: pct(runs.map(r => r.ms), 95), mean: mean(r => r.ms),
+    name, n: runs.length, samples: runs.map(r => Math.round(r.ms)), p50: pct(runs.map(r => r.ms), 50), p95: pct(runs.map(r => r.ms), 95), mean: mean(r => r.ms),
     spawns: mean(r => r.spawns), git: part('git'), jgit: part('jgit'), scan: part('scan'), check: part('check'), refresh: part('refresh'),
     open: part('open'), sql: part('sql'), tool, rest, http: mean(r => r.ms) - tool, rss: Math.max(...runs.map(r => r.rss ?? 0)),
   };
@@ -77,26 +77,31 @@ async function main() {
   const rows = [];
   await restart();
   const root = args.root, wt = args.worktree;
-  await measured('find', { root, q: 'LoginFailures' });
-  await measured('find', { root: wt, q: 'LoginFailures' });
+  const edit = args.only === 'edit';
+  if (!edit) {
+    await measured('find', { root, q: 'LoginFailures' });
+    await measured('find', { root: wt, q: 'LoginFailures' });
+  }
 
-  for (const target of [['main checkout', root], ['task worktree', wt]]) {
+  if (!edit) for (const target of [['main checkout', root], ['task worktree', wt]]) {
     const warm = [];
     for (let i = 0; i < N; i++) { const [t, b] = QUERIES[i % QUERIES.length]; warm.push(await measured(t, { root: target[1], ...b })); }
     rows.push(summary(`warm, back to back (${target[0]})`, warm));
   }
   const paused = [];
-  for (let i = 0; i < PAUSED; i++) { await sleep(1100); const [t, b] = QUERIES[i % QUERIES.length]; paused.push(await measured(t, { root: wt, ...b })); }
-  rows.push(summary('warm, after a 1.1 s pause (task worktree)', paused));
+  if (!edit) for (let i = 0; i < PAUSED; i++) { await sleep(1100); const [t, b] = QUERIES[i % QUERIES.length]; paused.push(await measured(t, { root: wt, ...b })); }
+  if (!edit) rows.push(summary('warm, after a 1.1 s pause (task worktree)', paused));
 
   const firstRepo = [], firstWt = [];
-  for (let i = 0; i < RESTARTS; i++) {
+  if (!edit) for (let i = 0; i < RESTARTS; i++) {
     await restart();
     firstRepo.push(await measured('find', { root, q: 'LoginFailures' }));
     firstWt.push(await measured('find', { root: wt, q: 'LoginFailures' }));
   }
-  rows.push(summary('first query after daemon start (main checkout)', firstRepo));
-  rows.push(summary('first query in an unchanged worktree (repo known)', firstWt));
+  if (!edit) {
+    rows.push(summary('first query after daemon start (main checkout)', firstRepo));
+    rows.push(summary('first query in an unchanged worktree (repo known)', firstWt));
+  }
 
   if (args.clone) {
     const clone = args.clone;
@@ -105,13 +110,15 @@ async function main() {
     const full = path.join(clone, file), original = fs.readFileSync(full);
     const edits = [], reverts = [];
     try {
-      for (let i = 0; i < EDITS; i++) {
+      // The first cycles start the parse worker and warm the JIT: not counted.
+      for (let i = 0; i < WARMUP + EDITS; i++) {
         fs.writeFileSync(full, Buffer.concat([original, Buffer.from(`\nfun profileEdit${i}() = ${i}\n`)]));
         await sleep(1100);
-        edits.push(await measured('find', { root: clone, q: `profileEdit${i}` }));
+        const edited = await measured('find', { root: clone, q: `profileEdit${i}` });
         fs.writeFileSync(full, original);
         await sleep(1100);
-        reverts.push(await measured('find', { root: clone, q: 'LoginFailures' }));
+        const reverted = await measured('find', { root: clone, q: 'LoginFailures' });
+        if (i >= WARMUP) { edits.push(edited); reverts.push(reverted); }
       }
     } finally { fs.writeFileSync(full, original); }
     rows.push(summary('overlay refresh: file edited (clone)', edits));

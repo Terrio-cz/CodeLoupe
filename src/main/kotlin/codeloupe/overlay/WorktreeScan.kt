@@ -4,31 +4,29 @@ import codeloupe.lang.Languages
 import codeloupe.platform.TimedPart
 import codeloupe.platform.Timings
 import java.io.IOException
-import java.nio.file.AccessDeniedException
-import java.nio.file.FileVisitResult
-import java.nio.file.Files
-import java.nio.file.NoSuchFileException
 import java.nio.file.Path
-import java.nio.file.SimpleFileVisitor
-import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Stamps of every indexable file under a worktree, without a git process. Attributes come with the directory
- * listing (`walkFileTree`); asking per file opens it, which on Windows costs ~5x the CPU. Two threads halve the
- * wall time at the same CPU; Terrio (1 100 directories, 2 200 sources): ~30 ms, ~60 ms CPU.
+ * listing; asking per file opens it, which on Windows costs ~5x the CPU. Directories are listed on a few threads
+ * (a native listing on Windows, [WindowsListing]); Terrio (1 200 directories, 2 200 sources): ~20 ms.
  */
 object WorktreeScan {
-    private const val THREADS = 2
+    // Listing is syscall-bound: more threads than this gave nothing on a 24-core machine, fewer leave cores idle.
+    private val threads = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4)
 
+    // Threads end after a quiet half minute: nothing of the pool stays while nobody asks.
     private val pool: ExecutorService by lazy {
-        Executors.newFixedThreadPool(THREADS) { Thread(it, "codeloupe-scan").apply { isDaemon = true } }
+        ThreadPoolExecutor(threads, threads, 30, TimeUnit.SECONDS, LinkedBlockingQueue()) { Thread(it, "codeloupe-scan").apply { isDaemon = true } }
+            .apply { allowCoreThreadTimeOut(true) }
     }
 
     /**
@@ -67,48 +65,23 @@ object WorktreeScan {
 
         private fun visit(dir: Path, rel: String) {
             if (done.isDone) return
-            val entries = list(dir)
+            val entries = WindowsListing.list(dir) ?: JdkListing.list(dir)
             // A nested repository or worktree belongs to itself, as for git.
-            if (rel.isNotEmpty() && entries.any { it.first.fileName.toString() == ".git" }) return
-            for ((entry, attrs) in entries) {
-                val name = entry.fileName.toString()
-                val path = if (rel.isEmpty()) name else "$rel/$name"
-                if (attrs.isDirectory && name != ".git" && path !in prune) {
-                    fork(entry, path)
-                } else if (attrs.isRegularFile && Languages.languageOf(name) != null) {
-                    stamps[path] = stampOf(attrs)
-                } else if (attrs.isRegularFile && name == ".gitignore") {
-                    ignoreFiles[path] = stampOf(attrs)
+            if (rel.isNotEmpty() && entries.any { it.name == ".git" }) return
+            for (entry in entries) {
+                val name = entry.name
+                if (entry.directory) {
+                    if (name == ".git") continue
+                    val path = join(rel, name)
+                    if (path !in prune) fork(dir.resolve(name), path)
+                } else if (entry.regular && Languages.languageOf(name) != null) {
+                    stamps[join(rel, name)] = Stamp(entry.mtime, entry.size)
+                } else if (entry.regular && name == ".gitignore") {
+                    ignoreFiles[join(rel, name)] = Stamp(entry.mtime, entry.size)
                 }
             }
         }
 
-        private fun stampOf(attrs: BasicFileAttributes) = Stamp(attrs.lastModifiedTime().to(TimeUnit.MICROSECONDS), attrs.size())
-
-        /** Entries of one directory with the attributes its listing carries; links are not followed. */
-        private fun list(dir: Path): List<Pair<Path, BasicFileAttributes>> {
-            val entries = ArrayList<Pair<Path, BasicFileAttributes>>()
-            try {
-                Files.walkFileTree(
-                    dir, emptySet(), 1,
-                    object : SimpleFileVisitor<Path>() {
-                        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                            entries += file to attrs
-                            return FileVisitResult.CONTINUE
-                        }
-
-                        override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult =
-                            if (skippable(exc)) FileVisitResult.CONTINUE else throw exc
-                    },
-                )
-            } catch (e: IOException) {
-                if (!skippable(e)) throw e
-            }
-            return entries
-        }
-
-        // Deleted while the walk ran (a build cleaning up): gone. Unreadable (a root-owned bind mount, a deny ACL): the
-        // same every walk, so skipping it never reads as a deletion; git skips it too.
-        private fun skippable(e: IOException) = e is NoSuchFileException || e is AccessDeniedException
+        private fun join(rel: String, name: String) = if (rel.isEmpty()) name else "$rel/$name"
     }
 }
