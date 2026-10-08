@@ -179,6 +179,52 @@ no `git` process runs. The first call in a repository waits for the scan of its 
 Repositories also come from a tracker's `repos` and from the repositories the daemon has served; `<repo name>-worktrees`
 beside a repository is always a root.
 
+### Docker resources
+
+Every container, image, volume and network that is made through CodeLoupe carries three labels naming its owner:
+`codeloupe.repo` (the repository's main worktree), `codeloupe.workspace` (the worktree directory) and `codeloupe.task`
+(the workspace's task id, empty for one without). The workspace is the one of the directory you run in (`--dir` names
+another), found through the registry above.
+
+```
+codeloupe ws up [-f compose.yaml] [-p project] [--profile x] [-- up-args]   # default: -d
+codeloupe ws run [--dir d] <docker run arguments>
+codeloupe ws build [--dir d] <docker build arguments>
+codeloupe ws volume create <name>
+codeloupe ws resources [--class owned|adopted|unowned] [--json]     # GET /resources
+```
+
+`ws volume create` and the inventory use the Docker Engine API (named pipe `\\.\pipe\dockerDesktopLinuxEngine` /
+`docker_engine`, or a unix socket; `DOCKER_HOST` with `npipe://` or `unix://` is honoured): no `docker` process, no
+output parsing. Compose, build and the full `docker run` command line are client side, so those three call `docker`
+with the labels added and check the result through the API: `ws up` reads `docker compose config --format json` and adds
+the labels through a generated override file to every service (containers), to `build` (images the project builds),
+and to the project's own volumes and networks (not to `external` ones); `ws build` passes `--label` and verifies the
+image; `ws run` passes `--label` and first creates the named volumes it mounts, labelled (Docker would create them
+without). A `codeloupe.*` label given by the caller is refused, a volume that exists and is not the workspace's is
+never relabelled. Exit code 3: something the command made came out without the labels. Images a project only pulls
+are not created by CodeLoupe and carry no labels.
+
+`ws resources` lists what exists, by owner: **owned** (the labels), **adopted** (an adoption rule of the config maps its
+name to a workspace, for resources made before the labels existed) and **unowned**, which is only reported — nothing
+in CodeLoupe changes a resource it does not own, and adoption itself changes nothing in Docker: it is this mapping.
+Owned and adopted rows show the workspace's state in the registry (`not in registry` when its worktree is gone).
+
+```json
+{ "workspaces": { "adoption": [
+  { "repo": "TerrioImporter", "match": "^terrio-ter-(\\d+)(?:[-_].*)?$", "workspace": "TER-$1", "task": "TER-$1" },
+  { "repo": "TerrioImporter", "match": "^(?:terrio-)?importer-app:ter-(\\d+)(?:-.*)?$", "kinds": ["image"], "workspace": "TER-$1", "task": "TER-$1" }
+] } }
+```
+
+`match` is a case-insensitive regular expression tried against each name of the resource (container name, image
+`repo:tag`, volume or network name) and against the compose project it belongs to; `$1`… stand for its groups. Rules are
+tried in order, the first one wins, labels beat rules. Containers, volumes and networks are also matched by their compose
+project. Images are not, by default: compose labels an image with the project that built it, but images get re-tagged and
+shared between tasks (`aot`, `jdk25`), so the project alone does not make one a task's leftover. A rule with
+`"matchProject": true` (and `"kinds": ["image"]`) adopts the untagged and re-tagged images a stack built; the `via`
+column says which name matched.
+
 ## Desktop app
 
 `app/` holds the Electron desktop app (tray, notifications, daemon start/stop, screens over the daemon's
@@ -271,6 +317,7 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |
 | `jobs` | commands run for agents: policy hook, slots, processes, summaries, completion actions, `job` tool |
 | `workspace` | `GET /workspaces`: worktrees, branches, tasks, merge and tracker state, orphan directories |
+| `docker` | Docker Engine API client (named pipe / unix socket), ownership labels, compose override, `GET /resources`: owned / adopted / unowned |
 | `events` | event log, server-sent-events stream, webhook subscriptions and deliveries |
 | `cli` | `codeloupe` commands and the daemon client |
 
@@ -278,3 +325,10 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 TerrioImporter part runs where that repository is checked out (`CODELOUPE_TERRIO`). `UsagesGoldenTest` checks
 `usages` on 44 TerrioImporter symbols against a manually verified oracle (`src/test/resources/golden`) and writes
 `build/reports/codeloupe/golden-usages.md`: superset of `rg -w`, precision of `exact` (≥ 95 %), candidate share.
+
+## Licence
+
+CodeLoupe is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE): you may use, study, modify
+and share it for any noncommercial purpose (personal use, research, education, charities, public institutions), but
+not sell it, offer it as a paid product or service, or use it for commercial purposes. This is not an open-source
+licence in the OSI sense. For commercial use, contact the licensor (Terrio-cz).

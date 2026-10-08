@@ -4,7 +4,7 @@
   "private": true,
   "description": "CodeLoupe desktop app: token usage and savings, branches, tasks, index health and gaps from the local daemon",
   "main": "out/main/index.js",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "node": ">=22.12"
   },

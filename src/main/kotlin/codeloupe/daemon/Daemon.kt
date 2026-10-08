@@ -4,6 +4,8 @@ import codeloupe.CodeLoupe
 import codeloupe.JsonFormat
 import codeloupe.config.Config
 import codeloupe.config.PortPolicy
+import codeloupe.docker.ResourceInventory
+import codeloupe.docker.resourceRoutes
 import codeloupe.events.EventBus
 import codeloupe.events.EventStore
 import codeloupe.events.WebhookKey
@@ -85,6 +87,7 @@ class Daemon private constructor(
     private val trackers = Trackers.open(TrackerSettingsLoader.load(config.home), config.home, scope, ::log)
     private val tools = Tools.catalog(trackers)
     private val workspaces = Workspaces(config, registry, trackers)
+    private val resources = ResourceInventory(config, workspaces)
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = trackers::touch)
     private val guard = RequestGuard(config.port)
     private val infoFile = config.home.resolve("daemon.json")
@@ -184,6 +187,7 @@ class Daemon private constructor(
             }
             jobRoutes(jobs)
             workspaceRoutes(workspaces)
+            resourceRoutes(resources)
             eventRoutes(events, webhooks, webhookKey)
             post("/shutdown") {
                 val pending = jobs.pending()
