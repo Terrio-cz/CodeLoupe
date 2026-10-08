@@ -4,6 +4,7 @@ import codeloupe.TestRepos
 import codeloupe.events.Scrubber
 import codeloupe.jobs.PolicyDecision.Verdict
 import java.nio.file.Files
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -104,6 +105,8 @@ class JobPartsTest {
 
     @Test
     fun `program names resolve like Bash - bare names on PATH only - and read as programs`() {
+        // Resolution uses the host's path syntax (backslashes), so the Windows rules can only be checked on Windows.
+        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"))
         val dir = TestRepos.tmpDir("exe")
         Files.writeString(dir.resolve("tool.cmd"), "@echo off")
         val env = mapOf("PATH" to TestRepos.tmpDir("empty").toString(), "PATHEXT" to ".EXE;.CMD")

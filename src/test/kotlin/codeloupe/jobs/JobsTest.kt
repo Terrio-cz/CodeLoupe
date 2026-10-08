@@ -213,7 +213,10 @@ class JobsTest {
         val chain = await(root)
         assertEquals(listOf(JobStatus.DONE, JobStatus.CANCELLED), chain.map { it.status })
         assertFalse(Files.exists(work.resolve("rollback")), "no job step after a cancel")
-        assertTrue(daemon.events.since(since, 500).any { it.type == EventTypes.JOB_NOTIFY && it.data["rootId"]?.jsonPrimitive?.content == root })
+        // The notify is emitted after the cancelled status is stored, so await() can return just before it.
+        val notified = { daemon.events.since(since, 500).any { it.type == EventTypes.JOB_NOTIFY && it.data["rootId"]?.jsonPrimitive?.content == root } }
+        repeat(100) { if (!notified()) Thread.sleep(50) }
+        assertTrue(notified())
     }
 
     @Test
