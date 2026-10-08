@@ -30,7 +30,7 @@ class SimilarTool(private val trackers: Trackers, private val initialWaitMs: Lon
         val note = trackers.current(initialWaitMs, staleWaitMs)
         val limit = args.int("limit") ?: 5
         val answer = withContext(Dispatchers.IO) {
-            Similar.render(mirrors.flatMap { Similar.find(it.store, summary, args.string("description").orEmpty(), limit) }.take(limit))
+            Similar.render(mirrors.flatMap { Similar.find(it.store, summary, args.string("description").orEmpty(), limit, project = project) }.take(limit))
         }
         return if (note == null) answer else "$answer\n$note"
     }

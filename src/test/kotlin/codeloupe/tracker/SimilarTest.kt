@@ -53,6 +53,13 @@ class SimilarTest {
     }
 
     @Test
+    fun `a project filter keeps to that project's tasks`() {
+        val summary = "Local YouTrack mirror with incremental watcher"
+        assertTrue(Similar.find(store, summary, project = "cl", nowMs = now).isNotEmpty())
+        assertTrue(Similar.find(store, summary, project = "TER", nowMs = now).isEmpty())
+    }
+
+    @Test
     fun `terms drop stop words and numbers, put the summary first and cap at sixteen`() {
         assertEquals(listOf("slim", "write", "proxy"), SimilarTerms.of("Add the slim write proxy", ""))
         assertEquals(listOf("mirror", "watcher"), SimilarTerms.of("Mirror 2026 from the watcher", "mirror 42"))
