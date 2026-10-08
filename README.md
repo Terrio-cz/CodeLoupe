@@ -219,8 +219,11 @@ Owned and adopted rows show the workspace's state in the registry (`not in regis
 
 `match` is a case-insensitive regular expression tried against each name of the resource (container name, image
 `repo:tag`, volume or network name) and against the compose project it belongs to; `$1`… stand for its groups. Rules are
-tried in order, the first one wins, labels beat rules. Compose labels images with their project, so the untagged and
-re-tagged images a stack built are adopted with it; the `via` column says which name matched.
+tried in order, the first one wins, labels beat rules. Containers, volumes and networks are also matched by their compose
+project. Images are not, by default: compose labels an image with the project that built it, but images get re-tagged and
+shared between tasks (`aot`, `jdk25`), so the project alone does not make one a task's leftover. A rule with
+`"matchProject": true` (and `"kinds": ["image"]`) adopts the untagged and re-tagged images a stack built; the `via`
+column says which name matched.
 
 ## Desktop app
 

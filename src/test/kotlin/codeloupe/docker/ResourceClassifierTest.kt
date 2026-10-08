@@ -71,6 +71,39 @@ class ResourceClassifierTest {
     }
 
     @Test
+    fun `an image is not adopted through the compose project that built it unless a rule asks for that`() {
+        val project = mapOf(DockerObject.COMPOSE_PROJECT to "terrio-ter-561")
+        val shared = listOf("terrio-importer-app:aot", "terrio-importer-app:jdk25", "terrio-importer-app:jdk25c").map { DockerObject(ResourceKind.IMAGE, "i-$it", listOf(it), project) }
+        val untagged = DockerObject(ResourceKind.IMAGE, "f0f0f0f0f0f0", emptyList(), project)
+        val byName = DockerObject(ResourceKind.IMAGE, "b1", listOf("terrio-importer-app:ter-561-aot"), project)
+        val entries = classifier.classify(shared + untagged + byName).associateBy { it.names.singleOrNull() ?: it.id }
+        shared.forEach { assertEquals(OwnershipClass.UNOWNED, entries.getValue(it.names.single()).ownership, it.names.single()) }
+        assertEquals(OwnershipClass.UNOWNED, entries.getValue("f0f0f0f0f0f0").ownership)
+        // A name the rules match still adopts an image.
+        assertEquals("TER-561", entries.getValue("terrio-importer-app:ter-561-aot").workspace)
+
+        val optIn = ResourceClassifier(
+            WorkspacesConfig.parse(
+                Json.parseToJsonElement(
+                    """{"workspaces":{"adoption":[{"repo":"R","match":"^terrio-ter-(\\d+)$","workspace":"TER-$1","kinds":["image"],"matchProject":true}]}}""",
+                ).jsonObject,
+            ).adoption,
+        ) { _, _ -> null }
+        val adopted = optIn.classify(shared + untagged)
+        assertEquals(OwnershipClass.ADOPTED, adopted.map { it.ownership }.distinct().single())
+        assertEquals("adoption rule 1 (terrio-ter-561)", adopted.first().via)
+    }
+
+    @Test
+    fun `a rule can switch the project match off for containers`() {
+        val rule = WorkspacesConfig.parse(
+            Json.parseToJsonElement("""{"workspaces":{"adoption":[{"repo":"R","match":"^terrio-ter-(\\d+)$","workspace":"TER-$1","matchProject":false}]}}""").jsonObject,
+        ).adoption
+        val container = DockerObject(ResourceKind.CONTAINER, "c", listOf("db-1"), mapOf(DockerObject.COMPOSE_PROJECT to "terrio-ter-7"))
+        assertEquals(OwnershipClass.UNOWNED, ResourceClassifier(rule) { _, _ -> null }.classify(listOf(container)).single().ownership)
+    }
+
+    @Test
     fun `labels beat adoption rules`() {
         val labelled = obj(ResourceKind.VOLUME, "terrio-ter-420", mapOf(Ownership.REPO to "Other", Ownership.WORKSPACE to "feature-x", Ownership.TASK to ""))
         val entry = classifier.classify(listOf(labelled)).single()
