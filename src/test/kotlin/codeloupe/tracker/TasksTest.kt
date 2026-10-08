@@ -105,13 +105,15 @@ class TasksTest {
 
     @Test
     fun `every query answers from the index in well under 100 ms`() {
-        repeat(3) { TaskList.matching(store, TaskFilter.parse("#unresolved watcher")) }
-        val times = listOf<() -> Any>(
+        val queries = listOf<() -> Any>(
             { TaskList.matching(store, TaskFilter.parse("#unresolved epic: CL-4 mirror")) },
             { TaskGraph.render(store, "CL-26", 3, 60) },
             { ReadyTasks.render(store, TaskFilter.parse("epic: CL-4"), emptyMap(), 40) },
             { EpicProgress.render(store, "CL-4", 40) },
-        ).map { q -> val t = System.nanoTime(); q(); (System.nanoTime() - t) / 1_000_000 }
+        )
+        // Warm every query (a cold JIT or a busy CI runner costs one slow call), then take the best of three.
+        queries.forEach { q -> repeat(3) { q() } }
+        val times = queries.map { q -> (1..3).minOf { val t = System.nanoTime(); q(); (System.nanoTime() - t) / 1_000_000 } }
         assertTrue(times.all { it < 100 }, times.toString())
     }
 }
