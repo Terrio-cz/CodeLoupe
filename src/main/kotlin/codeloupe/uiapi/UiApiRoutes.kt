@@ -36,6 +36,7 @@ fun Route.uiApiRoutes(api: UiApi) {
         get("runs/{id}/steps") { call.answer(StepPage.serializer()) { api.steps(call.parameters["id"].orEmpty(), call.query("sort"), call.query("limit"), call.query("cursor")) } }
         get("gaps") { call.answer(Gaps.serializer()) { api.gaps(call.query("range"), call.query("tool"), call.query("reason")) } }
         get("environment") { call.answer(EnvironmentView.serializer()) { api.environment() } }
+        get("environment/audit") { call.answer(EnvironmentAuditView.serializer()) { api.environmentAudit(call.query("name"), call.query("scope"), call.query("limit")) } }
         get("settings") { call.answer(SettingsView.serializer()) { api.settings() } }
         get("events") { call.answer(EventsView.serializer()) { api.events(call.query("since"), call.query("limit")) } }
         route("{...}") {

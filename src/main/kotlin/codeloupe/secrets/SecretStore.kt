@@ -16,7 +16,7 @@ import java.util.Base64
  * [resolve] and [knownValues] (callers inject it into a process or mask it), never through a string that is printed.
  * Several processes (the daemon, the CLI) share the file; every call reads it afresh.
  */
-class SecretStore(val file: Path, private val protector: KeyProtector, private val clock: () -> Instant = Instant::now) {
+class SecretStore(val file: Path, private val protector: KeyProtector, val audit: SecretAudit? = null, private val clock: () -> Instant = Instant::now) {
     @Serializable
     private class Entry(val meta: SecretMeta, val nonce: String, val value: String)
 
@@ -47,6 +47,7 @@ class SecretStore(val file: Path, private val protector: KeyProtector, private v
         val now = IsoTime.of(clock())
         val meta = SecretMeta(name, scope.toString(), source, old?.meta?.created ?: now, if (old != null) now else null, old?.meta?.lastUsed, old?.meta?.usedBy.orEmpty())
         write(Vault(vault.version, vault.protector, vault.wrappedKey, vault.entries.filterNot { it === old } + Entry(meta, sealed.nonce, sealed.value)))
+        audit?.record(if (old != null) SecretAudit.Action.ROTATED else SecretAudit.Action.CREATED, name, meta.scope, source)
         return meta
     }
 
@@ -56,6 +57,7 @@ class SecretStore(val file: Path, private val protector: KeyProtector, private v
         val kept = vault.entries.filterNot { it.meta.name == name && it.meta.scope == scope.toString() }
         if (kept.size == vault.entries.size) return false
         write(Vault(vault.version, vault.protector, vault.wrappedKey, kept))
+        audit?.record(SecretAudit.Action.REMOVED, name, scope.toString(), "store")
         return true
     }
 
@@ -116,6 +118,7 @@ class SecretStore(val file: Path, private val protector: KeyProtector, private v
     private fun touch(vault: Vault, used: List<Entry>, usedBy: String) {
         val ids = used.toSet()
         val now = IsoTime.of(clock())
+        used.forEach { audit?.record(SecretAudit.Action.READ, it.meta.name, it.meta.scope, usedBy) }
         write(Vault(vault.version, vault.protector, vault.wrappedKey, vault.entries.map { e ->
             if (e !in ids) e else Entry(e.meta.copy(lastUsed = now, usedBy = (listOf(usedBy) + e.meta.usedBy).distinct().take(USED_BY)), e.nonce, e.value)
         }))
@@ -166,7 +169,7 @@ class SecretStore(val file: Path, private val protector: KeyProtector, private v
         fun open(home: Path, env: Map<String, String> = System.getenv()): SecretStore {
             val file = home.resolve("secrets").resolve("vault.env")
             val wrapped = if (Files.isRegularFile(file)) JsonFormat.json.decodeFromString(Vault.serializer(), Files.readString(file)).protector else null
-            return SecretStore(file, KeyProtectors.choose(env, wrapped))
+            return SecretStore(file, KeyProtectors.choose(env, wrapped), audit = SecretAudit(home.resolve("secrets").resolve("audit.log")))
         }
     }
 }

@@ -50,6 +50,7 @@ export class MockApi implements ApiSource {
         return { summary: g.summary.filter(x => !q.tool || x.tool === q.tool), items, report: d.gapReport() };
       }
       case 'environment': return d.environment();
+      case 'environment/audit': return d.environmentAudit(q.name === undefined ? null : String(q.name), q.limit === undefined ? 100 : Number(q.limit));
       case 'settings': return d.settings();
       case 'events': return d.events(q.since === undefined ? null : Number(q.since));
       case 'status/history': return d.statusHistory();

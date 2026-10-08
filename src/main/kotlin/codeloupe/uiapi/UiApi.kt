@@ -5,6 +5,7 @@ import codeloupe.daemon.QueueSnapshot
 import codeloupe.events.EventBus
 import codeloupe.ingest.Transcripts
 import codeloupe.repo.Registry
+import codeloupe.secrets.SecretAccess
 import codeloupe.tracker.Trackers
 import codeloupe.workspace.WorkspaceState
 import codeloupe.workspace.Workspaces
@@ -24,6 +25,7 @@ class UiApi(
     queue: () -> QueueSnapshot,
     trackerPollSec: Long,
     scope: CoroutineScope,
+    secrets: SecretAccess,
     log: (String) -> Unit = {},
     waitMs: Long = Transcripts.DEFAULT_WAIT_MS,
 ) : AutoCloseable {
@@ -38,6 +40,7 @@ class UiApi(
     private val feed = EventFeed(events, registry, transcripts)
     private val overview = OverviewViews(callLog, worktrees, transcripts)
     private val settings = SettingsViews(config, catalog, trackers, trackerPollSec)
+    private val environment = EnvironmentViews(secrets, config.secrets.rotationDays)
 
     suspend fun nav(gapsSince: String?): Nav {
         val since = gapsSince?.let { runCatching { Instant.parse(it) }.getOrNull() ?: throw UiApiException.badRequest("gapsSince must be an ISO instant") }
@@ -68,7 +71,12 @@ class UiApi(
 
     suspend fun gaps(range: String?, tool: String?, reason: String?): Gaps = gapViews.gaps(range, tool, reason)
 
-    fun environment(): EnvironmentView = settings.environment()
+    fun environment(): EnvironmentView = environment.keys()
+
+    fun environmentAudit(name: String?, scope: String?, limit: String?): EnvironmentAuditView {
+        val max = limit?.let { it.toIntOrNull()?.takeIf { n -> n in 1..MAX_AUDIT } ?: throw UiApiException.badRequest("limit must be 1..$MAX_AUDIT") } ?: DEFAULT_AUDIT
+        return environment.audit(name, scope, max)
+    }
 
     suspend fun settings(): SettingsView = settings.settings()
 
@@ -83,5 +91,7 @@ class UiApi(
     private companion object {
         const val DEFAULT_EVENTS = 100
         const val MAX_EVENTS = 1_000
+        const val DEFAULT_AUDIT = 100
+        const val MAX_AUDIT = 500
     }
 }

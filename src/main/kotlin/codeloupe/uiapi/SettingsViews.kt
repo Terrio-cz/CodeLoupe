@@ -16,6 +16,4 @@ internal class SettingsViews(private val config: Config, private val catalog: Re
         },
         budgets = with(config.budgets) { SettingsView.Budgets(dailyWeighted, rssMb, IndexViews.BUILD_PEAK_BUDGET_MB, p95Ms, queueWaitMs, busyRate) },
     )
-
-    fun environment() = EnvironmentView(emptyList(), storeReady = false)
 }

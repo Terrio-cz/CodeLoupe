@@ -13,7 +13,7 @@ import codeloupe.secrets.SecretStore
 class EnvTool(private val access: SecretAccess) : Tool {
     override val name = "env"
     override val description = "Names of the environment variables and secrets the CodeLoupe store holds for a workspace and repository — " +
-        "scope (global < workspace < repository, the narrowest wins), source, created, rotated, last use and by what. Never a value: " +
+        "scope (global < workspace < repository, the narrowest wins), source, created, rotated, last use and by what, and ROTATE on a name older than the configured age. Never a value: " +
         "start a process with them through `codeloupe env run --workspace <w> --repo <r> -- <command>`. all=true lists every scope."
     override val properties = Schema.properties(
         "workspace" to Schema.string("Workspace folder or id the caller works in"),
@@ -28,6 +28,6 @@ class EnvTool(private val access: SecretAccess) : Tool {
         if (!access.vaultExists()) return "the secret store is empty; `codeloupe env set <NAME>` stores the first value"
         val metas = if (args.bool("all") == true) store.list() else store.visible(SecretStore.chain(args.string("workspace"), args.string("repository")))
         if (metas.isEmpty()) return "no secret applies to that workspace and repository"
-        return (listOf("${metas.size} names (values are never shown):") + SecretReport.lines(metas)).joinToString("\n")
+        return (listOf("${metas.size} names (values are never shown):") + SecretReport.lines(metas, access.rotationDays)).joinToString("\n")
     }
 }

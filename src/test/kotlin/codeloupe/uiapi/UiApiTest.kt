@@ -6,6 +6,8 @@ import codeloupe.config.Config
 import codeloupe.config.MetricsConfig
 import codeloupe.config.WorkspacesConfig
 import codeloupe.daemon.Daemon
+import codeloupe.secrets.PassphraseProtector
+import codeloupe.secrets.SecretStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -48,6 +50,7 @@ class UiApiTest {
         Config(home, port, 60_000, 120_000, 512, null, workspaces = WorkspacesConfig(repos = listOf(WorkspacesConfig.Repo(repo.toString()))),
             metrics = MetricsConfig(transcriptDirs = listOf(TestRepos.tmpDir("ui-transcripts").toString())),
         ),
+        secretStore = SecretStore(home.resolve("secrets").resolve("vault.env"), PassphraseProtector("pw".toCharArray(), iterations = 1_000)),
     )
     private val http = HttpClient.newHttpClient()
 
@@ -177,7 +180,8 @@ class UiApiTest {
         assertTrue(settings.contains(repo.fileName.toString()), settings)
         // The limits /status judges the daemon by, for the budget lines of the Overview charts.
         assertTrue(settings.contains("\"p95Ms\":1000") && settings.contains("\"queueWaitMs\":30000") && settings.contains("\"busyRate\":0.1"), settings)
-        assertEquals("{\"keys\":[],\"storeReady\":false}", json("/ui-api/v1/environment").toString())
+        assertEquals("{\"keys\":[],\"storeReady\":true,\"rotationDays\":90}", json("/ui-api/v1/environment").toString())
+        assertEquals("{\"events\":[]}", json("/ui-api/v1/environment/audit").toString())
         assertEquals("{\"summary\":[],\"items\":[],\"report\":null}", json("/ui-api/v1/gaps").toString())
         assertEquals(404, get("/ui-api/v1/tasks/CL-1").statusCode())
     }

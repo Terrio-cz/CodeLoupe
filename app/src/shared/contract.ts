@@ -252,12 +252,30 @@ export interface Environment {
     name: string;
     scope: 'global' | 'repo' | 'workspace';
     scopeRef: string | null;
-    source: 'store' | 'env' | 'file';
+    /** `store`: added in the app or by hand; `file`: imported from `sourceRef`. */
+    source: 'store' | 'file';
+    sourceRef: string | null;
+    /** Who read it, most recent first (audit). */
     consumers: string[];
+    reads: number;
     lastUsedAt: Iso | null;
+    createdAt: Iso;
+    /** The last change: rotated, else created. */
     updatedAt: Iso;
+    ageDays: number;
+    /** Older than `rotationDays` of the store: time to rotate it. */
+    rotationDue: boolean;
   }[];
+  /** False while no key protector works, so nothing can be stored yet. */
   storeReady: boolean;
+  /** `config.json` `secrets.rotationDays`; 0 = no reminders. */
+  rotationDays: number;
+}
+
+// § 9.13b — who read or changed which key and when, never a value.
+export type EnvironmentAction = 'read' | 'created' | 'rotated' | 'removed';
+export interface EnvironmentAudit {
+  events: { at: Iso; name: string; scope: 'global' | 'repo' | 'workspace'; scopeRef: string | null; action: EnvironmentAction; consumer: string }[];
 }
 
 // § 9.14
@@ -309,6 +327,7 @@ export interface ResourceMap {
   index: IndexHealth;
   gaps: Gaps;
   environment: Environment;
+  'environment/audit': EnvironmentAudit;
   settings: DaemonSettings;
   events: Events;
   'status/history': ResourceSample[];

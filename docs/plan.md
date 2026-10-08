@@ -756,6 +756,14 @@ rozhoduje launcher.
 - Na reálných kořenech tohoto počítače (jen jména, nic nebylo importováno ani přepsáno): 168 souborů, 712 výskytů, 113 jmen, 375 dvojic jméno+scope, 125 citlivých,
   120 s duplicitní hodnotou, 57 s konfliktem, 3 vyloučené složky; sken trvá ~8 s včetně startu JVM.
 
+### Výsledek CL-55 — audit tajemství a připomenutí rotace (2026-10-08)
+
+- Každé vydání hodnoty spotřebiteli (`env run`, `/env/values` s hlavičkou `x-codeloupe-used-by`) a každé vytvoření, rotace a smazání zapíše řádek JSON
+  `{at, name, scope, action, consumer}` do `<home>/secrets/audit.log`; hodnota v něm není nikdy, test to hlídá na souboru. Zápis je best effort (plný disk nezastaví `env run`),
+  soubor se jen připisuje a po 4 MB přejde do `audit.log.1` (zůstane zhruba 8 MB historie). Maskování hodnot a čtení metadat se nezapisuje.
+- Stáří klíče = od rotace, jinak od vytvoření; `secrets.rotationDays` (výchozí 90, 0 = vypnuto) označí klíč `ROTATE` v `env list`, v nástroji `env` a ve sloupci Stáří obrazovky Prostředí.
+- `GET /ui-api/v1/environment` vrací klíče z metadat vaultu (bez dešifrování) se spotřebiteli z auditu a stářím, `GET /ui-api/v1/environment/audit` posledních až 500 událostí.
+
 ### Výsledek CL-62 — ingest transcriptů, rozpočty a události pro aplikaci (2026-10-08)
 
 - **Ingest** (`codeloupe.ingest`, `<home>/transcripts.db`): líný, bez časovače. Volání UI API (`runs`, `overview`, `gaps`, `nav`,
