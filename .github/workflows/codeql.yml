@@ -14,20 +14,20 @@ concurrency:
 permissions:
   contents: read
 
-# Code scanning results can only be uploaded to GitHub from a public repository or one with GitHub Code Security.
-# Until then the SARIF stays an artifact and tools/sarif-gate.mjs fails the job on a high-severity finding.
-# To switch to the Security tab: set the repository variable CODEQL_UPLOAD to "always" and add
-# `security-events: write` to the permissions of the analyze job.
+# Pushes to main and the weekly run upload to the Security tab (the repository is public). Pull requests keep the SARIF
+# as an artifact only: their token is read-only for forks and Dependabot. tools/sarif-gate.mjs fails every run on a
+# high-severity finding.
 # Besides Kotlin/Java and TypeScript, the javascript-typescript run also covers these workflow files.
 jobs:
   analyze:
     name: analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # actions: read lets the analyze step look up its own workflow run, which a private repository requires.
+    # actions: read lets the analyze step look up its own workflow run; security-events: write is for the SARIF upload.
     permissions:
       contents: read
       actions: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -61,7 +61,7 @@ jobs:
         with:
           category: /language:${{ matrix.language }}
           output: sarif-results
-          upload: ${{ vars.CODEQL_UPLOAD || 'never' }}
+          upload: ${{ github.event_name == 'pull_request' && 'never' || 'always' }}
 
       - name: Upload SARIF
         if: always()
