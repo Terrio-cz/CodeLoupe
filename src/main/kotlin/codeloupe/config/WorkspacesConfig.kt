@@ -10,6 +10,8 @@ import kotlinx.serialization.json.JsonPrimitive
  * A repository is also known when a tracker lists it in `repos`; `<repo name>-worktrees` next to the repository is
  * always a root. A repo entry may be just the path. `adoption` maps resources without CodeLoupe labels to workspaces,
  * see [AdoptionRule]; `reconcile` configures the cleanup of released workspaces, see [ReconcileConfig]; `ports` gives the range of the port registry, see [PortsConfig].
+ * `gradleUserHome` names the Gradle user home whose `daemon/` logs say where an idle Gradle daemon last built, when it is neither
+ * `GRADLE_USER_HOME` of the daemon nor `~/.gradle`.
  */
 data class WorkspacesConfig(
     val repos: List<Repo> = emptyList(),
@@ -18,6 +20,7 @@ data class WorkspacesConfig(
     val adoption: List<AdoptionRule> = emptyList(),
     val reconcile: ReconcileConfig = ReconcileConfig(),
     val ports: PortsConfig = PortsConfig(),
+    val gradleUserHome: String? = null,
 ) {
     data class Repo(val path: String, val roots: List<String> = emptyList())
 
@@ -32,7 +35,7 @@ data class WorkspacesConfig(
                 }
             }
             val adoption = (section["adoption"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(AdoptionRule::parse) }
-            return WorkspacesConfig(repos, (section["abandonedDays"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it > 0 } ?: 14, adoption, ReconcileConfig.parse(section["reconcile"] as? JsonObject), PortsConfig.parse(section["ports"] as? JsonObject))
+            return WorkspacesConfig(repos, (section["abandonedDays"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it > 0 } ?: 14, adoption, ReconcileConfig.parse(section["reconcile"] as? JsonObject), PortsConfig.parse(section["ports"] as? JsonObject), text(section["gradleUserHome"]))
         }
 
         private fun text(element: Any?): String? = (element as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }

@@ -21,4 +21,7 @@ data class Workspace(
     val lastActivity: String? = null,
     /** Only when asked for: summing a build output directory takes seconds. */
     val sizeBytes: Long? = null,
+    /** Only when asked for (`ram=1`): the working set of the processes that work in this directory, and how many they are. */
+    val ramBytes: Long? = null,
+    val processes: Int? = null,
 )

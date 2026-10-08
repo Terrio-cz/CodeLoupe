@@ -1,10 +1,12 @@
 # CodeLoupe desktop app
 
-Electron app over the daemon's read-only UI API: token usage and savings, branches and worktrees with their
-changed declarations, YouTrack tasks from the mirror, index health, gaps, environment keys and settings.
-A tray icon shows the daemon state, RSS and queue; the app starts the daemon when it is down, and it
-sends notifications for budget breaches, finished builds, new gaps and daemon outages. It does not monitor
-agent runs; the launcher does that. Spec: [../docs/ui-spec.md](../docs/ui-spec.md).
+Electron app over the daemon: token usage and savings with the daemon's latency, memory and CPU against its budgets,
+branches and worktrees with their changed declarations and callers, workspaces with the Docker resources, ports and cleanup
+they hold, YouTrack tasks from the mirror, jobs with their slots and webhooks, the cost of agent runs from the transcripts,
+index health, gaps, environment keys and settings. A tray icon shows the daemon state, RSS and queue; the app starts the
+daemon when it is down, and it sends notifications for budget breaches, finished builds, new gaps and daemon outages. It reads;
+the only things it changes are a released workspace and a confirmed cleanup, after a native confirmation. It does not follow
+what an agent is doing now; the launcher does that. Spec: [../docs/ui-spec.md](../docs/ui-spec.md).
 
 ## Requirements
 
@@ -61,7 +63,6 @@ Verification modes (development builds only):
 - Workspaces actions (release a worktree, confirm a cleanup) change the real daemon only after main has checked the request against the daemon's own registry and plan and the user said yes in a native dialog that lists what goes; the page never sends a path to delete, only plan keys.
 - Job logs: the page names a job id; main reads only `<home>/jobs/<id>.log` of a finished job, strips terminal codes and masks credential-looking values. The live event stream is opened while the Jobs screen is open and passes on only the event type and job id.
 - The Accounts screen changes `<home>/accounts.json` (names, folders, URLs) and puts a YouTrack token into the store through `<cli> env set` on stdin; the connection test reads the token back from the daemon in main, sends it only to the instance's own URL (redirects are not followed) and answers with a sentence. Removing an entry, adding or removing a YouTrack account (the daemon restarts) are confirmed in a native dialog.
-- The Gaps screen's "Přepočítat report" action runs `<cli> metrics gaps --since <30 days ago> --out <home>/gaps-report.json` with a fixed argument list and no shell; nothing in it comes from the page.
 - Settings → Claude Code runs the `claude` CLI (no shell, fixed argv: `mcp add|remove`, `plugin marketplace add`, `plugin install`) only after a native confirmation that lists the commands; the page cannot click it, and the app never writes Claude Code's files itself. See the root README, section Claude Code.
 - Main opens a folder only if it is an existing git worktree from the daemon. It opens a URL only if it is `https` and its origin matches a configured YouTrack instance.
 - Permissions, navigation, new windows and webviews are denied.

@@ -60,10 +60,13 @@ export function Workspaces({ route }: { route: Route }) {
   const [sizes, setSizes] = useState(false);
   const [settings] = useSettings();
   const list = useApi('workspaces', undefined, { size: sizes ? 1 : undefined });
-  const resources = useApi('resources', undefined, { stats: sizes ? 1 : undefined });
-  const plan = useApi('reconcile');
-  const releases = useApi('releases');
-  const ports = useApi('ports');
+  // Each of these makes the daemon read git or Docker again (about a second): the registry goes first and shows the table,
+  // the rest follows and fills in what each workspace holds.
+  const next = list.data !== null;
+  const resources = useApi(next ? 'resources' : null, undefined, { stats: sizes ? 1 : undefined });
+  const plan = useApi(next ? 'reconcile' : null);
+  const releases = useApi(next ? 'releases' : null);
+  const ports = useApi(next ? 'ports' : null);
 
   const reloadAll = () => { list.reload(); resources.reload(); plan.reload(); releases.reload(); ports.reload(); };
   const rows = useMemo(

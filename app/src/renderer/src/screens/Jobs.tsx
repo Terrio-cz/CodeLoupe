@@ -77,7 +77,7 @@ export function Jobs({ route }: { route: Route }) {
         <Select label="Stav jobu" value={filter} onChange={v => setFilter(v as JobFilter)} options={FILTERS} />
         <Search label="Hledat job, příkaz, štítek" value={q} onChange={setQ} />
         <span style={{ flex: 1 }} />
-        <span className="muted">Posledních {num(items.length)} jobů · živě z proudu událostí daemonu{status.data?.jobs?.policyHook ? ' · politika hlídá příkazy' : ''}</span>
+        <span className="muted">Posledních {num(items.length)} jobů{settings?.apiSource === 'daemon' ? ' · živě z proudu událostí daemonu' : ' · mock data, bez živého proudu'}{status.data?.jobs?.policyHook ? ' · politika hlídá příkazy' : ''}</span>
       </div>
 
       <section className="card" aria-label="Počty jobů">
