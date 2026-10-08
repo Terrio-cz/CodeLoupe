@@ -5,6 +5,7 @@ import codeloupe.config.ConfigLoader
 import codeloupe.metrics.GapReport
 import codeloupe.metrics.MetricsCollector
 import codeloupe.metrics.MetricsSetup
+import codeloupe.platform.IsoTime
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.multiple
@@ -25,7 +26,7 @@ class MetricsGapsCommand : CliktCommand(name = "gaps") {
     override fun run() {
         val setup = MetricsSetup(ConfigLoader.load())
         val runs = MetricsCollector(setup.categorizer()).runs(setup.projectDirs(dir), MetricsSetup.instant(since), until?.let(MetricsSetup::instant))
-        val report = GapReport.of(runs)
+        val report = GapReport.of(runs).covering(since, IsoTime.now())
         out?.let { Files.writeString(Path.of(it), JsonFormat.json.encodeToString(GapReport.serializer(), report) + "\n") }
         echo(report.render())
     }

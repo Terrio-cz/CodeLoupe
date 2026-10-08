@@ -17,7 +17,7 @@ describe('MockApi follows the read-only contract', () => {
     const all: ApiRequest[] = [
       { resource: 'nav' }, { resource: 'overview' }, { resource: 'worktrees' },
       { resource: 'worktrees/:id', id: wt.items[0].id }, { resource: 'tasks' }, { resource: 'tasks/:id', id: task.items[0].id },
-      { resource: 'index' }, { resource: 'gaps' }, { resource: 'environment' }, { resource: 'settings' }, { resource: 'events' },
+      { resource: 'index' }, { resource: 'gaps' }, { resource: 'environment' }, { resource: 'settings' }, { resource: 'events' }, { resource: 'status/history' },
     ];
     for (const r of all) expect(await get(r)).toBeTruthy();
   });

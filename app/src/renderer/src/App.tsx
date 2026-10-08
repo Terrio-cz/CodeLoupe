@@ -1,26 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { bridge, refreshAll, useApi } from './api';
 import { RANGE_OPTIONS, Segmented } from './components/Parts';
-import { PhaseBadge, RepoBadge } from './components/StatusBadge';
+import { Sidebar, sidebarCounts } from './components/Sidebar';
 import { useDaemon, useRange, useSettings } from './hooks';
-import { href, useRoute, type Screen } from './router';
-import { Branches } from './screens/Branches';
-import { Environment } from './screens/Environment';
-import { Gaps } from './screens/Gaps';
-import { IndexScreen } from './screens/IndexScreen';
-import { Overview } from './screens/Overview';
-import { Settings } from './screens/Settings';
-import { Tasks } from './screens/Tasks';
-
-const TITLES: Record<Screen, string> = {
-  overview: 'Přehled', branches: 'Větve', tasks: 'Úkoly', index: 'Index', gaps: 'Mezery',
-  environment: 'Prostředí', settings: 'Nastavení',
-};
-const ICONS: Record<Screen, string> = {
-  overview: '◉', branches: '⑂', tasks: '☰', index: '▤', gaps: '⚑', environment: '⚿', settings: '⚙',
-};
-const KEYS: Record<string, Screen> = { o: 'overview', b: 'branches', t: 'tasks', i: 'index', g: 'gaps', e: 'environment', s: 'settings' };
-const WITH_RANGE: Screen[] = ['overview', 'gaps'];
+import { href, useRoute } from './router';
+import { SCREEN_DEFS, screenDef } from './screenList';
+import { VIEWS } from './views';
 
 export function App() {
   const route = useRoute();
@@ -41,7 +26,7 @@ export function App() {
 
   useEffect(() => bridge().onNavigate(h => { location.hash = h; }), []);
   useEffect(() => { void bridge().metrics().then(m => setAppVersion(m.version)); }, []);
-  useEffect(() => { document.title = `${TITLES[route.screen]} · CodeLoupe`; }, [route.screen]);
+  useEffect(() => { document.title = `${screenDef(route.screen).title} · CodeLoupe`; }, [route.screen]);
   useEffect(() => {
     if (route.screen === 'gaps') try { localStorage.setItem('codeloupe.gapsSeen', new Date().toISOString()); } catch { /* storage blocked */ }
   }, [route.screen]);
@@ -75,9 +60,10 @@ export function App() {
         return;
       }
       // The second key wins over a new prefix, so `g g` goes to Mezery.
-      if (pendingG && Date.now() - pendingG < 1200 && KEYS[e.key]) {
+      const target = SCREEN_DEFS.find(d => d.key === e.key);
+      if (pendingG && Date.now() - pendingG < 1200 && target) {
         e.preventDefault();
-        location.hash = href(KEYS[e.key]);
+        location.hash = href(target.id);
         pendingG = 0;
         return;
       }
@@ -87,60 +73,19 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [settings?.shortcuts]);
 
-  const counts: Partial<Record<Screen, React.ReactNode>> = nav.data ? {
-    branches: nav.data.activeWorktrees,
-    tasks: nav.data.openTasks,
-    gaps: nav.data.newGaps ? <span title="nové od poslední návštěvy">{nav.data.newGaps} nové</span> : undefined,
-    index: <RepoBadge state={nav.data.indexState} />,
-  } : {};
-
-  const link = (s: Screen) => (
-    <a key={s} className="nav-link" href={href(s)} aria-current={route.screen === s ? 'page' : undefined} title={TITLES[s]}>
-      <span className="nav-icon" aria-hidden="true">{ICONS[s]}</span>
-      <span className="label-text">{TITLES[s]}</span>
-      {counts[s] !== undefined && <span className="count">{counts[s]}</span>}
-    </a>
-  );
-
-  const st = daemon?.status;
+  const def = screenDef(route.screen);
   return (
     <div className="shell">
-      <aside className="sidebar">
-        <div className="brand"><span aria-hidden="true">◎</span><span className="label-text">CodeLoupe</span><small>{appVersion && `v${appVersion}`}</small></div>
-        <nav aria-label="Hlavní navigace" style={{ display: 'contents' }}>
-          {link('overview')}
-          <div className="nav-group">Práce</div>
-          {link('branches')}{link('tasks')}
-          <div className="nav-group">Index</div>
-          {link('index')}{link('gaps')}
-          <div className="nav-group">Systém</div>
-          {link('environment')}{link('settings')}
-        </nav>
-        <div className="sidebar-foot">
-          <div className="daemon-pill">
-            <div className="line" aria-live="polite">{daemon ? <PhaseBadge phase={daemon.phase} /> : 'Daemon …'}</div>
-            <div className="detail muted">
-              {st ? `${st.rssMb} MB · fronta ${st.queue.fast.waiting.length + st.queue.heavy.waiting.length} · :${daemon?.port}` : daemon?.message ?? `port ${daemon?.port ?? '—'}`}
-            </div>
-            {settings?.apiSource === 'mock' && <div className="detail muted">Data: mock</div>}
-          </div>
-        </div>
-      </aside>
+      <Sidebar current={route.screen} counts={sidebarCounts(nav.data)} daemon={daemon} settings={settings} version={appVersion} />
       <main className="main" ref={main}>
         <header className="topbar">
-          <h1>{TITLES[route.screen]}</h1>
+          <h1>{def.title}</h1>
           <span className="spacer" />
-          {WITH_RANGE.includes(route.screen) && <Segmented label="Časový rozsah" value={range} onChange={setRange} options={RANGE_OPTIONS} />}
+          {def.range && <Segmented label="Časový rozsah" value={range} onChange={setRange} options={RANGE_OPTIONS} />}
           <button className="btn ghost" onClick={refreshAll} aria-label="Obnovit data (Ctrl+R)" title="Obnovit (Ctrl+R)">⟳</button>
         </header>
         <div className="content">
-          {route.screen === 'overview' && <Overview />}
-          {route.screen === 'branches' && <Branches route={route} />}
-          {route.screen === 'tasks' && <Tasks route={route} />}
-          {route.screen === 'index' && <IndexScreen />}
-          {route.screen === 'gaps' && <Gaps />}
-          {route.screen === 'environment' && <Environment />}
-          {route.screen === 'settings' && <Settings />}
+          {VIEWS[route.screen](route)}
         </div>
       </main>
     </div>

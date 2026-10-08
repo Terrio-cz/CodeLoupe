@@ -336,8 +336,9 @@ Z transcriptů: volání codeloupe, po kterém agent do 2 tahů sáhne po `rg`/`
 symbol nebo soubor = **mezera** (nástroj nestačil). Report seskupený podle nástroje a tvaru dotazu → backlog
 vylepšení. Plus: prázdné výsledky, `candidate` výsledky, které agent dál ručně rozhodoval, zápisy s rollbackem.
 Hotovo (CL-22): `codeloupe metrics gaps` — druhy `fallback`, `empty`, `busy`, `candidates`, týdně podle nástroje a
-tvaru dotazu (`name`, `qualified`, `overload`, `glob`, `path`); zápisy s rollbackem čekají na write nástroje, obrazovka
-Gaps v UI na CL-40.
+tvaru dotazu (`name`, `qualified`, `overload`, `glob`, `path`); zápisy s rollbackem čekají na write nástroje. Obrazovka
+Mezery v aplikaci (CL-40) ukazuje tento report z `<home>/gaps-report.json`, který daemon servíruje v `gaps.report` a který
+se přepočítá tlačítkem v aplikaci (CLI v samostatném procesu, asi 17 s na 3 000 běhů, měřeno 2026-10-08).
 
 **Scaffold šablony (CL-35): no-go.** Změřeno 2026-10-08 na 1 427 nových kódových souborech z transcriptů od 2026-09-23
 (`codeloupe metrics boilerplate`): kostra (package, importy, hlavičky typů, anotace, závorky, prázdné řádky) je **13,3 %**

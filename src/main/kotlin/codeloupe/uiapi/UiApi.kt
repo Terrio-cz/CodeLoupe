@@ -30,6 +30,7 @@ class UiApi(
     private val index = IndexViews(registry, catalog, events, queue, config.budgets.rssMb)
     private val overview = OverviewViews(callLog, worktrees)
     private val settings = SettingsViews(config, catalog, trackers, trackerPollSec)
+    private val gaps = GapViews(config.home.resolve(GapViews.FILE))
 
     suspend fun nav(): Nav = Nav(
         activeWorktrees = catalog.scan().repos.sumOf { r -> r.workspaces.count { it.state == WorkspaceState.ACTIVE && it.role == "worktree" } },
@@ -48,7 +49,7 @@ class UiApi(
 
     suspend fun index(): IndexHealth = index.health()
 
-    fun gaps(): Gaps = settings.gaps()
+    fun gaps(): Gaps = gaps.gaps()
 
     fun environment(): EnvironmentView = settings.environment()
 

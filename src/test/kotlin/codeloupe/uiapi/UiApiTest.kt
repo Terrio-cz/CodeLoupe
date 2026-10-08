@@ -172,8 +172,10 @@ class UiApiTest {
         val settings = json("/ui-api/v1/settings").toString()
         assertTrue(settings.contains("\"port\":$port"), settings)
         assertTrue(settings.contains(repo.fileName.toString()), settings)
+        // The limits /status judges the daemon by, for the budget lines of the Overview charts.
+        assertTrue(settings.contains("\"p95Ms\":1000") && settings.contains("\"queueWaitMs\":30000") && settings.contains("\"busyRate\":0.1"), settings)
         assertEquals("{\"keys\":[],\"storeReady\":false}", json("/ui-api/v1/environment").toString())
-        assertEquals("{\"summary\":[],\"items\":[]}", json("/ui-api/v1/gaps").toString())
+        assertEquals("{\"summary\":[],\"items\":[],\"report\":null}", json("/ui-api/v1/gaps").toString())
         assertEquals(404, get("/ui-api/v1/tasks/CL-1").statusCode())
     }
 
