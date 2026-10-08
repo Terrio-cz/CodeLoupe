@@ -75,14 +75,28 @@ class LazyEditStudy(private val repo: Path, private val adapter: KotlinAdapter =
                 if (was == null) (after.getOrNull(m.order - 1)?.text?.lastOrNull().orEmpty().length * 2) + dedent(m.text).joinToString("\n").length + 1 + CALL
                 else was.text.joinToString("\n").length + m.text.joinToString("\n").length + CALL
             }
-            val reproduced = when (val r = MemberMerge(adapter).merge(path, old, owner.name, code)) {
-                is MemberMerge.Result.Merged -> r.text.replace("\r\n", "\n").trimEnd() == new.replace("\r\n", "\n").trimEnd()
-                is MemberMerge.Result.Failed -> false
-            }
-            val note = if (reproduced) "" else (MemberMerge(adapter).merge(path, old, owner.name, code) as? MemberMerge.Result.Failed)?.reason ?: "differs from the real edit"
+            val merge = MemberMerge(adapter).merge(path, old, owner.name, code)
+            // The edit of the file also touched other places; what the merge must get right is this type: the same members, in the same order, text for text.
+            val reproduced = merge is MemberMerge.Result.Merged && sameMembers(merge.text, owner, after)
+            val note = if (reproduced) "" else (merge as? MemberMerge.Result.Failed)?.reason ?: (merge as MemberMerge.Result.Merged).let { difference(it.text, owner, after) ?: "differs" }
             return Row(sha.take(7), path.substringAfterLast('/'), owner.name, changed.size, added.size, lazy, hunks, whole, new.length + path.length + CALL, reproduced, note)
             }
         return null
+    }
+
+    private fun sameMembers(merged: String, owner: DeclFact, expected: List<Member>): Boolean = difference(merged, owner, expected) == null
+
+    /** Null when the merged type has the real edit's members in its order; else what differs: `other order` (same members), or `other members or text`. */
+    private fun difference(merged: String, owner: DeclFact, expected: List<Member>): String? {
+        val facts = adapter.extract("merged.kt", merged)
+        val mergedOwner = facts.decls.firstOrNull { it.kind == owner.kind && it.name == owner.name && it.container == owner.container && !it.local } ?: return "type lost"
+        val got = members(facts.decls, merged, mergedOwner, facts)?.map { it.identity to dedent(it.text) } ?: return "unreadable"
+        val want = expected.map { it.identity to dedent(it.text) }
+        return when {
+            got == want -> null
+            got.toSet() == want.toSet() -> "same members, other order"
+            else -> "other members or text"
+        }
     }
 
     private fun members(decls: List<DeclFact>, text: String, owner: DeclFact, facts: codeloupe.lang.FileFacts): List<Member>? {
@@ -125,6 +139,8 @@ class LazyEditStudy(private val repo: Path, private val adapter: KotlinAdapter =
         private const val CALL = 60
         private val MEMBER_KINDS = setOf("fun", "property", "constructor")
 
+        private fun pct(part: Int, whole: Int) = "%+d %%".format((part * 100.0 / whole - 100).toInt())
+
         fun table(rows: List<Row>): String = buildString {
             appendLine("| commit | file | type | changed + new | lazy | search/replace (hunks) | search/replace (whole members) | file rewrite | merge reproduces the real edit |")
             appendLine("|---|---|---|---:|---:|---:|---:|---:|---|")
@@ -132,7 +148,10 @@ class LazyEditStudy(private val repo: Path, private val adapter: KotlinAdapter =
                 appendLine("| ${r.commit} | ${r.file} | ${r.type} | ${r.changed} + ${r.added} | ${r.lazy} | ${r.editHunks} | ${r.editWhole} | ${r.rewrite} | ${if (r.reproduced) "yes" else "no: ${r.note}"} |")
             }
             fun total(f: (Row) -> Int) = rows.sumOf(f)
+            val wins = rows.count { it.lazy < it.editHunks }
             appendLine("| **total** | | | ${total { it.changed }} + ${total { it.added }} | **${total { it.lazy }}** | **${total { it.editHunks }}** | **${total { it.editWhole }}** | **${total { it.rewrite }}** | ${rows.count { it.reproduced }}/${rows.size} |")
+            appendLine()
+            appendLine("Lazy is shorter than tight search/replace in $wins of ${rows.size} edits; over the set it is ${pct(total { it.lazy }, total { it.editHunks })} against search/replace by hunks, ${pct(total { it.lazy }, total { it.editWhole })} against whole members, ${pct(total { it.lazy }, total { it.rewrite })} against a file rewrite.")
         }
     }
 }
