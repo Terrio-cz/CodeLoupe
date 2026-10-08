@@ -7,6 +7,9 @@ import codeloupe.jobs.JobRequest
 import codeloupe.jobs.JobRunner
 import codeloupe.jobs.Submission
 import codeloupe.repo.Registry
+import codeloupe.triage.Triage
+import codeloupe.triage.ViewLocator
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Files
@@ -51,8 +54,18 @@ class RunTool(private val jobs: JobRunner) : Tool {
         val result = OutputCompressor.compress(command, text, cwd)
         // A command that succeeded and printed little is only its output: no header to cost more than it saves.
         if (!result.shortened) return if (ended.exit == 0) result.text else listOf(exit, result.text).filter { it.isNotEmpty() }.joinToString("\n")
-        val saved = 100 - result.text.length * 100 / text.length.coerceAtLeast(1)
-        return "$exit · ${text.length} → ${result.text.length} chars ($saved% less) · rest: doc path=job:${job.id}\n${result.text}"
+        val summary = if (ended.exit == 0) result.text else pointToDeclarations(registry, cwd, result.text)
+        val saved = 100 - summary.length * 100 / text.length.coerceAtLeast(1)
+        return "$exit · ${text.length} → ${summary.length} chars ($saved% less) · rest: doc path=job:${job.id}\n$summary"
+    }
+
+    /** The errors and failed tests of a summary with the declaration each is in; the summary as it is where the index cannot say. */
+    private suspend fun pointToDeclarations(registry: Registry, cwd: String, summary: String): String = try {
+        registry.query(cwd) { view -> Triage.apply(summary, ViewLocator(view)) }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        summary
     }
 
     /** The log, its newest [MAX_BYTES] when it is larger: the end of an output is where a build says what went wrong. */
