@@ -1,6 +1,7 @@
 package codeloupe.overlay
 
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Mutex
 import java.nio.file.Path
 
@@ -46,6 +47,10 @@ internal class OverlayState(val worktree: String, val repoId: String, val file: 
 
     /** The refresh job that is writing the overlay, if any. */
     var running: Deferred<*>? = null
+
+    /** The check that re-derives the overlay against a new base while queries are answered from the previous pair, if any. */
+    @Volatile
+    var rebase: Job? = null
 
     /** What queries read now; replaced as a whole whenever the overlay changes, so it can be read without [lock]. */
     @Volatile

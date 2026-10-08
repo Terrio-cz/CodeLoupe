@@ -141,6 +141,11 @@ class Registry(
         val repo = base(repo(location.commonDir))
         repeat(ATTEMPTS) {
             val (baseFile, baseCommit) = synchronized(repo) { repo.baseFile!! to repo.baseCommit!! }
+            // A base that just moved does not make an unchanged worktree wait for its overlay to be derived anew.
+            overlays.stale(repo, location.worktree, baseCommit, baseFile)?.let { stale ->
+                val early = withContext(Dispatchers.IO) { read(repo, stale.baseFile, stale.baseCommit, stale.view.file, read) }
+                if (early != null) return early.value
+            }
             val answer = coroutineScope {
                 // Read the overlay as it is while the worktree is checked: the answer stands when the check changed nothing.
                 val known = if (speculative) overlays.known(location.worktree, baseCommit) else null
@@ -162,7 +167,8 @@ class Registry(
         readGate.acquire()
         try {
             // Taken under the lock that guards the swap, so a new build cannot prune this base in between.
-            val lease = synchronized(repo) { if (repo.baseCommit == baseCommit) views.take(baseFile, overlay) else null } ?: return null
+            // The previous base is kept until the next swap: an unchanged worktree is still read against it meanwhile.
+            val lease = synchronized(repo) { if (repo.baseCommit == baseCommit || repo.previousCommit == baseCommit) views.take(baseFile, overlay) else null } ?: return null
             var healthy = false
             try {
                 // An overlay refreshed against a newer base in the meantime does not fit this one.
@@ -176,6 +182,9 @@ class Registry(
             readGate.release()
         }
     }
+
+    /** Queries answered from the previous base while their worktree's overlay was re-derived after a landing. */
+    fun staleReads(): Int = overlays.staleReads.get()
 
     /** Closes the open read views and git repositories; the next query opens them again. */
     fun close() {

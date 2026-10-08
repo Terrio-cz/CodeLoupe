@@ -15,9 +15,14 @@ import codeloupe.platform.Timings
 import codeloupe.repo.BuildLauncher
 import codeloupe.repo.BusyException
 import codeloupe.repo.RepoState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
@@ -26,6 +31,7 @@ import kotlinx.serialization.json.put
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
@@ -45,6 +51,11 @@ class Overlays(
     private val emit: (String, JsonObject) -> Unit = { _, _ -> },
 ) {
     private val states = ConcurrentHashMap<String, OverlayState>()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // After a landing every idle worktree re-derives its overlay (git processes, parsing); a few at a time keep the queries that are
+    // answered meanwhile fast.
+    private val rebases = Semaphore(REBASES_AT_ONCE)
 
     // The walk costs ~30 ms; an agent edits between turns that take seconds, so a check this young is still fresh.
     private val checkNanos = checkMs * 1_000_000
@@ -77,6 +88,31 @@ class Overlays(
             outcome.getOrThrow()
         }
     }
+
+    /**
+     * When the base just moved and this worktree has not changed, the previous base with the worktree's overlay on it: the
+     * pair the last check settled, still true of the worktree. The overlay is re-derived against [baseCommit] in the
+     * background, so the first query after a landing does not wait for it. Null when the worktree changed since its last
+     * check (an edit must show), when a refresh is writing, or when there is no previous pair to answer from.
+     */
+    fun stale(repo: RepoState, worktree: String, baseCommit: String, baseFile: Path): StaleRead? {
+        val state = states[key(worktree)] ?: return null
+        val view = state.view ?: return null
+        val (previousCommit, previousFile) = synchronized(repo) { repo.previousCommit to repo.previousFile }
+        if (previousFile == null || view.base != previousCommit || view.base == baseCommit || !previousFile.exists()) return null
+        if (state.mustCheck || state.running?.isActive == true) return null
+        // The walk costs what a check costs; no lock, so it does not wait for the re-derivation that holds it.
+        val walk = Timings.measure(TimedPart.CHECK) { WorktreeScan.scan(Path.of(worktree), state.prune) }
+        if (walk.sources != state.scan || walk.ignoreFiles != state.ignoreFiles || state.view !== view) return null
+        if (state.rebase?.isActive != true) {
+            state.rebase = scope.launch { rebases.withPermit { runCatching { fresh(repo, worktree, baseCommit, baseFile, System.nanoTime()) } } }
+        }
+        staleReads.incrementAndGet()
+        return StaleRead(previousCommit!!, previousFile, view)
+    }
+
+    /** Queries answered from the previous base while an overlay was re-derived (telemetry and tests). */
+    val staleReads = AtomicInteger()
 
     /** The overlay as the last check left it, without checking again; null when it was never checked against [baseCommit]. */
     fun known(worktree: String, baseCommit: String): OverlayVersion? = states[key(worktree)]?.view?.takeIf { it.base == baseCommit }
@@ -294,5 +330,6 @@ class Overlays(
 
         /** Worktrees whose last walk stays in memory (~150 B per file each). */
         const val MAX_STATES = 16
+        const val REBASES_AT_ONCE = 2
     }
 }
