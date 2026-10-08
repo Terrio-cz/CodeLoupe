@@ -14,10 +14,6 @@ internal class SettingsViews(private val config: Config, private val catalog: Re
         youtrack = trackers.mirrors.map { m ->
             SettingsView.Youtrack(m.instance.url, m.instance.projects, runCatching { m.instance.token.read().isNotBlank() }.getOrDefault(false), pollSec)
         },
-        budgets = SettingsView.Budgets(null, config.budgets.rssMb, IndexViews.BUILD_PEAK_BUDGET_MB),
+        budgets = with(config.budgets) { SettingsView.Budgets(dailyWeighted, rssMb, IndexViews.BUILD_PEAK_BUDGET_MB, p95Ms, queueWaitMs, busyRate) },
     )
-
-    fun environment() = EnvironmentView(emptyList(), storeReady = false)
-
-    fun gaps() = Gaps(emptyList(), emptyList())
 }

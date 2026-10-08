@@ -1,3 +1,7 @@
+import type { Delivery, JobChain, JobRecord, JobsSnapshot, Webhook } from './jobs';
+import type { RunDetail, RunPage, StepPage } from './runs';
+import type { PortReport, ReconcilePlan, ReleaseStatus, ResourceReport, WorkspaceList } from './workspaces';
+
 // Read-only UI API of the CodeLoupe daemon (docs/ui-spec.md § 9, YouTrack CL-39).
 // This file is the app's copy of the contract: a change to the spec changes both.
 
@@ -64,9 +68,32 @@ export interface DaemonStatus {
   heapMb: number;
   cpuSec: number;
   calls: { total: number; errors: number; busy: number };
+  /** Percentiles over the last 1000 calls (CL-24). */
+  latency?: CallLatency;
+  /** Whether the daemon is within `config.json` `budgets`; the warnings name what it exceeds. */
+  budgets?: { ok: boolean; warnings: string[] };
   /** A build runs when heavy.running is set. */
   queue: { fast: Lane; heavy: Lane; [stat: string]: unknown };
+  /** Jobs of the daemon and the slots they hold or wait for. */
+  jobs?: JobsSnapshot;
   repos: { id: string; commonDir: string; defaultRef: string; baseCommit: string | null; lastBuild: LastBuild | null }[];
+}
+export interface CallLatency {
+  window: number;
+  p50Ms: number;
+  p95Ms: number;
+  p95Chars: number;
+  /** 0..1 */
+  emptyRate: number;
+  busyRate: number;
+  byTool: Record<string, { calls: number; p50Ms: number; p95Ms: number }>;
+}
+/** One reading of `GET /status/history`: taken while the daemon is used, one a minute, the last 240. */
+export interface ResourceSample {
+  t: Iso;
+  rssMb: number | null;
+  heapMb: number;
+  cpuSec: number;
 }
 /** Last successful build; failures are recorded by CL-62. */
 export interface LastBuild {
@@ -197,6 +224,32 @@ export interface Gaps {
     turn: number | null;
     target: string;
   }[];
+  /** The weekly report of `codeloupe metrics gaps` (CL-22); null until someone ran it. */
+  report: GapReport | null;
+}
+
+/** What went short of a CodeLoupe call: the agent fell back to rg/cat/Read, or the answer was empty, busy or candidates only. */
+export type GapKind = 'fallback' | 'empty' | 'busy' | 'candidates';
+export interface GapReport {
+  /** When the report was computed. */
+  generatedAt: Iso | null;
+  /** First day of the transcripts it covers. */
+  since: string | null;
+  runs: number;
+  /** CodeLoupe calls seen in those runs. */
+  calls: number;
+  rows: GapReportRow[];
+}
+export interface GapReportRow {
+  /** ISO week, e.g. `2026-W41`. */
+  week: string;
+  tool: string;
+  /** Form of the query: `find:glob`, `symbol:qualified`, … */
+  shape: string;
+  kind: GapKind;
+  count: number;
+  /** A few identifiers or file names that were asked (redacted by the daemon). */
+  examples: string[];
 }
 
 // § 9.13 — metadata only, never values.
@@ -205,12 +258,30 @@ export interface Environment {
     name: string;
     scope: 'global' | 'repo' | 'workspace';
     scopeRef: string | null;
-    source: 'store' | 'env' | 'file';
+    /** `store`: added in the app or by hand; `file`: imported from `sourceRef`. */
+    source: 'store' | 'file';
+    sourceRef: string | null;
+    /** Who read it, most recent first (audit). */
     consumers: string[];
+    reads: number;
     lastUsedAt: Iso | null;
+    createdAt: Iso;
+    /** The last change: rotated, else created. */
     updatedAt: Iso;
+    ageDays: number;
+    /** Older than `rotationDays` of the store: time to rotate it. */
+    rotationDue: boolean;
   }[];
+  /** False while no key protector works, so nothing can be stored yet. */
   storeReady: boolean;
+  /** `config.json` `secrets.rotationDays`; 0 = no reminders. */
+  rotationDays: number;
+}
+
+// § 9.13b — who read or changed which key and when, never a value.
+export type EnvironmentAction = 'read' | 'created' | 'rotated' | 'removed';
+export interface EnvironmentAudit {
+  events: { at: Iso; name: string; scope: 'global' | 'repo' | 'workspace'; scopeRef: string | null; action: EnvironmentAction; consumer: string }[];
 }
 
 // § 9.14
@@ -221,7 +292,16 @@ export interface DaemonSettings {
   defaultRoot: string | null;
   repos: { id: string; path: string; baseRef: string }[];
   youtrack: { url: string; projects: string[]; tokenConfigured: boolean; pollSec: number }[];
-  budgets: { dailyWeighted: number | null; daemonRssMb: number; buildPeakRssMb: number };
+  budgets: {
+    dailyWeighted: number | null;
+    daemonRssMb: number;
+    buildPeakRssMb: number;
+    /** The limits `/status` judges the daemon by (`config.json` `budgets`). */
+    p95Ms: number;
+    queueWaitMs: number;
+    /** 0..1 */
+    busyRate: number;
+  };
 }
 
 // § 9.15
@@ -253,8 +333,23 @@ export interface ResourceMap {
   index: IndexHealth;
   gaps: Gaps;
   environment: Environment;
+  'environment/audit': EnvironmentAudit;
   settings: DaemonSettings;
   events: Events;
+  runs: RunPage;
+  'runs/:id': RunDetail;
+  'runs/:id/steps': StepPage;
+  'status/history': ResourceSample[];
+  workspaces: WorkspaceList;
+  resources: ResourceReport;
+  reconcile: ReconcilePlan;
+  releases: { items: ReleaseStatus[] };
+  ports: PortReport;
+  status: DaemonStatus;
+  jobs: { items: JobRecord[] };
+  'jobs/:id': JobChain;
+  webhooks: { items: Webhook[] };
+  deliveries: { items: Delivery[] };
 }
 export type Resource = keyof ResourceMap;
 

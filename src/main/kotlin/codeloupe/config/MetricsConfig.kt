@@ -8,12 +8,14 @@ import kotlinx.serialization.json.JsonPrimitive
 /**
  * `codeloupe metrics`, from `config.json` `metrics`: `transcriptDirs` (project directories of Claude Code transcripts;
  * default every directory under `~/.claude/projects`), `categories` (`[{ "category": "tests", "tool": "regex", "file": "regex",
- * "command": "regex" }]`, tried before the built-in ones) and `defaultCategories` (false = only the ones listed).
+ * "command": "regex" }]`, tried before the built-in ones), `defaultCategories` (false = only the ones listed) and `ingestTtlMs`
+ * (the daemon reads new transcript lines for the desktop app at most this often, and only when a UI API call asks; default 10 000).
  */
 data class MetricsConfig(
     val transcriptDirs: List<String> = emptyList(),
     val categories: List<CategoryRule> = emptyList(),
     val defaultCategories: Boolean = true,
+    val ingestTtlMs: Long = 10_000,
 ) {
     companion object {
         fun parse(file: JsonObject): MetricsConfig {
@@ -22,6 +24,7 @@ data class MetricsConfig(
                 transcriptDirs = (metrics["transcriptDirs"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content },
                 categories = (metrics["categories"] as? JsonArray).orEmpty().mapNotNull { rule(it as? JsonObject) },
                 defaultCategories = (metrics["defaultCategories"] as? JsonPrimitive)?.content != "false",
+                ingestTtlMs = (metrics["ingestTtlMs"] as? JsonPrimitive)?.content?.toLongOrNull()?.takeIf { it >= 0 } ?: MetricsConfig().ingestTtlMs,
             )
         }
 

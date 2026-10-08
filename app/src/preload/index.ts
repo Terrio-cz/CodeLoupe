@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { ACTION_CH } from '../shared/actions';
+import { JOB_CH, type LiveEvent } from '../shared/jobs';
 import { CH, type CodeLoupeBridge, type DaemonState, type UpdateState } from '../shared/ipc';
 
 // The renderer's only access to anything outside the page; every call is validated again in main.
@@ -34,6 +36,25 @@ const bridge: CodeLoupeBridge = {
       const listener = (_e: IpcRendererEvent, s: UpdateState) => cb(s);
       ipcRenderer.on(CH.updatePush, listener);
       return () => ipcRenderer.removeListener(CH.updatePush, listener);
+    },
+  },
+  actions: {
+    gapsRefresh: () => ipcRenderer.invoke(ACTION_CH.gapsRefresh),
+    workspaceRelease: req => ipcRenderer.invoke(ACTION_CH.workspaceRelease, req),
+    reconcileRun: req => ipcRenderer.invoke(ACTION_CH.reconcileRun, req),
+  },
+  jobs: {
+    log: id => ipcRenderer.invoke(JOB_CH.log, id),
+  },
+  live: {
+    subscribe: cb => {
+      const listener = (_e: IpcRendererEvent, event: LiveEvent) => cb(event);
+      ipcRenderer.on(JOB_CH.livePush, listener);
+      void ipcRenderer.invoke(JOB_CH.liveStart);
+      return () => {
+        ipcRenderer.removeListener(JOB_CH.livePush, listener);
+        void ipcRenderer.invoke(JOB_CH.liveStop);
+      };
     },
   },
   metrics: () => ipcRenderer.invoke(CH.metrics),

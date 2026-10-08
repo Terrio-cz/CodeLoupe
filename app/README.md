@@ -25,6 +25,15 @@ npm run lint       # eslint; CI runs npm ci, lint, typecheck, test and build on 
 npm run dist       # installer for this OS in dist/ (run ./gradlew bundle first); see the root README, Installers
 ```
 
+## Adding a screen
+
+A screen is one entry in `src/renderer/src/screenList.ts` (route id, title, icon, sidebar group, `g <key>` shortcut) and one
+line in `src/renderer/src/views.tsx` (its component; the build fails without it). A sidebar count goes into
+`components/Sidebar.tsx`. Data comes from `useApi(resource, id?, query?)`: a resource is one line in `src/shared/request.ts`
+(its daemon path and query keys), its type one line in `ResourceMap` of `src/shared/contract.ts`, and its mock answer a case
+in `src/main/api/MockApi.ts`. What changes something is not a resource but an action of `src/shared/actions.ts`: the page
+asks, main validates, confirms in a native dialog where needed, and does it.
+
 ## Configuration
 
 Settings are saved in `<userData>/settings.json` and edited on the Settings screen.
@@ -40,13 +49,16 @@ Settings are saved in `<userData>/settings.json` and edited on the Settings scre
 Overrides that apply to one run only: `CODELOUPE_APP_CLI='["java","-cp","C:/…/codeloupe/lib/*","codeloupe.MainKt"]'` and `CODELOUPE_APP_API=mock|daemon`.
 
 Verification modes (development builds only):
-- `CODELOUPE_APP_SCREENSHOTS=<dir>` captures every screen in light and dark mode, writes `metrics.json`, then quits.
+- `CODELOUPE_APP_SCREENSHOTS=<dir>` captures every screen in light and dark mode, writes `metrics.json` (memory, and the milliseconds each screen took to show its data), then quits. `CODELOUPE_APP_SCREENSHOT_ROUTES='[["name","#/hash"],…]'` replaces the list of screens, e.g. with ids from a real daemon.
 - `CODELOUPE_APP_TOUR=1|close` visits every screen so memory can be measured from the OS. With `close`, the run ends in the tray.
 
 ## Security
 
 - The renderer is sandboxed: `contextIsolation`, no `nodeIntegration`, a strict CSP with `connect-src 'none'`, and the bundle is served from `app://codeloupe`.
 - All data goes through preload IPC. Main validates every request (resource, id and query allow-list) and calls only `http://127.0.0.1:<port>`, without an `Origin` header and with `x-codeloupe: 1`.
+- Workspaces actions (release a worktree, confirm a cleanup) change the real daemon only after main has checked the request against the daemon's own registry and plan and the user said yes in a native dialog that lists what goes; the page never sends a path to delete, only plan keys.
+- Job logs: the page names a job id; main reads only `<home>/jobs/<id>.log` of a finished job, strips terminal codes and masks credential-looking values. The live event stream is opened while the Jobs screen is open and passes on only the event type and job id.
+- The Gaps screen's "Přepočítat report" action runs `<cli> metrics gaps --since <30 days ago> --out <home>/gaps-report.json` with a fixed argument list and no shell; nothing in it comes from the page.
 - Settings → Claude Code runs the `claude` CLI (no shell, fixed argv: `mcp add|remove`, `plugin marketplace add`, `plugin install`) only after a native confirmation that lists the commands; the page cannot click it, and the app never writes Claude Code's files itself. See the root README, section Claude Code.
 - Main opens a folder only if it is an existing git worktree from the daemon. It opens a URL only if it is `https` and its origin matches a configured YouTrack instance.
 - Permissions, navigation, new windows and webviews are denied.

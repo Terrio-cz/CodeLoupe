@@ -72,17 +72,21 @@ function BranchDrawer({ id, onClose }: { id: string; onClose(): void }) {
             <span>↑{w.ahead} ↓{w.behind} od <span className="mono">{w.baseRef}</span> (merge-base <span className="mono">{w.mergeBase}</span>)</span>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {w.task && <button className="btn" onClick={() => go('tasks', w.task!.id)}>Úkol {w.task.id} →</button>}
+            {(w.task ?? w.taskId) && <button className="btn" onClick={() => go('tasks', w.task?.id ?? w.taskId)}>Úkol {w.task?.id ?? w.taskId} →</button>}
             <button className="btn" onClick={() => void bridge().open.worktree(w.id).then(setOpened)}>Otevřít složku</button>
             {opened === false && <span className="t2" role="status">Složku nejde otevřít (neexistuje nebo to není git worktree).</span>}
           </div>
 
-          {w.task && (
+          {(w.task || w.taskId) && (
             <Section title="Úkol">
               <ul className="rows"><li>
-                <button className="link" onClick={() => go('tasks', w.task!.id)}>{w.task.id}</button>
-                <span className="grow">{w.task.summary}</span>
-                <StatusBadge tone={taskTone(w.task.state)}>{w.task.state}</StatusBadge>
+                <button className="link" onClick={() => go('tasks', w.task?.id ?? w.taskId)}>{w.task?.id ?? w.taskId}</button>
+                {w.task ? (
+                  <>
+                    <span className="grow">{w.task.summary}</span>
+                    <StatusBadge tone={taskTone(w.task.state)}>{w.task.state}</StatusBadge>
+                  </>
+                ) : <span className="grow muted">v mirroru YouTrack zatím není</span>}
               </li></ul>
             </Section>
           )}
