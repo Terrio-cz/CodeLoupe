@@ -7,11 +7,6 @@ import codeloupe.query.DeclRow
 internal class Types(private val cache: IndexCache, private val visibility: Visibility) {
     private val closures = HashMap<DeclRow, TypeClosure>()
     private val inProgress = HashSet<DeclRow>()
-    private val bySupertype: Map<String, List<DeclRow>> by lazy {
-        val map = HashMap<String, MutableList<DeclRow>>()
-        for (d in cache.view.decls("d.supertypes <> ''")) d.supertypes.split(' ').filter { it.isNotEmpty() }.forEach { map.getOrPut(it) { ArrayList() } += d }
-        map
-    }
 
     /**
      * `Foo`, `Foo<Bar>?`, `Outer.Inner`, `pkg.Foo` as seen from [at] in [file]; empty for library and function types.
@@ -68,7 +63,7 @@ internal class Types(private val cache: IndexCache, private val visibility: Visi
 
     /** Indexed types that name [type] as a direct supertype, and the entries of an enum. */
     fun directSubtypes(type: DeclRow): List<DeclRow> =
-        bySupertype[type.name].orEmpty().filter { d -> direct(d).any { (_, resolved) -> type in resolved } } +
+        cache.supertypedBy(type.name).filter { d -> direct(d).any { (_, resolved) -> type in resolved } } +
             cache.children(type).filter { it.kind == "enum_entry" }
 
     fun allSubtypes(type: DeclRow): List<DeclRow> {
