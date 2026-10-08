@@ -5,7 +5,7 @@ import kotlinx.serialization.json.JsonObject
 
 /** The tool catalog. Every tool also takes `root`, the repository or worktree to answer for. */
 object Tools {
-    val ALL: List<Tool> = listOf(FindTool, OutlineTool, SymbolTool, UsagesTool, CallsTool, HierarchyTool, ChangesTool)
+    val ALL: List<Tool> = listOf(FindTool, GrepTool, OutlineTool, SymbolTool, ContextTool, UsagesTool, CallsTool, HierarchyTool, ChangesTool)
 
     val ROOT: JsonObject = Schema.string(
         "Path to the repository or worktree to answer for (absolute). Defaults to the configured defaultRoot.",
