@@ -32,6 +32,7 @@ class ProcessStopper(
         // A Kotlin daemon serves the builds of every workspace; the others only the one they work in.
         val building = all.any { it.kind == ProcessKind.GRADLE_CLIENT && (target.kind == ProcessKind.KOTLIN_DAEMON || ProcessAttribution.belongsTo(it, path)) }
         if (building) return Outcome.Blocked("a Gradle build is running")
+        if (target.busy == true) return Outcome.Blocked("Gradle marks it busy")
         val handle = ProcessHandle.of(pid).orElse(null) ?: return Outcome.Gone
         if (handle.info().startInstant().map { it.toEpochMilli() }.orElse(startMs) != startMs) return Outcome.Gone
         if (busy(handle)) return Outcome.Blocked("busy: it used CPU in the last ${probeMs} ms")

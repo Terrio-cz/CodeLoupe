@@ -10,7 +10,7 @@ object ProcessRender {
             append(ram.processes).append(" processes, ").append(ram.rssMb).append(" MB, ").append(ram.buildRssMb).append(" MB of them build tools\n")
             for (p in report.processes.filter { it.repo == ram.repo && it.workspace == ram.workspace }) {
                 append("  ").append(p.kind.name.lowercase().replace('_', '-').padEnd(14)).append("pid ").append(p.pid.toString().padEnd(7)).append(p.rssMb.toString().padStart(6)).append(" MB  ")
-                append(p.name).append("  ").append(p.commandLine.take(LINE)).append('\n')
+                append(p.name).append(p.busy?.let { if (it) " (busy)" else " (idle)" }.orEmpty()).append("  ").append(p.commandLine.take(LINE)).append('\n')
             }
         }
         for (problem in report.problems) append("! ").append(problem).append('\n')

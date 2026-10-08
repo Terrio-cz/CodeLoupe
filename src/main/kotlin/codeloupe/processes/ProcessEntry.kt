@@ -19,8 +19,10 @@ data class ProcessEntry(
     val workspaceState: WorkspaceState,
     /** The directory of the workspace, as the registry names it. */
     val path: String,
-    /** `cwd`, or `command line` when the process works elsewhere but was started on a path of the workspace. */
+    /** `cwd`; `last build` for a Gradle daemon that built there last; `command line` for a process started on a path of the workspace. */
     val via: String,
+    /** A Gradle daemon: whether its log says it is busy. */
+    val busy: Boolean? = null,
 ) {
     /** What the reconciler names it by; the start time keeps a reused pid from being mistaken for it. */
     val key: String get() = key(pid, startMs)

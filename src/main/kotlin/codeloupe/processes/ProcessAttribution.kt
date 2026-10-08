@@ -9,7 +9,8 @@ import java.nio.file.Path
 
 /**
  * Says which workspace a process belongs to: the one whose directory holds the process's working directory (the deepest
- * one, since worktrees may sit inside the main checkout), else the one whose path appears in its command line. Pure over the
+ * one, since worktrees may sit inside the main checkout), else, for a Gradle daemon, the one it last built in, else the one whose
+ * path appears in its command line. Pure over the
  * process list and the registry; nothing is read from the OS here except to normalise paths.
  */
 object ProcessAttribution {
@@ -20,20 +21,23 @@ object ProcessAttribution {
         if (places.isEmpty()) return emptyList()
         return processes.filter { it.pid != self }.mapNotNull { p ->
             val byCwd = p.cwd?.let { cwd -> key(cwd).let { k -> places.firstOrNull { inside(k, it.key) } } }
-            val place = byCwd ?: p.commandLine?.let { line -> normalise(line).let { text -> places.firstOrNull { mentions(text, it.key) } } } ?: return@mapNotNull null
-            entry(p, place, if (byCwd != null) "cwd" else "command line")
+            val byBuild = if (byCwd == null) p.buildDir?.let { dir -> key(dir).let { k -> places.firstOrNull { inside(k, it.key) } } } else null
+            val place = byCwd ?: byBuild ?: p.commandLine?.let { line -> normalise(line).let { text -> places.firstOrNull { mentions(text, it.key) } } } ?: return@mapNotNull null
+            entry(p, place, if (byCwd != null) "cwd" else if (byBuild != null) "last build" else "command line")
         }.sortedWith(compareBy({ it.repo.lowercase() }, { it.workspace.lowercase() }, { -it.rssMb }, { it.pid }))
     }
 
     /** Whether [process] belongs to the directory [path] by the same rule. */
     fun belongsTo(process: ProcessInfo, path: String): Boolean {
         val target = key(path)
-        return process.cwd?.let { inside(key(it), target) } == true || process.commandLine?.let { mentions(normalise(it), target) } == true
+        return process.cwd?.let { inside(key(it), target) } == true || process.buildDir?.let { inside(key(it), target) } == true ||
+            process.commandLine?.let { mentions(normalise(it), target) } == true
     }
 
     private fun entry(p: ProcessInfo, place: Place, via: String) = ProcessEntry(
         pid = p.pid, startMs = p.startMs, kind = p.kind, name = p.name, commandLine = display(p.commandLine.orEmpty()), cwd = p.cwd?.replace('\\', '/'),
         rssMb = (p.rssBytes ?: 0) / MB, repo = place.repo, workspace = place.workspace.name, workspaceState = place.workspace.state, path = place.workspace.path, via = via,
+        busy = p.busy,
     )
 
     private fun display(commandLine: String): String {
