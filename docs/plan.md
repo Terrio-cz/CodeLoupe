@@ -173,6 +173,9 @@ jeden soubor.
   - `args` — počet argumentů volání (trailing lambda se počítá, spread = −1), pro rozlišení overloadů.
 - object expression (`object : I { … }`) je lokální deklarace `object` se jménem `<anonymous>` a svými nadtypy
   (formát `2/kotlin-psi-4`, CL-81): je to implementace pro `hierarchy`, její členy jsou její děti.
+- Java (CL-11, formát `2/kotlin-java-psi-5`): stejná fakta ze stejného parseru; mapování viz „Výsledek CL-11“ — metoda = `fun`, pole =
+  `property`, konstruktor = `constructor` se jménem třídy, enum konstanta = `enum_entry`, `@interface` = `annotation`, record = `class`
+  + jeho komponenty jako `property` hned za ním, `new I() { … }` = lokální `object` `<anonymous>`, inicializační blok = `init`.
 - `decls.returns` bez deklarovaného typu = typový spec inicializátoru, `by lazy { … }` nebo těla výrazem;
   parametry nesou příznaky `default` a `vararg`.
 - typový spec (`lang/TypeSpec`): text typu (`Foo`, `List<Foo>`), `@řádek:sloupec` = deklarovaný typ toho, na co
@@ -364,7 +367,7 @@ takže tento řízený benchmark agentů zůstává nespuštěný.
 |---|---|---|
 | 0 Spike + baseline | parser, RAM, chybovost; `codemetrics` + baseline | ✅ hotovo (§ 1, § 3) |
 | 1 Core + daemon ✅ | repo, daemon (single instance, HTTP MCP, fronta, `/status`), registry repozitářů, Kotlin adaptér, store, plný build v podprocesu, CLI `find/outline/symbol` | fixtury § 7 (Kotlin) zelené; build Terrio ≤ 10 s, DB ≤ 100 MB; restart daemonu okno přežije (jinak shim) |
-| 2 Čtení + resolver | ✅ `usages`, `calls` (callers/callees), `hierarchy` (CL-13/14/20); `grep` a `context` ✅ (CL-15, CL-18); zbývá `modules`, `check`; Java adaptér | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
+| 2 Čtení + resolver | ✅ `usages`, `calls` (callers/callees), `hierarchy` (CL-13/14/20); `grep` a `context` ✅ (CL-15, CL-18); Java adaptér ✅ (CL-11); zbývá `modules`, `check` | golden test 40 symbolů: nadmnožina 100 %, `exact` ≥ 95 %; Java fixtury zelené |
 | 3 Vrstvy worktree | delta, vrstvy, líný sync, `changes`, úklid vrstev | změna/nový/smazaný soubor vidět v dalším dotazu; výchozí větev posunutá o 500 souborů → správné odpovědi, sync v P3 |
 | 4 Zápis *(podmíněná, po fázi 7)* | zápisové nástroje + pojistky + `rename_symbol` — jen když detektor mezer ukáže, že coder po `symbol` stejně čte celý soubor kvůli `Edit`, nebo když chybí rename bez IDEA | round-trip bajtově stejný (CRLF i LF); fuzz 200 zápisů + compile zelený; rename na 10 symbolech = compile zelený |
 | 5 Zátěž a platformy | 10 klientů paralelně (dotazy 8 worktree + sync + zápisy); testy na Linuxu (WSL/Docker) | budgety § 2; P0 p95 drží během P3; testy zelené na Windows i Linuxu |
@@ -739,6 +742,38 @@ rozhoduje launcher.
 - **Ověření (TerrioImporter, jen čtení, 10 přistálých + 10 otevřených TER):** viz příloha CL-91. Přistání 9/9 shodné s `git` (SHA prvního rodiče,
   počet commitů bez `merge origin/master`, počet souborů); TER-496 je Done bez jediného commitu → bez přistání, jen predikce. Nalezeno a opraveno:
   `+` pro cesty cizího repa (`src/views/Admin.jsx`), pro dvojici `a.md/b.md`, a `=` pro deklaraci podle zastaralého čísla řádku.
+
+### Výsledek CL-11 — Java adaptér (2026-10-08)
+
+- **Cesta**: Java PSI je ve stejném `kotlin-compiler-embeddable` jako Kotlin PSI (kompilátor čte Java zdroje) — žádná nová závislost, licence
+  beze změny (`checkLicense` zelený), žádný nativní kód, stejné prostředí `PsiEnvironment` pro oba jazyky. `lang/java`: `JavaAdapter`,
+  `JavaExtractor` (průchod stromem), `JavaShapes` (druhy deklarací), `JavaReferences` (druhy referencí), `JavaLocalTypes` a `JavaLambdaTypes`
+  (typové specy), společné s Kotlinem zůstaly `Source`, `LocalScopes`, `Reference`, `Span`, `Kdoc`, `Modifiers`.
+- **Mapování na fakta**: třída/rozhraní/enum/`@interface`/record → `class`/`interface`/`enum`/`annotation`/`class`; vnořené typy a lokální
+  třídy jako Kotlin; metoda → `fun` (parametry se jmény a typy, `...` = `vararg`, návrat `void` zapsán), konstruktor → `constructor`
+  (kompaktní konstruktor recordu dostane komponenty), pole → `property` (`int a, b;` sdílí typ a modifikátory), komponenta recordu →
+  `property` za deklarací recordu, konstanta enumu → `enum_entry` (její tělo je její děti), blok inicializace → `init`; `@Override` přidá
+  modifikátor `override` (dispatch pro `hierarchy` a `usages` stojí na něm, bez anotace se přepis nepozná); `sig` = slova modifikátorů +
+  hlavička až do těla. Reference: volání metody a `new T(…)` = `call` (konstruktor přes třídu, jako `T(…)` v Kotlinu), `a.b` = `nav`,
+  `T::m` = `callable_ref`, typy a anotace = `type` (každý segment `a.b.C`), prvek anotace = `named_arg`. Metody a proměnné jsou v Javě
+  oddělené jmenné prostory: volání se na lokální vazbu nikdy nenaváže. Importy včetně `static` a `.*` jsou `ImportFact` (hvězdička =
+  `star`), takže statický import řeší stejný `Visibility` jako import objektu v Kotlinu. `Type.member` pro `static` člen (i zděděný)
+  najde nově `MemberLookup.static`; `X[]`, `Optional<T>`, `Stream<T>` a Java kolekce mají prvek jako Kotlinské `List<T>`.
+- **Lambdy a typy**: parametr lambdy dostane typ prvku receiveru u `forEach/filter/map/anyMatch/ifPresent …` (i přes `stream()`), nebo
+  první typový argument deklarovaného `Consumer<T>/Predicate<T>/Function<T,R>`; pattern proměnná (`o instanceof Circle c`) je vazba.
+  Nepodporováno (zůstane `candidate`): lambda předaná metodě z indexu (parametr volaného se čte až při dotazu), `this(…)`/`super(…)`
+  nejsou reference, soubor `Xyz.kt` volaný z Javy jako `XyzKt.f()`, Kotlin přístup k vlastnosti přes `getX()` Javy.
+- **Testy** (stejné otázky jako u Kotlinu): `JavaExtractorTest` (fakta `Constructs.java`, CRLF+BOM, chybný soubor, Java 21 syntaxe),
+  `JavaUsagesTest` (13 testů: receivery, overloady, statické importy, vnořené typy, anonymní třídy, lambdy, `rg -w` nadmnožina, `usages` /
+  `calls` / `context` / `hierarchy`), `JavaQueryTest` (`find`/`outline`/`symbol`), `JavaToolsTest` (`grep`, mapa repozitáře, vrstva
+  worktree), `JavaChangesTest` (`changes`, Kotlin volající Javy), `MixedLanguageTest` (smíšený repozitář přes build worker).
+  Fixtury `fixtures/java/{sample,usages}`, `fixtures/mixed`. Golden test Terrio (44 symbolů) beze změny: nadmnožina 100 %, exact přesnost 100 %.
+- **Paměť a čas** (JBR 25.0.3, `tools/rss-mix.mjs`, 50 dotazů vč. `changes bodies` v task worktree s úpravami Java i Kotlin souborů, nový
+  daemon): Terrio samotné (2 212 `.kt`) **193 MB** RSS; JDK `java.base`+`java.xml`+`java.sql`+`java.logging`+`java.net.http`+`java.desktop/java`
+  (5 992 `.java`) **200 MB**; smíšený repozitář (Terrio + 706 `.java` z JDK, 2 917 souborů) **209 MB** (Metaspace 47–48 MB, heap 54–76 MB;
+  Java parser přidá do daemonu ~1 MB tříd, nárůst je velikost indexu). Plný build z git objektů: smíšený 2 917 souborů **11,2 s, peak
+  workeru 400 MB**; jen Java 5 992 souborů 23,9 s, 351 MB; Terrio 8,9 s, 376 MB. Jediný soubor JDK s chybou parseru je
+  `NormalizerImpl.java` (`for (a(), b(); …)` — IntelliJ parser ho nepřijme), zůstane v degradovaném režimu.
 
 ## 10. Rizika
 

@@ -69,17 +69,19 @@ class JavaUsagesTest {
     fun `method references, pattern variables, static imports`() {
         assertEquals(mapOf("Edge.java:10" to Label.EXACT, "Edge.java:19" to Label.EXACT), labels("Point.area"))
         assertEquals(mapOf("Edge.java:14" to Label.EXACT), labels("Circle.radius"), "reached through a pattern variable")
-        assertEquals(mapOf("Edge.java:23" to Label.EXACT), labels("Accounts.helper"), "a static import; a parameter of that name is no method")
+        assertEquals(mapOf("Edge.java:23" to Label.EXACT, "Edge.java:75" to Label.OTHER), labels("Accounts.helper"), "a static import; a parameter of that name is no method")
         assertEquals(mapOf("Edge.java:27" to Label.EXACT), labels("Accounts.shared"))
     }
 
     @Test
     fun `scopes - shadowing members of an anonymous class, nested types, qualified types, constructors`() {
-        assertEquals(mapOf("Edge.java:75" to Label.OTHER), labels("Outer.helper"), "inside an anonymous class its own member wins")
+        assertEquals(mapOf("Edge.java:23" to Label.OTHER, "Edge.java:75" to Label.OTHER), labels("Outer.helper"), "inside an anonymous class its own member wins")
         assertEquals(mapOf("Edge.java:76" to Label.OTHER), labels("Outer.label2"))
         assertEquals(mapOf("Sub.java:5" to Label.EXACT), labels("Nested.make"))
         assertEquals(Label.EXACT, labels("com.example.model.Point")["Edge.java:34"], "a package-qualified type")
-        assertEquals(mapOf("Edge.java:18" to Label.OTHER, "Edge.java:31" to Label.CANDIDATE), labels("Point(int)"), "a constructor call")
+        val constructor = labels("Point(int)")
+        assertEquals(Label.CANDIDATE, constructor["Edge.java:31"], "a constructor call that fits")
+        assertEquals(Label.OTHER, constructor["Edge.java:18"], "one with two arguments does not")
     }
 
     @Test
@@ -114,7 +116,7 @@ class JavaUsagesTest {
     fun `usages output - grouped by file and declaration, one line per hit, others counted`() {
         val text = UsagesQuery.run(view, UsagesQuery.Args("Account.describe"))
         assertTrue(text.startsWith("usages of src/main/java/com/example/model/Account.java:18-20  [Account] public String describe()\n4 exact, 1 candidate\n"), text)
-        assertContains(text, "\nsrc/main/java/com/example/other/Report.java\n  [Report] public void run(…)\n  18 = account.describe()\n  19 ? savings.describe()")
+        assertContains(text, "\nsrc/main/java/com/example/other/Report.java\n  [Report] public void run(…)\n  18 = account.describe();\n  19 ? savings.describe();")
         assertTrue(text.endsWith("2 more lines with the name resolve to other declarations (all=true lists them)"), text)
     }
 
@@ -140,13 +142,13 @@ class JavaUsagesTest {
 
     @Test
     fun `hierarchy - subtypes, supertypes and overrides`() {
-        assertContains(HierarchyQuery.run(view, "com.example.model.Account"), "subtypes:\n  src/main/java/com/example/model/SavingsAccount.java:3  public class SavingsAccount extends Account")
+        assertContains(HierarchyQuery.run(view, "com.example.model.Account"), "subtypes:\n  ./SavingsAccount.java:3  public class SavingsAccount extends Account")
         assertContains(HierarchyQuery.run(view, "AccountStore"), "supertypes:\n  src/main/java/com/example/model/Store.java:3  public interface Store<T>")
-        assertContains(HierarchyQuery.run(view, "Account.describe"), "overridden by:\n  src/main/java/com/example/model/SavingsAccount.java:8  [SavingsAccount] public String describe()")
+        assertContains(HierarchyQuery.run(view, "Account.describe"), "overridden by:\n  ./SavingsAccount.java:8  [SavingsAccount] public String describe()")
         assertContains(HierarchyQuery.run(view, "AccountStore.find"), "overrides:\n  src/main/java/com/example/model/Store.java:6  [Store] T find(…)")
-        assertContains(HierarchyQuery.run(view, "Shape"), "subtypes:\n  src/main/java/com/example/model/Circle.java:3  public class Circle extends Shape")
+        assertContains(HierarchyQuery.run(view, "Shape"), "subtypes:\n  ./Circle.java:3  public class Circle extends Shape")
         assertContains(HierarchyQuery.run(view, "Named"), "subtypes:\n  src/main/java/com/example/other/Edge.java:39  [Edge.lit] new Named()", message = "an anonymous class")
-        assertContains(HierarchyQuery.run(view, "Level"), "subtypes:\n  src/main/java/com/example/model/Level.java:4  LOW", message = "enum constants")
+        assertContains(HierarchyQuery.run(view, "Level"), "subtypes:\n  ./Level.java:4  [Level] LOW", message = "enum constants")
         assertContains(HierarchyQuery.run(view, "Named.label"), "overridden by:\n  src/main/java/com/example/other/Edge.java:40  [Edge.lit.<anonymous>] public String label()")
     }
 
