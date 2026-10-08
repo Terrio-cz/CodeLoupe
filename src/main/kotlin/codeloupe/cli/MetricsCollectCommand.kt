@@ -7,6 +7,7 @@ import codeloupe.metrics.MetricsCollector
 import codeloupe.metrics.MetricsRender
 import codeloupe.metrics.MetricsReport
 import codeloupe.metrics.MetricsSetup
+import codeloupe.metrics.MoneyRender
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.default
@@ -38,6 +39,7 @@ class MetricsCollectCommand : CliktCommand(name = "collect") {
         val file = if (baseline) config.home.resolve(BaselineStore.FILE).also { Files.createDirectories(config.home) } else Path.of(out ?: "$label-${LocalDate.now()}.json")
         Files.writeString(file, PRETTY.encodeToString(MetricsReport.serializer(), report) + "\n")
         echo(MetricsRender.summary(report.aggregate, roles?.split(',')?.toSet()))
+        MoneyRender.roleLines(report.runs, config.metrics.prices).forEach(::echo)
         echo("runs ${report.runs.size} -> $file")
     }
 

@@ -1185,6 +1185,25 @@ rozhoduje launcher.
   řádků, ale nemá zachycený výstup. Počet následných čtení v transkriptech (ověření karty) nebyl měřen: transkripty nenesou pár „souhrn →
   další čtení“ spolehlivě; měřím proto jen velikost a pokrytí.
 
+### Výsledek CL-142 — metriky v penězích (2026-10-09)
+
+- **Rozhodnutí**: ceny za milion tokenů po modelech (input, output, čtení z cache, zápis 5 min a 1 h) jsou datovaná tabulka v kódu
+  (`PriceTable.DEFAULT`, stav z referenčního přehledu API k 2026-10-06; čtení cache je u Opus 5.5, Sonnet 5.5 a Fable 5.1 uvedené,
+  u ostatních desetina `input`, zápisy 1,25× a 2×). `config.json` `metrics.prices` modely přepíše nebo doplní a nese vlastní `asOf` a měnu;
+  u modelu stačí `input` a `output`. Žádné vyhledávání cen za běhu. Datum v id modelu (`-20251001`) se ignoruje, neznámý model se
+  nehádá: jeho běhy se počítají jako necenované a id se vypíše. `<synthetic>` (vlastní řádky Claude Code) stojí 0.
+- **Příkazy**: `metrics collect` vypíše peníze po rolích vedle relativních jednotek, `compare` změnu peněz po rolích, nový
+  `metrics what-if <report> [--roles …] [--models …]` cenu týchž tokenů na jiných modelech s upozorněním, že jde o horní mez (jiný model
+  potřebuje jiné tahy). Reportový JSON se nezměnil (peníze se počítají z `runs`), takže starší reporty fungují.
+- **Test**: `MetricsMoneyTest` (dva modely v syntetických transkriptech, neznámý model, přepis cen z konfigurace, `compare`).
+- **Měření na transkriptech tohoto stroje** (od 2026-10-02, 2 001 běhů, ceny ze 2026-10-06; `main` 1 547 USD, `terrio-reviewer` 817,
+  `terrio-coder-high` 557, `general-purpose` 409, `terrio-planner` 330, `tnt-coder-high` 267, `terrio-coder` 262, `terrio-tester` 127,
+  `terrio-suggester` 69, `terrio-changelog` 15,8, `terrio-steward` 15,5, `terrio-retro` 14,1). What-if týchž tokenů, horní mez:
+  `terrio-steward` 15,45 USD → Haiku 5.5 0,77 (−95 %), Sonnet 5.5 15,45 (±0, už na něm běží); `terrio-changelog` 15,79 → 0,79 (−95 %);
+  `terrio-retro` 14,12 → 1,41 (−90 %), na Sonnet 5.5 28,24 (+100 %, běží dnes na Haiku 4.5); `terrio-suggester` 68,60 → Haiku 5.5 2,52
+  (−96 %), Sonnet 5.5 50,36 (−27 %); `terrio-tester` 127,25 → Haiku 5.5 6,36 (−95 %). Dnes běží steward, changelog a tester na Sonnet 5.5, retro na Haiku 4.5, suggester z poloviny na Opus 5.5 (61 z 117 běhů). Skutečná úspora bude menší a závisí na kvalitě:
+  rozhodnutí o výměně modelu patří uživateli a vyžaduje kontrolu běhů (např. `compare` po týdnu).
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

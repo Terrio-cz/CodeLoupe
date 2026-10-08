@@ -8,7 +8,8 @@ CodeLoupe saves, and which questions it still cannot answer.
 
 ```bash
 codeloupe metrics collect --since 2026-09-23 --until 2026-10-02 --label baseline --dir ~/.claude/projects/<project>
-codeloupe metrics compare baseline-2026-10-08.json after-2026-10-20.json
+codeloupe metrics compare baseline-2026-10-08.json after-2026-10-20.json   # medians and money per role
+codeloupe metrics what-if week.json --roles steward,retro --models claude-haiku-5-5,claude-sonnet-5-5   # same tokens, other models
 codeloupe metrics gaps --since 2026-10-01               # where CodeLoupe calls fell short, by week and query shape
 codeloupe metrics boilerplate --since 2026-09-23         # skeleton share of the new code files agents write
 codeloupe metrics hooks --since 2026-10-01               # how often the plugin's steering hook spoke and was followed
@@ -22,7 +23,27 @@ tool categories ranked by what their results cost while they stay in context. Th
 symbol or file, and calls answered empty, busy or with candidates only. Large windows are read one run at a time; add
 `CODELOUPE_OPTS=-Xmx1g` when a single transcript holds huge lines. `config.json` `metrics`: `transcriptDirs`,
 `categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
-ones), `defaultCategories` (false = only yours) and `ingestTtlMs` (see below); the hook command is described in [Plugin hooks](Plugin-hooks).
+ones), `defaultCategories` (false = only yours), `prices` (see Money) and `ingestTtlMs` (see below); the hook command is described in [Plugin hooks](Plugin-hooks).
+
+## Money
+
+Next to the relative units, `collect` prints each role's cost in money, `compare` the money change per role and `what-if` what a
+role's runs would have cost on other models. Money is the token counts of each run (input, output, cache reads, 5 min and 1 h
+cache writes) times the price of the model that run used; no price is looked up at run time. The prices are a dated table that ships
+with CodeLoupe (stamped with the day it was copied from the API reference) and that `config.json` overrides:
+
+```json
+{ "metrics": { "prices": { "asOf": "2026-11-01", "currency": "USD", "models": {
+  "claude-opus-5-5": { "input": 4, "output": 20, "cacheRead": 0.2, "cacheWrite5m": 5, "cacheWrite1h": 8 },
+  "my-model": { "input": 1, "output": 5 } } } } }
+```
+
+Prices are per million tokens; only `input` and `output` are required (cache read, 5 min and 1 h writes default to 0.1, 1.25 and 2
+times `input`). Models listed replace or add to the built-in ones, a trailing date in a model id (`-20251001`) is ignored. A model
+the table does not know is **not guessed**: its runs are counted as unpriced and the model id is listed under the table. `what-if`
+keeps each run's token counts, which makes its figure an upper bound on a saving (another model needs other turns, a cheaper one
+often more, and may do the task worse) and prints that caveat; use it to pick roles to try on a cheaper model, then compare real
+runs with `compare`.
 
 ## Savings against a baseline
 
