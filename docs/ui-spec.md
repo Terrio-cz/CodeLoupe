@@ -447,6 +447,23 @@ main procesu jako v § 3.7.1 — nikdy přes daemon HTTP.
   každý nealfanumerický znak cesty → `-`); složka v obou účtech patří tomu, kdo v ní psal naposledy. Úspora zatím 0 jako v Přehledu.
 - API: `GET /ui-api/v1/accounts` (§ 9.13a) — jen metadata, nikdy tokeny.
 
+### 3.10 Úvodní průvodce (CL-119)
+
+První spuštění (nastavení aplikace nemá `onboardingDone`, a soubor před tím nebyl) ukáže místo okna s postranním panelem
+průvodce o čtyřech krocích; každý jde přeskočit, „Přeskočit vše“ ho ukončí, „Hotovo“ taky. Z Nastavení se otevře znovu
+(`#/settings?welcome=1`). Aplikace, která nastavení už měla (starší verze), průvodce nezačíná.
+
+| Krok | Co dělá | Kdo zapisuje |
+|---|---|---|
+| 1 Repozitáře | „Přidat repozitáře…“ otevře nativní dialog výběru složek (main); vybrané cesty jdou do CLI `repos add --json`, které je zapíše do `config.json` `workspaces.repos` (ostatní klíče zůstanou, neplatný JSON se nepřepíše), složky bez `.git` odmítne a daemonu zadá první dotaz, aby repozitář poznal a začal ho indexovat | CLI (cesta z dialogu, ne ze stránky) |
+| 2 YouTrack | Účet YouTrack z obrazovky Účty (§ 3.9): URL, projekty, token z pole `password`; token jde na stdin `env set` do šifrovaného storu (klíč chrání OS), účet nese jen jméno tokenu; „Test“ ověří spojení | main + CLI, daemon se restartuje |
+| 3 Claude Code | Stávající karta z Nastavení (MCP server / plugin přes `claude` CLI po nativním potvrzení) | `claude` CLI |
+| 4 Zkouška | Skutečný dotaz `outline` (mapa repozitáře) na vybraný repozitář daemona; odpověď se ukáže jako text, při stavěném indexu to řekne | CLI čte, nic nepíše |
+
+Token se nikde neukáže ani nezaloguje a stránka žádnou cestu k zápisu neposílá. Poznámka k původnímu zadání (token přes
+`safeStorage`): token jde do šifrovaného storu CL-50, jehož klíč chrání stejný OS (DPAPI, Keychain, libsecret) jako
+`safeStorage`, a daemon ho čte podle jména (`TokenSource.Stored`); blob `safeStorage` by daemon otevřít neuměl.
+
 ## 4. Tray a notifikace
 
 Tray ikona: každý stav má vlastní tvar, ne jen barvu — běží = plný kruh, build = kruh s výsečí,

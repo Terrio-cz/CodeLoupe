@@ -6,12 +6,13 @@ import { Sidebar, sidebarCounts } from './components/Sidebar';
 import { useDaemon, useRange, useSettings } from './hooks';
 import { href, useRoute } from './router';
 import { SCREEN_DEFS, screenDef } from './screenList';
+import { Onboarding } from './screens/Onboarding';
 import { VIEWS } from './views';
 
 export function App() {
   const route = useRoute();
   const daemon = useDaemon();
-  const [settings] = useSettings();
+  const [settings, updateSettings] = useSettings();
   const [range, setRange] = useRange();
   const [gapsSince] = useState(() => lastVisit());
   const [appVersion, setAppVersion] = useState('');
@@ -85,6 +86,10 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [settings?.shortcuts]);
 
+  // First run, or reopened from Settings (`?welcome=1`): the onboarding instead of the shell.
+  if (settings && (!settings.onboardingDone || route.params.has('welcome'))) {
+    return <Onboarding onFinish={() => void updateSettings({ onboardingDone: true }).then(() => { location.hash = href('overview'); })} />;
+  }
   const def = screenDef(route.screen);
   return (
     <div className="shell">

@@ -30,7 +30,7 @@ class CodeLoupeCommand(requested: String? = null) : CliktCommand(name = "codelou
             "find" to ::FindCommand, "grep" to ::GrepCommand, "outline" to ::OutlineCommand, "symbol" to ::SymbolCommand, "context" to ::ContextCommand, "usages" to ::UsagesCommand,
             "calls" to ::CallsCommand, "hierarchy" to ::HierarchyCommand, "changes" to ::ChangesCommand,
             "run" to ::RunCommand, "env" to ::EnvCommand,"issue" to ::IssueCommand, "task_context" to ::TaskContextCommand, "dispatch_plan" to ::DispatchPlanCommand, "doc" to ::DocCommand, "tasks" to ::TasksCommand, "similar" to ::SimilarCommand, "task_code" to ::TaskCodeCommand, "code_tasks" to ::CodeTasksCommand,
-            "update" to ::UpdateCommand, "job" to ::JobCommand, "webhook" to ::WebhookCommand, "workspaces" to ::WorkspacesCommand, "ws" to ::WsCommand,
+            "repos" to ::ReposCommand, "update" to ::UpdateCommand, "job" to ::JobCommand, "webhook" to ::WebhookCommand, "workspaces" to ::WorkspacesCommand, "ws" to ::WsCommand,
             "metrics" to ::MetricsCommand, "mcp-config" to ::McpConfigCommand,
         )
     }

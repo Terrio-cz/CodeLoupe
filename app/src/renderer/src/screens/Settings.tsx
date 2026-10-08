@@ -90,6 +90,10 @@ export function Settings() {
 
       <ClaudeCodeCard />
 
+      <Card title="Úvodní průvodce" actions={<button className="btn" onClick={() => { location.hash = '#/settings?welcome=1'; }}>Otevřít průvodce</button>}>
+        <p className="t2">Repozitáře, účet YouTrack, připojení k Claude Code a zkušební dotaz v jednom průchodu. Každý krok jde přeskočit.</p>
+      </Card>
+
       <Card title="Daemon (jen čtení)" actions={<button className="btn" onClick={() => void bridge().open.config()}>Ukázat config.json</button>}>
         {d ? (
           <dl className="dl">

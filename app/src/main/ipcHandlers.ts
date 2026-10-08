@@ -18,6 +18,7 @@ import { EventStream } from './live/EventStream';
 import { registerLive } from './live/registerLive';
 import { registerEnv } from './env/registerEnv';
 import { registerAccounts } from './accounts/registerAccounts';
+import { registerOnboarding } from './onboarding/registerOnboarding';
 
 export interface IpcContext {
   store: SettingsStore;
@@ -50,6 +51,7 @@ export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
   const envContext = { settings: () => ctx.store.get(), homeDir: () => ctx.home.dir, port: () => ctx.manager.port(), source: ctx.source };
   registerEnv(envContext, handle);
   registerAccounts({ ...envContext, restartDaemon: () => ctx.manager.restart() }, handle);
+  registerOnboarding(envContext, handle);
   handle(CH.api, (req: unknown) => callApi(ctx, req));
   handle(CH.daemonState, () => ctx.manager.check());
   handle(CH.daemonStart, () => ctx.manager.start());

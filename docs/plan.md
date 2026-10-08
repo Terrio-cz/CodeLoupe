@@ -904,6 +904,16 @@ rozhoduje launcher.
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu, fixture složkám dvou účtů a lokálnímu fake YouTrack: přidání účtu, přejmenování, výchozí,
   filtr Přehledu (390 → 130), přidání YouTrack účtu s tokenem, test spojení (fake instance dostala uložený token), rotace (dostala nový), odebrání (token ze storu pryč); token se nikdy neobjevil v DOM ani v odpovědích daemona.
 
+### Výsledek CL-119 — úvodní průvodce v aplikaci (2026-10-08)
+
+- `codeloupe repos add|list` (`RepoConfig`): zápis jen `workspaces.repos` do `config.json`, ostatní klíče a objektové položky s `roots` zůstanou, neplatný JSON se nepřepíše; složka bez `.git` se odmítne,
+  přidané repozitáře dostanou první dotaz, takže je daemon pozná a začne stavět index bez restartu. Průvodce volá toto CLI s cestami z nativního dialogu; stránka žádnou cestu nepíše.
+- Průvodce (čtyři kroky: repozitáře, YouTrack, Claude Code, skutečný dotaz `outline`) se ukáže, když v nastavení aplikace není `onboardingDone` a soubor před tím neexistoval (starší instalace ho nezačínají);
+  jde přeskočit po krocích i celý a z Nastavení otevřít znovu. Token YouTrack jde přes tok účtů do šifrovaného storu (klíč chrání stejný OS jako `safeStorage`, daemon ho čte podle jména).
+- Dotaz zkoušky je `outline` bez cíle (mapa repozitáře), ne `find *`: Java launcher ve Windows rozbaluje `*` v argumentech na soubory aktuální složky, takže glob v argv se do CLI nedostane.
+- Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools) na čistém profilu: první start ukáže průvodce, přidání repozitáře (jedna složka přijata, jedna odmítnuta) a zachování klíče v `config.json`,
+  účet YouTrack s tokenem (token jen ve storu, fake instance ho dostala), skutečný dotaz vrátil mapu fixture repozitáře, dokončení se zapamatovalo, z Nastavení se otevřel znovu, druhý start jde rovnou do aplikace.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

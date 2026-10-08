@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { ACTION_CH } from '../shared/actions';
 import { ENV_CH } from '../shared/envActions';
 import { ACCOUNT_CH } from '../shared/accountActions';
+import { ONBOARDING_CH } from '../shared/onboardingActions';
 import { JOB_CH, type LiveEvent } from '../shared/jobs';
 import { CH, type CodeLoupeBridge, type DaemonState } from '../shared/ipc';
 
@@ -65,6 +66,10 @@ const bridge: CodeLoupeBridge = {
     youtrackTest: id => ipcRenderer.invoke(ACCOUNT_CH.youtrackTest, id),
     youtrackRotate: (id, token) => ipcRenderer.invoke(ACCOUNT_CH.youtrackRotate, id, token),
     youtrackRemove: id => ipcRenderer.invoke(ACCOUNT_CH.youtrackRemove, id),
+  },
+  onboarding: {
+    addRepositories: () => ipcRenderer.invoke(ONBOARDING_CH.addRepositories),
+    query: repoId => ipcRenderer.invoke(ONBOARDING_CH.query, repoId),
   },
   metrics: () => ipcRenderer.invoke(CH.metrics),
   open: {
