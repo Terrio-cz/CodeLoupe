@@ -3,7 +3,7 @@
 //
 //   ./gradlew installDist
 //   node tools/benchmark.mjs --work <scratch dir> [--cli build/install/codeloupe/bin/codeloupe] [--port 47651]
-//        [--items 8] [--no-gitnexus] [--out docs/benchmarks.md] [--json docs/benchmarks.json] [--svg docs/benchmarks.svg]
+//        [--items 8] [--no-gitnexus] [--out docs/benchmarks.md] [--json docs/benchmarks.json] [--svg docs/benchmarks.svg]   (also writes -dark, -share and -share-dark next to it)
 //   node tools/benchmark.mjs --report-only docs/benchmarks.json      # rewrite the markdown and SVG from a saved run
 //
 // What it does (every number in docs/benchmarks.md comes from this script):
@@ -24,6 +24,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { CHARTS, THEMES, chartPath, renderChart } from './benchmarkCharts.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -653,7 +654,7 @@ function renderMarkdown(d) {
     const rows = us.filter(x => (!r || x.repo === r) && !Number.isNaN(x.codeloupe.exact));
     L.push(`| ${r ?? 'both'} | ${num(median(rows.map(x => x.minimal.hits)))} | ${num(median(rows.map(x => x.codeloupe.exact + (x.codeloupe.candidate || 0))))} | ${(median(rows.map(x => (x.codeloupe.exact + (x.codeloupe.candidate || 0)) / Math.max(1, x.minimal.hits)))).toFixed(2)} |`);
   }
-  L.push('', 'Checked by hand on two items of the Exposed checkout at the commit above (`rg -n -w -g "*.kt" SCryptHasher` and `IntVectorColumnType`): the 5 lines for `SCryptHasher` are one call, the declaration, a string literal and two KDoc links (CodeLoupe: 1 reference); the 6 lines for `IntVectorColumnType` are three calls, one `is` check, the declaration and an import (CodeLoupe: 4).', '', '![Median tokens per question](benchmarks.svg)', '');
+  L.push('', 'Checked by hand on two items of the Exposed checkout at the commit above (`rg -n -w -g "*.kt" SCryptHasher` and `IntVectorColumnType`): the 5 lines for `SCryptHasher` are one call, the declaration, a string literal and two KDoc links (CodeLoupe: 1 reference); the 6 lines for `IntVectorColumnType` are three calls, one `is` check, the declaration and an import (CodeLoupe: 4).', '', ...pictureLines('Median tokens read per question', 'benchmarks.svg', 'benchmarks-dark.svg'), '');
 
   L.push('### CodeLoupe against minimal grep, question by question', '', 'Minimal grep is a best case for grep (the agent never reads a line it does not need). Medians within 10 % of each other count as about the same.', '');
   const verdicts = [];
@@ -705,37 +706,23 @@ function renderMarkdown(d) {
   return L.join('\n');
 }
 
-function renderSvg(d) {
-  const series = [['minimal', 'grep, minimal', '#8b949e'], ['typical', 'grep + read', '#d4a72c'], ['codeloupe', 'CodeLoupe', '#0969da'], ['gitnexus', 'GitNexus', '#8250df']];
-  const W = 860, rowH = 74, top = 54, left = 190, right = 70, plotW = W - left - right;
-  const H = top + KINDS.length * rowH + 20;
-  const maxV = 100000, minV = 10;
-  const x = v => left + plotW * (Math.log10(Math.max(v, minV)) - 1) / (Math.log10(maxV) - 1);
-  const e = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const out = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">`,
-    `<title>Median tokens read per question</title><rect width="${W}" height="${H}" rx="8" fill="#ffffff" stroke="#d0d7de"/>`,
-    `<text x="16" y="24" font-size="15" font-weight="600" fill="#1f2328">Median tokens read per question (log scale, lower is better)</text>`];
-  series.forEach(([, label, c], i) => out.push(`<rect x="${left + i * 130}" y="34" width="10" height="10" fill="${c}"/><text x="${left + i * 130 + 14}" y="43" fill="#1f2328">${e(label)}</text>`));
-  for (const t of [10, 100, 1000, 10000, 100000]) out.push(`<line x1="${x(t)}" y1="${top}" x2="${x(t)}" y2="${H - 20}" stroke="#d8dee4"/><text x="${x(t)}" y="${H - 6}" text-anchor="middle" fill="#57606a">${num(t)}</text>`);
-  KINDS.forEach(([k, label], r) => {
-    const p = pooled(d.results, k); const y0 = top + r * rowH;
-    out.push(`<text x="${left - 10}" y="${y0 + 30}" text-anchor="end" fill="#1f2328" font-weight="600">${e(label)}</text>`);
-    series.forEach(([key], i) => {
-      const v = p[key]; const y = y0 + 4 + i * 16;
-      if (v == null) { out.push(`<text x="${left + 4}" y="${y + 10}" fill="#8c959f" font-size="11">n/a</text>`); return; }
-      out.push(`<rect x="${left}" y="${y}" width="${Math.max(2, x(v) - left)}" height="12" fill="${series[i][2]}"/><text x="${x(v) + 5}" y="${y + 10}" fill="#1f2328" font-size="11">${num(v)}</text>`);
-    });
-  });
-  out.push('</svg>');
-  return out.join('\n') + '\n';
+/** A light/dark pair as a <picture>, for GitHub's colour scheme. */
+export function pictureLines(alt, light, dark, width = 860) {
+  return [`<picture>`, `  <source media="(prefers-color-scheme: dark)" srcset="${dark}">`, `  <img alt="${alt}" src="${light}" width="${width}">`, `</picture>`];
 }
 
 function writeReports(d) {
   const md = path.resolve(args.out && args.out !== true ? args.out : path.join(ROOT, 'docs', 'benchmarks.md'));
   const svg = path.resolve(args.svg && args.svg !== true ? args.svg : path.join(ROOT, 'docs', 'benchmarks.svg'));
   fs.writeFileSync(md, renderMarkdown(d));
-  fs.writeFileSync(svg, renderSvg(d));
-  log('wrote', md, svg);
+  fs.mkdirSync(path.dirname(svg), { recursive: true });
+  const written = [];
+  for (const name of CHARTS) for (const theme of Object.keys(THEMES)) {
+    const file = chartPath(svg, name, theme);
+    fs.writeFileSync(file, renderChart(name, theme, d, { KINDS, pooled, num, sum }));
+    written.push(file);
+  }
+  log('wrote', md, ...written);
 }
 
 if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {

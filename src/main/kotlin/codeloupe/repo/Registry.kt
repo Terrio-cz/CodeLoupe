@@ -43,7 +43,7 @@ class Registry(
     private val repos = ConcurrentHashMap<String, RepoState>()
     private val views = ViewPool()
     private val readGate = Semaphore(config.maxParallelQueries, true)
-    private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, views::release, log, emit)
+    private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, config.largeWorktreeFiles, views::release, log, emit)
     private val builds = BaseBuilds(queue, launcher, log, release = ::releaseBase, swapped = ::collectOverlays, emit = emit)
     private val mergeBases = MergeBases(queue, launcher, config.queryTimeoutMs)
 

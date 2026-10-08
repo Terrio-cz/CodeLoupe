@@ -11,12 +11,9 @@ const COLORS: Record<Glyph, [number, number, number]> = {
   app: [42, 120, 214],
 };
 
-/** Whether a point lies within `r` of the segment (x1,y1)-(x2,y2). */
-function capsule(x: number, y: number, x1: number, y1: number, x2: number, y2: number, r: number): boolean {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)));
-  return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy)) <= r;
+/** Whether a point lies in the axis-aligned box [x0,x1] x [y0,y1]. */
+function box(x: number, y: number, x0: number, x1: number, y0: number, y1: number): boolean {
+  return x >= x0 && x <= x1 && y >= y0 && y <= y1;
 }
 
 /** Whether a point of the unit square centred on 0,0 (radius 1) belongs to the glyph. */
@@ -36,15 +33,15 @@ function inside(glyph: Glyph, x: number, y: number): boolean {
     case 'down':
       return ring || (r < 0.62 && (Math.abs(x - y) < 0.18 || Math.abs(x + y) < 0.18) && Math.abs(x) < 0.4 && Math.abs(y) < 0.4);
     case 'app': {
-      // Brand mark (docs/brand): lens ring, handle towards the bottom right, three index lines inside.
-      const rr = Math.hypot(x + 0.125, y + 0.125);
-      const lens = rr <= 0.703 && rr >= 0.547;
+      // Brand mark (docs/brand): two brackets around a solid block.
       return (
-        lens ||
-        capsule(x, y, 0.344, 0.344, 0.812, 0.812, 0.094) ||
-        capsule(x, y, -0.4375, -0.344, 0.094, -0.344, 0.053) ||
-        capsule(x, y, -0.281, -0.125, 0.219, -0.125, 0.053) ||
-        capsule(x, y, -0.4375, 0.094, -0.0625, 0.094, 0.053)
+        box(x, y, -0.781, -0.594, -0.781, 0.781) ||
+        box(x, y, -0.781, -0.344, -0.781, -0.594) ||
+        box(x, y, -0.781, -0.344, 0.594, 0.781) ||
+        box(x, y, 0.594, 0.781, -0.781, 0.781) ||
+        box(x, y, 0.344, 0.781, -0.781, -0.594) ||
+        box(x, y, 0.344, 0.781, 0.594, 0.781) ||
+        box(x, y, -0.219, 0.219, -0.219, 0.219)
       );
     }
   }

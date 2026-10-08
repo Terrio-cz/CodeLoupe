@@ -23,6 +23,12 @@ internal class OverlayState(val worktree: String, val repoId: String, val file: 
     @Volatile
     var usedAt = System.nanoTime()
 
+    /** Whether this repository is too large to walk: checked through git alone, [scan] stays empty. Decided once per base. */
+    var large = false
+
+    /** The base commit [large] was decided for. */
+    var largeFor: String? = null
+
     /** The base commit [entries] and [scan] are relative to; null until the first check. */
     var base: String? = null
 

@@ -36,7 +36,12 @@ class OverlayTest {
     private val queue = JobQueue(CoroutineScope(Dispatchers.Default))
 
     @Test
-    fun `changed, new and deleted files of a worktree show in its next query`() {
+    fun `changed, new and deleted files of a worktree show in its next query`() = changesShow(config)
+
+    @Test
+    fun `the same in a repository too large to walk, where git alone settles what changed`() = changesShow(config.copy(largeWorktreeFiles = 1))
+
+    private fun changesShow(config: Config) {
         val registry = Registry(config, queue)
         write(repo, "build/Old.kt", "package demo\n\nclass Old\n")
         assertContains(find(registry, feature, "Alpha.one"), "fun one")
