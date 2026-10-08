@@ -225,6 +225,38 @@ shared between tasks (`aot`, `jdk25`), so the project alone does not make one a 
 `"matchProject": true` (and `"kinds": ["image"]`) adopts the untagged and re-tagged images a stack built; the `via`
 column says which name matched.
 
+### Cleanup of released workspaces (reconciler)
+
+`codeloupe ws reconcile` is the dry run (`GET /reconcile`): for every owned or adopted resource and every orphan
+directory it says what the policy does and why. Unowned resources are not in it at all.
+
+| verdict | when | what happens |
+|---|---|---|
+| `auto` | labelled by CodeLoupe, its workspace has **landed**, no container of the workspace runs, older than `graceMinutes` | removed without asking, if `auto` is on |
+| `confirm` | adopted by a rule; or the workspace is abandoned, an orphan, or gone from the registry; or landed but still running; or an orphan directory under a worktree root | removed only when named: `ws reconcile --confirm <key>` or `--workspace TER-420` |
+| `keep` | the workspace is active; its repository is not in the registry; younger than the grace period | stays |
+| `protected` | a `protect` rule of the config matches | never touched, whatever else holds |
+
+`--run` (or `POST /reconcile/run` with `{"confirm": [keys], "workspaces": [names]}`) does it now: the `auto` entries plus
+what is named. A named `keep` or `protected` entry is refused. The plan is re-read from the registry and Docker for every
+run, so a stale key removes nothing it should not. Removal goes through the Engine API, containers first (stopped, removed
+with their anonymous volumes), then networks, volumes, images, never forced: a resource that is in use is *blocked*, not
+killed. An orphan directory is deleted without following links; a file that is still locked (Windows) leaves it blocked.
+
+Blocked and failed targets are retried with a growing wait (`retryBaseMinutes`, doubling up to `retryMaxMinutes`), kept
+in `<home>/reconcile-state.json`, so the backoff survives a restart of the daemon or the PC. A removal someone confirmed
+is retried without a second confirmation. With `auto` on the daemon runs the `auto` entries shortly after it starts, after
+a job finished, every `intervalMinutes` while a client has called the daemon in the last 15 minutes, and whenever a retry
+falls due. Every attempt is written to `daemon.log` and `<home>/reconcile.jsonl` and emitted as a `reconcile.action` event.
+
+```json
+{ "workspaces": { "reconcile": { "auto": true, "intervalMinutes": 30, "graceMinutes": 60, "retryBaseMinutes": 1, "retryMaxMinutes": 360,
+  "protect": [ { "match": "^terrio-importer(_|$)" }, { "match": "^terrio-importer_terrio-postgres-data$", "kinds": ["volume"] } ] } } }
+```
+
+`auto` is off by default. `protect` patterns are regular expressions tried (case-insensitively, anywhere in the name,
+so anchor them) against each name of a resource and its compose project; without `kinds` they also cover directories.
+
 ## Desktop app
 
 `app/` holds the Electron desktop app (tray, notifications, daemon start/stop, screens over the daemon's
@@ -317,6 +349,7 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 | `daemon` | Ktor server, MCP endpoint, job queue, call log |
 | `jobs` | commands run for agents: policy hook, slots, processes, summaries, completion actions, `job` tool |
 | `workspace` | `GET /workspaces`: worktrees, branches, tasks, merge and tracker state, orphan directories |
+| `reconcile` | `GET /reconcile`, `POST /reconcile/run`: policy, executor, backoff state, scheduler, journal |
 | `docker` | Docker Engine API client (named pipe / unix socket), ownership labels, compose override, `GET /resources`: owned / adopted / unowned |
 | `events` | event log, server-sent-events stream, webhook subscriptions and deliveries |
 | `cli` | `codeloupe` commands and the daemon client |

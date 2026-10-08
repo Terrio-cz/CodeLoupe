@@ -23,10 +23,21 @@ class DockerTestSupport(val api: DockerApi, repo: String = "cltest-repo", worksp
         mine(api.images()).forEach { http.request("DELETE", "/images/${it.id}?force=1") }
     }
 
-    /** Removes the `cltest-` volume [volume] that was made without labels (to be adopted). */
+    /** Removes the `cltest-` volume [volume], whoever it belongs to; a missing one is fine. */
     fun removeVolume(volume: String) {
         check(volume.startsWith("cltest-")) { "refusing to remove $volume" }
         http.request("DELETE", "/volumes/$volume")
+    }
+
+    /** Removes the `cltest-` container [container] (a missing one is fine), stopped or not. */
+    fun removeContainer(container: String) {
+        check(container.startsWith("cltest-")) { "refusing to remove $container" }
+        http.request("DELETE", "/containers/$container?force=1&v=1")
+    }
+
+    fun removeNetwork(network: String) {
+        check(network.startsWith("cltest-")) { "refusing to remove $network" }
+        http.request("DELETE", "/networks/$network")
     }
 
     /** A volume without any label, the way Docker makes one for a plain `docker run -v`. */
@@ -34,6 +45,27 @@ class DockerTestSupport(val api: DockerApi, repo: String = "cltest-repo", worksp
         check(volume.startsWith("cltest-")) { "refusing to create $volume" }
         assertEquals(201, http.request("POST", "/volumes/create", """{"Name":"$volume"}""".toByteArray()).status)
     }
+
+    /** A `cltest-` network with [owner]'s labels, or none. */
+    fun createNetwork(network: String, owner: Ownership?) {
+        check(network.startsWith("cltest-")) { "refusing to create $network" }
+        assertEquals(201, http.request("POST", "/networks/create", """{"Name":"$network","Labels":${labelsJson(owner)}}""".toByteArray()).status)
+    }
+
+    /** A created, not started `cltest-` container from [image] with [owner]'s labels. */
+    fun createContainer(container: String, image: String, owner: Ownership?) {
+        check(container.startsWith("cltest-")) { "refusing to create $container" }
+        val reply = http.request("POST", "/containers/create?name=$container", """{"Image":"$image","Cmd":["true"],"Labels":${labelsJson(owner)}}""".toByteArray())
+        assertEquals(201, reply.status, reply.text)
+    }
+
+    /** A `cltest-` volume with [owner]'s labels. */
+    fun createVolume(volume: String, owner: Ownership) {
+        check(volume.startsWith("cltest-")) { "refusing to create $volume" }
+        api.createVolume(volume, owner)
+    }
+
+    private fun labelsJson(owner: Ownership?) = owner?.labels()?.entries?.joinToString(",", "{", "}") { "\"${it.key}\":\"${it.value}\"" } ?: "{}"
 
     fun mine(objects: List<DockerObject>) = objects.filter {
         Ownership.of(it.labels) == ownership && (it.names.isEmpty() || it.names.all { n -> n.startsWith("cltest-") })

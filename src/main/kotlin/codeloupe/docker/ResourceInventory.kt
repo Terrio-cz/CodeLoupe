@@ -2,6 +2,7 @@ package codeloupe.docker
 
 import codeloupe.config.Config
 import codeloupe.platform.IsoTime
+import codeloupe.workspace.WorkspaceList
 import codeloupe.workspace.WorkspaceState
 import codeloupe.workspace.Workspaces
 import kotlinx.coroutines.CancellationException
@@ -13,7 +14,8 @@ import kotlinx.coroutines.withContext
  * workspace registry. Read-only: it lists through the Engine API and never changes a resource.
  */
 class ResourceInventory(private val config: Config, private val workspaces: Workspaces, private val connect: () -> DockerApi = DockerApi::connect) {
-    suspend fun report(): ResourceReport = withContext(Dispatchers.IO) {
+    /** [registry]: the workspace list to join with, when the caller has read it already. */
+    suspend fun report(registry: WorkspaceList? = null): ResourceReport = withContext(Dispatchers.IO) {
         val problems = ArrayList<String>()
         val api = try {
             connect()
@@ -27,10 +29,10 @@ class ResourceInventory(private val config: Config, private val workspaces: Work
         } catch (e: Exception) {
             return@withContext ResourceReport(IsoTime.now(), api.address, problems = listOf("${api.address}: ${e.message.orEmpty().lineSequence().first()}"))
         }
-        val registry = workspaces.list()
-        problems += registry.problems
+        val list = registry ?: workspaces.list()
+        problems += list.problems
         val states = HashMap<Pair<String, String>, WorkspaceState>()
-        for (repo in registry.repos) for (workspace in repo.workspaces) states[repo.name.lowercase() to workspace.name.lowercase()] = workspace.state
+        for (repo in list.repos) for (workspace in repo.workspaces) states[repo.name.lowercase() to workspace.name.lowercase()] = workspace.state
         val entries = ResourceClassifier(config.workspaces.adoption) { repo, workspace -> states[repo.lowercase() to workspace.lowercase()] }.classify(objects)
         val counts = entries.groupingBy { "${it.ownership.name.lowercase()}/${it.kind.name.lowercase()}" }.eachCount().toSortedMap()
         ResourceReport(IsoTime.now(), "${api.address} (Docker ${api.version()})", counts, entries, problems)

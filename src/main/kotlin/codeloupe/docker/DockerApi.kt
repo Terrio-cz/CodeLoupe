@@ -81,6 +81,33 @@ class DockerApi(private val endpoint: DockerEndpoint) {
         return VolumeOutcome.CREATED
     }
 
+    /** Stops a running container; a stopped or missing one is fine. The Engine waits [seconds] for it to exit before it kills it. */
+    fun stopContainer(id: String, seconds: Int = 10) {
+        val reply = http.request("POST", "/containers/${encode(id)}/stop?t=$seconds")
+        if (reply.status !in setOf(204, 304, 404)) throw DockerUnavailable("stop container $id: HTTP ${reply.status} ${message(reply)}")
+    }
+
+    /** Removes a stopped container and its anonymous volumes. Never forced: a running one is a conflict. */
+    fun removeContainer(id: String): Removal = remove("/containers/${encode(id)}?v=1", "remove container $id")
+
+    fun removeNetwork(id: String): Removal = remove("/networks/${encode(id)}", "remove network $id")
+
+    fun removeVolume(name: String): Removal = remove("/volumes/${encode(name)}", "remove volume $name")
+
+    /** Removes an image by id, with the parents nothing else uses. Never forced: one that a container or another tag holds is a conflict. */
+    fun removeImage(id: String): Removal = remove("/images/${encode(id)}", "remove image $id")
+
+    // 404: already gone, which is what was wanted. 409 (and 403 for a network with endpoints): in use, retry later.
+    private fun remove(path: String, what: String): Removal {
+        val reply = http.request("DELETE", path)
+        return when (reply.status) {
+            200, 204 -> Removal.REMOVED
+            404 -> Removal.GONE
+            403, 409 -> Removal.Conflict(message(reply))
+            else -> throw DockerUnavailable("$what: HTTP ${reply.status} ${message(reply)}")
+        }
+    }
+
     private fun array(path: String): List<JsonObject> = json("GET", path).jsonArray.map { it.jsonObject }
 
     private fun json(method: String, path: String): JsonElement {
@@ -99,6 +126,12 @@ class DockerApi(private val endpoint: DockerEndpoint) {
     private fun encode(text: String) = URLEncoder.encode(text, Charsets.UTF_8).replace("+", "%20")
 
     enum class VolumeOutcome { CREATED, ALREADY_OURS, EXISTS_OTHER }
+
+    sealed interface Removal {
+        data object REMOVED : Removal
+        data object GONE : Removal
+        data class Conflict(val message: String) : Removal
+    }
 
     companion object {
         private const val SHORT = 12
