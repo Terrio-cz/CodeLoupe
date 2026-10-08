@@ -22,6 +22,18 @@ updates:
     groups:
       npm:
         patterns: ["*"]
+    # These majors only move together: vite 8 is outside electron-vite 5's peer range and pulls lightningcss (MPL-2.0,
+    # not on the licence allow-list), plugin-react 6 and vitest 5 need vite 8, and @types/node follows the Node line
+    # of engines/CI (22), not the newest. Minor and patch updates still come; the majors are tracked in CL-117.
+    ignore:
+      - dependency-name: vite
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: vitest
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
