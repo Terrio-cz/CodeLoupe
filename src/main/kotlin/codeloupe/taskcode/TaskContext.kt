@@ -72,19 +72,24 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
         return TaskCodeRender.task(f.answer, TOUCH_LINES).lines().drop(1).joinToString("\n")
     }
 
-    /** The source files the task landed, is changing in a worktree or is predicted (surely or likely) to touch. */
+    /**
+     * The source files the task landed or is predicted (surely or likely) to touch; only when the text names none, the first
+     * few the worktree changed, so a task far along does not drown the pack in its own diff.
+     */
     private fun paths(f: TaskCodeQuery.Facts): List<String> {
         val a = f.answer
         val landed = a.files.filterValues { it != 'D' }.keys
         val predicted = a.prediction?.predictions.orEmpty().filter { it.mark == Prediction.SURE || it.mark == Prediction.LIKELY }.mapNotNull { it.path }
-        return (landed + a.worktree?.files.orEmpty() + predicted).distinct().filter { Languages.languageOf(it) != null }.take(MAX_FILES)
+        fun sources(paths: Collection<String>) = paths.distinct().filter { Languages.languageOf(it) != null }
+        return sources(landed + predicted).ifEmpty { sources(a.worktree?.files.orEmpty()).take(WORKTREE_FILES) }.take(MAX_FILES)
     }
 
     private suspend fun declarations(root: String, paths: List<String>): String {
         if (paths.isEmpty()) return ""
         val lines = registry.query(root, speculative = false) { view ->
             paths.flatMap { path ->
-                val decls = view.decls("f.path = :path AND d.local = 0", mapOf("path" to path), "ORDER BY start_line")
+                // A private member says nothing a planner can build on.
+                val decls = view.decls("f.path = :path AND d.local = 0", mapOf("path" to path), "ORDER BY start_line").filterNot { it.sig.startsWith("private ") }
                 if (decls.isEmpty()) emptyList()
                 else listOf(path) + decls.take(MAX_DECLS).map { "  ${it.startLine}-${it.endLine}  ${if (it.container.isNotEmpty()) "[${it.container}] " else ""}${shorten(it.sig)}" } +
                     listOfNotNull(decls.size.takeIf { it > MAX_DECLS }?.let { "  … +${it - MAX_DECLS} more (outline $path)" })
@@ -121,7 +126,8 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
         const val CRITERION = 110
         const val TOUCH_LINES = 20
         const val MAX_FILES = 6
-        const val MAX_DECLS = 12
+        const val WORKTREE_FILES = 3
+        const val MAX_DECLS = 10
         const val COMMITS_PER_FILE = 40
         const val MAX_PRIOR = 8
         const val SUMMARY = 70
