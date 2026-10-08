@@ -20,6 +20,7 @@ A release is a tag. `git tag v1.2.3 && git push origin v1.2.3` runs [release.yml
 | `codeloupe-<v>-<os>-<arch>.zip` | The bundle alone: `bin/`, `lib/`, `runtime/` |
 | `codeloupe-<v>-daemon-sbom.cdx.json` | CycloneDX SBOM of the daemon and CLI (Gradle runtime classpath) |
 | `codeloupe-<v>-app-sbom.cdx.json` | CycloneDX SBOM of the app's npm dependencies that ship (no dev tooling). Electron and Chromium come inside the installer with their own `LICENSES` files |
+| `packaging-manifests.zip` | winget, Scoop and Homebrew manifests generated from the files above (see below) |
 | `SHA256SUMS.txt` | SHA-256 of every file above |
 
 The release notes list one line per card (`CL-<n>` and its commit subjects since the previous `v*` tag), merges
@@ -32,6 +33,26 @@ the bundle name) and into the app (`electron-builder -c.extraMetadata.version`: 
 the sidebar). The installer smoke test of a release checks all of them (`--expect-version`). A development build has
 Gradle version `0.1.0` and the app's `package.json` version.
 
+## Package-manager manifests (CL-130)
+
+The release job runs `tools/packaging-manifests.mjs` on the release files and attaches `packaging-manifests.zip`:
+
+| Path in the zip | Goes to |
+|---|---|
+| `winget/manifests/t/Terrio/CodeLoupe/<v>/` (three YAML files, `Terrio.CodeLoupe`) | a pull request to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) (`winget validate --manifest <dir>` checks them first) |
+| `scoop/codeloupe.json` | a Scoop bucket (the manifest has `checkver` and `autoupdate`, so a bucket follows new releases by itself) |
+| `homebrew/Casks/codeloupe.rb` | a Homebrew tap (`brew style --cask` checks it; CI does) |
+
+The URLs point at the release's assets, hashes come from `SHA256SUMS.txt` (an installer present on disk must match
+it), so the draft release must be published before a manifest is submitted. Nothing is submitted by the pipeline: that is
+an outward-facing step the owner takes. Names and licence (`PolyForm-Noncommercial-1.0.0`) should be checked against
+winget-pkgs' policy before the first submission. The Scoop manifest unpacks the NSIS installer as an archive instead of
+running it, so a Scoop install is portable and Scoop alone updates it.
+
+macOS builds are signed ad hoc by the `afterPack` hook `app/scripts/ad-hoc-sign.mjs`; the `bundle` job checks
+`codesign -dv` (`Signature=adhoc`) and `codesign --verify --deep --strict` on both macOS runners, and the installer smoke
+test verifies the installed copy. The manual allow steps for a browser download are in the README, Installers.
+
 ## Not yet
 
-Signing and notarisation (CL-105), auto-update feed files for electron-updater (CL-107).
+Auto-update feed files for electron-updater (CL-107).

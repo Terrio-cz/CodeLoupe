@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 jobs:
-  # Unit tests of the scripts in tools/ (release notes).
+  # Unit tests of the scripts in tools/ (release notes, manifests, ad hoc signing).
   tools:
     name: tools
     runs-on: ubuntu-latest
@@ -33,6 +33,27 @@ jobs:
           node-version: "22"
 
       - run: node --test tools/*.test.mjs
+
+  # The winget, Scoop and Homebrew manifests of a release (CL-130) from fixture files, checked by the tools that exist on
+  # a runner: the generator's own tests above, `brew style` for the cask here. winget has no hosted runner image.
+  manifests:
+    name: manifests (macos)
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Generate from fixture files and style-check the cask
+        run: |
+          mkdir fixture
+          for n in win-x64.exe mac-arm64.dmg mac-x64.dmg; do echo "$n" > "fixture/CodeLoupe-1.2.3-$n"; done
+          (cd fixture && shasum -a 256 CodeLoupe-* > SHA256SUMS.txt)
+          node tools/packaging-manifests.mjs --dir fixture --version 1.2.3 --out manifests
+          brew style --cask manifests/homebrew/Casks/codeloupe.rb
 
   test:
     name: test (${{ matrix.os }})
@@ -209,6 +230,11 @@ jobs:
               hdiutil attach app/dist/*.dmg -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg"
               cp -R "$RUNNER_TEMP/dmg/CodeLoupe.app" unpacked/
               hdiutil detach "$RUNNER_TEMP/dmg"
+              # Nothing is paid for (CL-105): the app is signed ad hoc (CL-130), which Apple Silicon needs to run it at all.
+              codesign -dv unpacked/CodeLoupe.app 2>&1 | tee codesign.txt
+              grep -q 'Signature=adhoc' codesign.txt
+              codesign --verify --deep --strict --verbose=2 unpacked/CodeLoupe.app
+              codesign --verify --strict unpacked/CodeLoupe.app/Contents/Resources/codeloupe/runtime/bin/java
               node tools/bundle-smoke.mjs unpacked/CodeLoupe.app/Contents/Resources/codeloupe
               ;;
             windows-*)

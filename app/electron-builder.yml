@@ -1,6 +1,6 @@
 # Installers of the desktop app with the daemon and its Java runtime inside (CL-104). `npm run dist` builds the one
 # for the OS and CPU it runs on: jlink output is specific to both, so each installer comes from its own runner.
-# Signing and notarisation come with CL-105; until then macOS and Windows installers are unsigned.
+# Nothing is paid for (CL-105, docs/code-signing.md): the Windows installer is unsigned, the macOS app is signed ad hoc.
 appId: cz.terrio.codeloupe
 productName: CodeLoupe
 copyright: Terrio
@@ -23,6 +23,8 @@ electronLanguages:
   - en-US
   - cs
 artifactName: CodeLoupe-${version}-${os}-${arch}.${ext}
+# Ad hoc macOS signature (a no-op on the other platforms).
+afterPack: ./scripts/ad-hoc-sign.mjs
 
 win:
   target: nsis
@@ -40,7 +42,8 @@ mac:
   target: dmg
   category: public.app-category.developer-tools
   icon: stage/icon.png
-  # No certificate yet (CL-105): without this electron-builder looks for one in the keychain.
+  # No certificate (CL-105: nothing is paid for): without this electron-builder looks for one in the keychain.
+  # The app is signed ad hoc by the afterPack hook instead (CL-130).
   identity: null
 
 linux:
