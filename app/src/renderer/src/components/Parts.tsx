@@ -30,10 +30,10 @@ export function KpiTile({ label, value, ctx, children }: { label: string; value:
 
 /** ▲/▼ with a word, never colour alone. */
 export function Delta({ now, before, unit = '' }: { now: number; before: number; unit?: string }) {
-  if (!before) return <span>bez srovnání</span>;
+  if (!before) return <span>no comparison</span>;
   const d = Math.round(((now - before) / before) * 100);
-  if (d === 0) return <span>stejně{unit}</span>;
-  return <span className="delta"><span className="arrow" aria-hidden="true">{d > 0 ? '▲' : '▼'}</span> {Math.abs(d)} % {d > 0 ? 'víc' : 'méně'}{unit}</span>;
+  if (d === 0) return <span>same{unit}</span>;
+  return <span className="delta"><span className="arrow" aria-hidden="true">{d > 0 ? '▲' : '▼'}</span> {Math.abs(d)}% {d > 0 ? 'more' : 'less'}{unit}</span>;
 }
 
 export function Card({ title, actions, children, bodyClass = 'card-body' }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; bodyClass?: string }) {
@@ -62,9 +62,9 @@ export function Segmented<T extends string>({ label, value, options, onChange }:
 }
 
 export const RANGE_OPTIONS: { value: Range; label: string }[] = [
-  { value: '24h', label: '24 h' },
-  { value: '7d', label: '7 d' },
-  { value: '30d', label: '30 d' },
+  { value: '24h', label: '24h' },
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
 ];
 export const rangeLabel = (r: Range) => RANGE_OPTIONS.find(o => o.value === r)!.label;
 
@@ -100,7 +100,7 @@ export function Search({ label, value, onChange }: { label: string; value: strin
 export function Loading({ variant = 'lines' }: { variant?: 'lines' | 'table' | 'kpis' }) {
   if (variant === 'kpis') {
     return (
-      <div className="skeleton-kpis" aria-busy="true" aria-label="Načítám">
+      <div className="skeleton-kpis" aria-busy="true" aria-label="Loading">
         {[0, 1, 2, 3].map(i => (
           <div key={i} className="kpi">
             <div className="skeleton" style={{ width: '45%', height: 10 }} />
@@ -113,7 +113,7 @@ export function Loading({ variant = 'lines' }: { variant?: 'lines' | 'table' | '
   }
   if (variant === 'table') {
     return (
-      <div className="skeleton-rows" aria-busy="true" aria-label="Načítám">
+      <div className="skeleton-rows" aria-busy="true" aria-label="Loading">
         {[36, 52, 44, 60, 40, 48].map((w, i) => (
           <div key={i} className="row">
             <div className="skeleton" style={{ width: `${w / 2}%` }} />
@@ -125,21 +125,21 @@ export function Loading({ variant = 'lines' }: { variant?: 'lines' | 'table' | '
     );
   }
   return (
-    <div className="card-body" aria-busy="true" aria-label="Načítám">
+    <div className="card-body" aria-busy="true" aria-label="Loading">
       {[70, 90, 60, 80].map((w, i) => <div key={i} className="skeleton" style={{ width: `${w}%`, margin: '10px 0' }} />)}
     </div>
   );
 }
 
 /** A heading in the app's words, then the message as it came (a daemon error can be terse or English), then what to do. */
-export function ErrorState({ message, onRetry, action, title = 'Nepodařilo se načíst data' }: { message: string; onRetry?: () => void; action?: ReactNode; title?: string }) {
+export function ErrorState({ message, onRetry, action, title = 'Could not load data' }: { message: string; onRetry?: () => void; action?: ReactNode; title?: string }) {
   return (
     <div className="state error" role="alert">
       <span className="state-icon"><Icon name="alert" size={18} /></span>
       <div className="state-title">{title}</div>
       <div className="state-text muted">{message}</div>
       <div className="actions">
-        {onRetry && <button className="btn" onClick={onRetry}><Icon name="refresh" size={14} />Zkusit znovu</button>}
+        {onRetry && <button className="btn" onClick={onRetry}><Icon name="refresh" size={14} />Retry</button>}
         {action}
       </div>
     </div>

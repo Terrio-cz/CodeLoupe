@@ -368,7 +368,7 @@ symbol nebo soubor = **mezera** (nástroj nestačil). Report seskupený podle n�
 vylepšení. Plus: prázdné výsledky, `candidate` výsledky, které agent dál ručně rozhodoval, zápisy s rollbackem.
 Hotovo (CL-22): `codeloupe metrics gaps` — druhy `fallback`, `empty`, `busy`, `candidates`, týdně podle nástroje a
 tvaru dotazu (`name`, `qualified`, `overload`, `glob`, `path`); zápisy s rollbackem čekají na write nástroje. Obrazovka
-Mezery v aplikaci (CL-40) ukazuje tento report z ingestu transkriptů (`gaps.report`); `codeloupe metrics gaps` na 3 062 bězích
+Obrazovka Gaps v aplikaci (CL-40) ukazuje tento report z ingestu transkriptů (`gaps.report`); `codeloupe metrics gaps` na 3 062 bězích
 trvá asi 17 s (měřeno 2026-10-08), proto daemon pro obrazovku čte ingest, ne transkripty.
 
 **Scaffold šablony (CL-35): no-go.** Změřeno 2026-10-08 na 1 427 nových kódových souborech z transcriptů od 2026-09-23
@@ -830,17 +830,17 @@ rozhoduje launcher.
 - Každé vydání hodnoty spotřebiteli (`env run`, `/env/values` s hlavičkou `x-codeloupe-used-by`) a každé vytvoření, rotace a smazání zapíše řádek JSON
   `{at, name, scope, action, consumer}` do `<home>/secrets/audit.log`; hodnota v něm není nikdy, test to hlídá na souboru. Zápis je best effort (plný disk nezastaví `env run`),
   soubor se jen připisuje a po 4 MB přejde do `audit.log.1` (zůstane zhruba 8 MB historie). Maskování hodnot a čtení metadat se nezapisuje.
-- Stáří klíče = od rotace, jinak od vytvoření; `secrets.rotationDays` (výchozí 90, 0 = vypnuto) označí klíč `ROTATE` v `env list`, v nástroji `env` a ve sloupci Stáří obrazovky Prostředí.
+- Stáří klíče = od rotace, jinak od vytvoření; `secrets.rotationDays` (výchozí 90, 0 = vypnuto) označí klíč `ROTATE` v `env list`, v nástroji `env` a ve sloupci Age obrazovky Environment.
 - `GET /ui-api/v1/environment` vrací klíče z metadat vaultu (bez dešifrování) se spotřebiteli z auditu a stářím, `GET /ui-api/v1/environment/audit` posledních až 500 událostí.
 
-### Výsledek CL-54 — obrazovka Prostředí v aplikaci (2026-10-08)
+### Výsledek CL-54 — obrazovka Environment v aplikaci (2026-10-08)
 
 - Zápisy jdou jen přes main proces: stránka pošle hodnotu jednou z pole `type=password` (pole se vyprázdní při odeslání, hodnota není ve stavu Reactu), main ji
   zvaliduje (jméno, rozsah, ≤ 16 KB) a předá CLI `env set` na stdin; do argumentu, logu ani odpovědi se nedostane a chybová hláška se od ní čistí. Store tak zapisuje jediný
   kód (formát, ochrana klíče OS, audit), aplikace žádnou kryptografii nemá.
 - Průvodce importem spouští tok CL-52 (inventář → výběr zdroje u konfliktů → import → volitelné nahrazení zdrojů odkazem → vrácení) a okno vidí jen jména, cesty a počty.
   Mazání, nahrazení zdrojů a návrat potvrzuje nativní dialog main procesu se jménem klíče a jeho spotřebiteli.
-- „Kopírovat“ je jen s OS re-autentizací (macOS Touch ID); na Windows a Linuxu Electron žádný dotaz na uživatele nemá, takže tlačítko tam není. Hodnota jde do schránky,
+- „Copy“ je jen s OS re-autentizací (macOS Touch ID); na Windows a Linuxu Electron žádný dotaz na uživatele nemá, takže tlačítko tam není. Hodnota jde do schránky,
   nikdy do okna, čtení je v auditu jako „CodeLoupe app (clipboard copy)“ a schránka se po 60 s vyčistí, jen když ji nikdo mezitím nepřepsal.
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu a fixture stromu: přidání, rotace, import s nahrazením zdrojů,
   návrat bajt po bajtu a smazání; po každém kroku se hledá každá z testovacích hodnot v DOM stránky i v odpovědích daemona (nenašla se).
@@ -904,8 +904,8 @@ rozhoduje launcher.
   v ceně, tazích, peak kontextu, roli, TER, délce i chybách; zbylých 7 jsou běhy, které mezi oběma čteními ještě rostly.
   Generovaný test se 2 651 běhy: každé řazení seznamu a kroky < 200 ms, druhý průchod nečte nic.
 - **Rozhodnutí**: baseline po rolích daemon nemá, takže `baselineRange` a úspory zůstávají 0 (nevymýšlí se odhad); `busy` volání
-  nejsou mezera pro UI (je to zátěž daemonu). Seznam běhů a kroky vystavuje API, i když obrazovka Běhy z UI vypadla (§ 3.3):
-  data jsou potřeba pro Přehled a pro případnou obrazovku v aplikaci.
+  nejsou mezera pro UI (je to zátěž daemonu). Seznam běhů a kroky vystavuje API, i když obrazovka Runs z UI vypadla (§ 3.3):
+  data jsou potřeba pro Overview a pro případnou obrazovku v aplikaci.
 
 ### Výsledek distribuce zdarma (CL-105, CL-130, 2026-10-08)
 
@@ -961,14 +961,14 @@ rozhoduje launcher.
 
 - `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`, `default`) a YouTrack instance (`url`, `projects`, `token` = jméno
   globálního tajemství `YOUTRACK_TOKEN_<ID>` ve storu). Bez souboru je jediným účtem `~/.claude`. Ingest čte `projects` každého vypsaného účtu a přiřazuje transcripty podle cesty
-  (`runs.path LIKE <configDir>/projects/%`), takže cena 7 d na účet je jeden SQL přes `usage_hours`; filtr Přehledu (`overview?account=`) používá stejný předpona v `hours` a `gapCount`.
+  (`runs.path LIKE <configDir>/projects/%`), takže cena 7 d na účet je jeden SQL přes `usage_hours`; filtr Overview (`overview?account=`) používá stejný předpona v `hours` a `gapCount`.
 - Okna účtu: pracovní složka, která za 15 min volala CodeLoupe, patří účtu, jehož `projects/<ProjectDirName>` existuje (u dvou účtů tomu s novější změnou). E-mail účtu je jediné, co se čte z `.claude.json`.
 - YouTrack účty se k trackeru přidávají v `TrackerSettingsLoader` (token `TokenSource.Stored`, cache 30 s, spotřebitel „tracker mirror: <id>“ v auditu); mirror se staví při startu, proto přidání a odebrání
   účtu restartuje daemon. Tracker z `config.json` je v tabulce jen ke čtení.
 - Souběh: aplikace (CLI), daemon (poznamenání použití) i test zapisují do téhož vaultu; `SecretStore` teď čte-mění-zapisuje pod zámkem `vault.env.lock` (zámek souboru + zámek JVM),
   test se čtyřmi zapisovateli a dvěma čtenáři na samostatných instancích neztratil žádný záznam.
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu, fixture složkám dvou účtů a lokálnímu fake YouTrack: přidání účtu, přejmenování, výchozí,
-  filtr Přehledu (390 → 130), přidání YouTrack účtu s tokenem, test spojení (fake instance dostala uložený token), rotace (dostala nový), odebrání (token ze storu pryč); token se nikdy neobjevil v DOM ani v odpovědích daemona.
+  filtr Overview (390 → 130), přidání YouTrack účtu s tokenem, test spojení (fake instance dostala uložený token), rotace (dostala nový), odebrání (token ze storu pryč); token se nikdy neobjevil v DOM ani v odpovědích daemona.
 
 ### Výsledek CL-119 — úvodní průvodce v aplikaci (2026-10-08)
 

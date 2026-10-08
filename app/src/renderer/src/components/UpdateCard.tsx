@@ -7,13 +7,13 @@ import { Card } from './Parts';
 /** What the state means for the user, in one line. */
 export function updateLine(u: UpdateState): string {
   switch (u.phase) {
-    case 'off': return u.mode === 'unavailable' ? (u.reason ?? 'Aktualizace nejsou dostupné.') : 'Automatická kontrola je vypnutá.';
-    case 'checking': return 'Hledám novou verzi…';
-    case 'downloading': return `Stahuji ${u.latest ?? 'novou verzi'}${u.percent !== null ? ` (${u.percent} %)` : ''}…`;
-    case 'ready': return `Verze ${u.latest} je stažená a ověřená. Restartujte aplikaci a nainstaluje se.`;
-    case 'available': return `Je dostupná verze ${u.latest}. ${u.reason ?? ''}`.trim();
-    case 'error': return `Kontrola selhala: ${u.message ?? 'neznámá chyba'}`;
-    default: return u.checkedAt ? `Máte nejnovější verzi (kontrola ${new Date(u.checkedAt).toLocaleString('cs-CZ')}).` : 'Zatím nezkontrolováno.';
+    case 'off': return u.mode === 'unavailable' ? (u.reason ?? 'Updates are not available.') : 'Automatic check is off.';
+    case 'checking': return 'Checking for a new version…';
+    case 'downloading': return `Downloading ${u.latest ?? 'new version'}${u.percent !== null ? ` (${u.percent}%)` : ''}…`;
+    case 'ready': return `Version ${u.latest} is downloaded and verified. Restart the app to install it.`;
+    case 'available': return `Version ${u.latest} is available. ${u.reason ?? ''}`.trim();
+    case 'error': return `Check failed: ${u.message ?? 'unknown error'}`;
+    default: return u.checkedAt ? `You have the latest version (checked ${new Date(u.checkedAt).toLocaleString('en-US')}).` : 'Not checked yet.';
   }
 }
 
@@ -30,27 +30,27 @@ export function UpdateCard() {
   if (!settings || !state) return null;
   const busy = state.phase === 'checking' || state.phase === 'downloading';
   return (
-    <Card title="Aktualizace">
+    <Card title="Updates">
       <dl className="dl">
-        <dt>Verze</dt><dd>{state.current}</dd>
-        <dt>Stav</dt><dd role="status">{updateLine(state)}</dd>
-        {state.mode === 'notify' && state.reason && state.phase !== 'available' && <><dt>Způsob</dt><dd>{state.reason}</dd></>}
+        <dt>Version</dt><dd>{state.current}</dd>
+        <dt>State</dt><dd role="status">{updateLine(state)}</dd>
+        {state.mode === 'notify' && state.reason && state.phase !== 'available' && <><dt>Method</dt><dd>{state.reason}</dd></>}
         {state.rollback && (
-          <><dt>Daemon</dt><dd>Daemon verze {state.rollback.failedVersion} se nespustil ({state.rollback.reason}), běží předchozí verze {state.rollback.usingVersion}.</dd></>
+          <><dt>Daemon</dt><dd>Daemon version {state.rollback.failedVersion} did not start ({state.rollback.reason}); the previous version {state.rollback.usingVersion} is running.</dd></>
         )}
       </dl>
       <div className="actions" style={{ margin: '12px 0 4px' }}>
         <label className="check">
-          <input type="checkbox" checked={settings.autoUpdate} disabled={state.mode === 'unavailable'} onChange={e => void update({ autoUpdate: e.target.checked })} /> Hledat novou verzi automaticky
+          <input type="checkbox" checked={settings.autoUpdate} disabled={state.mode === 'unavailable'} onChange={e => void update({ autoUpdate: e.target.checked })} /> Check for new versions automatically
         </label>
       </div>
       <p className="t2">
-        Aplikace se ptá jen na stránce vydání na GitHubu (Terrio-cz/CodeLoupe), nic o vás neposílá a bez zapnutého přepínače se sama neptá vůbec. Stažený instalátor se ověří podle SHA-512 z vydání.
+        The app only asks the GitHub releases page (Terrio-cz/CodeLoupe), sends nothing about you, and never asks on its own unless the switch is on. A downloaded installer is verified against the SHA-512 from the release.
       </p>
       <div className="actions">
-        {state.phase === 'ready' && <button className="btn primary" onClick={() => void bridge().update.install()}>Restartovat a aktualizovat</button>}
-        {state.phase === 'available' && <button className="btn primary" onClick={() => void bridge().update.openRelease()}>Otevřít stránku vydání</button>}
-        <button className="btn" disabled={busy || state.mode === 'unavailable' || state.phase === 'ready'} onClick={() => void bridge().update.check().then(setState)}>Zkontrolovat teď</button>
+        {state.phase === 'ready' && <button className="btn primary" onClick={() => void bridge().update.install()}>Restart and update</button>}
+        {state.phase === 'available' && <button className="btn primary" onClick={() => void bridge().update.openRelease()}>Open release page</button>}
+        <button className="btn" disabled={busy || state.mode === 'unavailable' || state.phase === 'ready'} onClick={() => void bridge().update.check().then(setState)}>Check now</button>
       </div>
     </Card>
   );

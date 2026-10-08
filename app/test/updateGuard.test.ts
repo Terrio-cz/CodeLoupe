@@ -102,14 +102,14 @@ describe('UpdateGuard', () => {
     const { g, manager, files, used, told, rolledBack } = await guard();
     manager.restart.mockImplementationOnce(async () => { manager.current = state('running', '0.9.0-rc.1'); return manager.current; });
     g.watch();
-    manager.emit('failed', 'Spuštění selhalo: Error: Unable to access jarfile');
+    manager.emit('failed', 'Start failed: Error: Unable to access jarfile');
     await vi.waitFor(() => expect(rolledBack).toHaveLength(1));
     expect(used).toHaveLength(1);
     expect(used[0].version).toBe('0.9.0-rc.1');
     expect(manager.restart).toHaveBeenCalledOnce();
     expect(files.readPending()).toBeNull();
     expect(files.readRollback()).toMatchObject({ failedVersion: '0.9.0-rc.2', usingVersion: '0.9.0-rc.1' });
-    expect(told[0]).toContain('běží předchozí verze 0.9.0-rc.1');
+    expect(told[0]).toContain('previous version 0.9.0-rc.1 is running');
     // The previous bundle stays: it is the one that runs while the rollback is in force.
     expect(UpdateGuard.bundleInForce(files, '0.9.0-rc.2')?.bundle.version).toBe('0.9.0-rc.1');
     expect(UpdateGuard.bundleInForce(files, '0.9.0-rc.3')).toBeNull();
@@ -122,7 +122,7 @@ describe('UpdateGuard', () => {
       const { g, manager, rolledBack } = await guard({ timeoutMs: 5_000 });
       manager.restart.mockImplementationOnce(async () => { manager.current = state('running', '0.9.0-rc.1'); return manager.current; });
       g.watch();
-      manager.push(state('error', undefined, { message: 'Daemon po spuštění neodpovídá na /status.' }));
+      manager.push(state('error', undefined, { message: 'The daemon does not answer /status after starting.' }));
       await vi.advanceTimersByTimeAsync(5_001);
       expect(rolledBack).toHaveLength(1);
     } finally {
@@ -138,7 +138,7 @@ describe('UpdateGuard', () => {
     await vi.waitFor(() => expect(told).toHaveLength(1));
     expect(used.map(b => b.version)).toEqual(['0.9.0-rc.1', '0.9.0-rc.2']);
     expect(files.readRollback()).toBeNull();
-    expect(told[0]).toContain('ani z předchozí verze');
+    expect(told[0]).toContain('from previous version 0.9.0-rc.1 either');
   });
 
   it('only reports the failure when no previous bundle was kept', async () => {

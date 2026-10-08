@@ -15,31 +15,31 @@ export function StatusBadge({ tone, live, children }: { tone: Tone; live?: boole
 }
 
 const LAYER: Record<LayerState, [Tone, string]> = {
-  fresh: ['ok', 'čerstvá'],
-  stale: ['warning', 'zastaralá'],
-  building: ['running', 'parsuje se'],
-  error: ['critical', 'chyba'],
-  none: ['neutral', 'bez vrstvy'],
+  fresh: ['ok', 'fresh'],
+  stale: ['warning', 'stale'],
+  building: ['running', 'parsing'],
+  error: ['critical', 'error'],
+  none: ['neutral', 'no layer'],
 };
 export const LayerBadge = ({ state }: { state: LayerState }) => <StatusBadge tone={LAYER[state][0]} live={state === 'building'}>{LAYER[state][1]}</StatusBadge>;
 
 const REPO: Record<RepoIndexState, [Tone, string]> = {
-  ready: ['ok', 'připraven'],
-  building: ['running', 'build běží'],
-  stale: ['warning', 'zastaralý'],
-  error: ['critical', 'chyba'],
-  none: ['neutral', 'bez indexu'],
+  ready: ['ok', 'ready'],
+  building: ['running', 'building'],
+  stale: ['warning', 'stale'],
+  error: ['critical', 'error'],
+  none: ['neutral', 'no index'],
 };
 export const RepoBadge = ({ state }: { state: RepoIndexState }) => <StatusBadge tone={REPO[state][0]} live={state === 'building'}>{REPO[state][1]}</StatusBadge>;
 
 const PHASE: Record<DaemonPhase, [Tone, string]> = {
-  unknown: ['neutral', 'zjišťuji'],
-  starting: ['running', 'spouští se'],
-  running: ['ok', 'běží'],
-  stopping: ['running', 'zastavuje se'],
-  stopped: ['neutral', 'zastaven'],
-  down: ['critical', 'neodpovídá'],
-  error: ['critical', 'chyba'],
+  unknown: ['neutral', 'state unknown'],
+  starting: ['running', 'starting'],
+  running: ['ok', 'running'],
+  stopping: ['running', 'stopping'],
+  stopped: ['neutral', 'stopped'],
+  down: ['critical', 'not responding'],
+  error: ['critical', 'error'],
 };
 export const PhaseBadge = ({ phase }: { phase: DaemonPhase }) => <StatusBadge tone={PHASE[phase][0]} live={phase === 'running' || phase === 'starting' || phase === 'stopping'}>Daemon {PHASE[phase][1]}</StatusBadge>;
 
@@ -50,10 +50,10 @@ export function taskTone(state: string): Tone {
 }
 
 const CHANGE: Record<DeclChangeKind, [string, string]> = {
-  added: ['+', 'přidaná'],
-  body: ['~', 'upravené tělo'],
-  signature: ['^', 'změněná signatura'],
-  removed: ['-', 'odstraněná'],
+  added: ['+', 'added'],
+  body: ['~', 'body changed'],
+  signature: ['^', 'signature changed'],
+  removed: ['-', 'removed'],
 };
 export function ChangeMark({ change }: { change: DeclChangeKind }) {
   return (
@@ -64,18 +64,18 @@ export function ChangeMark({ change }: { change: DeclChangeKind }) {
 }
 
 const WORKSPACE: Record<WorkspaceState | 'gone', [Tone, string]> = {
-  active: ['running', 'aktivní'],
-  landed: ['ok', 'dokončený'],
-  abandoned: ['warning', 'opuštěný'],
-  orphan: ['serious', 'sirotek'],
-  gone: ['neutral', 'chybí v registru'],
+  active: ['running', 'active'],
+  landed: ['ok', 'landed'],
+  abandoned: ['warning', 'abandoned'],
+  orphan: ['serious', 'orphan'],
+  gone: ['neutral', 'missing from registry'],
 };
 export const WorkspaceBadge = ({ state }: { state: WorkspaceState | 'gone' }) => <StatusBadge tone={WORKSPACE[state][0]}>{WORKSPACE[state][1]}</StatusBadge>;
 
 const VERDICT: Record<Verdict, [Tone, string]> = {
-  auto: ['running', 'uklidí se samo'],
-  confirm: ['warning', 'čeká na potvrzení'],
-  keep: ['neutral', 'zůstane'],
-  protected: ['neutral', 'chráněný'],
+  auto: ['running', 'cleans up automatically'],
+  confirm: ['warning', 'awaiting confirmation'],
+  keep: ['neutral', 'kept'],
+  protected: ['neutral', 'protected'],
 };
 export const VerdictBadge = ({ verdict }: { verdict: Verdict }) => <StatusBadge tone={VERDICT[verdict][0]}>{VERDICT[verdict][1]}</StatusBadge>;

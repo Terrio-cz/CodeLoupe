@@ -12,6 +12,8 @@ interface Props {
   onChanged(): void;
 }
 
+const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
+
 type Phase =
   | { step: 'scan' }
   | { step: 'failed'; message: string }
@@ -57,11 +59,11 @@ export function ImportWizard({ onClose, onChanged }: Props) {
   };
 
   return (
-    <Drawer title="Import proměnných" subtitle="Najde proměnné v souborech Claude a v repozitářích a přesune vybrané do šifrovaného úložiště. Hodnoty okno nikdy nevidí." onClose={onClose} wide>
+    <Drawer title="Import variables" subtitle="Finds variables in Claude files and in repositories and moves the selected ones into the encrypted store. The window never sees the values." onClose={onClose} wide>
       {phase.step === 'scan' && (
-        <div className="state" aria-busy="true" aria-label="Prohledávám">Prohledávám složky Claude a repozitáře (čtou se jen soubory s proměnnými, v okně zůstanou jména)…</div>
+        <div className="state" aria-busy="true" aria-label="Scanning">Scanning Claude folders and repositories (only files with variables are read; the window keeps just the names)…</div>
       )}
-      {phase.step === 'importing' && <div className="state" aria-busy="true" aria-label="Importuji">Importuji do úložiště…</div>}
+      {phase.step === 'importing' && <div className="state" aria-busy="true" aria-label="Importing">Importing into the store…</div>}
       {phase.step === 'failed' && <ErrorState message={phase.message} onRetry={() => void scan(includeExcluded)} />}
       {phase.step === 'choose' && <Choose inventory={phase.inventory} picks={picks} setPicks={setPicks} onlySensitive={onlySensitive} setOnlySensitive={setOnlySensitive}
         includeExcluded={includeExcluded} setIncludeExcluded={v => { setIncludeExcluded(v); void scan(v); }} replaceSources={replaceSources} setReplaceSources={setReplaceSources}
@@ -94,36 +96,36 @@ export function Choose(p: ChooseProps) {
   return (
     <>
       <p className="muted">
-        {inv.counts.groups} proměnných ({inv.counts.names} jmen) v {inv.counts.files} souborech: {inv.counts.sensitive} vypadá jako přihlašovací údaj, {inv.counts.duplicates} se opakuje,
-        {' '}{inv.counts.conflicts} má zdroje s různou hodnotou, {inv.counts.inStore} už je ve storu.
+        {plural(inv.counts.groups, 'variable')} ({plural(inv.counts.names, 'name')}) in {plural(inv.counts.files, 'file')}: {inv.counts.sensitive} look like credentials, {inv.counts.duplicates} repeat,
+        {' '}{inv.counts.conflicts} have sources with different values, {inv.counts.inStore} already in the store.
       </p>
       {inv.excluded.length > 0 && !p.includeExcluded && (
-        <div className="banner info" role="note">Vynecháno {inv.excluded.length} složek cizích systémů (TNT/FoodRetailor): {inv.excluded.slice(0, 3).join(', ')}{inv.excluded.length > 3 ? ', …' : ''}.</div>
+        <div className="banner info" role="note">Skipped {plural(inv.excluded.length, 'folder')} of other systems (TNT/FoodRetailor): {inv.excluded.slice(0, 3).join(', ')}{inv.excluded.length > 3 ? ', …' : ''}.</div>
       )}
       <div className="filterbar">
-        <label className="check"><input type="checkbox" checked={p.onlySensitive} onChange={e => p.setOnlySensitive(e.target.checked)} /> Jen údaje, které vypadají citlivě</label>
-        <label className="check"><input type="checkbox" checked={p.includeExcluded} onChange={e => p.setIncludeExcluded(e.target.checked)} /> Zahrnout vyloučené složky</label>
+        <label className="check"><input type="checkbox" checked={p.onlySensitive} onChange={e => p.setOnlySensitive(e.target.checked)} /> Only values that look sensitive</label>
+        <label className="check"><input type="checkbox" checked={p.includeExcluded} onChange={e => p.setIncludeExcluded(e.target.checked)} /> Include excluded folders</label>
       </div>
       <div className="table-wrap">
         <table className="data import-table choose">
-          <caption className="sr-only">Nalezené proměnné</caption>
+          <caption className="sr-only">Variables found</caption>
           <thead>
-            <tr><th scope="col">Importovat</th><th scope="col">Klíč</th><th scope="col">Rozsah</th><th scope="col">Zdroje</th><th scope="col">Stav</th></tr>
+            <tr><th scope="col">Import</th><th scope="col">Key</th><th scope="col">Scope</th><th scope="col">Sources</th><th scope="col">State</th></tr>
           </thead>
           <tbody>
-            {shown.length === 0 && <tr><td colSpan={5}>Nic k importu.</td></tr>}
+            {shown.length === 0 && <tr><td colSpan={5}>Nothing to import.</td></tr>}
             {shown.map(g => <GroupRow key={groupKey(g)} g={g} picks={picks} setPicks={p.setPicks} />)}
           </tbody>
         </table>
       </div>
       <fieldset className="import-options">
-        <legend className="sr-only">Možnosti importu</legend>
-        <label className="check"><input type="checkbox" checked={p.replaceSources} onChange={e => p.setReplaceSources(e.target.checked)} /> Po importu nahradit hodnoty ve zdrojích odkazem (záloha zůstane, jde vrátit)</label>
-        <label className="check"><input type="checkbox" checked={p.overwrite} onChange={e => p.setOverwrite(e.target.checked)} /> Přepsat odlišnou hodnotu, kterou už store drží</label>
+        <legend className="sr-only">Import options</legend>
+        <label className="check"><input type="checkbox" checked={p.replaceSources} onChange={e => p.setReplaceSources(e.target.checked)} /> After import, replace values in the sources with a reference (a backup is kept and can be restored)</label>
+        <label className="check"><input type="checkbox" checked={p.overwrite} onChange={e => p.setOverwrite(e.target.checked)} /> Overwrite a different value the store already holds</label>
       </fieldset>
-      {unresolved > 0 && <div className="banner" role="note">{unresolved} proměnných má zdroje s různou hodnotou: vyberte u nich zdroj, jinak se neimportují.</div>}
+      {unresolved > 0 && <div className="banner" role="note">{unresolved === 1 ? '1 variable has' : `${unresolved} variables have`} sources with different values: pick a source for them, otherwise they are not imported.</div>}
       <div className="drawer-actions">
-        <button className="btn primary" disabled={count === 0} onClick={p.onRun}>Importovat ({count})</button>
+        <button className="btn primary" disabled={count === 0} onClick={p.onRun}>Import ({count})</button>
       </div>
     </>
   );
@@ -137,8 +139,8 @@ function GroupRow({ g, picks, setPicks }: { g: EnvInventory['variables'][number]
     <tr>
       <td>
         {g.conflict
-          ? <span className="muted">vyberte zdroj</span>
-          : <input type="checkbox" aria-label={`Importovat ${g.name}`} checked={ticked} onChange={() => setPicks(togglePick(picks, g))} />}
+          ? <span className="muted">pick a source</span>
+          : <input type="checkbox" aria-label={`Import ${g.name}`} checked={ticked} onChange={() => setPicks(togglePick(picks, g))} />}
       </td>
       <td className="mono">{g.name}</td>
       <td>{scopeLabel(g.scope)}</td>
@@ -147,7 +149,7 @@ function GroupRow({ g, picks, setPicks }: { g: EnvInventory['variables'][number]
           {g.sources.map(s => (
             <li key={s.id}>
               {g.conflict && (
-                <input type="radio" name={idBase} aria-label={`Použít zdroj ${s.file}`} checked={picks[key]?.[0] === s.id} onChange={() => setPicks(choose(picks, g, s.id))} />
+                <input type="radio" name={idBase} aria-label={`Use source ${s.file}`} checked={picks[key]?.[0] === s.id} onChange={() => setPicks(choose(picks, g, s.id))} />
               )}{' '}
               <span title={`${s.kind}: ${s.locator}`}>{s.file}</span> <span className="muted">({s.locator})</span>
             </li>
@@ -156,11 +158,11 @@ function GroupRow({ g, picks, setPicks }: { g: EnvInventory['variables'][number]
       </td>
       <td>
         <span className="flags">
-          {g.sensitive && <StatusBadge tone="neutral">citlivé</StatusBadge>}
-          {g.conflict && <StatusBadge tone="serious">různé hodnoty</StatusBadge>}
-          {g.duplicate && <StatusBadge tone="neutral">opakuje se</StatusBadge>}
-          {g.store === 'same' && <StatusBadge tone="ok">ve storu</StatusBadge>}
-          {g.store === 'differs' && <StatusBadge tone="warning">store má jinou</StatusBadge>}
+          {g.sensitive && <StatusBadge tone="neutral">sensitive</StatusBadge>}
+          {g.conflict && <StatusBadge tone="serious">different values</StatusBadge>}
+          {g.duplicate && <StatusBadge tone="neutral">repeated</StatusBadge>}
+          {g.store === 'same' && <StatusBadge tone="ok">in store</StatusBadge>}
+          {g.store === 'differs' && <StatusBadge tone="warning">store differs</StatusBadge>}
         </span>
       </td>
     </tr>
@@ -170,37 +172,37 @@ function GroupRow({ g, picks, setPicks }: { g: EnvInventory['variables'][number]
 export function Done({ result, rolled, onRollback, onClose }: { result: EnvImportResult; rolled: string | null; onRollback(id: string): void; onClose(): void }) {
   return (
     <>
-      <div className="banner info" role="status">Vytvořeno {result.created}, aktualizováno {result.updated}, přeskočeno {result.skipped}.{result.replacedFiles > 0 ? ` Zdroje nahrazeny v ${result.replacedFiles} souborech.` : ''}</div>
+      <div className="banner info" role="status">Created {result.created}, updated {result.updated}, skipped {result.skipped}.{result.replacedFiles > 0 ? ` Sources replaced in ${plural(result.replacedFiles, 'file')}.` : ''}</div>
       <div className="table-wrap">
         <table className="data import-table">
-          <caption className="sr-only">Výsledek importu</caption>
-          <thead><tr><th scope="col">Klíč</th><th scope="col">Rozsah</th><th scope="col">Výsledek</th><th scope="col">Zdroj</th></tr></thead>
+          <caption className="sr-only">Import result</caption>
+          <thead><tr><th scope="col">Key</th><th scope="col">Scope</th><th scope="col">Result</th><th scope="col">Source</th></tr></thead>
           <tbody>
             {result.items.slice(0, 200).map(i => (
               <tr key={i.id}>
                 <td className="mono">{i.name}</td>
                 <td>{scopeLabel(i.scope)}</td>
-                <td>{outcomeLabel(i.outcome)}{i.replaced ? ', zdroj nahrazen odkazem' : ''}</td>
+                <td>{outcomeLabel(i.outcome)}{i.replaced ? ', source replaced with a reference' : ''}</td>
                 <td>{i.file}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {result.items.length > 200 && <p className="muted">… a {result.items.length - 200} dalších.</p>}
+      {result.items.length > 200 && <p className="muted">… and {result.items.length - 200} more.</p>}
       {result.notReplaced.length > 0 && (
         <div className="banner" role="note">
-          Nenahrazeno:
+          Not replaced:
           <ul className="plain">{result.notReplaced.map(n => <li key={n.file}>{n.file}: {n.reason}</li>)}</ul>
         </div>
       )}
       {result.backupId && (
         <div className="banner info" role="note">
-          Původní soubory jsou v šifrované záloze {result.backupId}.
-          {rolled ? <> {rolled}</> : <> <button className="btn" onClick={() => onRollback(result.backupId!)}>Vrátit zdroje do původního stavu</button></>}
+          The original files are in encrypted backup {result.backupId}.
+          {rolled ? <> {rolled}</> : <> <button className="btn" onClick={() => onRollback(result.backupId!)}>Restore sources to original state</button></>}
         </div>
       )}
-      <div className="drawer-actions"><button className="btn primary" onClick={onClose}>Hotovo</button></div>
+      <div className="drawer-actions"><button className="btn primary" onClick={onClose}>Done</button></div>
     </>
   );
 }

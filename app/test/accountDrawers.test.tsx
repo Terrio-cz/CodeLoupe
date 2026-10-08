@@ -12,19 +12,19 @@ describe('account drawers', () => {
       expect(field).toContain('type="password"');
       expect(field).toContain('autoComplete="new-password"');
       expect(field).not.toMatch(/\svalue=/);
-      expect(html).toContain('po uložení se už nikde nezobrazí');
+      expect(html).toContain('never shown anywhere after saving');
     }
   });
 
   it('say that adding a YouTrack account restarts the daemon, and that a Claude account is only a folder', () => {
-    expect(renderToStaticMarkup(<YoutrackAccountDrawer onClose={noop} onDone={noop} />)).toContain('restartuje daemon');
+    expect(renderToStaticMarkup(<YoutrackAccountDrawer onClose={noop} onDone={noop} />)).toContain('restarts the daemon');
     const claude = renderToStaticMarkup(<ClaudeAccountDrawer onClose={noop} onDone={noop} />);
     expect(claude).toContain('CLAUDE_CONFIG_DIR');
-    expect(claude).toContain('Vytvořit složku');
+    expect(claude).toContain('Create the folder');
     expect(claude).not.toContain('type="password"');
   });
 
   it('renames with the current name filled in', () => {
-    expect(renderToStaticMarkup(<RenameDrawer id="b" label="Účet B" onClose={noop} onDone={noop} />)).toContain('value="Účet B"');
+    expect(renderToStaticMarkup(<RenameDrawer id="b" label="Account B" onClose={noop} onDone={noop} />)).toContain('value="Account B"');
   });
 });

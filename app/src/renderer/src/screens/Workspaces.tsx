@@ -14,44 +14,44 @@ import { useAction } from '../useAction';
 import { confirmable, dockerCounts, joinWorkspaces, matches, stateCounts, type StateFilter, type WorkspaceRow } from '../workspaceModel';
 
 const STATES: { value: StateFilter; label: string }[] = [
-  { value: '', label: 'Všechny stavy' }, { value: 'active', label: 'Aktivní' }, { value: 'landed', label: 'Dokončené' },
-  { value: 'abandoned', label: 'Opuštěné' }, { value: 'orphan', label: 'Sirotci' }, { value: 'gone', label: 'Chybí v registru' }, { value: 'released', label: 'Uvolněné' },
+  { value: '', label: 'All states' }, { value: 'active', label: 'Active' }, { value: 'landed', label: 'Landed' },
+  { value: 'abandoned', label: 'Abandoned' }, { value: 'orphan', label: 'Orphans' }, { value: 'gone', label: 'Missing from registry' }, { value: 'released', label: 'Released' },
 ];
 
-const OUTCOME: Record<string, string> = { removed: 'odstraněno', gone: 'už neexistovalo', blocked: 'používané, zkusí se znovu', failed: 'selhalo, zkusí se znovu', skipped: 'přeskočeno' };
+const OUTCOME: Record<string, string> = { removed: 'removed', gone: 'no longer existed', blocked: 'in use, will retry', failed: 'failed, will retry', skipped: 'skipped' };
 
-/** Docker resources and ports of a workspace in one cell: `2 kont. · 1 vol. · 1 síť`, the ports on a second line. */
+/** Docker resources and ports of a workspace in one cell: `2 cont. · 1 vol. · 1 net`, the ports on a second line. */
 function DockerCell({ row }: { row: WorkspaceRow }) {
   const c = dockerCounts(row);
-  const parts = [c.containers && `${c.containers} kont.${c.running ? ` (${c.running} běží)` : ''}`, c.volumes && `${c.volumes} vol.`, c.networks && `${c.networks} síť`, c.images && `${c.images} img`].filter(Boolean);
+  const parts = [c.containers && `${c.containers} cont.${c.running ? ` (${c.running} running)` : ''}`, c.volumes && `${c.volumes} vol.`, c.networks && `${c.networks} net`, c.images && `${c.images} img`].filter(Boolean);
   const ports = row.ports.map(p => p.allocation.port).join(', ');
   if (!parts.length && !ports) return <span className="muted">—</span>;
   return (
     <>
-      {parts.length ? parts.join(' · ') : <span className="muted">bez prostředků</span>}
-      {ports && <div className="muted mono" title="Zapsané porty">porty {ports}</div>}
+      {parts.length ? parts.join(' · ') : <span className="muted">no resources</span>}
+      {ports && <div className="muted mono" title="Registered ports">ports {ports}</div>}
     </>
   );
 }
 
 /**
  * The list keeps to what tells workspaces apart; the repository column appears only while more than one is shown.
- * Disk and RAM are known only after „Zjistit disk a paměť“; until then their columns would be all dashes.
+ * Disk and RAM are known only after "Measure disk and memory"; until then their columns would be all dashes.
  */
 function columns(sizes: boolean, repoColumn: boolean): Column<WorkspaceRow>[] {
   return [
-    { key: 'name', header: 'Workspace', render: r => <span className="mono">{r.name}{r.ws?.role === 'main' ? ' · hlavní' : ''}</span> },
+    { key: 'name', header: 'Workspace', render: r => <span className="mono">{r.name}{r.ws?.role === 'main' ? ' · main' : ''}</span> },
     ...(repoColumn ? [{ key: 'repo', header: 'Repo', render: (r: WorkspaceRow) => r.repoName }] : []),
-    { key: 'state', header: 'Stav', render: r => <WorkspaceBadge state={r.state} /> },
-    { key: 'task', header: 'Úkol', render: r => (r.ws?.taskId ? <span title={r.ws.tracker?.summary}>{r.ws.taskId}{r.ws.tracker?.state ? ` · ${r.ws.tracker.state}` : ''}</span> : '—'), className: 'ellipsis narrow' },
-    { key: 'merge', header: 'Větev', render: r => (r.ws?.merge ? (r.ws.merge.merged ? 'sloučená' : `↑${r.ws.merge.ahead} nesloučeno`) : '—') },
-    { key: 'docker', header: 'Docker a porty', render: r => <DockerCell row={r} />, className: 'wrap-cell' },
+    { key: 'state', header: 'State', render: r => <WorkspaceBadge state={r.state} /> },
+    { key: 'task', header: 'Task', render: r => (r.ws?.taskId ? <span title={r.ws.tracker?.summary}>{r.ws.taskId}{r.ws.tracker?.state ? ` · ${r.ws.tracker.state}` : ''}</span> : '—'), className: 'ellipsis narrow' },
+    { key: 'merge', header: 'Branch', render: r => (r.ws?.merge ? (r.ws.merge.merged ? 'merged' : `↑${r.ws.merge.ahead} unmerged`) : '—') },
+    { key: 'docker', header: 'Docker and ports', render: r => <DockerCell row={r} />, className: 'wrap-cell' },
     ...(sizes ? [
       { key: 'disk', header: 'Disk', render: (r: WorkspaceRow) => (r.ws?.sizeBytes != null ? bytes(r.ws.sizeBytes) : '—'), numeric: true },
       { key: 'ram', header: 'RAM', render: (r: WorkspaceRow) => { const m = dockerCounts(r).memoryBytes; return m === null ? '—' : bytes(m); }, numeric: true },
     ] : []),
-    { key: 'activity', header: 'Aktivita', render: r => ago(r.ws?.lastActivity) },
-    { key: 'cleanup', header: 'Úklid', render: r => <CleanupCell row={r} />, className: 'wrap-cell' },
+    { key: 'activity', header: 'Activity', render: r => ago(r.ws?.lastActivity) },
+    { key: 'cleanup', header: 'Cleanup', render: r => <CleanupCell row={r} />, className: 'wrap-cell' },
   ];
 }
 
@@ -61,9 +61,9 @@ function CleanupCell({ row }: { row: WorkspaceRow }) {
   if (!auto && !confirm && !row.release) return <span className="muted">—</span>;
   return (
     <span>
-      {confirm > 0 && <StatusBadge tone="warning">{confirm} čeká na potvrzení</StatusBadge>}
-      {auto > 0 && <span className="muted">{confirm > 0 ? ' · ' : ''}{auto} sám</span>}
-      {row.release && <span className="muted">{auto || confirm ? ' · ' : ''}uvolněn, zbývá {row.release.pending ?? '?'}{row.release.retrying ? `, opakuje ${row.release.retrying}` : ''}</span>}
+      {confirm > 0 && <StatusBadge tone="warning">{confirm} awaiting confirmation</StatusBadge>}
+      {auto > 0 && <span className="muted">{confirm > 0 ? ' · ' : ''}{auto} automatic</span>}
+      {row.release && <span className="muted">{auto || confirm ? ' · ' : ''}released, {row.release.pending ?? '?'} left{row.release.retrying ? `, ${row.release.retrying} retrying` : ''}</span>}
     </span>
   );
 }
@@ -97,7 +97,7 @@ export function Workspaces({ route }: { route: Route }) {
     return () => clearInterval(t);
   }, [pendingRelease]);
 
-  if (!list.data) return <Card bodyClass="">{list.loading ? <Loading variant="table" /> : <ErrorState message={list.error?.message ?? 'Nelze načíst workspaces.'} onRetry={list.reload} />}</Card>;
+  if (!list.data) return <Card bodyClass="">{list.loading ? <Loading variant="table" /> : <ErrorState message={list.error?.message ?? 'Could not load workspaces.'} onRetry={list.reload} />}</Card>;
 
   const repos = list.data.repos.map(r => r.name);
   const shown = rows.filter(r => matches(r, { repo, state, q }));
@@ -112,22 +112,22 @@ export function Workspaces({ route }: { route: Route }) {
   return (
     <>
       <div className="filterbar">
-        <Select label="Repozitář" value={repo} onChange={setRepo} options={[{ value: '', label: 'Všechna repa' }, ...repos.map(r => ({ value: r, label: r }))]} />
-        <Select label="Stav workspace" value={state} onChange={v => setState(v as StateFilter)} options={STATES} />
-        <Search label="Hledat workspace, úkol" value={q} onChange={setQ} />
-        <label className="check"><input type="checkbox" checked={sizes} onChange={e => setSizes(e.target.checked)} />Zjistit disk a paměť <span className="muted">(projde soubory a ptá se Dockeru, trvá vteřiny)</span></label>
-        {sizes && (list.loading || resources.loading) && <span className="muted" role="status">Zjišťuji…</span>}
+        <Select label="Repository" value={repo} onChange={setRepo} options={[{ value: '', label: 'All repos' }, ...repos.map(r => ({ value: r, label: r }))]} />
+        <Select label="Workspace state" value={state} onChange={v => setState(v as StateFilter)} options={STATES} />
+        <Search label="Search workspace, task" value={q} onChange={setQ} />
+        <label className="check"><input type="checkbox" checked={sizes} onChange={e => setSizes(e.target.checked)} />Measure disk and memory <span className="muted">(walks files and asks Docker, takes seconds)</span></label>
+        {sizes && (list.loading || resources.loading) && <span className="muted" role="status">Measuring…</span>}
       </div>
-      {problems.length > 0 && <Banner><strong>Něco se nepodařilo přečíst</strong><ul className="plain">{problems.map(p => <li key={p}>{p}</li>)}</ul></Banner>}
+      {problems.length > 0 && <Banner><strong>Some data could not be read</strong><ul className="plain">{problems.map(p => <li key={p}>{p}</li>)}</ul></Banner>}
 
-      <section aria-label="Počty podle stavu">
+      <section aria-label="Counts by state">
         <div className="kpis">
-          <KpiTile label="Aktivní" value={<CountUp value={counts.active} format={num} />} ctx="práce běží" />
-          <KpiTile label="Dokončené" value={<CountUp value={counts.landed} format={num} />} ctx="práce je na hlavní větvi" />
-          <KpiTile label="Opuštěné" value={<CountUp value={counts.abandoned} format={num} />} ctx="bez aktivity, nesloučené" />
-          <KpiTile label="Sirotci" value={<CountUp value={counts.orphan} format={num} />} ctx="adresář bez worktree" />
-          <KpiTile label="Čeká na potvrzení" value={<CountUp value={toConfirm.length} format={num} />} ctx="prostředky k úklidu" />
-          <KpiTile label="Uvolněné" value={<CountUp value={released.length} format={num} />} ctx={`zbývá ${num(released.reduce((a, r) => a + (r.pending ?? 0), 0))} prostředků`} />
+          <KpiTile label="Active" value={<CountUp value={counts.active} format={num} />} ctx="work in progress" />
+          <KpiTile label="Landed" value={<CountUp value={counts.landed} format={num} />} ctx="work is on the main branch" />
+          <KpiTile label="Abandoned" value={<CountUp value={counts.abandoned} format={num} />} ctx="inactive, unmerged" />
+          <KpiTile label="Orphans" value={<CountUp value={counts.orphan} format={num} />} ctx="directory without worktree" />
+          <KpiTile label="To confirm" value={<CountUp value={toConfirm.length} format={num} />} ctx="resources to clean up" />
+          <KpiTile label="Released" value={<CountUp value={released.length} format={num} />} ctx={(left => `${num(left)} ${left === 1 ? 'resource' : 'resources'} left`)(released.reduce((a, r) => a + (r.pending ?? 0), 0))} />
         </div>
       </section>
 
@@ -135,11 +135,11 @@ export function Workspaces({ route }: { route: Route }) {
 
       <Card bodyClass="">
         <DataTable label="Workspaces" rows={shown} columns={columns(sizes, !repo && repos.length > 1)} rowKey={r => r.id} selected={route.id}
-          onOpen={r => go('workspaces', r.id)} shortcuts={settings?.shortcuts} empty="Žádný workspace neodpovídá filtru." />
+          onOpen={r => go('workspaces', r.id)} shortcuts={settings?.shortcuts} empty="No workspace matches the filter." />
       </Card>
       {route.id && (selected
         ? <WorkspaceDrawer row={selected} onClose={() => go('workspaces')} onChanged={reloadAll} />
-        : <Drawer title={route.id} onClose={() => go('workspaces')}><ErrorState title="Workspace nenalezen" message="Tento workspace v registru není." /></Drawer>)}
+        : <Drawer title={route.id} onClose={() => go('workspaces')}><ErrorState title="Workspace not found" message="This workspace is not in the registry." /></Drawer>)}
     </>
   );
 }
@@ -158,19 +158,19 @@ function ConfirmCard({ entries, onDone }: { entries: PlanEntry[]; onDone(): void
   };
 
   return (
-    <Card title={`Čeká na potvrzení úklidu (${entries.length})`} bodyClass="" actions={
+    <Card title={`Cleanup awaiting confirmation (${entries.length})`} bodyClass="" actions={
       <>
-        <button className="btn ghost" onClick={() => setPicked(picked.size === entries.length ? new Set() : new Set(entries.map(e => e.key)))}>{picked.size === entries.length ? 'Zrušit výběr' : 'Vybrat vše'}</button>
-        <button className="btn primary" disabled={picked.size === 0 || action.busy} onClick={() => void remove()}>{action.busy ? 'Odstraňuji…' : `Potvrdit úklid vybraných (${picked.size})`}</button>
+        <button className="btn ghost" onClick={() => setPicked(picked.size === entries.length ? new Set() : new Set(entries.map(e => e.key)))}>{picked.size === entries.length ? 'Clear selection' : 'Select all'}</button>
+        <button className="btn primary" disabled={picked.size === 0 || action.busy} onClick={() => void remove()}>{action.busy ? 'Removing…' : `Clean up selected (${picked.size})`}</button>
       </>
     }>
       <div className="table-wrap" style={{ maxHeight: 280 }}>
-        <table className="data" aria-label="Prostředky čekající na potvrzení">
-          <thead><tr><th scope="col"><span className="sr-only">Vybrat</span></th><th scope="col">Druh</th><th scope="col">Prostředek</th><th scope="col">Workspace</th><th scope="col">Proč</th></tr></thead>
+        <table className="data" aria-label="Resources awaiting confirmation">
+          <thead><tr><th scope="col"><span className="sr-only">Select</span></th><th scope="col">Kind</th><th scope="col">Resource</th><th scope="col">Workspace</th><th scope="col">Reason</th></tr></thead>
           <tbody>
             {entries.map(e => (
               <tr key={e.key}>
-                <td><input type="checkbox" checked={picked.has(e.key)} onChange={() => toggle(e.key)} aria-label={`Vybrat ${e.name}`} /></td>
+                <td><input type="checkbox" checked={picked.has(e.key)} onChange={() => toggle(e.key)} aria-label={`Select ${e.name}`} /></td>
                 <td>{e.kind}</td><td className="mono ellipsis" title={e.name}>{e.name}</td><td className="mono">{e.workspace ?? '—'}</td><td className="ellipsis" title={e.reason}>{e.reason}</td>
               </tr>
             ))}
@@ -210,47 +210,47 @@ function WorkspaceDrawer({ row, onClose, onChanged }: { row: WorkspaceRow; onClo
   };
 
   return (
-    <Drawer title={<span className="mono">{row.name}</span>} subtitle={ws ? <span className="mono">{ws.path}</span> : `${row.repoName}: workspace chybí v registru`} onClose={onClose}>
+    <Drawer title={<span className="mono">{row.name}</span>} subtitle={ws ? <span className="mono">{ws.path}</span> : `${row.repoName}: workspace missing from registry`} onClose={onClose}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <WorkspaceBadge state={row.state} />
-        {row.release && <span className="chip">uvolněný {ago(row.release.at)}</span>}
+        {row.release && <span className="chip">released {ago(row.release.at)}</span>}
         <span className="muted">{row.repoName}</span>
       </div>
       {ws?.note && <Banner tone="info" role="note">{ws.note}</Banner>}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {canRelease && <button className="btn" disabled={release.busy} onClick={() => void doRelease()}>{release.busy ? 'Uvolňuji…' : 'Uvolnit workspace…'}</button>}
-        {waiting.length > 0 && <button className="btn primary" disabled={cleanup.busy} onClick={() => void doCleanup()}>{cleanup.busy ? 'Odstraňuji…' : `Potvrdit úklid (${waiting.length})…`}</button>}
-        {ws?.taskId && <button className="btn" onClick={() => go('tasks', ws.taskId)}>Úkol {ws.taskId} →</button>}
+        {canRelease && <button className="btn" disabled={release.busy} onClick={() => void doRelease()}>{release.busy ? 'Releasing…' : 'Release workspace…'}</button>}
+        {waiting.length > 0 && <button className="btn primary" disabled={cleanup.busy} onClick={() => void doCleanup()}>{cleanup.busy ? 'Removing…' : `Confirm cleanup (${waiting.length})…`}</button>}
+        {ws?.taskId && <button className="btn" onClick={() => go('tasks', ws.taskId)}>Task {ws.taskId} →</button>}
       </div>
       <Outcome outcome={release.outcome} />
       <Outcome outcome={cleanup.outcome} />
 
-      <Section title="Souhrn">
+      <Section title="Summary">
         <dl className="dl">
-          <dt>Role</dt><dd>{ws ? ({ main: 'hlavní worktree', worktree: 'worktree', directory: 'adresář bez worktree' } as const)[ws.role] : '—'}</dd>
-          <dt>Větev</dt><dd className="mono">{ws?.branch ?? '—'}{ws?.head ? ` · ${ws.head.slice(0, 7)}` : ''}</dd>
-          <dt>Vůči {ws?.merge?.defaultRef ?? 'hlavní větvi'}</dt>
-          <dd>{ws?.merge ? (ws.merge.merged ? 'vše je sloučeno' : `${ws.merge.ahead} ${ws.merge.ahead === 1 ? 'commit' : ws.merge.ahead < 5 ? 'commity' : 'commitů'} nesloučeno`) : '—'}{ws?.merge?.subject ? <div className="muted">{ws.merge.subject}</div> : null}</dd>
-          <dt>Úkol</dt><dd>{ws?.taskId ? `${ws.taskId} · ${ws.tracker?.state ?? 'v mirroru není'}${ws.tracker?.resolved ? ' (vyřešený)' : ''}` : '—'}{ws?.tracker?.summary ? <div className="muted">{ws.tracker.summary}</div> : null}</dd>
-          <dt>Poslední aktivita</dt><dd>{ago(ws?.lastActivity)}</dd>
-          <dt>Disk</dt><dd>{ws?.sizeBytes != null ? bytes(ws.sizeBytes) : 'nezjištěno (zapněte „Zjistit disk a paměť“)'}</dd>
-          <dt>Paměť kontejnerů</dt><dd>{dockerCounts(row).memoryBytes !== null ? bytes(dockerCounts(row).memoryBytes!) : dockerCounts(row).running ? 'nezjištěno (zapněte „Zjistit disk a paměť“)' : 'žádný kontejner neběží'}</dd>
+          <dt>Role</dt><dd>{ws ? ({ main: 'main worktree', worktree: 'worktree', directory: 'directory without worktree' } as const)[ws.role] : '—'}</dd>
+          <dt>Branch</dt><dd className="mono">{ws?.branch ?? '—'}{ws?.head ? ` · ${ws.head.slice(0, 7)}` : ''}</dd>
+          <dt>Against {ws?.merge?.defaultRef ?? 'main branch'}</dt>
+          <dd>{ws?.merge ? (ws.merge.merged ? 'everything is merged' : `${ws.merge.ahead} ${ws.merge.ahead === 1 ? 'commit' : 'commits'} unmerged`) : '—'}{ws?.merge?.subject ? <div className="muted">{ws.merge.subject}</div> : null}</dd>
+          <dt>Task</dt><dd>{ws?.taskId ? `${ws.taskId} · ${ws.tracker?.state ?? 'not in mirror'}${ws.tracker?.resolved ? ' (resolved)' : ''}` : '—'}{ws?.tracker?.summary ? <div className="muted">{ws.tracker.summary}</div> : null}</dd>
+          <dt>Last activity</dt><dd>{ago(ws?.lastActivity)}</dd>
+          <dt>Disk</dt><dd>{ws?.sizeBytes != null ? bytes(ws.sizeBytes) : 'not measured (turn on "Measure disk and memory")'}</dd>
+          <dt>Container memory</dt><dd>{dockerCounts(row).memoryBytes !== null ? bytes(dockerCounts(row).memoryBytes!) : dockerCounts(row).running ? 'not measured (turn on "Measure disk and memory")' : 'no container running'}</dd>
         </dl>
       </Section>
 
       {row.release && (
-        <Section title="Uvolnění">
+        <Section title="Release">
           <dl className="dl">
-            <dt>Uvolněn</dt><dd>{ago(row.release.at)}</dd>
-            <dt>Zbývá</dt><dd>{row.release.pending === null ? 'daemon se ještě nepodíval' : `${num(row.release.pending)} prostředků`}</dd>
-            <dt>Čeká na opakování</dt><dd>{row.release.retrying === null ? '—' : num(row.release.retrying)}</dd>
+            <dt>Released</dt><dd>{ago(row.release.at)}</dd>
+            <dt>Left</dt><dd>{row.release.pending === null ? 'daemon has not checked yet' : `${num(row.release.pending)} ${row.release.pending === 1 ? 'resource' : 'resources'}`}</dd>
+            <dt>Awaiting retry</dt><dd>{row.release.retrying === null ? '—' : num(row.release.retrying)}</dd>
           </dl>
         </Section>
       )}
 
-      <Section title="Docker prostředky" count={Math.max(row.resources.length, row.plan.length)}>
-        {row.plan.length === 0 && row.resources.length === 0 ? <div className="muted">Žádné prostředky, které by CodeLoupe vlastnil nebo adoptoval.</div> : (
+      <Section title="Docker resources" count={Math.max(row.resources.length, row.plan.length)}>
+        {row.plan.length === 0 && row.resources.length === 0 ? <div className="muted">No resources owned or adopted by CodeLoupe.</div> : (
           <ul className="rows">
             {row.plan.map(e => (
               <li key={e.key} className="stacked">
@@ -258,7 +258,7 @@ function WorkspaceDrawer({ row, onClose, onChanged }: { row: WorkspaceRow; onClo
                 <span className="grow mono" title={e.name}>{e.name}</span>
                 <VerdictBadge verdict={e.verdict} />
                 <div className="sub muted">
-                  {e.reason}{e.attempts > 0 ? ` · pokusů ${e.attempts}${e.lastError ? `, naposledy: ${e.lastError}` : ''}${e.nextAttempt ? `, další ${ago(e.nextAttempt)}` : ''}` : ''}
+                  {e.reason}{e.attempts > 0 ? ` · ${e.attempts} ${e.attempts === 1 ? 'attempt' : 'attempts'}${e.lastError ? `, last: ${e.lastError}` : ''}${e.nextAttempt ? `, next ${ago(e.nextAttempt)}` : ''}` : ''}
                 </div>
               </li>
             ))}
@@ -269,13 +269,13 @@ function WorkspaceDrawer({ row, onClose, onChanged }: { row: WorkspaceRow; onClo
         )}
       </Section>
 
-      <Section title="Porty" count={row.ports.length}>
-        {row.ports.length === 0 ? <div className="muted">Žádný zapsaný port.</div> : (
+      <Section title="Ports" count={row.ports.length}>
+        {row.ports.length === 0 ? <div className="muted">No registered port.</div> : (
           <ul className="rows">
             {row.ports.map(p => (
               <li key={p.allocation.port}>
                 <span className="mono">{p.allocation.port}</span><span className="grow">{p.allocation.name}</span>
-                <StatusBadge tone={p.state === 'conflict' ? 'critical' : p.state === 'in-use' ? 'running' : 'neutral'}>{p.state === 'free' ? 'volný' : p.state === 'in-use' ? 'používá workspace' : 'koliduje'}</StatusBadge>
+                <StatusBadge tone={p.state === 'conflict' ? 'critical' : p.state === 'in-use' ? 'running' : 'neutral'}>{p.state === 'free' ? 'free' : p.state === 'in-use' ? 'used by workspace' : 'conflict'}</StatusBadge>
                 {p.usedBy && <span className="muted">{p.usedBy}</span>}
               </li>
             ))}

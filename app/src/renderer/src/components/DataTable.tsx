@@ -26,7 +26,7 @@ interface Props<T> {
   sort?: SortState;
   onSort?: (s: SortState) => void;
   empty?: ReactNode;
-  /** j/k/Enter while the table has focus (Settings → Klávesové zkratky). */
+  /** j/k/Enter while the table has focus (Settings → Keyboard shortcuts). */
   shortcuts?: boolean;
 }
 
@@ -80,7 +80,7 @@ export function DataTable<T>({ label, rows, columns, rowKey, onOpen, selected, s
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="empty-cell"><Empty>{empty ?? 'Žádná data.'}</Empty></td>
+              <td colSpan={columns.length} className="empty-cell"><Empty>{empty ?? 'No data.'}</Empty></td>
             </tr>
           ) : (
             rows.map(row => {

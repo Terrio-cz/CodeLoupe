@@ -62,10 +62,10 @@ export function setupUpdates(w: UpdateWiring): Updates {
     log(`state ${s.phase} latest=${s.latest ?? '-'} ${s.message ?? ''}`);
     if (s.phase === 'ready' && announced !== s.latest) {
       announced = s.latest ?? '';
-      w.notifier.info(`Aktualizace ${s.latest} je připravena`, 'Restartujte CodeLoupe v Nastavení.', '#/settings');
+      w.notifier.info(`Update ${s.latest} is ready`, 'Restart CodeLoupe in Settings.', '#/settings');
     } else if (s.phase === 'available' && announced !== s.latest) {
       announced = s.latest ?? '';
-      w.notifier.info(`Je dostupná verze ${s.latest}`, 'Stáhnout ji můžete ze stránky vydání (Nastavení).', '#/settings');
+      w.notifier.info(`Version ${s.latest} is available`, 'You can download it from the release page (Settings).', '#/settings');
     }
   });
 
@@ -77,7 +77,7 @@ export function setupUpdates(w: UpdateWiring): Updates {
     manager: w.manager,
     useBundle: bundle => w.store.setBundled(bundle),
     onRollback: record => service.setRollback(rollbackOf(record)),
-    tell: message => w.notifier.info('Aktualizace daemonu', message, '#/settings'),
+    tell: message => w.notifier.info('Daemon update', message, '#/settings'),
   });
   if (w.packaged) guard.watch();
 

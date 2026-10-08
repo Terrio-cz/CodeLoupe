@@ -229,7 +229,7 @@ claude mcp add --transport http --scope user codeloupe http://127.0.0.1:47391/mc
 ```
 
 **From the desktop app**: Settings → *Claude Code* shows whether `claude` is found and what is connected, and the
-buttons *Připojit plugin…* and *Přidat jen MCP server…* run exactly the commands above (after a native confirmation that
+buttons *Connect plugin…* and *Add MCP server only…* run exactly the commands above (after a native confirmation that
 lists them, with the daemon's current port), through the `claude` CLI, so Claude Code writes its own configuration.
 Without `claude` on `PATH` the card shows the commands to run by hand. The plugin is added from the marketplace folder
 next to the app (`resources/claude-plugin` when packaged, `CODELOUPE_PLUGIN_DIR` to override, the repository root in a
@@ -734,13 +734,13 @@ Scoop bucket or a Homebrew tap is a separate, manual step ([docs/release.md](doc
 ### Updates
 
 The installed app looks for a newer release on GitHub 30 seconds after it starts and every six hours (Settings →
-Aktualizace; **Hledat novou verzi automaticky** switches the check off, and with it off the app never contacts anything
+Updates; **Check for updates automatically** switches the check off, and with it off the app never contacts anything
 by itself). What happens next depends on the installation:
 
 | Installation | A newer release |
 |---|---|
-| Windows installer (NSIS), Linux AppImage | Downloaded in the background, the SHA-512 and size from the release's `latest.yml` / `latest-linux.yml` checked, then **Restartovat a aktualizovat** in Settings (or the next quit) installs it. The installer stops the daemon of the old installation and replaces its files; settings (`%APPDATA%\codeloupe-desktop`), secrets, task mirror and indexes (the daemon's home) are not touched, and the new app starts the daemon from the new bundle. An index written in an older format is rebuilt, never served. |
-| macOS, Linux `.deb`, a Windows copy unpacked by Scoop | Only a notification and **Otevřít stránku vydání** in Settings: macOS cannot update an app that has no Developer ID signature (nothing is paid for, [docs/code-signing.md](docs/code-signing.md)), the package manager owns the other two. Install the new version the way you installed this one. |
+| Windows installer (NSIS), Linux AppImage | Downloaded in the background, the SHA-512 and size from the release's `latest.yml` / `latest-linux.yml` checked, then **Restart and update** in Settings (or the next quit) installs it. The installer stops the daemon of the old installation and replaces its files; settings (`%APPDATA%\codeloupe-desktop`), secrets, task mirror and indexes (the daemon's home) are not touched, and the new app starts the daemon from the new bundle. An index written in an older format is rebuilt, never served. |
+| macOS, Linux `.deb`, a Windows copy unpacked by Scoop | Only a notification and **Open release page** in Settings: macOS cannot update an app that has no Developer ID signature (nothing is paid for, [docs/code-signing.md](docs/code-signing.md)), the package manager owns the other two. Install the new version the way you installed this one. |
 
 The first run of a new version is watched: the daemon of the new bundle has 90 seconds to answer. If it does not, the
 previous bundle (kept in `<app data>/update/previous` while the update was pending, about 190 MB, deleted once the new

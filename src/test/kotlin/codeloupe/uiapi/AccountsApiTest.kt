@@ -57,7 +57,7 @@ class AccountsApiTest {
             JsonFormat.json.encodeToString(
                 AccountsFile.serializer(),
                 AccountsFile(
-                    claude = listOf(AccountsFile.Claude("a", "Účet A", claudeA.toString()), AccountsFile.Claude("b", "Účet B", claudeB.toString()), AccountsFile.Claude("gone", "Chybí", claudeA.resolveSibling("no-such-dir").toString())),
+                    claude = listOf(AccountsFile.Claude("a", "Account A", claudeA.toString()), AccountsFile.Claude("b", "Account B", claudeB.toString()), AccountsFile.Claude("gone", "Missing", claudeA.resolveSibling("no-such-dir").toString())),
                     youtrack = listOf(
                         AccountsFile.Youtrack("terrio", "Terrio", "http://127.0.0.1:9", listOf("ter", "cl"), "YOUTRACK_TOKEN_TERRIO"),
                         AccountsFile.Youtrack("other", null, "http://127.0.0.1:9", listOf("X"), "YOUTRACK_TOKEN_OTHER"),
@@ -108,7 +108,7 @@ class AccountsApiTest {
         val claude = body["claude"]!!.jsonArray.map { it.jsonObject }.associateBy { it["id"]!!.jsonPrimitive.content }
         assertEquals(listOf("a", "b", "gone"), claude.keys.toList())
         assertEquals(listOf(true, false, false), claude.values.map { it["isDefault"]!!.jsonPrimitive.content.toBoolean() })
-        assertEquals("Účet A", claude.getValue("a")["label"]!!.jsonPrimitive.content)
+        assertEquals("Account A", claude.getValue("a")["label"]!!.jsonPrimitive.content)
         assertEquals(260L, claude.getValue("a")["weighted7d"]!!.jsonPrimitive.content.toLong(), "two turns of 130")
         assertEquals(130L, claude.getValue("b")["weighted7d"]!!.jsonPrimitive.content.toLong())
         assertEquals(0L, claude.getValue("gone")["weighted7d"]!!.jsonPrimitive.content.toLong())

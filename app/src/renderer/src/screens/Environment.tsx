@@ -16,7 +16,7 @@ type AuditEvent = EnvironmentAudit['events'][number];
 const scopeLabel = (k: { scope: string; scopeRef: string | null }) => (k.scopeRef ? `${k.scope} · ${k.scopeRef}` : k.scope);
 const target = (k: Key): KeyTarget => ({ name: k.name, scope: k.scope, scopeRef: k.scopeRef });
 
-const ACTION: Record<AuditEvent['action'], string> = { read: 'přečteno', created: 'vytvořeno', rotated: 'rotováno', removed: 'smazáno' };
+const ACTION: Record<AuditEvent['action'], string> = { read: 'read', created: 'created', rotated: 'rotated', removed: 'deleted' };
 
 interface Actions {
   canReveal: boolean;
@@ -27,29 +27,29 @@ interface Actions {
 
 function columns(rotationDays: number, actions: Actions): Column<Key>[] {
   return [
-    { key: 'name', header: 'Klíč', render: k => <span className="mono">{k.name}</span> },
-    { key: 'scope', header: 'Rozsah', render: scopeLabel },
-    { key: 'source', header: 'Zdroj', render: k => (k.source === 'file' ? <span title={k.sourceRef ?? undefined}>soubor</span> : 'store') },
+    { key: 'name', header: 'Key', render: k => <span className="mono">{k.name}</span> },
+    { key: 'scope', header: 'Scope', render: scopeLabel },
+    { key: 'source', header: 'Source', render: k => (k.source === 'file' ? <span title={k.sourceRef ?? undefined}>file</span> : 'store') },
     // The API never returns a value; the mask is all there is.
-    { key: 'value', header: 'Hodnota', render: () => <span className="mono" aria-label="hodnota skrytá">••••••••</span> },
-    { key: 'consumers', header: 'Spotřebitelé', render: k => k.consumers.join(', ') || '—', className: 'ellipsis' },
-    { key: 'used', header: 'Naposledy', render: k => ago(k.lastUsedAt) },
-    { key: 'updated', header: 'Upraveno', render: k => dateTime(k.updatedAt) },
+    { key: 'value', header: 'Value', render: () => <span className="mono" aria-label="value hidden">••••••••</span> },
+    { key: 'consumers', header: 'Consumers', render: k => k.consumers.join(', ') || '—', className: 'ellipsis' },
+    { key: 'used', header: 'Last used', render: k => ago(k.lastUsedAt) },
+    { key: 'updated', header: 'Updated', render: k => dateTime(k.updatedAt) },
     {
       key: 'age',
-      header: 'Stáří',
+      header: 'Age',
       render: k => (k.rotationDue
-        ? <StatusBadge tone="warning">{k.ageDays} d · rotovat</StatusBadge>
-        : <span title={rotationDays ? `Připomenutí po ${rotationDays} dnech` : 'Připomenutí vypnuto'}>{k.ageDays} d</span>),
+        ? <StatusBadge tone="warning">{k.ageDays} d · rotate</StatusBadge>
+        : <span title={rotationDays ? `Reminder after ${rotationDays} days` : 'Reminder off'}>{k.ageDays} d</span>),
     },
     {
       key: 'actions',
-      header: 'Akce',
+      header: 'Actions',
       render: k => (
         <span className="row-actions">
-          <button className="btn" onClick={e => { e.stopPropagation(); actions.rotate(k); }} aria-label={`Rotovat ${k.name}`}>Rotovat</button>
-          {actions.canReveal && <button className="btn" onClick={e => { e.stopPropagation(); actions.reveal(k); }} aria-label={`Zkopírovat ${k.name}`}>Kopírovat</button>}
-          <button className="btn" onClick={e => { e.stopPropagation(); actions.remove(k); }} aria-label={`Smazat ${k.name}`}>Smazat</button>
+          <button className="btn" onClick={e => { e.stopPropagation(); actions.rotate(k); }} aria-label={`Rotate ${k.name}`}>Rotate</button>
+          {actions.canReveal && <button className="btn" onClick={e => { e.stopPropagation(); actions.reveal(k); }} aria-label={`Copy ${k.name}`}>Copy</button>}
+          <button className="btn" onClick={e => { e.stopPropagation(); actions.remove(k); }} aria-label={`Delete ${k.name}`}>Delete</button>
         </span>
       ),
     },
@@ -83,33 +83,33 @@ export function Environment({ route }: { route?: Route }) {
   return (
     <>
       <div className="filterbar">
-        <Select label="Rozsah" value={scope} onChange={setScope} options={[{ value: '', label: 'Všechny rozsahy' }, { value: 'global', label: 'global' }, { value: 'repo', label: 'repo' }, { value: 'workspace', label: 'workspace' }]} />
-        <Search label="Hledat klíč" value={q} onChange={setQ} />
+        <Select label="Scope" value={scope} onChange={setScope} options={[{ value: '', label: 'All scopes' }, { value: 'global', label: 'global' }, { value: 'repo', label: 'repo' }, { value: 'workspace', label: 'workspace' }]} />
+        <Search label="Search key" value={q} onChange={setQ} />
         <span style={{ flex: 1 }} />
-        <button className="btn" onClick={() => setPanel({ kind: 'import' })} disabled={data?.storeReady === false}>Importovat…</button>
-        <button className="btn primary" onClick={() => setPanel({ kind: 'add' })} disabled={data?.storeReady === false}><Icon name="plus" size={14} />Přidat</button>
+        <button className="btn" onClick={() => setPanel({ kind: 'import' })} disabled={data?.storeReady === false}>Import…</button>
+        <button className="btn primary" onClick={() => setPanel({ kind: 'add' })} disabled={data?.storeReady === false}><Icon name="plus" size={14} />Add</button>
       </div>
       {data && !data.storeReady && (
-        <Banner tone="info" role="note">Šifrované úložiště zatím není připravené (chybí úložiště klíčů systému i heslo v CODELOUPE_PASSPHRASE), proto nejde nic přidat. Hodnota se po uložení nikdy nezobrazí.</Banner>
+        <Banner tone="info" role="note">The encrypted store is not ready yet (no system keychain and no passphrase in CODELOUPE_PASSPHRASE), so nothing can be added. A value is never shown after it is saved.</Banner>
       )}
       {notice && <Banner tone={notice.ok ? 'info' : 'warning'} role={notice.ok ? 'status' : 'alert'}>{notice.message}</Banner>}
       {due > 0 && data && (
-        <Banner>{due === 1 ? '1 klíč je' : `${due} klíčů je`} starších než {data.rotationDays} dní: čas je rotovat.</Banner>
+        <Banner>{due === 1 ? '1 key is' : `${due} keys are`} older than {data.rotationDays} days: time to rotate.</Banner>
       )}
-      <Card title={data ? `Klíče (${rows.length})` : 'Klíče'} bodyClass="">
-        {data ? <DataTable label="Klíče prostředí" rows={rows} columns={columns(data.rotationDays, actions)} rowKey={k => `${k.scope}:${k.scopeRef}:${k.name}`} empty="Žádné klíče. Přidejte první nebo importujte existující proměnné." />
-          : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Nelze načíst prostředí.'} onRetry={reload} />}
+      <Card title={data ? `Keys (${rows.length})` : 'Keys'} bodyClass="">
+        {data ? <DataTable label="Environment keys" rows={rows} columns={columns(data.rotationDays, actions)} rowKey={k => `${k.scope}:${k.scopeRef}:${k.name}`} empty="No keys. Add the first one or import existing variables." />
+          : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Could not load the environment.'} onRetry={reload} />}
       </Card>
       <Card title="Audit" bodyClass="">
         {audit.data ? (
           <DataTable
-            label="Audit klíčů"
+            label="Key audit"
             rows={audit.data.events}
             columns={auditColumns}
             rowKey={e => `${e.at}:${e.scope}:${e.scopeRef}:${e.name}:${e.action}:${e.consumer}`}
-            empty="Zatím nikdo žádný klíč nečetl."
+            empty="No key has been read yet."
           />
-        ) : audit.loading ? <Loading variant="table" /> : <ErrorState message={audit.error?.message ?? 'Nelze načíst audit.'} onRetry={audit.reload} />}
+        ) : audit.loading ? <Loading variant="table" /> : <ErrorState message={audit.error?.message ?? 'Could not load the audit.'} onRetry={audit.reload} />}
       </Card>
       {(panel?.kind === 'add' || panel?.kind === 'rotate') && (
         <KeyDrawer rotate={panel.kind === 'rotate' ? panel.key : undefined} onClose={() => setPanel(null)} onSaved={message => { setPanel(null); outcome({ ok: true, message }); }} />
@@ -120,9 +120,9 @@ export function Environment({ route }: { route?: Route }) {
 }
 
 const auditColumns: Column<AuditEvent>[] = [
-  { key: 'at', header: 'Kdy', render: e => dateTime(e.at) },
-  { key: 'name', header: 'Klíč', render: e => <span className="mono">{e.name}</span> },
-  { key: 'scope', header: 'Rozsah', render: scopeLabel },
-  { key: 'action', header: 'Akce', render: e => ACTION[e.action] },
-  { key: 'consumer', header: 'Spotřebitel', render: e => e.consumer, className: 'ellipsis' },
+  { key: 'at', header: 'When', render: e => dateTime(e.at) },
+  { key: 'name', header: 'Key', render: e => <span className="mono">{e.name}</span> },
+  { key: 'scope', header: 'Scope', render: scopeLabel },
+  { key: 'action', header: 'Action', render: e => ACTION[e.action] },
+  { key: 'consumer', header: 'Consumer', render: e => e.consumer, className: 'ellipsis' },
 ];

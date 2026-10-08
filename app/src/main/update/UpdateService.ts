@@ -133,7 +133,7 @@ export class UpdateService extends EventEmitter {
     try {
       await this.deps.beforeInstall(got.version);
     } catch (e) {
-      message = `Předchozí daemon se nepodařilo uschovat pro návrat: ${(e as Error).message}`;
+      message = `Could not keep the previous daemon for a rollback: ${(e as Error).message}`;
     }
     this.set({ phase: 'ready', latest: got.version, percent: 100, message });
     if (this.deps.installWhenReady) this.install();

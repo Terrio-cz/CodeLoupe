@@ -17,22 +17,22 @@ export interface ScreenDef {
 }
 
 export const SCREEN_DEFS = [
-  { id: 'overview', title: 'Přehled', icon: 'overview', group: 'top', key: 'o', range: true },
-  { id: 'branches', title: 'Větve', icon: 'branches', group: 'work', key: 'b' },
+  { id: 'overview', title: 'Overview', icon: 'overview', group: 'top', key: 'o', range: true },
+  { id: 'branches', title: 'Branches', icon: 'branches', group: 'work', key: 'b' },
   { id: 'workspaces', title: 'Workspaces', icon: 'workspaces', group: 'work', key: 'w' },
-  { id: 'tasks', title: 'Úkoly', icon: 'tasks', group: 'work', key: 't' },
-  { id: 'jobs', title: 'Joby', icon: 'jobs', group: 'work', key: 'j' },
-  { id: 'runs', title: 'Běhy', icon: 'runs', group: 'work', key: 'r', range: true },
+  { id: 'tasks', title: 'Tasks', icon: 'tasks', group: 'work', key: 't' },
+  { id: 'jobs', title: 'Jobs', icon: 'jobs', group: 'work', key: 'j' },
+  { id: 'runs', title: 'Runs', icon: 'runs', group: 'work', key: 'r', range: true },
   { id: 'index', title: 'Index', icon: 'index', group: 'index', key: 'i' },
-  { id: 'gaps', title: 'Mezery', icon: 'gaps', group: 'index', key: 'g', range: true },
-  { id: 'environment', title: 'Prostředí', icon: 'environment', group: 'system', key: 'e' },
-  { id: 'accounts', title: 'Účty', icon: 'accounts', group: 'system', key: 'u' },
-  { id: 'settings', title: 'Nastavení', icon: 'settings', group: 'system', key: 's' },
+  { id: 'gaps', title: 'Gaps', icon: 'gaps', group: 'index', key: 'g', range: true },
+  { id: 'environment', title: 'Environment', icon: 'environment', group: 'system', key: 'e' },
+  { id: 'accounts', title: 'Accounts', icon: 'accounts', group: 'system', key: 'a' },
+  { id: 'settings', title: 'Settings', icon: 'settings', group: 'system', key: 's' },
 ] as const satisfies readonly ScreenDef[];
 
 export type Screen = (typeof SCREEN_DEFS)[number]['id'];
 
-export const GROUP_TITLES: Record<Exclude<ScreenGroup, 'top'>, string> = { work: 'Práce', index: 'Index', system: 'Systém' };
+export const GROUP_TITLES: Record<Exclude<ScreenGroup, 'top'>, string> = { work: 'Work', index: 'Index', system: 'System' };
 
 const BY_ID: ReadonlyMap<string, ScreenDef> = new Map(SCREEN_DEFS.map(d => [d.id, d]));
 

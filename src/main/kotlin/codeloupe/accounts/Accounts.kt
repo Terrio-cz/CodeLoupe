@@ -32,6 +32,6 @@ class Accounts(
 
     companion object {
         const val DEFAULT_ID = "default"
-        private const val DEFAULT_LABEL = "Výchozí účet"
+        private const val DEFAULT_LABEL = "Default account"
     }
 }

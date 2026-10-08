@@ -20,7 +20,7 @@ export interface EnvContext {
 export function registerEnv(ctx: EnvContext, handle: <A extends unknown[], R>(channel: string, fn: (...args: A) => Promise<R> | R) => void): EnvManager {
   const manager = new EnvManager({
     run: cliRunner(ctx.settings, ctx.homeDir),
-    blocked: () => (ctx.source().kind === 'mock' ? 'Zdroj dat je Mock: úložiště se v tomto režimu nemění. Přepněte v Nastavení zdroj dat na Daemon.' : null),
+    blocked: () => (ctx.source().kind === 'mock' ? 'The data source is Mock: the store does not change in this mode. Switch the data source to Daemon in Settings.' : null),
     confirm: nativeConfirm,
     consumers: async key => {
       const env = (await ctx.source().get({ resource: 'environment' }, '/ui-api/v1/environment')) as Environment;
@@ -47,7 +47,7 @@ export function registerEnv(ctx: EnvContext, handle: <A extends unknown[], R>(ch
 export async function nativeConfirm(message: string, detail: string, okLabel: string): Promise<boolean> {
   if (!app.isPackaged && process.env.CODELOUPE_APP_CONFIRM === 'accept') return true;
   const win = BrowserWindow.getFocusedWindow();
-  const opts = { type: 'warning' as const, buttons: [okLabel, 'Zrušit'], defaultId: 1, cancelId: 1, title: 'CodeLoupe', message, detail };
+  const opts = { type: 'warning' as const, buttons: [okLabel, 'Cancel'], defaultId: 1, cancelId: 1, title: 'CodeLoupe', message, detail };
   const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
   return response === 0;
 }
@@ -57,7 +57,7 @@ function touchId(): (() => Promise<boolean>) | undefined {
   if (process.platform !== 'darwin' || !systemPreferences.canPromptTouchID()) return undefined;
   return async () => {
     try {
-      await systemPreferences.promptTouchID('zobrazit hodnotu klíče v CodeLoupe');
+      await systemPreferences.promptTouchID('show a key value in CodeLoupe');
       return true;
     } catch {
       return false;

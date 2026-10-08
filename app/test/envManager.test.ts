@@ -49,7 +49,7 @@ describe('validation', () => {
     expect(checkSet(set({ value: 'a\u0000b' })).ok).toBe(false);
     expect(checkSet(set({ value: 'x'.repeat(16 * 1024) })).ok).toBe(true);
     expect(checkSet(set({ value: 'x'.repeat(16 * 1024 + 1) })).ok).toBe(false);
-    expect(checkSet(set({ value: 'ž'.repeat(9000) })).ok).toBe(false);
+    expect(checkSet(set({ value: 'ß'.repeat(9000) })).ok).toBe(false);
   });
 
   it('checks the import request: ids, scopes and flags', () => {
@@ -66,7 +66,7 @@ describe('EnvManager.set', () => {
   it('sends the value on stdin only and answers without it', async () => {
     const t = setup();
     const out = await t.manager.set(set({ scope: { kind: 'workspace', ref: 'c:/work/terrio' } }));
-    expect(out).toEqual({ ok: true, message: 'YOUTRACK_TOKEN uloženo (workspace:c:/work/terrio).' });
+    expect(out).toEqual({ ok: true, message: 'YOUTRACK_TOKEN saved (workspace:c:/work/terrio).' });
     expect(t.calls).toHaveLength(1);
     expect(t.calls[0].args).toEqual(['env', 'set', 'YOUTRACK_TOKEN', '--scope', 'workspace:c:/work/terrio', '--source', 'app']);
     expect(t.calls[0].stdin).toBe(`${SECRET}\n`);
@@ -87,8 +87,8 @@ describe('EnvManager.set', () => {
   });
 
   it('refuses to write while the screen shows mock data', async () => {
-    const t = setup({ blocked: () => 'Zdroj dat je Mock' });
-    expect(await t.manager.set(set())).toEqual({ ok: false, message: 'Zdroj dat je Mock' });
+    const t = setup({ blocked: () => 'The data source is Mock' });
+    expect(await t.manager.set(set())).toEqual({ ok: false, message: 'The data source is Mock' });
     expect((await t.manager.scan(false)).ok).toBe(false);
     expect(t.calls).toHaveLength(0);
   });
@@ -97,7 +97,7 @@ describe('EnvManager.set', () => {
 describe('EnvManager.remove', () => {
   it('names the key and its readers in a native confirmation and deletes only after yes', async () => {
     const t = setup();
-    expect(await t.manager.remove({ name: 'GITHUB_TOKEN', scope: { kind: 'repo', ref: 'c:/x' } })).toEqual({ ok: true, message: 'GITHUB_TOKEN smazáno.' });
+    expect(await t.manager.remove({ name: 'GITHUB_TOKEN', scope: { kind: 'repo', ref: 'c:/x' } })).toEqual({ ok: true, message: 'GITHUB_TOKEN deleted.' });
     expect(t.confirms[0].message).toContain('GITHUB_TOKEN');
     expect(t.confirms[0].detail).toContain('youtrack-mcp, env run: docker');
     expect(t.calls[0].args).toEqual(['env', 'unset', 'GITHUB_TOKEN', '--scope', 'repo:c:/x']);
@@ -117,7 +117,7 @@ describe('EnvManager import', () => {
     const bad = setup({}, () => ({ code: 0, stdout: '{"nope":1}', stderr: '' }));
     expect((await bad.manager.scan(false)).ok).toBe(false);
     const down = setup({}, () => ({ code: 1, stdout: '', stderr: 'boom\n' }));
-    expect(await down.manager.scan(false)).toEqual({ ok: false, message: 'Inventář selhal: boom' });
+    expect(await down.manager.scan(false)).toEqual({ ok: false, message: 'Inventory failed: boom' });
   });
 
   it('imports the selection, asks before replacing sources and passes the options through', async () => {
@@ -135,7 +135,7 @@ describe('EnvManager import', () => {
   it('does nothing when the user declines the replacement', async () => {
     const t = setup({ confirm: async () => false });
     const out = await t.manager.importRun({ selections: [{ id: 'aabbccddeeff' }], replaceSources: true, overwrite: false, includeExcluded: false });
-    expect(out).toEqual({ ok: false, message: 'Import zrušen.' });
+    expect(out).toEqual({ ok: false, message: 'Import cancelled.' });
     expect(t.calls).toHaveLength(0);
   });
 
@@ -143,8 +143,8 @@ describe('EnvManager import', () => {
     const t = setup({}, () => ({ code: 1, stdout: JSON.stringify({ restored: 2, alreadyOriginal: 0, changedSince: ['C:/a/.env'], complete: false }), stderr: '' }));
     const out = await t.manager.rollback('20261008123456-aabbcc');
     expect(out.ok).toBe(false);
-    expect(out.message).toContain('Vráceno souborů: 2');
-    expect(out.message).toContain('1 souborů');
+    expect(out.message).toContain('Files restored: 2');
+    expect(out.message).toContain('1 file was edited');
     expect(t.calls[0].args).toEqual(['env', 'import', 'rollback', '20261008123456-aabbcc', '--json']);
     expect((await t.manager.rollback('../../x')).ok).toBe(false);
     expect(t.calls).toHaveLength(1);
@@ -216,6 +216,6 @@ describe('cliRunner', () => {
 
   it('says so when the command does not exist', async () => {
     const run = cliRunner(() => ({ ...DEFAULT_SETTINGS, cliCommand: path.join(dir, 'no-such-codeloupe.exe') }), () => dir);
-    await expect(run(['env', 'list'], null, 5_000)).rejects.toThrow(/nebyl nalezen/);
+    await expect(run(['env', 'list'], null, 5_000)).rejects.toThrow(/was not found/);
   });
 });

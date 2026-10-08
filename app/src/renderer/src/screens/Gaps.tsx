@@ -8,11 +8,13 @@ import { ago, dateTime, num, pct } from '../format';
 import { byWeek, filterRows, KIND_LABELS, totalOf } from '../gapReport';
 import { useRange } from '../hooks';
 
+const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? one : many}`;
+
 const REASONS: Record<string, string> = {
-  followup_read: 'agent dočítal ručně',
-  empty: 'prázdný výsledek',
-  candidate_manual: 'candidate rozhodnut ručně',
-  rollback: 'zápis vrácen',
+  followup_read: 'agent read on manually',
+  empty: 'empty result',
+  candidate_manual: 'candidate resolved manually',
+  rollback: 'write rolled back',
 };
 
 export function Gaps() {
@@ -22,7 +24,7 @@ export function Gaps() {
   const [open, setOpen] = useState<string | null>(null);
   const { data, error, loading, reload } = useApi('gaps', undefined, { range });
 
-  if (!data) return loading ? <><Loading variant="kpis" /><Card bodyClass=""><Loading variant="table" /></Card></> : <Card><ErrorState message={error?.message ?? 'Nelze načíst mezery.'} onRetry={reload} /></Card>;
+  if (!data) return loading ? <><Loading variant="kpis" /><Card bodyClass=""><Loading variant="table" /></Card></> : <Card><ErrorState message={error?.message ?? 'Could not load gaps.'} onRetry={reload} /></Card>;
 
   const report = data.report;
   const rows = report ? filterRows(report, { range, tool, kind }) : [];
@@ -33,38 +35,38 @@ export function Gaps() {
   return (
     <>
       <div className="filterbar">
-        <Select label="Nástroj" value={tool} onChange={setTool} options={[{ value: '', label: 'Všechny nástroje' }, ...tools.map(t => ({ value: t, label: t }))]} />
-        <Select label="Druh" value={kind} onChange={setKind} options={[{ value: '', label: 'Všechny druhy' }, ...(Object.keys(KIND_LABELS) as GapKind[]).map(k => ({ value: k, label: KIND_LABELS[k] }))]} />
-        <span className="muted hint">Mezera = volání CodeLoupe, které nestačilo: agent sáhl po rg/sed/cat/Read na stejný cíl, nebo odpověď byla prázdná, busy či jen kandidáti.</span>
+        <Select label="Tool" value={tool} onChange={setTool} options={[{ value: '', label: 'All tools' }, ...tools.map(t => ({ value: t, label: t }))]} />
+        <Select label="Kind" value={kind} onChange={setKind} options={[{ value: '', label: 'All kinds' }, ...(Object.keys(KIND_LABELS) as GapKind[]).map(k => ({ value: k, label: KIND_LABELS[k] }))]} />
+        <span className="muted hint">Gap = a CodeLoupe call that was not enough: the agent reached for rg/sed/cat/Read on the same target, or the answer was empty, busy or candidates only.</span>
       </div>
 
       {!report ? (
-        <Card title="Týdenní report">
-          <Empty icon="gaps" action={<button className="btn" onClick={reload}>Zkusit znovu</button>}>
-            Daemon v transkriptech Claude Code zatím nenašel žádný běh, tak není z čeho report složit. Čte je při prvním dotazu (<span className="mono">~/.claude/projects</span>).
+        <Card title="Weekly report">
+          <Empty icon="gaps" action={<button className="btn" onClick={reload}>Retry</button>}>
+            The daemon has not found any run in the Claude Code transcripts yet, so there is nothing to build the report from. It reads them on the first query (<span className="mono">~/.claude/projects</span>).
           </Empty>
         </Card>
       ) : (
         <>
-          <section aria-label="Souhrn reportu">
+          <section aria-label="Report summary">
             <div className="kpis">
-              <KpiTile label="Mezery v rozsahu" value={<CountUp value={total} format={num} />} ctx={`${num(rows.length)} řádků reportu`} />
-              <KpiTile label="Volání CodeLoupe v reportu" value={<CountUp value={seenCalls} format={num} />} ctx={`${num(report.runs)} běhů agentů`} />
-              <KpiTile label="Podíl mezer" value={seenCalls ? <CountUp value={(totalOf(report.rows) / seenCalls) * 100} format={v => pct(v, 1)} /> : '—'} ctx="mezery / volání, celý report" />
-              <KpiTile label="Report" value={ago(report.generatedAt)} ctx={report.since ? `od ${report.since}` : undefined} />
+              <KpiTile label="Gaps in range" value={<CountUp value={total} format={num} />} ctx={plural(rows.length, 'report row', 'report rows')} />
+              <KpiTile label="CodeLoupe calls in report" value={<CountUp value={seenCalls} format={num} />} ctx={plural(report.runs, 'agent run', 'agent runs')} />
+              <KpiTile label="Gap share" value={seenCalls ? <CountUp value={(totalOf(report.rows) / seenCalls) * 100} format={v => pct(v, 1)} /> : '—'} ctx="gaps / calls, whole report" />
+              <KpiTile label="Report" value={ago(report.generatedAt)} ctx={report.since ? `since ${report.since}` : undefined} />
             </div>
           </section>
-          <Card title="Týdenní report podle nástroje a tvaru dotazu" bodyClass="">
+          <Card title="Weekly report by tool and query shape" bodyClass="">
             <div className="table-wrap">
-              <table className="data" aria-label="Týdenní report mezer">
+              <table className="data" aria-label="Weekly gap report">
                 <thead>
                   <tr>
-                    <th scope="col">Nástroj</th><th scope="col">Tvar dotazu</th><th scope="col">Druh</th>
-                    <th scope="col" className="num">Počet</th><th scope="col">Co se hledalo</th>
+                    <th scope="col">Tool</th><th scope="col">Query shape</th><th scope="col">Kind</th>
+                    <th scope="col" className="num">Count</th><th scope="col">What was searched</th>
                   </tr>
                 </thead>
                 {rows.length === 0 ? (
-                  <tbody><tr><td colSpan={5} className="empty-cell"><Empty icon="check">Žádné mezery v tomto rozsahu a filtru.</Empty></td></tr></tbody>
+                  <tbody><tr><td colSpan={5} className="empty-cell"><Empty icon="check">No gaps in this range and filter.</Empty></td></tr></tbody>
                 ) : byWeek(rows).map(([week, inWeek]) => (
                   <tbody key={week}>
                     <tr className="group">
@@ -86,17 +88,17 @@ export function Gaps() {
         </>
       )}
       <p className="muted footnote">
-        Report je totéž co <span className="mono">codeloupe metrics gaps</span> za posledních 30 dní, jen z transkriptů, které daemon už načetl; rozsah nahoře vybírá týdny.
+        The report is the same as <span className="mono">codeloupe metrics gaps</span> for the last 30 days, only from transcripts the daemon has already read; the range above selects the weeks.
       </p>
 
       {data.summary.length > 0 && (
-        <Card title="Výskyty podle nástroje a tvaru dotazu (ingest transkriptů)" bodyClass="">
+        <Card title="Occurrences by tool and query shape (transcript ingest)" bodyClass="">
           <div className="table-wrap">
-            <table className="data" aria-label="Mezery podle nástroje">
+            <table className="data" aria-label="Gaps by tool">
               <thead>
                 <tr>
-                  <th scope="col">Nástroj</th><th scope="col">Tvar dotazu</th><th scope="col">Náhrada</th>
-                  <th scope="col" className="num">Počet</th><th scope="col">Poslední</th><th scope="col"><span className="sr-only">Výskyty</span></th>
+                  <th scope="col">Tool</th><th scope="col">Query shape</th><th scope="col">Fallback</th>
+                  <th scope="col" className="num">Count</th><th scope="col">Last</th><th scope="col"><span className="sr-only">Occurrences</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -111,7 +113,7 @@ export function Gaps() {
                         <td className="num">{num(s.count)}</td><td>{ago(s.lastAt)}</td>
                         <td>
                           <button className="btn ghost" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : key)}>
-                            <Icon name="chevron" size={14} className={expanded ? 'open' : undefined} />{expanded ? 'Skrýt' : 'Výskyty'}
+                            <Icon name="chevron" size={14} className={expanded ? 'open' : undefined} />{expanded ? 'Hide' : 'Occurrences'}
                           </button>
                         </td>
                       </tr>
@@ -121,7 +123,7 @@ export function Gaps() {
                           <td className="t2">{dateTime(g.at)} · {REASONS[g.reason]}</td>
                           <td className="mono">{g.fallback}</td>
                           <td className="mono" colSpan={2}>{g.target}</td>
-                          <td className="mono muted" title="Claude Code session a tah, kde agent sáhl po náhradě">{g.session}{g.turn !== null ? ` · tah ${g.turn}` : ''}</td>
+                          <td className="mono muted" title="Claude Code session and turn where the agent fell back">{g.session}{g.turn !== null ? ` · turn ${g.turn}` : ''}</td>
                         </tr>
                       ))}
                     </Fragment>

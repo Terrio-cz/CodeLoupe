@@ -43,11 +43,11 @@ class AccountsTest {
         b.resolve("projects").resolve("one").createDirectories()
         b.resolve("projects").resolve("two").createDirectories()
         Files.writeString(b.resolve("projects").resolve("not-a-dir.txt"), "x")
-        write(AccountsFile(claude = listOf(AccountsFile.Claude("a", "Účet A", userHome.resolve(".claude").toString()), AccountsFile.Claude("b", "Účet B", b.toString()))))
+        write(AccountsFile(claude = listOf(AccountsFile.Claude("a", "Account A", userHome.resolve(".claude").toString()), AccountsFile.Claude("b", "Account B", b.toString()))))
         assertEquals(listOf("a", "b"), accounts.claude().map { it.id })
         assertEquals(listOf(true, false), accounts.claude().map { it.isDefault })
         assertEquals(setOf("one", "two"), accounts.transcriptDirs().map { it.fileName.toString() }.toSet())
-        write(AccountsFile(claude = listOf(AccountsFile.Claude("a", "Účet A", "C:/a"), AccountsFile.Claude("b", "Účet B", b.toString(), default = true))))
+        write(AccountsFile(claude = listOf(AccountsFile.Claude("a", "Account A", "C:/a"), AccountsFile.Claude("b", "Account B", b.toString(), default = true))))
         assertEquals(listOf(false, true), accounts.claude().map { it.isDefault })
         assertTrue(accounts.claude().none { it.implicit })
     }

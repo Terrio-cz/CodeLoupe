@@ -47,11 +47,11 @@ export function scopeLabel(scope: string): string {
 }
 
 const OUTCOME: Record<string, string> = {
-  CREATED: 'vytvořeno',
-  UPDATED: 'aktualizováno',
-  SKIPPED_SAME: 'beze změny (store už ji má)',
-  SKIPPED_DIFFERS: 'přeskočeno (store drží jinou hodnotu)',
-  SKIPPED_CONFLICT: 'přeskočeno (zdroje se liší)',
+  CREATED: 'created',
+  UPDATED: 'updated',
+  SKIPPED_SAME: 'unchanged (already in store)',
+  SKIPPED_DIFFERS: 'skipped (store holds a different value)',
+  SKIPPED_CONFLICT: 'skipped (sources differ)',
 };
 
 export const outcomeLabel = (outcome: string): string => OUTCOME[outcome] ?? outcome.toLowerCase();

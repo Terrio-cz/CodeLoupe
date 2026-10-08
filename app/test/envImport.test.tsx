@@ -42,7 +42,7 @@ describe('import selection', () => {
   it('labels scopes and outcomes in words', () => {
     expect(scopeLabel('workspace:c:/work/terrio')).toBe('workspace · c:/work/terrio');
     expect(scopeLabel('global')).toBe('global');
-    expect(outcomeLabel('SKIPPED_CONFLICT')).toContain('zdroje se liší');
+    expect(outcomeLabel('SKIPPED_CONFLICT')).toContain('sources differ');
     expect(outcomeLabel('SOMETHING_NEW')).toBe('something_new');
   });
 });
@@ -56,11 +56,11 @@ describe('import wizard markup', () => {
     expect(html).toContain('DB_PASSWORD');
     expect(html).toContain('C:/work/terrio/.mcp.json');
     expect(html).not.toContain('BASH_TIMEOUT_MS');
-    expect(html).toContain('různé hodnoty');
-    expect(html).toContain('vyberte zdroj');
-    expect(html).toContain('Importovat (2)');
-    expect(html).toContain('Vynecháno 1 složek');
-    expect(html).toContain('1 proměnných má zdroje s různou hodnotou');
+    expect(html).toContain('different values');
+    expect(html).toContain('pick a source');
+    expect(html).toContain('Import (2)');
+    expect(html).toContain('Skipped 1 folder of');
+    expect(html).toContain('1 variable has sources with different values');
     expect(html).not.toContain('type="password"');
     expect(renderToStaticMarkup(<Choose {...props} onlySensitive={false} />)).toContain('BASH_TIMEOUT_MS');
   });
@@ -72,11 +72,11 @@ describe('import wizard markup', () => {
       notReplaced: [{ file: 'C:/work/app/api/.env', reason: 'changed since the scan' }],
     };
     const html = renderToStaticMarkup(<Done result={result} rolled={null} onRollback={noop} onClose={noop} />);
-    expect(html).toContain('Vytvořeno 2, aktualizováno 0, přeskočeno 1.');
-    expect(html).toContain('zdroj nahrazen odkazem');
+    expect(html).toContain('Created 2, updated 0, skipped 1.');
+    expect(html).toContain('source replaced with a reference');
     expect(html).toContain('20261008123456-aabbcc');
-    expect(html).toContain('Vrátit zdroje do původního stavu');
+    expect(html).toContain('Restore sources to original state');
     expect(html).toContain('changed since the scan');
-    expect(renderToStaticMarkup(<Done result={result} rolled="Vráceno souborů: 1." onRollback={noop} onClose={noop} />)).not.toContain('Vrátit zdroje do původního stavu');
+    expect(renderToStaticMarkup(<Done result={result} rolled="Restored 1 file." onRollback={noop} onClose={noop} />)).not.toContain('Restore sources to original state');
   });
 });

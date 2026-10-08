@@ -235,7 +235,7 @@ export class MockData {
       activity: [
         { at: iso(base), author: 'Tadeáš G.', kind: 'created', text: 'created the issue' },
         { at: iso(base + 2 * HOUR), author: 'Tadeáš G.', kind: 'state', text: 'To do → In Progress' },
-        { at: iso(base + 30 * HOUR), author: 'orchestrator', kind: 'comment', text: 'Plán hotový, kolo 1 běží.' },
+        { at: iso(base + 30 * HOUR), author: 'orchestrator', kind: 'comment', text: 'Plan ready, round 1 running.' },
         { at: iso(base + 50 * HOUR), author: 'orchestrator', kind: 'field', text: 'Test Evidence: attached' },
       ],
       worktrees: this.worktrees.filter(w => w.taskId === id),
@@ -355,8 +355,8 @@ export class MockData {
   accounts(): Accounts {
     return {
       claude: [
-        { id: 'default', label: 'Účet A', email: 'a@example.test', configDir: 'C:/Users/dev/.claude', isDefault: true, implicit: false, exists: true, windows: 4, weighted7d: 12_100_000, savedPct7d: 14, lastUsedAt: iso(this.now - 2 * 60_000) },
-        { id: 'b', label: 'Účet B', email: 'b@example.test', configDir: 'C:/Users/dev/.claude-b', isDefault: false, implicit: false, exists: true, windows: 2, weighted7d: 6_800_000, savedPct7d: 11, lastUsedAt: iso(this.now - HOUR) },
+        { id: 'default', label: 'Account A', email: 'a@example.test', configDir: 'C:/Users/dev/.claude', isDefault: true, implicit: false, exists: true, windows: 4, weighted7d: 12_100_000, savedPct7d: 14, lastUsedAt: iso(this.now - 2 * 60_000) },
+        { id: 'b', label: 'Account B', email: 'b@example.test', configDir: 'C:/Users/dev/.claude-b', isDefault: false, implicit: false, exists: true, windows: 2, weighted7d: 6_800_000, savedPct7d: 11, lastUsedAt: iso(this.now - HOUR) },
       ],
       youtrack: [
         { id: 'terrio', label: 'Terrio', url: 'https://terrio.youtrack.cloud', projects: ['TER', 'CL'], tokenConfigured: true, editable: true, mirror: { state: 'synced', syncedAt: iso(this.now - 2 * 60_000) } },
@@ -416,7 +416,7 @@ export class MockData {
   events(since: number | null): Events {
     const breach: DaemonEvent = {
       seq: this.seqBase + 1, at: iso(this.now), kind: 'budget_breach', severity: 'warning',
-      title: 'Denní rozpočet překročen', body: 'Dnes 26,1M vážených tokenů z 25M.', ref: { screen: 'overview', id: null },
+      title: 'Daily budget exceeded', body: 'Today 26.1M of 25M weighted tokens.', ref: { screen: 'overview', id: null },
     };
     const epoch = 'mock-1';
     if (since === null) return { epoch, lastSeq: this.seqBase, items: [] };

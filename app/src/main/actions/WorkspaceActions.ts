@@ -14,8 +14,8 @@ const KEY = /^(container|network|volume|image|directory):.{1,500}$/;
 const MAX_KEYS = 200;
 const SHOWN = 12;
 
-/** `3 prostředky`: the noun agrees with the number in Czech. */
-const resources = (n: number) => `${n} ${n === 1 ? 'prostředek' : n >= 2 && n <= 4 ? 'prostředky' : 'prostředků'}`;
+/** `3 resources`: the noun agrees with the number. */
+const resources = (n: number) => `${n} ${n === 1 ? 'resource' : 'resources'}`;
 
 const text = (v: unknown, max = 600): string | null => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : null);
 
@@ -31,49 +31,49 @@ export class WorkspaceActions {
     const req = input as Partial<ReleaseRequest> | null;
     const repo = text(req?.repo);
     const path = text(req?.path);
-    if (!repo || !path) return refused('Neúplný požadavek.');
+    if (!repo || !path) return refused('Incomplete request.');
 
     const registry = await this.daemon.get<WorkspaceList>('/workspaces');
     const found = registry.repos.find(r => r.repo === repo)?.workspaces.find(w => w.path === path);
-    if (!found || found.role !== 'worktree') return refused('Uvolnit jde jen worktree, který daemon zná (hlavní worktree a cizí adresáře ne).');
+    if (!found || found.role !== 'worktree') return refused('Only a worktree the daemon knows can be released (not the main worktree or foreign directories).');
 
     const plan = await this.daemon.get<ReconcilePlan>('/reconcile');
     const own = plan.entries.filter(e => e.workspace?.toLowerCase() === found.name.toLowerCase() && sameRepo(e, registry, repo));
     const stack = own.filter(e => e.verdict !== 'protected' && e.kind !== 'directory');
     const ok = await this.confirm({
-      message: `Uvolnit workspace ${found.name}?`,
+      message: `Release workspace ${found.name}?`,
       detail: [
-        stack.length ? `Daemon odstraní jeho Docker prostředky (${stack.length}):` : 'Workspace nemá žádné Docker prostředky; jen se označí jako uvolněný.',
+        stack.length ? `The daemon removes its Docker resources (${stack.length}):` : 'The workspace has no Docker resources; it is only marked as released.',
         ...listing(stack),
         '',
-        'Adresář worktree, větev ani úkol se nemění. Odstranění se opakuje, dokud je prostředek používaný.',
+        'The worktree directory, branch and task do not change. Removal is retried while a resource is in use.',
       ].join('\n'),
-      accept: 'Uvolnit',
+      accept: 'Release',
     });
-    if (!ok) return { ok: false, message: 'Zrušeno.' };
+    if (!ok) return { ok: false, message: 'Cancelled.' };
     await this.daemon.post('/workspaces/release', { target: found.path, repo });
-    return { ok: true, message: stack.length ? `Workspace ${found.name} uvolněn, úklid (${resources(stack.length)}) běží na pozadí.` : `Workspace ${found.name} uvolněn.` };
+    return { ok: true, message: stack.length ? `Workspace ${found.name} released, cleanup (${resources(stack.length)}) runs in the background.` : `Workspace ${found.name} released.` };
   }
 
   /** `POST /reconcile/run` with the entries the user confirmed; the daemon re-reads its plan and refuses what is no longer removable. */
   async reconcile(input: unknown): Promise<ReconcileOutcome> {
     const req = input as Partial<ReconcileRequest> | null;
     const keys = Array.isArray(req?.keys) ? req.keys : null;
-    if (!keys || keys.length === 0 || keys.length > MAX_KEYS || !keys.every(k => typeof k === 'string' && KEY.test(k))) return { ...refused('Neplatný výběr.'), results: [] };
+    if (!keys || keys.length === 0 || keys.length > MAX_KEYS || !keys.every(k => typeof k === 'string' && KEY.test(k))) return { ...refused('Invalid selection.'), results: [] };
 
     const plan = await this.daemon.get<ReconcilePlan>('/reconcile');
     const wanted = [...new Set(keys)].map(k => plan.entries.find(e => e.key === k));
-    if (wanted.some(e => !e)) return { ...refused('Plán úklidu se mezitím změnil; obnovte obrazovku.'), results: [] };
+    if (wanted.some(e => !e)) return { ...refused('The cleanup plan has changed in the meantime; refresh the screen.'), results: [] };
     const entries = wanted as PlanEntry[];
     const notConfirmable = entries.find(e => e.verdict !== 'confirm');
-    if (notConfirmable) return { ...refused(`„${notConfirmable.name}“ se potvrzením odstranit nedá (${notConfirmable.verdict}).`), results: [] };
+    if (notConfirmable) return { ...refused(`“${notConfirmable.name}” cannot be removed by confirmation (${notConfirmable.verdict}).`), results: [] };
 
     const ok = await this.confirm({
-      message: entries.length === 1 ? 'Odstranit tento prostředek?' : `Odstranit ${resources(entries.length)}?`,
-      detail: [...listing(entries), '', 'Nevratné: kontejnery, volumes a adresáře se smažou i s daty. Co je právě používané, se nesmaže a zkusí se znovu později.'].join('\n'),
-      accept: 'Odstranit',
+      message: entries.length === 1 ? 'Remove this resource?' : `Remove ${resources(entries.length)}?`,
+      detail: [...listing(entries), '', 'Irreversible: containers, volumes and directories are deleted with their data. Anything in use right now is not deleted and is retried later.'].join('\n'),
+      accept: 'Remove',
     });
-    if (!ok) return { ok: false, message: 'Zrušeno.', results: [] };
+    if (!ok) return { ok: false, message: 'Cancelled.', results: [] };
 
     const run = await this.daemon.post<{ actions: ReconcileAction[] }>('/reconcile/run', { confirm: entries.map(e => e.key) });
     const named = new Set(entries.map(e => e.key));
@@ -83,7 +83,7 @@ export class WorkspaceActions {
     const left = results.length - gone;
     return {
       ok: left === 0,
-      message: left === 0 ? `Odstraněno ${gone}.` : `Odstraněno ${gone}, ${left} zůstává (používané nebo selhalo; daemon to zkusí znovu).`,
+      message: left === 0 ? `Removed ${gone}.` : `Removed ${gone}, ${left} left (in use or failed; the daemon will retry).`,
       results,
     };
   }
@@ -100,5 +100,5 @@ function sameRepo(entry: PlanEntry, registry: WorkspaceList, repoPath: string): 
 
 function listing(entries: PlanEntry[]): string[] {
   const lines = entries.slice(0, SHOWN).map(e => `  ${e.kind}  ${e.name}${e.workspace ? `  (${e.workspace})` : ''}`);
-  return entries.length > SHOWN ? [...lines, `  … a dalších ${entries.length - SHOWN}`] : lines;
+  return entries.length > SHOWN ? [...lines, `  … and ${entries.length - SHOWN} more`] : lines;
 }

@@ -21,10 +21,10 @@ describe('job model', () => {
   });
 
   it('names a status in words with a tone, and the exit of a failed run', () => {
-    expect(jobStatus(job('J20261008-A1B2'))).toEqual({ tone: 'critical', label: 'selhalo (exit 1)' });
-    expect(jobStatus(job('J20261008-P4TX'))).toEqual({ tone: 'neutral', label: 'čeká na slot gradle-test' });
-    expect(jobStatus(job('J20261008-C3D4'))).toEqual({ tone: 'ok', label: 'hotovo' });
-    expect(jobStatus(job('J20261008-J9K1')).label).toBe('ztraceno');
+    expect(jobStatus(job('J20261008-A1B2'))).toEqual({ tone: 'critical', label: 'failed (exit 1)' });
+    expect(jobStatus(job('J20261008-P4TX'))).toEqual({ tone: 'neutral', label: 'waiting for slot gradle-test' });
+    expect(jobStatus(job('J20261008-C3D4'))).toEqual({ tone: 'ok', label: 'done' });
+    expect(jobStatus(job('J20261008-J9K1')).label).toBe('lost');
   });
 
   it('filters by what is going on and by text', () => {
@@ -44,9 +44,9 @@ describe('job model', () => {
 
   it('describes a delivery: delivered, waiting, retrying and failed', () => {
     const [pending, delivered, failed] = mock.deliveries().items;
-    expect(deliveryLabel(pending)).toBe('opakuje (2.)');
-    expect(deliveryLabel(delivered)).toBe('doručeno');
-    expect(deliveryLabel(failed)).toBe('selhalo');
+    expect(deliveryLabel(pending)).toBe('retrying (#2)');
+    expect(deliveryLabel(delivered)).toBe('delivered');
+    expect(deliveryLabel(failed)).toBe('failed');
   });
 
   it('follows a chain from its first job to the follow-up it started', () => {

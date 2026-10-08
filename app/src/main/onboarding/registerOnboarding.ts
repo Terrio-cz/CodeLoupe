@@ -18,12 +18,12 @@ export function registerOnboarding(ctx: EnvContext, handle: <A extends unknown[]
         } catch { /* not JSON: ask */ }
       }
       const win = BrowserWindow.getFocusedWindow();
-      const opts = { title: 'Vyberte repozitáře (složky s .git)', properties: ['openDirectory' as const, 'multiSelections' as const] };
+      const opts = { title: 'Select repositories (folders with .git)', properties: ['openDirectory' as const, 'multiSelections' as const] };
       const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
       return r.canceled ? [] : r.filePaths;
     },
     repos: async () => ((await ctx.source().get({ resource: 'settings' }, '/ui-api/v1/settings')) as DaemonSettings).repos,
-    blocked: () => (ctx.source().kind === 'mock' ? 'Zdroj dat je Mock: průvodce se v tomto režimu nic nepíše. Přepněte v Nastavení zdroj dat na Daemon.' : null),
+    blocked: () => (ctx.source().kind === 'mock' ? 'The data source is Mock: the setup guide writes nothing in this mode. Switch the data source to Daemon in Settings.' : null),
   });
   handle(ONBOARDING_CH.addRepositories, () => manager.addRepositories());
   handle(ONBOARDING_CH.query, (repoId: unknown) => manager.query(String(repoId)));

@@ -37,7 +37,7 @@ describe('release', () => {
 
   it('does nothing when the user declines', async () => {
     const { actions, posts } = setup(false);
-    expect(await actions.release({ repo: repoPath, path: ter664.path })).toEqual({ ok: false, message: 'Zrušeno.' });
+    expect(await actions.release({ repo: repoPath, path: ter664.path })).toEqual({ ok: false, message: 'Cancelled.' });
     expect(posts).toEqual([]);
   });
 
@@ -62,8 +62,8 @@ describe('reconcile', () => {
     const keys = confirmKeys.slice(0, 2);
     const r = await actions.reconcile({ keys });
     expect(r.ok).toBe(true);
-    expect(r.message).toBe('Odstraněno 2.');
-    expect(asked[0].message).toBe('Odstranit 2 prostředky?');
+    expect(r.message).toBe('Removed 2.');
+    expect(asked[0].message).toBe('Remove 2 resources?');
     expect(posts).toEqual([{ path: '/reconcile/run', body: { confirm: keys } }]);
   });
 
@@ -71,7 +71,7 @@ describe('reconcile', () => {
     const { actions } = setup(true, [{ key: confirmKeys[0], outcome: 'removed' }, { key: confirmKeys[1], outcome: 'blocked' }]);
     const r = await actions.reconcile({ keys: confirmKeys.slice(0, 2) });
     expect(r.ok).toBe(false);
-    expect(r.message).toBe('Odstraněno 1, 1 zůstává (používané nebo selhalo; daemon to zkusí znovu).');
+    expect(r.message).toBe('Removed 1, 1 left (in use or failed; the daemon will retry).');
     expect(r.results.map(x => x.outcome)).toEqual(['removed', 'blocked']);
   });
 
@@ -97,7 +97,7 @@ describe('reconcile', () => {
 
   it('does not call the daemon when the user declines', async () => {
     const { actions, posts } = setup(false);
-    expect(await actions.reconcile({ keys: [confirmKeys[0]] })).toEqual({ ok: false, message: 'Zrušeno.', results: [] });
+    expect(await actions.reconcile({ keys: [confirmKeys[0]] })).toEqual({ ok: false, message: 'Cancelled.', results: [] });
     expect(posts).toEqual([]);
   });
 });

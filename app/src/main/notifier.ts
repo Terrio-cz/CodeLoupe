@@ -70,7 +70,7 @@ export class Notifier {
 
   daemonPhase(phase: DaemonPhase): void {
     if (phase === 'running') {
-      if (this.outageShown) this.show('daemon', 'Daemon znovu běží', 'CodeLoupe daemon odpovídá.', '#/overview', true);
+      if (this.outageShown) this.show('daemon', 'Daemon running again', 'The CodeLoupe daemon is responding.', '#/overview', true);
       this.outageShown = false;
       this.wasRunning = true;
       return;
@@ -78,7 +78,7 @@ export class Notifier {
     // Only an outage the user did not cause: stops from the app or CLI end in 'stopped'.
     if (this.wasRunning && !this.outageShown && (phase === 'down' || phase === 'error') && this.settings().notify.daemon) {
       this.outageShown = true;
-      this.show('daemon', 'Daemon neodpovídá', this.settings().autoStartDaemon ? 'Spouštím ho znovu.' : 'Spusťte ho z tray menu.', '#/overview', true);
+      this.show('daemon', 'Daemon not responding', this.settings().autoStartDaemon ? 'Starting it again.' : 'Start it from the tray menu.', '#/overview', true);
     }
   }
 
@@ -86,14 +86,14 @@ export class Notifier {
   startFailed(message: string | null): void {
     if (this.wasRunning || this.outageShown || !this.settings().notify.daemon) return;
     this.outageShown = true;
-    this.show('daemon', 'Daemon se nepodařilo spustit', message ?? 'Zkontrolujte příkaz CLI v Nastavení.', '#/settings', true);
+    this.show('daemon', 'Daemon failed to start', message ?? 'Check the CLI command in Settings.', '#/settings', true);
   }
 
   /** Auto-start stopped trying (5 failures in 10 minutes). */
   gaveUp(message: string | null): void {
     if (!this.settings().notify.daemon) return;
     this.outageShown = true;
-    this.show('daemon', 'Daemon se nedaří spustit', message ?? 'Zkontrolujte příkaz CLI v Nastavení.', '#/settings', true);
+    this.show('daemon', 'Daemon keeps failing to start', message ?? 'Check the CLI command in Settings.', '#/settings', true);
   }
 
   /** A one-off message of the app itself (an update, a rollback); never throttled. */
@@ -106,7 +106,7 @@ export class Notifier {
     for (const [kind, p] of this.pending) {
       if (now - (this.lastShown.get(kind) ?? 0) < THROTTLE_MS) continue;
       this.pending.delete(kind);
-      const title = p.count > 1 ? `${p.last.title} (+${p.count - 1} další)` : p.last.title;
+      const title = p.count > 1 ? `${p.last.title} (+${p.count - 1} more)` : p.last.title;
       this.show(kind, title, p.last.body, `#/${p.last.ref.screen}`);
     }
   }

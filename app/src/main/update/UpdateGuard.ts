@@ -62,11 +62,11 @@ export class UpdateGuard {
     const pending = files.readPending();
     if (!pending || pending.to !== version || pending.from === version || !shipped) return false;
     this.onState = s => this.observe(s, shipped.version);
-    this.onFailed = message => void this.fail(message ?? 'spuštění selhalo');
+    this.onFailed = message => void this.fail(message ?? 'start failed');
     this.deps.manager.on('state', this.onState);
     this.deps.manager.on('failed', this.onFailed);
     this.deps.manager.on('gaveUp', this.onFailed);
-    this.timer = setTimeout(() => void this.fail('daemon neodpověděl do 90 sekund'), this.deps.timeoutMs ?? TIMEOUT_MS);
+    this.timer = setTimeout(() => void this.fail('the daemon did not respond within 90 seconds'), this.deps.timeoutMs ?? TIMEOUT_MS);
     this.onState(this.deps.manager.current);
     return true;
   }
@@ -106,7 +106,7 @@ export class UpdateGuard {
     files.clearPending();
     const previous = files.previousBundle();
     if (!previous || !pending) {
-      this.deps.tell(`Daemon nové verze ${version} se nespustil (${reason}) a předchozí verze není uschována.`);
+      this.deps.tell(`The daemon of new version ${version} did not start (${reason}) and no previous version is kept.`);
       return;
     }
     this.deps.useBundle(previous);
@@ -114,13 +114,13 @@ export class UpdateGuard {
     if (state.phase !== 'running') {
       // The old bundle fails too: the cause is not the bundle (a foreign process on the port, say). Leave it be.
       if (this.deps.shipped) this.deps.useBundle(this.deps.shipped);
-      this.deps.tell(`Daemon se nespustil ani z předchozí verze ${pending.from}: ${state.message ?? reason}`);
+      this.deps.tell(`The daemon did not start from previous version ${pending.from} either: ${state.message ?? reason}`);
       return;
     }
     const record: RollbackRecord = { failedVersion: version, usingVersion: pending.from, reason, at: new Date().toISOString() };
     files.writeRollback(record);
     this.deps.onRollback(record);
-    this.deps.tell(`Daemon verze ${version} se nespustil (${reason}); běží předchozí verze ${pending.from}.`);
+    this.deps.tell(`The daemon of version ${version} did not start (${reason}); previous version ${pending.from} is running.`);
   }
 
   private stop(): void {

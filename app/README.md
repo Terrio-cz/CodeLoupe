@@ -60,7 +60,7 @@ Verification modes (development builds only):
 
 - The renderer is sandboxed: `contextIsolation`, no `nodeIntegration`, a strict CSP with `connect-src 'none'`, and the bundle is served from `app://codeloupe`.
 - All data goes through preload IPC. Main validates every request (resource, id and query allow-list) and calls only `http://127.0.0.1:<port>`, without an `Origin` header and with `x-codeloupe: 1`.
-- The Environment screen writes the encrypted store only through main: the page sends a value once from a password field (emptied on submit), main hands it to `<cli> env set` on stdin, and no answer, log or argument carries it. Delete, replacing sources and roll back are confirmed in a native dialog. "Kopírovat" exists only where the OS can ask the user to authenticate again (Touch ID on macOS); elsewhere a value cannot be copied out at all.
+- The Environment screen writes the encrypted store only through main: the page sends a value once from a password field (emptied on submit), main hands it to `<cli> env set` on stdin, and no answer, log or argument carries it. Delete, replacing sources and roll back are confirmed in a native dialog. "Copy" exists only where the OS can ask the user to authenticate again (Touch ID on macOS); elsewhere a value cannot be copied out at all.
 - Workspaces actions (release a worktree, confirm a cleanup) change the real daemon only after main has checked the request against the daemon's own registry and plan and the user said yes in a native dialog that lists what goes; the page never sends a path to delete, only plan keys.
 - The first-run onboarding writes through main only: the folder dialog is native, the chosen paths go to `<cli> repos add`, the YouTrack step is the Accounts flow (token on stdin into the store), and the trial query is `<cli> outline` on a repository the daemon lists.
 - Job logs: the page names a job id; main reads only `<home>/jobs/<id>.log` of a finished job, strips terminal codes and masks credential-looking values. The live event stream is opened while the Jobs screen is open and passes on only the event type and job id.
@@ -79,7 +79,7 @@ Budget ≤ 300 MB RSS. The GPU and network services run inside the main process,
 Animations repaint in software (no GPU), and Chromium holds the raster memory for a few seconds. Switching quickly
 through every screen peaks about 35 MB above the pre-revamp app and is back at its level after 5 s idle; the motion
 rules that keep it there (no staggered entrances, no transform/opacity animation inside a scroller) and the
-measurements are in [docs/design-revamp.md](../docs/design-revamp.md), Paměť.
+measurements are in [docs/design-revamp.md](../docs/design-revamp.md), Memory.
 
 ## Window
 

@@ -34,7 +34,7 @@ export function MarkdownView({ source, allowed }: { source: string; allowed: Rea
         const box = /^\[( |x|X)\]\s+(.*)$/.exec(text);
         items.push(
           <li key={items.length}>
-            {box ? <><span aria-label={box[1] === ' ' ? 'nesplněno' : 'splněno'} role="img">{box[1] === ' ' ? '☐' : '☑'}</span> {md(box[2])}</> : md(text)}
+            {box ? <><span aria-label={box[1] === ' ' ? 'not done' : 'done'} role="img">{box[1] === ' ' ? '☐' : '☑'}</span> {md(box[2])}</> : md(text)}
           </li>,
         );
       }
