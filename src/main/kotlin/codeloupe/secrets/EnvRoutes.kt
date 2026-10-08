@@ -14,7 +14,7 @@ import java.security.MessageDigest
 
 /**
  * `GET /env/values?workspace=&repository=&names=A,B`: the values an MCP server or script needs, fetched in its own
- * process. The caller presents the token of `<home>/secrets/api.token` (readable by this user only) in `x-codeloupe-env-token`
+ * process. The caller presents the token of `<home>/secrets/api-token.env` (readable by this user only) in `x-codeloupe-env-token`
  * and says who it is in `x-codeloupe-used-by`, which lands in the metadata of every name it fetched. Not a tool: it is not
  * in the MCP catalog and no agent-facing surface returns its answer.
  */

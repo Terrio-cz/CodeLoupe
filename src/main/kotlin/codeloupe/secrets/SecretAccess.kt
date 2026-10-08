@@ -10,7 +10,7 @@ class SecretAccess(private val home: Path, private val env: Map<String, String> 
     private val opened: Result<SecretStore> by lazy { preset?.let { Result.success(it) } ?: runCatching { SecretStore.open(home, env) } }
 
     val vaultFile: Path = home.resolve("secrets").resolve("vault.env")
-    private val tokenFile: Path = home.resolve("secrets").resolve("api.token")
+    private val tokenFile: Path = home.resolve("secrets").resolve("api-token.env")
 
     val store: SecretStore? get() = opened.getOrNull()
 

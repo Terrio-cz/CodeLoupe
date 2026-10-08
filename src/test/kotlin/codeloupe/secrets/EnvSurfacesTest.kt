@@ -60,7 +60,7 @@ class EnvSurfacesTest {
     private fun tool(name: String, args: JsonObject): String =
         JsonFormat.json.parseToJsonElement(send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$name")).POST(HttpRequest.BodyPublishers.ofString(args.toString()))).second).jsonObject.getValue("text").jsonPrimitive.content
 
-    private fun token(): String = Files.readString(home.resolve("secrets").resolve("api.token")).trim()
+    private fun token(): String = Files.readString(home.resolve("secrets").resolve("api-token.env")).trim()
 
     @Test
     fun `the env tool and the CLI report list names, scopes, sources and use, never a value`() {
@@ -102,7 +102,7 @@ class EnvSurfacesTest {
         tool("env", buildJsonObject { put("root", JsonPrimitive(work.toString())) })
         val log = Files.readString(home.resolve("daemon.log"))
         assertFalse(secret in log || wsSecret in log)
-        Files.walk(home).filter { Files.isRegularFile(it) && !it.fileName.toString().startsWith("api.token") }.forEach { file ->
+        Files.walk(home).filter { Files.isRegularFile(it) && !it.fileName.toString().startsWith("api-token.env") }.forEach { file ->
             if (file.fileName.toString().endsWith(".db") || file.fileName.toString().endsWith(".jsa")) return@forEach
             assertFalse(String(Files.readAllBytes(file), Charsets.ISO_8859_1).contains(secret), "value in $file")
         }
