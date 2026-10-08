@@ -26,6 +26,7 @@ object ConfigLoader {
             buildHeapMb = number("buildHeapMb")?.toInt() ?: 512,
             defaultRoot = env["CODELOUPE_ROOT"]?.takeIf { it.isNotEmpty() } ?: text("defaultRoot"),
             overlayCheckMs = number("overlayCheckMs") ?: 1_000,
+            maxParallelQueries = number("maxParallelQueries")?.toInt()?.coerceAtLeast(1) ?: 2,
             jobs = JobsConfig.parse(file),
             workspaces = WorkspacesConfig.parse(file),
             metrics = MetricsConfig.parse(file),

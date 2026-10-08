@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonObject
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Semaphore
 import kotlin.io.path.exists
 
 /**
@@ -41,6 +42,7 @@ class Registry(
 ) {
     private val repos = ConcurrentHashMap<String, RepoState>()
     private val views = ViewPool()
+    private val readGate = Semaphore(config.maxParallelQueries, true)
     private val overlays = Overlays(queue, launcher, config.queryTimeoutMs, config.overlayCheckMs, views::release, log, emit)
     private val builds = BaseBuilds(queue, launcher, log, release = ::releaseBase, swapped = ::collectOverlays, emit = emit)
     private val mergeBases = MergeBases(queue, launcher, config.queryTimeoutMs)
@@ -154,16 +156,21 @@ class Registry(
 
     /** Null when the base or the overlay moved on since [baseCommit]: the caller tries again. */
     private fun <T> read(repo: RepoState, baseFile: Path, baseCommit: String, overlay: Path?, read: (View) -> T): Read<T>? {
-        // Taken under the lock that guards the swap, so a new build cannot prune this base in between.
-        val lease = synchronized(repo) { if (repo.baseCommit == baseCommit) views.take(baseFile, overlay) else null } ?: return null
-        var healthy = false
+        readGate.acquire()
         try {
-            // An overlay refreshed against a newer base in the meantime does not fit this one.
-            val answer = if (overlay == null || lease.view.overlayBase() == baseCommit) Read(read(lease.view)) else null
-            healthy = true
-            return answer
+            // Taken under the lock that guards the swap, so a new build cannot prune this base in between.
+            val lease = synchronized(repo) { if (repo.baseCommit == baseCommit) views.take(baseFile, overlay) else null } ?: return null
+            var healthy = false
+            try {
+                // An overlay refreshed against a newer base in the meantime does not fit this one.
+                val answer = if (overlay == null || lease.view.overlayBase() == baseCommit) Read(read(lease.view)) else null
+                healthy = true
+                return answer
+            } finally {
+                views.give(lease, healthy)
+            }
         } finally {
-            views.give(lease, healthy)
+            readGate.release()
         }
     }
 

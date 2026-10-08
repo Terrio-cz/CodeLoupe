@@ -8,6 +8,7 @@ import codeloupe.index.Store
 import codeloupe.platform.Sha1
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import kotlin.test.Test
@@ -28,6 +29,26 @@ class RegistryTest {
         val registry = Registry(config(buildTimeoutMs = 200), JobQueue(this))
         val failure = assertFailsWith<IllegalStateException> { registry.query(repo.toString()) { } }
         assertEquals("build timed out after 200 ms", failure.message)
+    }
+
+    @Test
+    fun `reads run at most maxParallelQueries at a time, the rest wait their turn`(): Unit = runBlocking {
+        val registry = Registry(config().copy(maxParallelQueries = 2), JobQueue(this))
+        registry.query(repo.toString()) { } // the first query builds the base
+        val running = java.util.concurrent.atomic.AtomicInteger()
+        val peak = java.util.concurrent.atomic.AtomicInteger()
+        val answers = (1..8).map {
+            async(Dispatchers.Default) {
+                registry.query(repo.toString()) {
+                    peak.accumulateAndGet(running.incrementAndGet(), ::maxOf)
+                    Thread.sleep(80)
+                    running.decrementAndGet()
+                    it
+                }
+            }
+        }
+        answers.forEach { it.await() }
+        assertEquals(2, peak.get(), "two at a time, never more, and the gate was in use")
     }
 
     @Test
