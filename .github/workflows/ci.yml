@@ -150,18 +150,6 @@ jobs:
 
       # The Electron installer of this OS around the bundle just built (CL-104). Signing comes with CL-105.
       # Install scripts stay off: electron-builder downloads the Electron it packs itself.
-      # Electron, NSIS, fpm and the AppImage tools are downloaded from GitHub on every build otherwise.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cache/electron
-            ~/.cache/electron-builder
-            ~/Library/Caches/electron
-            ~/Library/Caches/electron-builder
-            ~/AppData/Local/electron/Cache
-            ~/AppData/Local/electron-builder/Cache
-          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('app/package-lock.json') }}
-
       - name: Build the installer
         working-directory: app
         shell: bash
