@@ -543,6 +543,22 @@ Po merge s joby a trackerem (CL-84, CL-26) stejný profil: teplý dotaz 4,5 / 8,
   velikost cache, ale to, kam heap dorostl. Měřeno na TerrioImporter (50 dotazů: `usages`, `find`, `outline`, `symbol`,
   `hierarchy`, `calls`, z toho 5× `usages ApiKey.id`, třetina v task worktree): RSS 190 → **178–180 MB**, `usages ApiKey.id`
   teplé 1,0–1,3 s → **134–223 ms**; čerstvý home (vč. prvního buildu a parsu overlaye) 212 → 201 MB.
+- CL-118 a CL-25 (2026-10-08), `tools/rss-mix.mjs` a `tools/load-test.mjs` (daemon v dočasném home, klon TerrioImporter):
+  **příčina RSS** — nejde o únik ani o cache, ale o to, co proud dotazů dotkne: podlaha po `outline`/`find`/`symbol`
+  152–154 MB, `usages` a `calls` (stejný `UsageFinder`) +37 MB, `context` a `changes bodies` +9 MB, `grep` 0, `hierarchy` +2;
+  živý heap po full GC ~33 MB (15 MB `byte[]` řetězců `DeclRow`/`ImportRow`), plný `GC.run` RSS nesnížil (203 z 205),
+  NMT: heap 80 (dotčený), Metaspace 30–43 + sdílený CDS 29, kód 13–21, Symbol 10–13, vlákna 5; nad NMT ~40 MB (SQLite,
+  mapy JGit, stránky `jvm.dll`). Nejvíc dá omezení souběhu: 10 klientů × 8 worktrees = 244 MB při neomezeném souběhu,
+  215 při 4, **198** při 2 čteních naráz (`maxParallelQueries`, výchozí 2; dotaz trvá desítky ms, dva sloty pobrali
+  ~100 dotazů/s). Dál `-XX:+UseCompactObjectHeaders` (objekty cachovaných řádků o čtvrtinu menší, ale default CDS archiv se
+  nepoužije), `-Xmn10m` a `Min/MaxHeapFreeRatio` 10/30: mix z CL-118 (50 dotazů vč. `changes bodies`, `calls … callees
+  depth 3`, `usages ApiKey.id`, task worktree) **204–206 → 195–198 MB**. Bez účinku: menší SQLite cache (`cache_size`), JIT
+  prahy, `-Xshare:off`. Zátěž (8 worktrees, 10 klientů, think 250 ms, commit 12 souborů v čase 25 %, editace 4 worktrees):
+  p95 dotazu 105–127 ms, žádné `busy`, steady RSS 195–204 MB po 90 s, **plateau ~232 MB po 5 min** — skok o ~30 MB při
+  prvním parsu v procesu daemonu (třídy Kotlin parseru) po změně báze. Rozpočet „≤ 200 MB steady“ platí pro mix CL-118;
+  pro 8 worktrees po parsu je naměřeno 230–240 MB (peak ≤ 240 MB, limit 300). Po landu platí první dotaz v každém worktree
+  ~0,7 s (obnova overlaye proti nové bázi), ostatní ~100 ms. `BaseBuilds.sync` už nekopíruje bázi (100+ MB) pod zámkem repozitáře,
+  na kterém stojí každý dotaz.
 - Známé meze: JGit vrací při criss-cross historii jednu z nejlepších merge-base, nemusí být stejná jako od gitu (obě
   platí). Snapshot se při každé změně přepisuje celý (Terrio 2 200 souborů ~150 KB, repozitář se 100k soubory ~8 MB).
   Snapshot se přepisuje celý i po každé obnově indexu (IDE), synchronně pod zámkem worktree.

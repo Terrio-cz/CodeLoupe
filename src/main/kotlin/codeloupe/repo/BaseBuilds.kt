@@ -57,11 +57,11 @@ internal class BaseBuilds(
         val inline = InlineParse.fits(planned.puts)
         val job = queue.run(if (inline) JobQueue.Lane.FAST else JobQueue.Lane.HEAVY, "sync:${repo.id}:$commit") {
             build(repo, commit, current = { repo.syncTarget == commit }) { tmp ->
-                // Copied under the lock that guards pruning, so the source cannot vanish mid-copy.
-                val source = synchronized(repo) {
-                    Files.copy(repo.baseFile!!, tmp, StandardCopyOption.REPLACE_EXISTING)
-                    repo.baseCommit!!
-                }
+                // Copied outside the lock: a base is 100+ MB, and every query of the repository takes that lock to lease a view.
+                // Pruning keeps the current and the previous base, so the source outlives one swap; a copy that loses the race
+                // fails the sync, which base() retries.
+                val (sourceFile, source) = synchronized(repo) { repo.baseFile!! to repo.baseCommit!! }
+                Files.copy(sourceFile, tmp, StandardCopyOption.REPLACE_EXISTING)
                 val update = if (source == from) planned else changes(repo, source, commit)
                 if (inline) {
                     BaseBuilder.update(GitObjects.blobs(repo.commonDir), commit, tmp, update)
