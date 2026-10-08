@@ -20,11 +20,14 @@ Measured in CI on 2026-10-08 (Temurin 25.0.4, tiny repository, daemon idle after
 
 | OS | Zip | Unpacked (runtime) | Daemon RSS | First / warm query |
 |---|---|---|---|---|
-| Linux x64 | 139.8 MB | 195 MB (105 MB) | 109 MB | 3.6 s / 0.25 s |
-| Windows x64 | 135.3 MB | 182 MB (92 MB) | 104 MB | 9.1 s / 0.34 s |
-| macOS arm64 | 134.4 MB | 185 MB (95 MB) | 94 MB | 2.3 s / 0.16 s |
+| Linux x64 | 129.1 MB | 171 MB (78 MB) | 116 MB | 3.5 s / 0.19 s |
+| Windows x64 | 124.5 MB | 157 MB (64 MB) | 110 MB | 6.9 s / 0.48 s |
+| macOS arm64 | 123.7 MB | 160 MB (67 MB) | 103 MB | 3.1 s / 0.31 s |
+| macOS x64 | 125.0 MB | 163 MB (69 MB) | 91 MB | 8.1 s / 0.50 s |
 
-The first query includes starting the daemon and creating the class-data archive.
+(The same run on 2026-10-08, before the runtime was trimmed: runtime 105 / 92 / 95 / 97 MB, zip 142 / 138 / 137 / 138 MB.) The
+first query includes starting the daemon and creating the class-data archive. Runners differ from run to run by a factor of two
+(the first query of seven earlier runs: Linux 2.3-3.3 s, Windows 4.7-7.0 s, macOS arm64 2.9-6.4 s, macOS x64 4.0-12.5 s).
 
 ## Installers
 

@@ -1259,6 +1259,25 @@ rozhoduje launcher.
   (−96 %), Sonnet 5.5 50,36 (−27 %); `terrio-tester` 127,25 → Haiku 5.5 6,36 (−95 %). Dnes běží steward, changelog a tester na Sonnet 5.5, retro na Haiku 4.5, suggester z poloviny na Opus 5.5 (61 z 117 běhů). Skutečná úspora bude menší a závisí na kvalitě:
   rozhodnutí o výměně modelu patří uživateli a vyžaduje kontrolu běhů (např. `compare` po týdnu).
 
+### Výsledek CL-143 — menší jlink runtime (2026-10-09)
+
+- **Rozbor** (Windows, runtime z Temurin/OpenJDK 25, 91 MB): `lib/modules` 27,8 MB, `classes_nocoops.jsa` 14,2, `classes.jsa` 13,9,
+  `jvm.dll` 13,9, `ct.sym` 10,4, `jvm.lib` 1,1, zbytek 11. Archiv `classes_nocoops.jsa` je pro haldy nad 32 GB (daemon má 64–80 MB, worker 512 MB),
+  takže ho JVM nikdy nemapuje. `ct.sym` (pro `javac --release`) přichází s `jdk.compiler` (3 MB), který parser Kotlinu jen zmiňuje. `java.desktop`
+  (8 MB + nativní knihovny) vypadá nepoužitě, ale bez něj parser worker nevrací žádná fakta (soubory se indexují bez deklarací), takže zůstává.
+  `--compress zip-9` nedal nic (28 444 proti 28 460 KB), `java.rmi`, `java.scripting`, `java.sql`, `java.instrument` dohromady pod 0,5 MB.
+- **Změna**: `gradle/bundle.gradle.kts` vynechá `jdk.compiler` ze seznamu z `jdeps` a po `jlink` smaže `classes_nocoops.jsa` a `jvm.lib`.
+  `tools/bundle-smoke.mjs` teď parsuje i druhý Kotlin soubor (generika, lambdy, anotace, sealed, KDoc) a Java soubor (generika, record), aby chybějící
+  modul vyšel najevo; opraven i zápis souboru `--zip`, když chyběl `--out`.
+- **Velikost runtime v CI (Temurin 25.0.4), před → po**: Linux **105,1 → 77,6 MB (−26 %)**, Windows **92,3 → 63,6 (−31 %)**, macOS arm64
+  **94,5 → 66,9 (−29 %)**, macOS x64 **97,0 → 69,4 (−28 %)**; zip 142,4 → 129,1, 137,9 → 124,5, 137,0 → 123,7, 138,3 → 125,0 MB. CI `bundle` i
+  `installer smoke` na všech čtyřech runnerech zelené (run `cf9a37d`).
+- **Rychlost a paměť**: lokálně (Windows, 3 střídavé běhy smoke) první dotaz 2,8–3,1 s u obou, warm 259–323 ms u obou, RSS daemonu 114–115 MB u obou.
+  V CI jedna hodnota po změně leží v rozsahu předchozích sedmi běhů (viz tabulka v wiki), RSS daemonu +0 až +3 MB v šumu (116/110/103/91 proti 115/107/101/89).
+- **AOT cache JDK 25 (nezapnuto)**: CLI `find` 187 → 157 ms (−16 %) proti dynamickému AppCDS, start daemonu 1 181 → 617 ms, RSS daemonu 114 → 110 MB; cache
+  22 MB (CLI) a 51 MB (daemon) v home, ne v balíčku. Nezapnuto, protože tři věci nejsou vyřešené (souběžné první volání CLI zapisují jeden soubor,
+  zápis při ukončení daemona zdržuje `stop`, platnost po přesunu instalace): karta **CL-150** s měřením.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
