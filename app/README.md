@@ -1,10 +1,12 @@
 # CodeLoupe desktop app
 
-Electron app over the daemon's read-only UI API: token usage and savings, branches and worktrees with their
-changed declarations, YouTrack tasks from the mirror, index health, gaps, environment keys and settings.
-A tray icon shows the daemon state, RSS and queue; the app starts the daemon when it is down, and it
-sends notifications for budget breaches, finished builds, new gaps and daemon outages. It does not monitor
-agent runs; the launcher does that. Spec: [../docs/ui-spec.md](../docs/ui-spec.md).
+Electron app over the daemon: token usage and savings with the daemon's latency, memory and CPU against its budgets,
+branches and worktrees with their changed declarations and callers, workspaces with the Docker resources, ports and cleanup
+they hold, YouTrack tasks from the mirror, jobs with their slots and webhooks, the cost of agent runs from the transcripts,
+index health, gaps, environment keys and settings. A tray icon shows the daemon state, RSS and queue; the app starts the
+daemon when it is down, and it sends notifications for budget breaches, finished builds, new gaps and daemon outages. It reads;
+the only things it changes are a released workspace and a confirmed cleanup, after a native confirmation. It does not follow
+what an agent is doing now; the launcher does that. Spec: [../docs/ui-spec.md](../docs/ui-spec.md).
 
 ## Requirements
 

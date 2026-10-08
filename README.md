@@ -511,8 +511,13 @@ workspace's. `codeloupe status` shows `portAllocations`.
 
 ## Desktop app
 
-`app/` holds the Electron desktop app (tray, notifications, daemon start/stop, screens over the daemon's
-read-only UI API). See [app/README.md](app/README.md) and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
+`app/` holds the Electron desktop app (tray, notifications, daemon start/stop). Screens, light and dark: Overview (cost and
+savings, p95 latency, daemon memory and CPU with the budget warnings), Branches (changed declarations, callers, tests, the
+runs of the task), Workspaces (every registry state with its Docker resources, ports, disk and memory; release and confirmed
+cleanup), Tasks, Jobs (states, slots and holders, live, logs with the summary first, chains, webhooks), Runs (what each agent
+run cost and where), Index, Gaps (the weekly gap report), Environment and Settings. They read the daemon's UI API and a few
+of its read-only routes; the two actions that change something ask in a native dialog first. See [app/README.md](app/README.md)
+and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
 
 ## Configuration
 
