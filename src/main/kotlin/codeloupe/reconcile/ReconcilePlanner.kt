@@ -4,6 +4,7 @@ import codeloupe.config.ReconcileConfig
 import codeloupe.docker.OwnershipClass
 import codeloupe.docker.ResourceEntry
 import codeloupe.docker.ResourceKind
+import codeloupe.processes.ProcessEntry
 import codeloupe.workspace.Workspace
 import codeloupe.workspace.WorkspaceList
 import codeloupe.workspace.WorkspaceState
@@ -20,7 +21,9 @@ import java.time.Instant
  * - the workspace is active: kept; the repository is not in the registry at all: kept;
  * - the workspace landed and the resource is labelled by CodeLoupe, has no running sibling and is older than the grace
  *   period: `auto`; adopted, running or abandoned/orphan/gone: `confirm`;
- * - an orphan directory under a worktree root: always `confirm`.
+ * - an orphan directory under a worktree root: always `confirm`;
+ * - a build tool (Gradle daemon or worker, Kotlin daemon) working in a workspace directory: released: `auto`; the workspace is
+ *   active: kept; landed, abandoned or orphan: `confirm`. Other processes are never planned, only reported.
  */
 class ReconcilePlanner(
     private val config: ReconcileConfig,
@@ -28,14 +31,15 @@ class ReconcilePlanner(
     private val releasedAt: (String, String) -> Instant? = { _, _ -> null },
     private val now: () -> Instant = Instant::now,
 ) {
-    fun plan(resources: List<ResourceEntry>, registry: WorkspaceList): List<PlanEntry> {
+    fun plan(resources: List<ResourceEntry>, registry: WorkspaceList, processes: List<ProcessEntry> = emptyList()): List<PlanEntry> {
         val knownRepos = registry.repos.mapTo(HashSet()) { it.name.lowercase() }
         val running = resources.filter { it.kind == ResourceKind.CONTAINER && it.state in RUNNING }
             .mapTo(HashSet()) { it.repo.orEmpty().lowercase() to it.workspace.orEmpty().lowercase() }
         val owned = resources.filter { it.ownership != OwnershipClass.UNOWNED }.map { entry(it, it.repo.orEmpty().lowercase() in knownRepos, running) }
         val directories = registry.repos.flatMap { repo -> repo.workspaces.filter { it.role == "directory" && it.state == WorkspaceState.ORPHAN }.map { repo.name to it } }
             .map { (repo, directory) -> directory(repo, directory) }
-        return (owned + directories).sortedWith(compareBy({ it.kind.ordinal }, { it.workspace.orEmpty().lowercase() }, { it.name }))
+        val tools = processes.filter { it.kind.buildTool }.map(::process)
+        return (owned + directories + tools).sortedWith(compareBy({ it.kind.ordinal }, { it.workspace.orEmpty().lowercase() }, { it.name }))
     }
 
     private fun entry(resource: ResourceEntry, repoKnown: Boolean, running: Set<Pair<String, String>>): PlanEntry {
@@ -82,6 +86,23 @@ class ReconcilePlanner(
     }
 
     private fun created(resource: ResourceEntry): Instant? = resource.created?.let { runCatching { Instant.parse(it) }.getOrNull() }
+
+    private fun process(p: ProcessEntry): PlanEntry {
+        val protected = config.protect.any { it.covers(null, listOfNotNull(p.commandLine, p.cwd, p.path), null) }
+        val release = if (protected) null else releasedAt(p.repo, p.workspace)?.takeIf { at -> Instant.ofEpochMilli(p.startMs) <= at }
+        val (verdict, reason) = when {
+            protected -> Verdict.PROTECTED to "protected by the config"
+            release != null -> Verdict.AUTO to "the workspace was released at $release"
+            else -> when (p.workspaceState) {
+                WorkspaceState.ACTIVE -> Verdict.KEEP to "the workspace is active"
+                WorkspaceState.LANDED -> Verdict.CONFIRM to "the workspace landed; release it to stop its build tools"
+                WorkspaceState.ABANDONED -> Verdict.CONFIRM to "the workspace is abandoned"
+                WorkspaceState.ORPHAN -> Verdict.CONFIRM to "the workspace is an orphan"
+            }
+        }
+        val name = "${p.kind.name.lowercase().replace('_', '-')} pid ${p.pid} (${p.rssMb} MB)"
+        return PlanEntry(p.key, TargetKind.PROCESS, name, p.repo, p.workspace, null, p.workspaceState, verdict, reason, released = release != null, path = p.path)
+    }
 
     private fun directory(repo: String, directory: Workspace): PlanEntry {
         val protected = config.protect.any { it.covers(null, listOf(directory.path, directory.name), null) }

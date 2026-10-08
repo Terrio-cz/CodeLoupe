@@ -19,12 +19,13 @@ class WorkspacesCommand : CliktCommand(name = "workspaces") {
     private val repo by option(help = "Only the repository containing this path (default: every configured one)")
     private val state by option(help = "Only workspaces in this state").enum<WorkspaceState> { it.name.lowercase() }
     private val size by option(help = "Sum the files of every directory (seconds on built worktrees)").flag()
+    private val ram by option(help = "Add the memory of the processes that work in each directory").flag()
     private val json by option("--json", help = "The daemon's JSON answer").flag()
 
     override fun help(context: Context) = "Every worktree of the configured repositories with branch, task, merge and tracker state; directories git does not know are orphans."
 
     override fun run() {
-        val query = listOfNotNull(repo?.let { "repo=" + URLEncoder.encode(Path.of(it).toAbsolutePath().toString(), Charsets.UTF_8) }, if (size) "size=1" else null).joinToString("&")
+        val query = listOfNotNull(repo?.let { "repo=" + URLEncoder.encode(Path.of(it).toAbsolutePath().toString(), Charsets.UTF_8) }, if (size) "size=1" else null, if (ram) "ram=1" else null).joinToString("&")
         val (status, body) = DaemonClient(ConfigLoader.load()).send("GET", "/workspaces" + if (query.isEmpty()) "" else "?$query", timeout = null)
         if (status != 200) {
             echo(body["error"]?.jsonPrimitive?.content ?: "HTTP $status", err = true)

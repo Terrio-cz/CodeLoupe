@@ -2,6 +2,7 @@ package codeloupe.reconcile
 
 import codeloupe.config.ReconcileConfig
 import codeloupe.docker.ResourceReport
+import codeloupe.processes.ProcessReport
 import codeloupe.platform.IsoTime
 import codeloupe.workspace.WorkspaceList
 import kotlinx.coroutines.sync.Mutex
@@ -25,6 +26,8 @@ class Reconciler(
     /** The released workspaces, when the planner takes them from this store: a mark goes once nothing of it is left. */
     private val releases: ReleaseStore? = null,
     private val log: (String) -> Unit = {},
+    /** The build tools working in workspace directories; the reconciler stops the ones the plan allows. */
+    private val processes: suspend (WorkspaceList) -> ProcessReport = { ProcessReport(IsoTime.now()) },
     /** Called for every attempt with its trigger: the log, the event stream. */
     private val record: (ActionResult, String) -> Unit,
 ) {
@@ -104,13 +107,14 @@ class Reconciler(
     private suspend fun snapshot(): Snapshot {
         val list = registry()
         val report = inventory(list)
-        val entries = planner.plan(report.resources, list).map { entry ->
+        val running = processes(list)
+        val entries = planner.plan(report.resources, list, running.processes).map { entry ->
             state.get(entry.key)?.let { entry.copy(attempts = it.attempts, nextAttempt = it.nextAttempt, lastError = it.lastError) } ?: entry
         }
         // Only removable entries keep a backoff. Docker not answering leaves its entries out of the plan, which must not wipe it.
         if (report.engine != null) state.retain(entries.filter { it.verdict == Verdict.AUTO || it.verdict == Verdict.CONFIRM }.mapTo(HashSet()) { it.key })
         val counts = entries.groupingBy { it.verdict.name.lowercase() }.eachCount().toSortedMap()
         if (report.engine != null) latest = entries
-        return Snapshot(entries, ReconcilePlan(IsoTime.now(), config.auto, counts, entries, report.problems), report.engine != null)
+        return Snapshot(entries, ReconcilePlan(IsoTime.now(), config.auto, counts, entries, report.problems + running.problems.filter { it !in report.problems }), report.engine != null)
     }
 }

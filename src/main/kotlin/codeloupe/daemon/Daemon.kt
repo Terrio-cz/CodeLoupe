@@ -35,6 +35,8 @@ import codeloupe.reconcile.releaseRoutes
 import codeloupe.reconcile.Reconciler
 import codeloupe.reconcile.reconcileRoutes
 import codeloupe.platform.IsoTime
+import codeloupe.processes.ProcessInventory
+import codeloupe.processes.processRoutes
 import codeloupe.platform.ProcessMemory
 import codeloupe.platform.Timings
 import codeloupe.repo.Registry
@@ -115,12 +117,13 @@ class Daemon private constructor(
     private val workspaces = Workspaces(config, registry, trackers)
     private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets, ::log)
     private val resources = ResourceInventory(config, workspaces)
+    private val processes = ProcessInventory(workspaces)
     private val reconcileConfig = config.workspaces.reconcile
     private val releases = ReleaseStore(config.home.resolve("releases.json"))
     private val reconciler = Reconciler(
         reconcileConfig, { workspaces.list() }, { resources.report(it) }, ReconcilePlanner(reconcileConfig, releases::releasedAt),
         ReconcileExecutor({ DockerApi.connect() })::execute, ReconcileState(config.home.resolve("reconcile-state.json"), reconcileConfig), releases, ::log,
-        ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
+        { processes.report(it) }, ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
     )
     private val ports = PortRegistry(
         config.workspaces.ports, PortStore(config.home.resolve("ports.json")), LocalPorts(),
@@ -246,8 +249,9 @@ class Daemon private constructor(
                 call.respondJson(HttpStatusCode.OK, ToolOutcome.serializer(), runner.run(tool, ToolArgs(args), "api"))
             }
             jobRoutes(jobs)
-            workspaceRoutes(workspaces)
+            workspaceRoutes(workspaces, processes)
             resourceRoutes(resources)
+            processRoutes(processes)
             reconcileRoutes(reconciler)
             releaseRoutes(workspaces, releases, reconciler, ::released)
             portRoutes(ports)
