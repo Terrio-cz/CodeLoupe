@@ -79,6 +79,42 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
         return query(sql, params, RefRow::of)
     }
 
+    /** Paths the overlay holds, tombstones included: each hides the base copy of its file. Empty without an overlay. */
+    fun overlayPaths(): Set<String> =
+        if (overlay) query("SELECT path FROM ov.files", emptyMap()) { it.getString(1) }.toSet() else emptySet()
+
+    /** Declarations of the base alone, as [decls] without the masking: what every view of this base shares. */
+    fun baseDecls(where: String, params: Map<String, Any?> = emptyMap()): List<DeclRow> = query(
+        "SELECT ${DeclRow.COLUMNS}, 'base' AS src FROM main.decls d JOIN main.files f ON f.id = d.file_id WHERE (${where.replace("{db}", "main")})",
+        params, DeclRow::of,
+    )
+
+    /** Declarations of the overlay alone; none without one. */
+    fun overlayDecls(where: String, params: Map<String, Any?> = emptyMap()): List<DeclRow> = if (!overlay) emptyList() else query(
+        "SELECT ${DeclRow.COLUMNS}, 'ov' AS src FROM ov.decls d JOIN ov.files f ON f.id = d.file_id WHERE (${where.replace("{db}", "ov")})",
+        params, DeclRow::of,
+    )
+
+    /** References of the base alone (see [baseDecls]). */
+    fun baseRefs(where: String, params: Map<String, Any?> = emptyMap()): List<RefRow> = query(
+        "SELECT ${RefRow.COLUMNS}, 'base' AS src FROM main.refs r JOIN main.files f ON f.id = r.file_id WHERE ($where)", params, RefRow::of,
+    )
+
+    /** References of the overlay alone; none without one. */
+    fun overlayRefs(where: String, params: Map<String, Any?> = emptyMap()): List<RefRow> = if (!overlay) emptyList() else query(
+        "SELECT ${RefRow.COLUMNS}, 'ov' AS src FROM ov.refs r JOIN ov.files f ON f.id = r.file_id WHERE ($where)", params, RefRow::of,
+    )
+
+    /** Imports of the base alone (see [baseDecls]). */
+    fun baseImports(where: String, params: Map<String, Any?> = emptyMap()): List<ImportRow> = query(
+        "SELECT i.fqn, i.alias, i.star, f.path FROM main.imports i JOIN main.files f ON f.id = i.file_id WHERE ($where)", params, ImportRow::of,
+    )
+
+    /** Imports of the overlay alone; none without one. */
+    fun overlayImports(where: String, params: Map<String, Any?> = emptyMap()): List<ImportRow> = if (!overlay) emptyList() else query(
+        "SELECT i.fqn, i.alias, i.star, f.path FROM ov.imports i JOIN ov.files f ON f.id = i.file_id WHERE ($where)", params, ImportRow::of,
+    )
+
     /** How many references are named [name], counted up to [cap]: a size check that loads no rows. */
     fun refCount(name: String, cap: Int): Int {
         val base = "SELECT 1 FROM main.refs r JOIN main.files f ON f.id = r.file_id WHERE r.name = :name"

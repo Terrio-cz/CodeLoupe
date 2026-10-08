@@ -20,10 +20,10 @@ data class RefRow(
         const val COLUMNS = "r.name, r.line, r.col, r.kind, r.recv, r.decl_id, r.bind, r.recv_type, r.args, f.path"
 
         fun of(rs: ResultSet) = RefRow(
-            name = rs.getString("name"), line = rs.getInt("line"), col = rs.getInt("col"), kind = rs.getString("kind"),
-            recv = rs.getString("recv"), declId = rs.getLong("decl_id").takeUnless { rs.wasNull() }, bind = rs.getString("bind"),
-            recvType = rs.getString("recv_type"), args = rs.getInt("args").takeUnless { rs.wasNull() }, path = rs.getString("path"),
-            src = rs.getString("src"),
+            name = rs.getString("name").pooled(), line = rs.getInt("line"), col = rs.getInt("col"), kind = rs.getString("kind").pooled(),
+            recv = rs.getString("recv")?.pooled(), declId = rs.getLong("decl_id").takeUnless { rs.wasNull() }, bind = rs.getString("bind")?.pooled(),
+            recvType = rs.getString("recv_type")?.pooled(), args = rs.getInt("args").takeUnless { rs.wasNull() }, path = rs.getString("path").pooled(),
+            src = rs.getString("src").pooled(),
         )
     }
 }
