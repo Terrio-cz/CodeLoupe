@@ -270,6 +270,11 @@ With a tracker configured (see Configuration) more tools work on a local mirror 
 | `tasks` | one line per task (`id state · type · priority ‹epic› title ⛔blockers`). `mode=list` with a YouTrack-like `query` (`project: TER state: -Done #unresolved epic: TER-1 type: Bug {Fix versions}: 1.0 sort: id` plus full-text words), `graph` (an issue's epic, dependencies, subtasks, relations; `depth` ≤ 3), `ready` (open tasks without open subtasks whose dependencies are resolved and that no git worktree branch holds), `progress` (an epic: counts by state, criteria, blockers, open tasks) |
 | `update` | writes to the tracker: `set={Field: value}` (State, Assignee, Priority, Type, `summary`, `description` or any custom field; comma-separated for multi-value fields; an empty value clears) and/or `comment=<text>`. Answers one line of at most 300 characters — the fields that changed (`State: To do→Done`), `+comment <id>`, and the state when it did not change — instead of the issue. The mirror stores the tracker's own answer to the write, so the next `issue` read needs no request |
 
+### Hooks of the plugin
+
+The plugin points shell searches and whole-file reads of indexed source at the CodeLoupe call that answers them (`PreToolUse` hook,
+`advise` by default, one switch to turn every hook off). Details, modes and measurements: [docs/wiki/Plugin-hooks.md](docs/wiki/Plugin-hooks.md).
+
 ### Editing by declaration (`edit`)
 
 `edit` changes source by declaration instead of by text, one tool for every write (the tool count is capped, so it is one tool with an
@@ -603,6 +608,7 @@ and the UI spec [docs/ui-spec.md](docs/ui-spec.md).
 | Budgets that make `/status` warn | `p95Ms` 1000, `queueWaitMs` 30000, `rssMb` 250, `busyRate` 0.1 | `config.json` `budgets` `{ "rssMb": 200 }` |
 | Weighted-token budgets of a day and of one agent run (events for the desktop app) | none | `config.json` `budgets` `{ "dailyWeighted": 150000000, "runWeighted": 20000000 }` |
 | Writing by declaration (`edit`) | `auto`: offered when the gap detector shows the need; no write in `.git`, secrets, conflicted files | `config.json` `write` `{ "mode": "on", "linkedWorktreesOnly": true, "deny": ["**/generated/**"], "gate": { "wholeFileReads": 20, "manualRenames": 3, "windowDays": 30 } }` |
+| Hooks of the plugin | on; steering in `advise` mode, large from 150 lines, at most 40 pieces of advice a session, none after 4 unheeded in a row | `config.json` `hooks` (see [Hooks of the plugin](#hooks-of-the-plugin)); `CODELOUPE_HOOKS=off` in Claude Code's environment |
 | Trackers to mirror | none | `config.json` `trackers` (below) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
 
@@ -642,6 +648,7 @@ codeloupe metrics collect --since 2026-09-23 --until 2026-10-02 --label baseline
 codeloupe metrics compare baseline-2026-10-08.json after-2026-10-20.json
 codeloupe metrics gaps --since 2026-10-01               # where CodeLoupe calls fell short, by week and query shape
 codeloupe metrics boilerplate --since 2026-09-23         # skeleton share of the new code files agents write
+codeloupe metrics hooks --since 2026-10-01               # how often the plugin's steering hook spoke and was followed
 ```
 
 `collect` writes one JSON report with, per role, median / p75 / sum of cost (relative price units: input 1, 5 min cache

@@ -1,5 +1,6 @@
 package codeloupe.daemon
 
+import codeloupe.hooks.HookStats
 import codeloupe.jobs.JobsSnapshot
 import codeloupe.platform.PartTime
 import codeloupe.reconcile.ReleaseStatus
@@ -36,4 +37,6 @@ data class DaemonStatus(
     val gitSpawns: Long = 0,
     /** Time spent per [codeloupe.platform.TimedPart], lower-case names. */
     val timings: Map<String, PartTime> = emptyMap(),
+    /** The plugin's hook calls since the daemon started (`POST /hook`). */
+    val hooks: HookStats = HookStats(),
 )

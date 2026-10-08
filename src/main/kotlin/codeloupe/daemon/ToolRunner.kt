@@ -10,6 +10,7 @@ import codeloupe.tools.Tool
 import codeloupe.tools.ToolArgs
 import kotlinx.coroutines.CancellationException
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Runs a tool against the index of its `root` and records the call. */
@@ -24,6 +25,7 @@ class ToolRunner(
     private val errors = AtomicInteger()
     private val busy = AtomicInteger()
     private val window = CallWindow()
+    private val perRoot = ConcurrentHashMap<String, AtomicInteger>()
 
     suspend fun run(tool: Tool, args: ToolArgs, via: String): ToolOutcome {
         val started = Instant.now()
@@ -46,6 +48,7 @@ class ToolRunner(
             ToolOutcome(false, "error: ${e.message}")
         }
         total.incrementAndGet()
+        callRoot?.let { perRoot.computeIfAbsent(it) { AtomicInteger() }.incrementAndGet() }
         if (!outcome.ok) errors.incrementAndGet()
         if (wasBusy) busy.incrementAndGet()
         val record = CallRecord(
@@ -58,6 +61,9 @@ class ToolRunner(
     }
 
     fun stats() = CallStats(total.get(), errors.get(), busy.get())
+
+    /** Calls made so far on the worktree [root] (as git spells its path); the hooks tell by it whether advice was taken. */
+    fun callsOn(root: String): Int = perRoot[root]?.get() ?: 0
 
     fun latency() = window.snapshot()
 
