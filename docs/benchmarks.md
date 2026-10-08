@@ -77,7 +77,10 @@ rg counts every line that holds the word: the declaration, imports, KDoc links, 
 
 Checked by hand on two items of the Exposed checkout at the commit above (`rg -n -w -g "*.kt" SCryptHasher` and `IntVectorColumnType`): the 5 lines for `SCryptHasher` are one call, the declaration, a string literal and two KDoc links (CodeLoupe: 1 reference); the 6 lines for `IntVectorColumnType` are three calls, one `is` check, the declaration and an import (CodeLoupe: 4).
 
-![Median tokens per question](benchmarks.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="benchmarks-dark.svg">
+  <img alt="Median tokens read per question" src="benchmarks.svg" width="860">
+</picture>
 
 ### CodeLoupe against minimal grep, question by question
 

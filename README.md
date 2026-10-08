@@ -33,6 +33,11 @@ them with `rg` and by reading files. CodeLoupe answers each with one call that r
 What the agent has to read, median over the questions of each kind on two public repositories (tokens are characters
 divided by 3.16; method and every row in [docs/benchmarks.md](docs/benchmarks.md)):
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks-share-dark.svg">
+  <img alt="CodeLoupe answer as a share of grep + read" src="docs/benchmarks-share.svg" width="830">
+</picture>
+
 | Task | Tool | CodeLoupe | grep + read | grep, minimal |
 |---|---|---:|---:|---:|
 | Read a type | `symbol` | 326 | 789 | 322 |
@@ -65,7 +70,10 @@ answers issue reads locally; `codeloupe metrics` shows from Claude Code transcri
 [docs/benchmarks.md](docs/benchmarks.md), [docs/benchmarks.json](docs/benchmarks.json) and the chart below. Run of
 2026-10-08 on Windows 11, i7-13700F, 64 GB, CodeLoupe 0.1.0 (commit `b2a695e`), `gitnexus@1.6.12` from npm.
 
-![Median tokens read per question](docs/benchmarks.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks-dark.svg">
+  <img alt="Median tokens read per question" src="docs/benchmarks.svg" width="830">
+</picture>
 
 Tokens read per question, median over 15–16 questions of each kind (2 for the branch, 6 for text search):
 
@@ -617,7 +625,7 @@ by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktre
 (needs git, ripgrep and network; about 25 minutes). It clones the public repositories at pinned commits into the scratch
 directory, installs GitNexus there from npm (`--no-gitnexus` skips it, `--rg <binary>` points at a ripgrep that is not on
 `PATH`), starts its own daemon on port 47651 (`--port`) with a throwaway home, never touches the daemon on the default
-port, and writes `docs/benchmarks.md`, `.json` and `.svg`; `--report-only docs/benchmarks.json` rewrites the markdown and
+port, and writes `docs/benchmarks.md`, `.json` and the branded charts (`docs/benchmarks*.svg`, light and dark, drawn by `tools/benchmarkCharts.mjs`); `--report-only docs/benchmarks.json` rewrites the markdown and
 the chart from a saved run.
 
 `node tools/load-test.mjs --install build/install/codeloupe --source <repo>` clones the repository into a scratch directory, adds
