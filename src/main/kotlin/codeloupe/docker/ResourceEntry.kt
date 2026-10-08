@@ -29,4 +29,6 @@ data class ResourceEntry(
     val state: String? = null,
     val created: String? = null,
     val project: String? = null,
+    /** Containers: the host ports it publishes. */
+    val publishedPorts: List<Int> = emptyList(),
 )

@@ -5,6 +5,7 @@ import codeloupe.JsonFormat
 import codeloupe.config.Config
 import codeloupe.config.PortPolicy
 import codeloupe.docker.DockerApi
+import codeloupe.docker.ResourceKind
 import codeloupe.docker.ResourceInventory
 import codeloupe.docker.resourceRoutes
 import codeloupe.events.EventBus
@@ -16,6 +17,10 @@ import codeloupe.events.eventRoutes
 import codeloupe.jobs.JobRunner
 import codeloupe.jobs.JobTool
 import codeloupe.jobs.jobRoutes
+import codeloupe.ports.LocalPorts
+import codeloupe.ports.PortRegistry
+import codeloupe.ports.PortStore
+import codeloupe.ports.portRoutes
 import codeloupe.reconcile.ReconcileExecutor
 import codeloupe.reconcile.ReconcilePlanner
 import codeloupe.reconcile.ReconcileRecorder
@@ -106,6 +111,10 @@ class Daemon private constructor(
         ReconcileExecutor({ DockerApi.connect() })::execute, ReconcileState(config.home.resolve("reconcile-state.json"), reconcileConfig), releases, ::log,
         ReconcileRecorder(::log, AppendLog(config.home.resolve("reconcile.jsonl")), events)::invoke,
     )
+    private val ports = PortRegistry(
+        config.workspaces.ports, PortStore(config.home.resolve("ports.json")), LocalPorts(),
+        { resources.report().takeIf { it.engine != null }?.resources?.filter { it.kind == ResourceKind.CONTAINER } },
+    )
     @Volatile private var lastClientCall: Instant? = null
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = trackers::touch)
     private val guard = RequestGuard(config.port)
@@ -121,7 +130,7 @@ class Daemon private constructor(
             uptimeSec = Instant.now().epochSecond - started.epochSecond, rssMb = ProcessMemory.rssMb(),
             heapMb = (runtime.totalMemory() - runtime.freeMemory()) / MB, cpuSec = cpu,
             calls = runner.stats(), queue = queue.snapshot(), repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
-            gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(),
+            gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(), portAllocations = ports.allocated,
         )
     }
 
@@ -142,6 +151,7 @@ class Daemon private constructor(
     // A workspace was released: its cleanup starts at once, in the background, whatever the request is waiting for.
     private fun released(ref: WorkspaceRef) {
         log("workspace ${ref.workspace} of ${ref.repo} released")
+        ports.free(ref)
         scope.launch { runCatching { reconciler.run("release", auto = reconcileConfig.auto) } }
     }
 
@@ -217,6 +227,7 @@ class Daemon private constructor(
             resourceRoutes(resources)
             reconcileRoutes(reconciler)
             releaseRoutes(workspaces, releases, reconciler, ::released)
+            portRoutes(ports)
             eventRoutes(events, webhooks, webhookKey)
             post("/shutdown") {
                 val pending = jobs.pending()

@@ -268,6 +268,19 @@ cleanup of leftovers.
 `auto` is off by default. `protect` patterns are regular expressions tried (case-insensitively, anywhere in the name,
 so anchor them) against each name of a resource and its compose project; without `kinds` they also cover directories.
 
+### Ports per workspace
+
+With `"ports": { "range": [19000, 19999] }` under `workspaces`, a workspace asks for a port by name:
+`codeloupe ws ports allocate app` prints the port of `app` in the workspace of the directory (the same name always gets the
+same one; `postgres`, `web`, … get others). A new port is one that nothing listens on (it is bound and connected to), no
+container publishes and no workspace has recorded, so it never collides with a live listener; the allocation is a record
+in `<home>/ports.json`, it holds nothing open. `codeloupe ws ports` (and `GET /ports`, for the app) lists every allocation
+with what holds it now: `free`; `in-use` by the workspace's own container or by a process whose command line names the
+workspace; or `conflict` with the owning container (and its workspace, or none) or the process (pid and command line, from
+`netstat` / `ss` / `lsof`). Ports of the range held by something that is no workspace's are listed as `foreign` (today
+the 19002 / 19003 slots with a foreign container). `ws ports free [name]` forgets a port, and `ws release` frees all of the
+workspace's. `codeloupe status` shows `portAllocations`.
+
 ## Desktop app
 
 `app/` holds the Electron desktop app (tray, notifications, daemon start/stop, screens over the daemon's

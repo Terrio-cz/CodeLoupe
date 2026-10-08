@@ -26,6 +26,8 @@ data class DaemonStatus(
     val trackers: List<TrackerSummary> = emptyList(),
     /** Released workspaces whose cleanup is not finished (`ws release`). */
     val releases: List<ReleaseStatus> = emptyList(),
+    /** Ports recorded for workspaces (`ws ports`). */
+    val portAllocations: Int = 0,
     /** git processes started since the daemon started. */
     val gitSpawns: Long = 0,
     /** Time spent per [codeloupe.platform.TimedPart], lower-case names. */

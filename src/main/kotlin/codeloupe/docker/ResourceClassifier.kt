@@ -14,6 +14,7 @@ class ResourceClassifier(private val rules: List<AdoptionRule>, private val stat
     private fun classify(resource: DockerObject): ResourceEntry {
         val base = ResourceEntry(
             resource.kind, resource.id, resource.names, OwnershipClass.UNOWNED, state = resource.state, created = resource.created, project = resource.project,
+            publishedPorts = resource.publishedPorts,
         )
         Ownership.of(resource.labels)?.let { return owned(base, OwnershipClass.OWNED, it, "labels") }
         rules.forEachIndexed { index, rule -> rule.apply(resource)?.let { return owned(base, OwnershipClass.ADOPTED, it.ownership, "adoption rule ${index + 1} (${it.matched})") } }

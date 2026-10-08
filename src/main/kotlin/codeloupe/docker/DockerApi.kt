@@ -26,6 +26,7 @@ class DockerApi(private val endpoint: DockerEndpoint) {
         DockerObject(
             ResourceKind.CONTAINER, c.str("Id").take(SHORT), c.strings("Names").map { it.removePrefix("/") }, c.labels(),
             state = c.str("State").ifEmpty { null }, created = c["Created"]?.jsonPrimitive?.content?.toLongOrNull()?.let { Instant.ofEpochSecond(it).toString() },
+            publishedPorts = (c["Ports"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.get("PublicPort")?.jsonPrimitive?.content?.toIntOrNull() }.distinct(),
         )
     }
 
