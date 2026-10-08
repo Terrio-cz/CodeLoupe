@@ -1,0 +1,65 @@
+# Installers of the desktop app with the daemon and its Java runtime inside (CL-104). `npm run dist` builds the one
+# for the OS and CPU it runs on: jlink output is specific to both, so each installer comes from its own runner.
+# Signing and notarisation come with CL-105; until then macOS and Windows installers are unsigned.
+appId: cz.terrio.codeloupe
+productName: CodeLoupe
+copyright: Terrio
+directories:
+  output: dist
+  buildResources: installer
+files:
+  - out/**/*
+  - package.json
+  # The renderer is bundled by Vite and main imports only Electron and Node modules.
+  - "!node_modules"
+extraResources:
+  # stage/ is filled by scripts/stage-resources.mjs: the Gradle bundle and the Claude Code plugin.
+  - from: stage/codeloupe
+    to: codeloupe
+  - from: stage/claude-plugin
+    to: claude-plugin
+# Chromium's own strings (spell-check, context menus); the app's text is not translated through them.
+electronLanguages:
+  - en-US
+  - cs
+artifactName: CodeLoupe-${version}-${os}-${arch}.${ext}
+
+win:
+  target: nsis
+  icon: installer/icon.png
+nsis:
+  # One click, per user: nothing to confirm and no administrator rights, the app starts when the install ends.
+  oneClick: true
+  perMachine: false
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  # Stops the daemon before files are replaced or removed, and asks about the data on uninstall.
+  include: installer/installer.nsh
+
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
+  icon: installer/icon.png
+  # No certificate yet (CL-105): without this electron-builder looks for one in the keychain.
+  identity: null
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  icon: installer/icon.png
+  # A deb needs a maintainer address; this one is a placeholder that goes nowhere until the project has a contact.
+  maintainer: Terrio <codeloupe@users.noreply.github.com>
+deb:
+  # The tray icon needs an appindicator library on some desktops; the rest ships inside the app.
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0

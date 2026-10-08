@@ -22,6 +22,7 @@ npm run dev        # dev server with hot reload
 npm test           # vitest: request validation, settings, mock API, token contrast, daemon manager
 npm run typecheck
 npm run lint       # eslint; CI runs npm ci, lint, typecheck, test and build on every OS
+npm run dist       # installer for this OS in dist/ (run ./gradlew bundle first); see the root README, Installers
 ```
 
 ## Configuration
@@ -31,7 +32,7 @@ Settings are saved in `<userData>/settings.json` and edited on the Settings scre
 | Setting | Default | Notes |
 |---|---|---|
 | Data source | `mock` | `mock` serves the contract from deterministic data, `daemon` calls `/ui-api/v1/*` (CL-39). Daemon status and start/stop are always real. |
-| CLI command | `codeloupe` | Used for `start`/`stop`, without a shell. Only a native confirmation dialog can change it, never the page. It must be an `.exe` or `node`/`java` plus a script path; a `.cmd`/`.bat` shim is refused with an explanation. For the Kotlin CLI: `java` with the arguments `-cp <install>/lib/* codeloupe.MainKt` (Java expands the `*` itself, no shell needed). |
+| CLI command | `codeloupe`; in an installed app the bundled runtime and jar, resolved at every start | Used for `start`/`stop`, without a shell. Only a native confirmation dialog can change it, never the page. It must be an `.exe` or `node`/`java` plus a script path; a `.cmd`/`.bat` shim is refused with an explanation. For the Kotlin CLI: `java` with the arguments `-cp <install>/lib/* codeloupe.MainKt` (Java expands the `*` itself, no shell needed). |
 | Port | from `<home>/daemon.json`, then `CODELOUPE_PORT`, `config.json`, 47391 | An explicit override is passed to the daemon it starts. |
 | Start the daemon when it is down | on | Off after a manual stop (in the app or `codeloupe stop`) until the next manual start. |
 | Open at login | off | |
