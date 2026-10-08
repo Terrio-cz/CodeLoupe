@@ -50,8 +50,7 @@ class ProcessStopper(
         return cpu(handle) - before > IDLE_CPU_MS
     }
 
-    private fun cpu(handle: ProcessHandle): Long =
-        (listOf(handle) + handle.descendants().toList()).sumOf { it.info().totalCpuDuration().map(Duration::toMillis).orElse(0) }
+    private fun cpu(handle: ProcessHandle): Long = (listOf(handle) + handle.descendants().toList()).sumOf(ProcessCpu::ms)
 
     private fun exited(handle: ProcessHandle): Boolean = runCatching { handle.onExit().get(graceMs, TimeUnit.MILLISECONDS); true }.getOrDefault(false)
 

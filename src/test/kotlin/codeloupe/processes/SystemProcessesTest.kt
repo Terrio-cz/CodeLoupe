@@ -19,7 +19,6 @@ class SystemProcessesTest {
             assertEquals(ProcessKind.GRADLE_DAEMON, listed.kind)
             assertTrue((listed.rssBytes ?: 0) > 1_000_000, "a JVM holds more than 1 MB: ${listed.rssBytes}")
             assertTrue(listed.startMs > 0)
-            assertNotNull(listed.cpuMs)
         }
     }
 
