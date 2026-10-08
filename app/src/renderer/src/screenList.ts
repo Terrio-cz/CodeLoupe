@@ -19,6 +19,8 @@ export const SCREEN_DEFS = [
   { id: 'branches', title: 'Větve', icon: '⑂', group: 'work', key: 'b' },
   { id: 'workspaces', title: 'Workspaces', icon: '▣', group: 'work', key: 'w' },
   { id: 'tasks', title: 'Úkoly', icon: '☰', group: 'work', key: 't' },
+  { id: 'jobs', title: 'Joby', icon: '▷', group: 'work', key: 'j' },
+  { id: 'runs', title: 'Běhy', icon: '↯', group: 'work', key: 'r', range: true },
   { id: 'index', title: 'Index', icon: '▤', group: 'index', key: 'i' },
   { id: 'gaps', title: 'Mezery', icon: '⚑', group: 'index', key: 'g', range: true },
   { id: 'environment', title: 'Prostředí', icon: '⚿', group: 'system', key: 'e' },

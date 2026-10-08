@@ -85,6 +85,10 @@ async function install() {
     appDir = path.join(apps, 'CodeLoupe.app');
     appBin = path.join(appDir, 'Contents', 'MacOS', 'CodeLoupe');
     resources = path.join(appDir, 'Contents', 'Resources');
+    // Signed ad hoc (CL-130): Apple Silicon does not run an unsigned app, and the copy must still verify.
+    run('codesign', ['--verify', '--deep', '--strict', appDir]);
+    if (!run('codesign', ['-dv', appDir]).stderr.includes('Signature=adhoc')) throw new Error('the installed app is not signed ad hoc');
+    report.signature = 'adhoc';
     uninstall = async () => { fs.rmSync(appDir, { recursive: true, force: true }); };
   }
   if (!fs.existsSync(appBin)) throw new Error(`installed, but ${appBin} is missing`);

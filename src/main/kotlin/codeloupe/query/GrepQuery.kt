@@ -48,7 +48,7 @@ object GrepQuery {
             }
             if (hits.isNotEmpty()) byPath[path] = hits
         }
-        if (total == 0) return "no match for \"$pattern\" in the indexed source (Kotlin files)"
+        if (total == 0) return "no match for \"$pattern\" in the indexed source (Kotlin and Java files)"
         val paths = byPath.keys.sortedWith(PathOrder)
         val out = StringBuilder("grep \"$pattern\": $total hit${if (total == 1) "" else "s"} in ${paths.size} file${if (paths.size == 1) "" else "s"}")
         var shown = 0

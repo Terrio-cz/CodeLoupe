@@ -80,6 +80,7 @@ class RegistryTest {
         val stale = stateFor("1/tree-sitter")
         assertNull(stale.baseFile)
         assertNull(stale.baseCommit)
+        assertNull(stateFor("2/kotlin-psi-4").baseFile, "the format before Java was indexed")
     }
 
     @Test

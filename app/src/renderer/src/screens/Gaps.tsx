@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react';
 import type { GapKind } from '../../../shared/contract';
-import { bridge, useApi } from '../api';
+import { useApi } from '../api';
 import { Card, ErrorState, KpiTile, Loading, Select } from '../components/Parts';
 import { ago, dateTime, num, pct } from '../format';
 import { byWeek, filterRows, KIND_LABELS, totalOf } from '../gapReport';
@@ -18,8 +18,6 @@ export function Gaps() {
   const [tool, setTool] = useState('');
   const [kind, setKind] = useState('');
   const [open, setOpen] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [outcome, setOutcome] = useState<{ ok: boolean; message: string } | null>(null);
   const { data, error, loading, reload } = useApi('gaps', undefined, { range });
 
   if (!data) return <Card>{loading ? <Loading /> : <ErrorState message={error?.message ?? 'Nelze načíst mezery.'} onRetry={reload} />}</Card>;
@@ -30,35 +28,19 @@ export function Gaps() {
   const total = totalOf(rows);
   const seenCalls = report?.calls ?? 0;
 
-  const refresh = async () => {
-    setRefreshing(true);
-    setOutcome(null);
-    try {
-      setOutcome(await bridge().actions.gapsRefresh());
-      reload();
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   return (
     <>
       <div className="filterbar">
         <Select label="Nástroj" value={tool} onChange={setTool} options={[{ value: '', label: 'Všechny nástroje' }, ...tools.map(t => ({ value: t, label: t }))]} />
         <Select label="Druh" value={kind} onChange={setKind} options={[{ value: '', label: 'Všechny druhy' }, ...(Object.keys(KIND_LABELS) as GapKind[]).map(k => ({ value: k, label: KIND_LABELS[k] }))]} />
         <span className="muted">Mezera = volání CodeLoupe, které nestačilo: agent sáhl po rg/sed/cat/Read na stejný cíl, nebo odpověď byla prázdná, busy či jen kandidáti.</span>
-        <span style={{ flex: 1 }} />
-        <button className="btn" onClick={() => void refresh()} disabled={refreshing} aria-describedby="gaps-refresh-hint">
-          {refreshing ? 'Počítám report…' : 'Přepočítat report'}
-        </button>
       </div>
-      {outcome && <div className={`banner${outcome.ok ? ' info' : ''}`} role="status">{outcome.message}</div>}
 
       {!report ? (
         <Card title="Týdenní report">
           <div className="state">
-            <div>Report ještě nebyl spočítán. Projde transkripty Claude Code z posledních 30 dnů (<span className="mono">codeloupe metrics gaps</span>), trvá asi půl minuty.</div>
-            <button className="btn primary" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? 'Počítám report…' : 'Spočítat report'}</button>
+            <div>Daemon v transkriptech Claude Code zatím nenašel žádný běh, tak není z čeho report složit. Čte je při prvním dotazu (<span className="mono">~/.claude/projects</span>).</div>
+            <button className="btn" onClick={reload}>Zkusit znovu</button>
           </div>
         </Card>
       ) : (
@@ -102,8 +84,8 @@ export function Gaps() {
           </Card>
         </>
       )}
-      <p id="gaps-refresh-hint" className="muted" style={{ margin: 0 }}>
-        Report se počítá z transkriptů na tomto počítači jen na vyžádání; daemon ho pak servíruje ze souboru <span className="mono">gaps-report.json</span> ve svém home.
+      <p className="muted" style={{ margin: 0 }}>
+        Report je totéž co <span className="mono">codeloupe metrics gaps</span> za posledních 30 dní, jen z transkriptů, které daemon už načetl; rozsah nahoře vybírá týdny.
       </p>
 
       {data.summary.length > 0 && (

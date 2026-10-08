@@ -121,10 +121,10 @@ export function niceStep(raw: number): number {
 }
 
 /** Horizontal bars of one series, sorted, value printed next to the bar. */
-export function BarList({ label, items }: { label: string; items: { name: string; value: number; note?: string }[] }) {
+export function BarList({ label, items, noteWidth }: { label: string; items: { name: string; value: number; note?: string }[]; noteWidth?: number }) {
   const max = Math.max(1, ...items.map(i => i.value));
   return (
-    <ul className="bar-list" aria-label={label}>
+    <ul className="bar-list" aria-label={label} style={noteWidth ? ({ '--note-w': `${noteWidth}px` } as React.CSSProperties) : undefined}>
       {items.map(i => (
         <li key={i.name}>
           <span className="mono">{i.name}</span>

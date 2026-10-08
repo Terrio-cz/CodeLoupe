@@ -10,7 +10,9 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 - **Nepřidává práci agentům**: čte jen to, co daemon už ví (read-only API, § 9). Nic v UI nevolá MCP nástroje.
 - **Nemonitoruje agenty** (uživatel 2026-10-07): běhy agentů, jejich kroky a stav sleduje launcher. Aplikace
   ukazuje jen to, co CodeLoupe měří o sobě — spotřebu a úsporu tokenů proti baseline, telemetrii vlastních
-  volání, mezery, čtení issue přes mirror, index. Obrazovka „Běhy agentů“ a časová osa běhu (CL-42) proto nejsou.
+  volání, mezery, čtení issue přes mirror, index. Časová osa běhu (CL-42) proto není. Obrazovka Běhy (§ 3.3) je jen rozbor
+  nákladů hotových běhů z transkriptů (kolik stály a kde), ne sledování toho, co agent právě dělá. Je tu od CL-40
+  (2026-10-08) nad API z CL-62 a odebere se jedním řádkem v `screenList.ts`.
 - **Hustý developer-tool styl** (Browserbase, Mintlify, Vercel, Linear): levý sidebar, tabulky s 32px řádky,
   postranní detail panely, žádné dekorace, ilustrace ani gradienty. Čísla tabulková (`tabular-nums`).
 - **Světlý i tmavý režim** ze stejných tokenů (§ 6), výchozí = systém.
@@ -48,6 +50,8 @@ CL-54 (Prostředí), API daemonu CL-39 (§ 9 je jeho kontrakt).
 | `#/overview` | Přehled | — | `overview`, `/status` |
 | `#/branches` · `#/branches/:id` | Větve | drawer (520 px) | `worktrees`, `worktrees/{id}` |
 | `#/workspaces` · `#/workspaces/<repo>%2F<name>` | Workspaces (CL-72) | drawer (520 px) | `/workspaces`, `/resources`, `/reconcile`, `/workspaces/releases`, `/ports` (§ 9.18) |
+| `#/runs` · `#/runs/:id` | Běhy (CL-40) | drawer (1040 px) | `runs`, `runs/{id}`, `runs/{id}/steps` |
+| `#/jobs` · `#/jobs/:id` | Joby (CL-89) | drawer (1040 px) | `/jobs`, `/jobs/{id}`, `/status` (sloty), `/webhooks`, `/webhooks/deliveries`, `/events/stream` (§ 9.18) |
 | `#/tasks` · `#/tasks/:id` | Úkoly | celá stránka s panelem vlastností vpravo | `tasks`, `tasks/{id}` |
 | `#/index` | Index | — | `index` |
 | `#/gaps` | Mezery | řádek se rozbalí | `gaps` |
@@ -159,11 +163,35 @@ Větve                          [Repo: všechna ▾] [Stav vrstvy ▾] [🔍 hle
 - Změny: značky `+` přidaná, `~` upravené tělo, `^` změněná signatura, `-` odstraněná (stejné jako `changes()`
   v plan.md § 6), vždy s textovým popiskem v `title`/`aria-label`.
 - Sekce draweru jsou sbalitelné; dlouhé seznamy po 20 + „zobrazit dalších N“.
+- **Běhy agentů na úkolu** (CL-41): pět nejdražších běhů za 30 dní, které úkol větve zmiňují (z `runs?q=<úkol>`), každý s
+  proklikem do detailu běhu (`#/runs/<id>`), a „Všechny běhy úkolu“ (`#/runs?q=<úkol>`). Úkol větve má vlastní tlačítko
+  a sekci, i když ho mirror ještě nemá („v mirroru zatím není“). Detail běhu má zpětný odkaz na úkol.
 - „Otevřít složku“ = IPC `open.worktree(id)`: main vezme cestu z daemonu a otevře ji jen jako adresář s `.git` (§ 10).
 
-### 3.3 (zrušeno) Běhy agentů
+### 3.3 Běhy (CL-40, nad API z CL-62)
 
-Obrazovka běhů a detail s časovou osou kroků (původně CL-42) byly vyřazeny rozhodnutím uživatele 2026-10-07:
+Seznam běhů agentů z transkriptů Claude Code a jejich detail: **kolik běh stál a kde**. Je to rozbor nákladů po skutečnosti,
+ne sledování agentů: aplikace neukazuje, co agent právě dělá, ani nic neřídí (to dělá launcher, viz níže).
+
+```
+Běhy                         [Role ▾] [Řazení ▾] [🔍 hledat zadání, úkol, roli]        [24h|7d|30d]
+┌ Běhy v rozsahu 2 044 ┬ Cena zobrazených 61M ┬ Nad rozpočet běhu 3 ┐
+│ Začátek     Role           Zadání                  Úkol     Délka  Tahy  Cena   Peak kontext  Podíl výsl.  Volání │
+│ 10-08 14:02 terrio-coder   Implement TER-671 …     TER-671  41 min  55   1,2M   142k          54 %         87    │
+└ [Načíst další]  50 z 2 044
+```
+
+- Seznam řadí daemon (`sort`: začátek, cena, tahy, peak kontext, podíl výsledků, délka; vždy sestupně), filtruje podle role,
+  textu a rozsahu a stránkuje po 50. První čtení transkriptů trvá asi minutu: seznam se v té době každé 3 s doplňuje a
+  nahoře je to řečeno.
+- Detail (drawer, široký): souhrn (role, model, doba, cena, peak kontext, podíl výsledků nástrojů), **z čeho se cena
+  skládá** (cache read × 0,1, cache write 1 h × 2, 5 min × 1,25, output × 5, input × 1), cena **podle kategorie nástroje**
+  (volání, velikost výsledků, výsledky držené v kontextu × tahy, cena, chyby) a **kroky** po 200 (pořadí, tah, nástroj,
+  kategorie, o čem volání bylo, velikost výsledku, doba, cena držení, chyba nebo mezera). Popis volání a zadání běhu jsou
+  zkrácené a maskované daemonem, nikdy obsah výsledku; aplikace je nic dalšího nenačítá.
+- Mezi kroky se mezera CodeLoupe (`fallback`, `empty`, `candidates`) ukáže slovy, takže se dá od kroku k Mezerám.
+
+Původně (CL-42) byly běhy agentů a časová osa kroků vyřazeny rozhodnutím uživatele 2026-10-07:
 monitorování agentů patří launcheru, ne CodeLoupe. Data z transcriptů daemon dál používá pro spotřebu a úsporu na
 Přehledu a pro detektor mezer. Seznam běhů a jejich kroky nově vystavuje i API (§ 9.7–9.8, CL-62), aby na něm šla
 postavit obrazovka Běhy (CL-40); samotná obrazovka je práce aplikace.
@@ -242,10 +270,9 @@ Mezery                                      [Nástroj ▾] [Důvod ▾] [24h|7d|
 - Rozbalený řádek: jednotlivé výskyty (čas, důvod, náhrada, cíl, session a tah jako text — bez prokliku do běhu).
 - **Týdenní report** (CL-40) nahoře: výstup `codeloupe metrics gaps` (CL-22) po týdnech, nástroji a tvaru dotazu s druhem
   mezery (`fallback` = agent sáhl po rg/cat/Read, `empty`, `busy`, `candidates`), počtem a několika hledanými identifikátory.
-  Čte ho daemon ze souboru `<home>/gaps-report.json` (`gaps.report`), protože čtení transkriptů trvá desítky sekund;
-  tlačítko „Přepočítat report“ pošle main procesu akci, ten spustí `<cli> metrics gaps --since <před 30 dny> --out <soubor>`
-  (pevné argumenty, bez shellu) a stránku obnoví. Rozsah 24h/7d/30d filtruje týdny, které do něj zasahují. Tabulka výskytů
-  z ingestu transkriptů (CL-62) se ukáže, až v ní něco je.
+  Vychází z ingestu transkriptů (`gaps.report`, CL-62; před prvním ingestem ze souboru `<home>/gaps-report.json`, který
+  zapíše `codeloupe metrics gaps --out`). Rozsah 24h/7d/30d filtruje týdny, které do něj zasahují, filtry nástroje a druhu
+  řádky reportu. Tabulka jednotlivých výskytů z ingestu se ukáže, když v ní něco je.
 
 ### 3.7 Prostředí (CL-54)
 
@@ -265,23 +292,27 @@ Prostředí                       [Rozsah ▾] [🔍 hledat klíč]          [Im
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Hodnota se nikdy nezobrazí** po uložení; API ji nevrací vůbec (§ 9.13). Ve verzi CL-43 je obrazovka
-  jen ke čtení; tlačítka zápisu jsou neaktivní s popiskem „CL-54“.
+- **Hodnota se nikdy nezobrazí** po uložení; API ji nevrací vůbec (§ 9.13).
+- Sloupec Stáří (CL-55) značí klíč starší než `secrets.rotationDays` slovem „rotovat“; pod tabulkou je audit čtení a změn.
+- Odkazy `#/environment?add=1` a `#/environment?import=1` otevřou rovnou drawer přidání a průvodce importem.
 - „Naposledy“ a „Spotřebitelé“ = audit injektáže tajemství do procesů (CL-51, CL-55): každé vydání hodnoty
   procesu zapíše `name, consumer, at` (bez hodnoty).
 
 #### 3.7.1 Zápisové toky (CL-54)
 
 Úložiště: šifrovaný store (CL-50); aplikace hodnoty nikdy nedrží déle, než je nutné. Kanály IPC
-`env.set`, `env.rotate`, `env.delete`, `env.import.*`, `env.reveal` existují až s CL-54 a mají vlastní
-validaci (jméno `^[A-Z][A-Z0-9_]{0,63}$`, hodnota ≤ 16 KB).
+`env.capabilities`, `env.set` (přidání i rotace), `env.remove`, `env.scan`, `env.importRun`, `env.rollback`,
+`env.reveal` (`src/shared/envActions.ts`) mají vlastní validaci v main (jméno `^[A-Za-z_][A-Za-z0-9_]{0,63}$` jako store,
+hodnota 1 B až 16 KB bez NUL, rozsah `global` / `workspace:<cesta>` / `repo:<cesta>`, ID položek `^[0-9a-f]{12}$`).
+Main store sám nezapisuje: spustí CLI (`env set`, `env unset`, `env import …`, bez shellu) a hodnotu mu pošle na stdin, takže
+trezor, jeho ochrana klíče i audit zůstávají na jednom místě. Při zdroji dat Mock se nezapisuje nic.
 
 | Tok | Kroky |
 |---|---|
 | Přidat / upravit | Drawer „Přidat klíč“: jméno, rozsah, hodnota (`type=password`, bez autocomplete a spellchecku). Odeslání pošle hodnotu jediným voláním `env.set` do main procesu, renderer ihned vymaže stav pole a hodnotu nikdy nedostane zpět. Main ji uloží do storu (CL-50, klíč storu chráněný `safeStorage` / OS keychainem) a vrátí jen metadata. |
 | Rotovat | Stejný drawer s předvyplněným jménem; stará hodnota se nezobrazí, po uložení audit „rotated“. |
 | Import (wizard) | 1) Inventář: main projde Claude složky (CL-52) a vrátí jen jména, zdroj a počet výskytů. 2) Potvrzení: uživatel zaškrtne, co importovat. 3) Import: main přesune hodnoty do storu, renderer vidí jen průběh. 4) Volitelně nahrazení zdroje odkazem na store (CL-53) s náhledem změn (jen cesty a jména). |
-| Odhalit | Jen po OS re-auth: Windows Hello přes nativní helper (Electron nemá API), macOS `systemPreferences.promptTouchID`, Linux heslo přes polkit. Hodnota se ukáže v modálním okně vlastněném main procesem (ne v rendereru aplikace), zkopírovat jde jedním tlačítkem, okno se samo zavře po 30 s; po 60 s se schránka vyčistí, jen pokud stále obsahuje odhalenou hodnotu (porovnání hashe). |
+| Kopírovat | Jen po OS re-auth: macOS `systemPreferences.promptTouchID`; Windows Hello a polkit by chtěly nativní helper, který aplikace nemá, takže tam se tlačítko nenabízí vůbec (`env.capabilities`). Hodnotu nikdy nedostane renderer ani okno: main ji přečte z daemona jako pojmenovaného spotřebitele (zapíše se do auditu), vloží do schránky a po 60 s schránku vyčistí, jen pokud stále obsahuje tutéž hodnotu (porovnání hashe). |
 | Smazat | Potvrzovací dialog main procesu se jménem klíče a jeho spotřebiteli. |
 
 ### 3.7a Workspaces (CL-72)
@@ -318,6 +349,38 @@ Workspaces                                 [Repo ▾] [Stav ▾] [🔍 hledat]  
   aktuálnímu plánu (jen verdikt `confirm`), v nativním dialogu vypíše, co se smaže (kontejnery, sítě, volumes, images,
   adresáře), a po potvrzení zavolá `POST /reconcile/run {confirm}`. Výsledek po položkách (odstraněno / už neexistovalo /
   používané — zkusí se znovu / selhalo) se ukáže pod tlačítkem. V mock režimu akce nic nemění.
+
+### 3.7b Joby (CL-89)
+
+Joby daemonu (`codeloupe job start`): co běží, co čeká na slot, co skončilo a jak, a webhooky, které o tom dostaly zprávu.
+Jen čtení; obrazovka se obnovuje z proudu událostí daemonu.
+
+```
+Joby                                       [Stav ▾] [🔍 hledat job, příkaz, štítek]  Posledních 12 jobů · živě
+┌ Běží 2 ┬ Ve frontě 3 ┬ Hotové 4 ┬ Selhané 2 ┬ Zamítnuté a zrušené 1 ┐
+┌ Sloty a kdo je drží ──────────────────────────────────────────────────────────────────┐
+│ gradle-test  2/2 ████████  drží: J…K2QF · TER-671  J…M9ZD · TER-672  · čeká 2: J…P4TX · TER-664 … │
+│ vps-test     0/1 ░░░░░░░░  volný                                                      │
+┌ Job              Stav                 Příkaz              Slot         Štítek  Řetěz        Začátek  Doba ┐
+│ J…A1B2  ● selhalo (exit 1)  gradlew test …   gradle-test  TER-671  2 kroky po skončení  před 31 min 3,2 min │
+└ Webhooky ───────────────────────────┐ ┌ Log doručení ───────────────────────────────────┐
+```
+
+- Stavy jobu: **čeká** (na slot), **běží**, **hotovo** (exit 0), **selhalo (exit n)**, **zamítnuto** politikou, **zrušeno**,
+  **ztraceno** (daemon se zastavil, než skončil), **chyba** (program nešel spustit). Stav je slovo + tečka, ne jen barva.
+- **Sloty** jsou z `/status` `jobs.slots`: kapacita, kdo slot drží (běžící joby) a kdo čeká ve frontě, s proklikem na job.
+- **Živě**: main otevře `GET /events/stream` (SSE, navazuje po posledním `Last-Event-ID`, znovu se připojuje s prodlevou
+  1 → 15 s), jen dokud je obrazovka otevřená; stránka dostane jen typ události a id jobu (ne data) a po 200 ms bez další
+  události načte joby, sloty a doručení znovu. Bez proudu (mock) se běžící joby obnovují po 10 s.
+- **Detail (drawer)**: stav, doba, štítek, příkaz; **Log: souhrn** jako první — počty testů (prošlo / selhalo / přeskočeno),
+  první chybové řádky a posledních 15 řádků, jak je spočítal daemon (`JobSummary`); teprve tlačítko „Zobrazit celý log“
+  přečte konec logu (max 400 řádků / 96 kB). Dokončené joby jen: log běžícího jobu ještě nemá z uložených hodnot
+  vymaskovaná tajemství, takže se nečte. Main čte soubor `<home>/jobs/<id>.log` podle id (cestu ze záznamu jen porovná),
+  odstraní barevné kódy a skryje věci podobné tajemstvím (tokeny, `Bearer …`, `KLÍČ=hodnota`, `https://user:heslo@`).
+- **Řetěz dokončení**: úkoly navazující na job (`--then`, `--on-failure`) jako kroky řetězu (job → následný job) a
+  deklarované kroky (`notify`, `webhook`, `job`) s adresou bez query; „Probudí agenta“ = `wake`.
+- **Webhooky**: odběry (adresa bez query, události, od kdy) a log doručení (stav: doručeno / čeká / opakuje (n.) /
+  selhalo, pokusy, poslední HTTP kód nebo chyba, kdy). Správa odběrů (přidání, smazání) zůstává v CLI.
 
 ### 3.8 Nastavení
 
@@ -804,6 +867,12 @@ Aplikace čte i několik stávajících jen čtecích cest daemonu; renderer je 
 | `releases` | `GET /workspaces/releases` | – |
 | `ports` | `GET /ports` | – |
 | `processes` | `GET /processes` | – (CL-71; zatím mimo `request.ts`) |
+| `status` | `GET /status` | – (sloty jobů; jinak ho čte main proces sám) |
+| `jobs` | `GET /jobs` | `limit` |
+| `jobs/:id` | `GET /jobs/{id}` | – (řetěz jobu) |
+| `webhooks` | `GET /webhooks` | – |
+| `deliveries` | `GET /webhooks/deliveries` | `limit` |
+
 
 `GET /workspaces?ram=1` (CL-71) přidá každému workspace `ramBytes` (pracovní sada procesů, které pracují v jeho adresáři) a
 `processes` (kolik jich je); bez `ram=1` jsou `null`. `GET /processes`: `{ generatedAt, workspaces: [{ repo, workspace, state, processes,
@@ -811,7 +880,8 @@ rssMb, buildRssMb }], processes: [{ pid, startMs, kind: 'gradle-daemon' | 'gradl
 commandLine (maskovaná, ≤ 300 znaků), cwd, rssMb, repo, workspace, workspaceState, path, via: 'cwd' | 'last build' | 'command line', busy }], problems }`.
 V plánu `GET /reconcile` jsou build daemony jako položky `kind: 'process'` s klíčem `process:<pid>:<start>`.
 
-Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevolá; viz § 10.
+Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevolá; viz § 10. Mimo `api` jdou ještě dva
+stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 3.7b) a `live.subscribe` (proud událostí).
 
 ### 9.17 Zdroje dat a implementace
 
@@ -866,11 +936,11 @@ Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevol
     `https:` a origin přesně shodný s některou instancí z nastavení daemonu (`new URL().origin`, žádné
     porovnání prefixu); jiné odkazy se zobrazí jen jako text.
   - **Akce** (`app/src/shared/actions.ts`, jediné zápisy aplikace kromě nastavení): `workspaceRelease({ repo, path })`,
-    `reconcileRun({ keys })`, `gapsRefresh()`. Stránka jen žádá; main ověří žádost proti vlastním datům daemonu
+    `reconcileRun({ keys })`. Stránka jen žádá; main ověří žádost proti vlastním datům daemonu
     (worktree musí být v registru, role `worktree`; klíče musí být v plánu s verdiktem `confirm`), ukáže nativní
     potvrzovací dialog s tím, co se změní, a teprve pak volá daemon (`POST` s hlavičkou `x-codeloupe`, bez `Origin`).
     Bez důvěryhodného daemonu a v mock režimu se neprovedou.
-  - `env.*` (§ 3.7.1) — přibudou až s CL-54, se stejnou kontrolou odesílatele a vlastní validací.
+  - `env.*` (§ 3.7.1, CL-54) — se stejnou kontrolou odesílatele a vlastní validací; potvrzení mazání a nahrazení zdrojů dělá nativní dialog main procesu.
   - `open.worktree` a `open.external` jen když `/status.pid` odpovídá `daemon.json` (§ 8) — cizí proces na
     portu nic neotevře; `open.config` skládá cestu lokálně a kontrolu nepotřebuje.
 - `setPermissionRequestHandler` a `setPermissionCheckHandler` → vše zamítnout; `will-attach-webview` → zamítnout;
@@ -914,4 +984,4 @@ Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevol
 
 - Obrazovky v prohlížeči na `/ui` (CL-40): prohlížeč posílá `Origin` jen u cross-origin a POST požadavků;
   pro same-origin GET z `/ui` bude potřeba vlastní rozhodnutí o ověření (token v URL fragmentu) — až s CL-40.
-- Zápisy prostředí (CL-54), auto-update, balení instalátoru (CL-45).
+- Auto-update a balení instalátoru (CL-45).

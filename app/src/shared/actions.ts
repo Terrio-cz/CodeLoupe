@@ -3,7 +3,6 @@
 import type { ReconcileAction } from './workspaces';
 
 export const ACTION_CH = {
-  gapsRefresh: 'cl:action:gaps-refresh',
   workspaceRelease: 'cl:action:workspace-release',
   reconcileRun: 'cl:action:reconcile-run',
 } as const;
@@ -30,8 +29,6 @@ export interface ReconcileOutcome extends ActionOutcome {
 }
 
 export interface ActionsBridge {
-  /** Runs `codeloupe metrics gaps` over the transcripts of the last 30 days and stores the report for the Gaps screen. */
-  gapsRefresh(): Promise<ActionOutcome>;
   /** Releases a worktree: after a native confirmation that lists them, the daemon removes its Docker resources. */
   workspaceRelease(req: ReleaseRequest): Promise<ActionOutcome>;
   /** Removes the plan entries after a native confirmation that lists them. */

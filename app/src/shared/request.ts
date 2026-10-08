@@ -36,12 +36,20 @@ const SPECS: Record<Resource, ResourceSpec> = {
   'environment/audit': ui('environment/audit', ['name', 'scope', 'limit']),
   settings: ui('settings'),
   events: ui('events', ['since', 'limit']),
+  runs: ui('runs', ['range', 'sort', 'role', 'q', 'limit', 'cursor']),
+  'runs/:id': ui('runs/:id'),
+  'runs/:id/steps': ui('runs/:id/steps', ['sort', 'limit', 'cursor']),
   'status/history': daemon('/status/history'),
   workspaces: daemon('/workspaces', ['repo', 'size']),
   resources: daemon('/resources', ['stats']),
   reconcile: daemon('/reconcile'),
   releases: daemon('/workspaces/releases'),
   ports: daemon('/ports'),
+  status: daemon('/status'),
+  jobs: daemon('/jobs', ['limit']),
+  'jobs/:id': daemon('/jobs/:id'),
+  webhooks: daemon('/webhooks'),
+  deliveries: daemon('/webhooks/deliveries', ['limit']),
 };
 
 // No `.` or `..` alone: the daemon would normalise them into another path.

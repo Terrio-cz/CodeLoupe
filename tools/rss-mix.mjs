@@ -50,8 +50,10 @@ async function main() {
   const clone = path.join(scratch, 'clone'), task = path.join(scratch, 'task');
   git(scratch, 'clone', '-q', '--local', path.resolve(args.source), clone);
   git(clone, 'worktree', 'add', '-q', '-b', 'task', task);
-  const kt = git(task, 'ls-files', '*.kt').split('\n').filter(Boolean);
-  for (const f of kt.slice(0, 6)) fs.appendFileSync(path.join(task, f), '\nfun rssMixEdit() = 1\n');
+  // Edits in the task worktree: up to six Kotlin and six Java files.
+  const sources = ext => git(task, 'ls-files', `*.${ext}`).split('\n').filter(Boolean);
+  for (const f of sources('kt').slice(0, 6)) fs.appendFileSync(path.join(task, f), '\nfun rssMixEdit() = 1\n');
+  for (const f of sources('java').slice(0, 6)) fs.appendFileSync(path.join(task, f), '\nclass RssMixEdit {}\n');
 
   fs.mkdirSync(home, { recursive: true });
   const jvm = [...DAEMON_JVM, ...(args['jvm-opts'] ? String(args['jvm-opts']).split(/\s+/).filter(Boolean) : []), '-XX:NativeMemoryTracking=summary'];

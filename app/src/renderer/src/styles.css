@@ -237,7 +237,7 @@ table.data td.ellipsis { max-width: 360px; overflow: hidden; text-overflow: elli
 
 /* Bars */
 .bar-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.bar-list li { display: grid; grid-template-columns: minmax(120px, 200px) 1fr 72px 64px; gap: 10px; align-items: center; min-height: 24px; }
+.bar-list li { display: grid; grid-template-columns: minmax(120px, 200px) 1fr 72px var(--note-w, 64px); gap: 10px; align-items: center; min-height: 24px; }
 .bar-list li > .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-list.latency li { grid-template-columns: minmax(70px, 110px) 1fr 64px 88px; }
 .bar-track { height: 14px; position: relative; }
@@ -251,7 +251,8 @@ table.data td.ellipsis { max-width: 360px; overflow: hidden; text-overflow: elli
   position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
   box-shadow: var(--shadow); border-radius: 6px; padding: 6px 8px; font-size: 12px; white-space: nowrap; transform: translate(-50%, -110%);
 }
-.legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-2); align-items: center; }
+.legend { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12px; color: var(--text-2); align-items: center; }
+.legend > span { white-space: nowrap; }
 .legend .sw { display: inline-block; width: 14px; height: 2px; margin-right: 6px; vertical-align: middle; background: var(--series-1); }
 .legend .sw.base { background: none; border-top: 2px dashed var(--series-baseline); height: 0; }
 
@@ -303,6 +304,19 @@ table.data td.ellipsis { max-width: 360px; overflow: hidden; text-overflow: elli
 .activity li { display: grid; grid-template-columns: 12px 1fr; gap: 8px; padding: 6px 0; }
 .activity .tick { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: var(--axis); }
 
+.slots { list-style: none; margin: 0; padding: 0; }
+.slots li { display: grid; grid-template-columns: 130px 44px 120px 1fr; gap: 12px; align-items: center; min-height: 36px; padding: 4px 14px; border-bottom: 1px solid var(--border); }
+.slots li:last-child { border-bottom: 0; }
+.slots .meter { margin: 0; }
+.slots .holders { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.chain { list-style: none; margin: 0; padding: 0; }
+.chain li { display: flex; gap: 10px; align-items: baseline; min-height: 28px; border-bottom: 1px solid var(--border); padding: 3px 0; }
+.chain li[aria-current='true'] { background: var(--accent-weak); }
+.chain .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+pre.cmd { margin: 0; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+pre.log { margin: 4px 0 0; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; overflow: auto; max-height: 220px; white-space: pre; font-size: 12px; }
+pre.log.failures { color: var(--critical-text); }
+pre.log.full { max-height: 420px; }
 .state { padding: 32px; text-align: center; color: var(--text-2); display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .skeleton { height: 12px; border-radius: 4px; background: var(--surface-2); }
 .toast {
@@ -314,3 +328,17 @@ table.data td.ellipsis { max-width: 360px; overflow: hidden; text-overflow: elli
 .banner.info { border-left-color: var(--accent); }
 .form-row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; min-height: 36px; }
 .form-row > .label { color: var(--text-2); }
+
+/* Environment: add/rotate form and import wizard (CL-54) */
+.key-form { display: flex; flex-direction: column; gap: 12px; }
+.drawer-actions { display: flex; gap: 8px; margin-top: 4px; }
+.row-actions { display: inline-flex; gap: 6px; }
+.row-actions .btn { min-height: 24px; padding: 0 8px; }
+.import-table { table-layout: fixed; width: 100%; }
+table.data.import-table th, table.data.import-table td { white-space: normal; overflow-wrap: anywhere; }
+table.data.import-table td { vertical-align: top; height: auto; padding-top: 6px; padding-bottom: 6px; }
+.import-table.choose th:first-child { width: 84px; }
+.import-table ul.sources { margin: 0; padding: 0; list-style: none; }
+.import-table ul.sources li { overflow-wrap: anywhere; }
+.import-options { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; margin: 0; }
+.flags { display: inline-flex; flex-direction: column; gap: 2px; }
