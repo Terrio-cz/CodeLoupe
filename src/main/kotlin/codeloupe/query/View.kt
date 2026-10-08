@@ -192,6 +192,25 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
         stream(sql, params) { each(it.getString(1), it.getString(2)) }
     }
 
+    /**
+     * How often each file refers to the name of a non-local type declared anywhere in the index, overlay copies masking
+     * base ones. Aggregated in SQL: a repository holds hundreds of thousands of references, the answer a few per file.
+     */
+    fun typeRefCounts(): List<RefCount> {
+        val kinds = "('class','interface','object','enum','annotation')"
+        val names = (listOf("SELECT name FROM main.decls WHERE kind IN $kinds AND local = 0") +
+            if (overlay) listOf("SELECT name FROM ov.decls WHERE kind IN $kinds AND local = 0") else emptyList()).joinToString(" UNION ")
+        val select = "SELECT f.path AS path, r.name AS name, count(*) AS n FROM {db}.refs r JOIN {db}.files f ON f.id = r.file_id " +
+            "WHERE f.deleted = 0 AND r.name IN ($names)"
+        val sql = if (overlay) {
+            select.replace("{db}", "ov") + " GROUP BY f.path, r.name UNION ALL " + select.replace("{db}", "main") +
+                " AND f.path NOT IN (SELECT path FROM ov.files) GROUP BY f.path, r.name"
+        } else {
+            select.replace("{db}", "main") + " GROUP BY f.path, r.name"
+        }
+        return query(sql, emptyMap()) { RefCount(it.getString("path"), it.getString("name"), it.getInt("n")) }
+    }
+
     /** Every module of the index (`importers/ruian`), the root module as an empty string. */
     fun modules(): List<String> {
         val base = query("SELECT DISTINCT module FROM main.files WHERE deleted = 0 AND module IS NOT NULL", emptyMap()) { it.getString(1) }

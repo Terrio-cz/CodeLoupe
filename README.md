@@ -93,7 +93,7 @@ Tools take `root` — the absolute path of the repository or worktree to answer 
 | Tool | Returns |
 |---|---|
 | `find` | declarations by name, `Type.member` or glob: `path:lines [container] signature` |
-| `outline` | members of a file or type with line ranges, no bodies |
+| `outline` | members of a file or type with line ranges, no bodies; without a target a map of the repository: files ranked by how much the rest of the code refers to them (PageRank over name references), their types as one-line signatures, cut to `budget` tokens (default 1500); `focus` (files or symbols) puts them first and ranks their neighbourhood, references counted both ways |
 | `symbol` | one declaration's source (KDoc, annotations, body) by `Type.member`, `member(ParamType)`, `pkg.Type` or `File.kt:line`; large types collapse to header + members |
 | `grep` | text search in the indexed source (Kotlin and `.kts` files, worktree edits included) for string literals, SQL, annotation arguments, config keys: literal by default (`regex=true`, `ignoreCase=true`), hits grouped by file and enclosing declaration, one code line each; `module`, `test`, `limit` narrow it |
 | `context` | a declaration's source, its direct callers and the declarations it calls in one answer (`symbol` + `calls` depth 1) instead of three calls |

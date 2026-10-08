@@ -271,7 +271,7 @@ tracker v konfiguraci) + `job` (start/status/cancel jedním nástrojem, CL-84).
 | Nástroj | Vrací |
 |---|---|
 | `find(q, kind?, module?, test?)` | `path:start-end kind FQN signatura` |
-| `outline(file \| type)` | signatury členů s rozsahy, bez těl |
+| `outline(file \| type)` | signatury členů s rozsahy, bez těl; bez cíle **mapa repozitáře** (CL-19): soubory seřazené PageRankem nad odkazy na jména typů, jejich typy jako jednořádkové signatury, ořez na `budget` tokenů (výchozí 1500, Terrio ≈ 1 500); `focus` (soubory nebo symboly) jde první a řadí okolí, odkazy se počítají oběma směry; testy se nepočítají, dokud na ně není focus |
 | `symbol(name, body=true)` | text deklarace (anotace, KDoc, tělo) + `hash`; overloady podle parametrů |
 | `usages(name, all?, limit?)` ✅ | výskyty seskupené podle souboru a obklopující deklarace, 1 řádek každý, `=` exact / `?` candidate; počet výskytů vedoucích jinam |
 | `calls(name, direction=callers\|callees, depth≤3)` ✅ | strom volání; pod první úrovní jen exact vazby, kandidáti jako počet (jeden nástroj místo dvou — strop 12 nástrojů) |
