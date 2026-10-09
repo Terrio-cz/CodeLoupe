@@ -30,6 +30,8 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
     var firstPrompt: String = from?.firstPrompt.orEmpty()
         private set
 
+    private val startTracker = StartTracker(from?.startCtx)
+
     private var emitted = from?.emitted ?: 0
     private val seen = HashSet<Long>().apply { from?.seen?.let(::addAll) }
     private val pending = HashMap<String, Pending>().apply { from?.pending?.forEach { put(it.id, Pending(it.name, it.input, it.atMs, it.turn)) } }
@@ -47,6 +49,8 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
             end = timestamp
         }
         val message = o["message"].obj()
+        o["attachment"].obj()?.let(startTracker::attachment)
+        if (type == "user" && message != null) startTracker.userLine(message)
         if (type == "user" && firstPrompt.isEmpty()) message?.get("content").str()?.let { firstPrompt = it.take(PROMPT_CHARS) }
         if (type == "assistant" && message != null) assistant(message, timestamp)
         if (type == "user") for (block in message?.get("content").arr().orEmpty()) result(block.obj() ?: continue, timestamp)
@@ -61,8 +65,11 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
 
     fun snapshot() = ParserSnapshot(
         role, start, end, model, turns, usage, peak, firstPrompt, emitted, seen.toList(),
-        pending.map { (id, c) -> ParserSnapshot.Call(id, c.name, c.input.plain(), c.atMs, c.turn) },
+        pending.map { (id, c) -> ParserSnapshot.Call(id, c.name, c.input.plain(), c.atMs, c.turn) }, startTracker.state(),
     )
+
+    /** What the run started with, priced for the turns read so far; null while no turn has been read. */
+    fun startContext(): StartCtx? = startTracker.context(turns)
 
     private fun assistant(message: JsonObject, timestamp: String?) {
         if (model == null) model = message["model"].str()
@@ -76,6 +83,7 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
                 ?: maxOf(0, u?.get("cache_creation_input_tokens").num() - written1h)
             val counted = Usage(u?.get("input_tokens").num(), written5m, written1h, u?.get("cache_read_input_tokens").num(), u?.get("output_tokens").num())
             usage += counted
+            startTracker.firstTurn(counted)
             usages += UsageAt(millis(timestamp) ?: millis(end) ?: 0, counted)
             peak = maxOf(peak, u?.get("input_tokens").num() + u?.get("cache_read_input_tokens").num() + u?.get("cache_creation_input_tokens").num())
         }

@@ -440,7 +440,7 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
   Host/Origin/hlavička, single instance, MCP přes restart).
 - Home: `%LOCALAPPDATA%codeloupe` / `~/Library/Caches/codeloupe` / `$XDG_CACHE_HOME/codeloupe`
   (`CODELOUPE_HOME`), port 47391 (`CODELOUPE_PORT`), `config.json` v home.
-- Měření: `codeloupe metrics collect|compare|gaps|boilerplate` (CL-21, CL-22, CL-35); `run/codemetrics.mjs` v Terrio workspace dává na stejných transcriptech stejná čísla.
+- Měření: `codeloupe metrics collect|compare|gaps|boilerplate` (CL-21, CL-22, CL-35); `run/codemetrics.mjs` v Terrio workspace dává na stejných transcriptech stejná čísla, včetně bloku `start` (počáteční kontext, CL-168; test `StartContextTest` drží čísla ze skriptu na dvou fixturách). Výjimka záměrně: volání CodeLoupe mají kategorii `codeloupe`, skript je řadí do `other` / `shell_other`; velikost MCP schémat (`--mcp` ve skriptu) Kotlin neměří.
 
 ### Výsledek portu na Kotlin/JVM (CL-56, 2026-10-07)
 
