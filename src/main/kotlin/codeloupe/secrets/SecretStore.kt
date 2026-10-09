@@ -37,7 +37,7 @@ class SecretStore(val file: Path, private val protector: KeyProtector, val audit
 
     /** What the store holds, narrowest scope last; no value, no key. */
     @Synchronized
-    fun list(): List<SecretMeta> = read()?.entries?.map { it.meta }?.sortedWith(compareBy({ it.name }, { SecretScope.parse(it.scope).rank })).orEmpty()
+    fun list(): List<SecretMeta> = read()?.entries?.map { it.meta }?.sortedWith(compareBy({ it.name }, { SecretScope.parse(it.scope, foldCase = false).rank })).orEmpty()
 
     /** The secrets that apply to [chain] (as [chain] builds it), one per name, the narrowest scope winning; metadata only. */
     @Synchronized
@@ -65,8 +65,8 @@ class SecretStore(val file: Path, private val protector: KeyProtector, val audit
     fun remove(name: String, scope: SecretScope): Boolean {
         val removed = locked {
             val vault = read() ?: return@locked false
-            val kept = vault.entries.filterNot { it.meta.name == name && it.meta.scope == scope.toString() }
-            if (kept.size == vault.entries.size) return@locked false
+            val entry = find(vault.entries, name, scope) ?: return@locked false
+            val kept = vault.entries.filterNot { it === entry }
             write(Vault(vault.version, vault.protector, vault.wrappedKey, kept))
             true
         }
@@ -81,7 +81,7 @@ class SecretStore(val file: Path, private val protector: KeyProtector, val audit
         val picked = pick(vault.entries, chain).filter { names == null || it.meta.name in names }
         if (picked.isEmpty()) return emptyMap()
         val dataKey = key(vault)
-        val values = picked.associate { entry -> entry.meta.name to Resolved(entry.meta, SecretCrypto.open(dataKey, SecretCrypto.Sealed(entry.nonce, entry.value), aad(entry.meta.name, SecretScope.parse(entry.meta.scope)))) }
+        val values = picked.associate { entry -> entry.meta.name to Resolved(entry.meta, SecretCrypto.open(dataKey, SecretCrypto.Sealed(entry.nonce, entry.value), aad(entry.meta.name, SecretScope.parse(entry.meta.scope, foldCase = false)))) }
         if (usedBy != null) touch(picked, usedBy)
         return values
     }
@@ -90,8 +90,8 @@ class SecretStore(val file: Path, private val protector: KeyProtector, val audit
     @Synchronized
     fun holds(name: String, scope: SecretScope, value: String): Boolean {
         val vault = read() ?: return false
-        val entry = vault.entries.firstOrNull { it.meta.name == name && it.meta.scope == scope.toString() } ?: return false
-        return SecretCrypto.open(key(vault), SecretCrypto.Sealed(entry.nonce, entry.value), aad(name, scope)) == value
+        val entry = find(vault.entries, name, scope) ?: return false
+        return SecretCrypto.open(key(vault), SecretCrypto.Sealed(entry.nonce, entry.value), aad(name, SecretScope.parse(entry.meta.scope, foldCase = false))) == value
     }
 
     /** Encrypts [data] under the vault key, bound to [label]: for a copy of a file that holds values, e.g. an import backup. */
@@ -117,16 +117,23 @@ class SecretStore(val file: Path, private val protector: KeyProtector, val audit
         val vault = read() ?: return emptyList()
         if (vault.entries.isEmpty()) return emptyList()
         val dataKey = key(vault)
-        val all = vault.entries.map { SecretCrypto.open(dataKey, SecretCrypto.Sealed(it.nonce, it.value), aad(it.meta.name, SecretScope.parse(it.meta.scope))) }
+        val all = vault.entries.map { SecretCrypto.open(dataKey, SecretCrypto.Sealed(it.nonce, it.value), aad(it.meta.name, SecretScope.parse(it.meta.scope, foldCase = false))) }
         cache = Triple(stamp.first, stamp.second, all)
         return all
     }
 
+    /** Per name the narrowest scope of [chain]; at one rank the entry stored under the exact id beats one an older version stored lower-cased. */
     private fun pick(entries: List<Entry>, chain: List<SecretScope>): List<Entry> {
-        val allowed = chain.map { it.toString() }.toSet()
+        val exact = chain.map { it.toString() }.toSet()
+        val allowed = exact + chain.map { it.legacy().toString() }
         return entries.filter { it.meta.scope in allowed }.groupBy { it.meta.name }
-            .map { (_, same) -> same.maxBy { SecretScope.parse(it.meta.scope).rank } }.sortedBy { it.meta.name }
+            .map { (_, same) -> same.maxWith(compareBy({ SecretScope.parse(it.meta.scope, foldCase = false).rank }, { it.meta.scope in exact })) }.sortedBy { it.meta.name }
     }
+
+    /** The entry of (name, scope): under the exact id, else under the lower-cased one an older version used. */
+    private fun find(entries: List<Entry>, name: String, scope: SecretScope): Entry? =
+        entries.firstOrNull { it.meta.name == name && it.meta.scope == scope.toString() }
+            ?: entries.firstOrNull { it.meta.name == name && it.meta.scope == scope.legacy().toString() }
 
     /** Notes the use on the entries that were read; the vault is read again under the lock, so a change made meanwhile stays. */
     private fun touch(used: List<Entry>, usedBy: String) {
@@ -209,8 +216,11 @@ class SecretStore(val file: Path, private val protector: KeyProtector, val audit
         private val JVM_LOCKS = ConcurrentHashMap<String, ReentrantLock>()
 
         /** The scopes that apply to a caller, widest first: global, then its workspace, then its repository. */
-        fun chain(workspace: String? = null, repository: String? = null): List<SecretScope> =
-            listOfNotNull(SecretScope.GLOBAL, workspace?.takeIf { it.isNotBlank() }?.let(SecretScope::workspace), repository?.takeIf { it.isNotBlank() }?.let(SecretScope::repository))
+        fun chain(workspace: String? = null, repository: String? = null, foldCase: Boolean = SecretScope.FOLDS_CASE): List<SecretScope> = listOfNotNull(
+            SecretScope.GLOBAL,
+            workspace?.takeIf { it.isNotBlank() }?.let { SecretScope.workspace(it, foldCase) },
+            repository?.takeIf { it.isNotBlank() }?.let { SecretScope.repository(it, foldCase) },
+        )
 
         /** The vault of the daemon home [home]; its protector is the one an existing vault was made with, else the best the OS has. */
         fun open(home: Path, env: Map<String, String> = System.getenv()): SecretStore {

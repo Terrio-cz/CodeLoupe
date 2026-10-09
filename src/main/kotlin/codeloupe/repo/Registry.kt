@@ -10,7 +10,6 @@ import codeloupe.git.GitObjects
 import codeloupe.git.JGitRepos
 import codeloupe.index.Store
 import codeloupe.overlay.Overlays
-import codeloupe.platform.Sha1
 import codeloupe.query.View
 import codeloupe.query.ViewPool
 import codeloupe.query.usages.BaseCaches
@@ -70,11 +69,11 @@ class Registry(
         return loaded?.takeIf { synchronized(it) { it.baseFile != null } }
     }
 
-    private fun repoDir(commonDir: String): Path = config.home.resolve("repos").resolve(Sha1.hex(commonDir.lowercase()).take(12))
+    private fun repoDir(commonDir: String): Path = config.home.resolve("repos").resolve(RepoKey.resolve(config.home.resolve("repos"), commonDir))
 
     fun repo(commonDir: String): RepoState = repos.computeIfAbsent(commonDir) {
-        val id = Sha1.hex(commonDir.lowercase()).take(12)
-        val dir = config.home.resolve("repos").resolve(id)
+        val dir = repoDir(commonDir)
+        val id = dir.fileName.toString()
         Files.createDirectories(dir)
         val saved = runCatching { JsonFormat.json.decodeFromString(RepoRecord.serializer(), Files.readString(dir.resolve("repo.json"))) }.getOrNull()
         RepoState(id, dir, commonDir, DefaultRef.of(commonDir)).apply {

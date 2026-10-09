@@ -33,7 +33,10 @@ What no test proves, because it needs a machine CI does not offer or cannot repr
 - A daemon killed without a chance to clean up: only Windows has job objects, so a job's grandchildren outside Windows are found
   and ended by pid when the daemon starts again, not at the moment it dies. The detached start outside Windows is a plain child
   in the caller's process group (no `setsid`), so a group kill by an agent host ends it.
-- Docker Desktop for Mac and Colima sockets, rootless Docker and Podman: only the Engine API through a fake is tested.
+- Docker Desktop for Mac, Colima, OrbStack, rootless Docker and Podman: the list of sockets and the Docker context lookup are tested against
+  files made in a temporary home, and the Engine API against a fake; a real Engine behind each of those sockets is not.
+- A thread priority is checked on Linux (every thread of a probe JVM), macOS (`ps`) and Windows (`PriorityClass`) in CI; how much the lowered
+  priority helps a busy machine is not measured.
 
 ## Measuring
 

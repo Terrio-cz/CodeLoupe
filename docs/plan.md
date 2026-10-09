@@ -1369,6 +1369,19 @@ rozhoduje launcher.
   (dekodér je testován fixturou), zamčený Keychain / KWallet, pád démona mimo Windows (jen job objekty hlídají vnuky; jinak je při dalším startu ukončí pid),
   start démona mimo Windows jako obyčejné dítě ve skupině volajícího (bez `setsid`).
 
+### Výsledek CL-165 — Linux a macOS: klíč repozitáře, domov hooku, sockety Dockeru, priorita vláken, smazaný cwd (2026-10-09)
+
+- **Klíč repozitáře** (`RepoKey`): id adresáře indexu je SHA-1 cesty složené podle file systému (`PathCase`: Windows a macOS ignorují velikost písmen, Linux ne), takže na Linuxu
+  `/src/Foo` a `/src/foo` už nesdílejí `repo.json` a základ. Migrace bez přeindexování: existující adresář, jehož `repo.json` jmenuje tuto cestu (pod starým klíčem s malými písmeny nebo
+  pod novým), se použije dál; adresář jiného pravopisu se nepřebírá. `repos add` skládá velikost podle téhož pravidla (`RepoConfig`). Testy: `RepoKeyTest`, `RegistryTest`, `RepoConfigTest`.
+- **Domov**: JVM bere na Linuxu a macOS `user.home` z passwd, `hook.sh`, launcher a git z `$HOME`; s přepsaným `HOME` (izolovaný profil, `sudo -E`) hook nenašel `daemon.json` a mlčel.
+  `UserHome.adopt()` na začátku `main` nastaví `user.home` podle `$HOME`, když jmenuje adresář. Testy: `UserHomeTest`, `HookScriptHomeTest` (skutečný skript s přepsaným `HOME`).
+- **Docker**: bez `DOCKER_HOST` se zkouší nejdřív endpoint aktuálního kontextu (`DOCKER_CONTEXT` / `currentContext`, adresář kontextu je SHA-256 jména), pak sockety Docker Desktopu, rootless Dockeru,
+  Colimy, OrbStacku, Rancher Desktopu a Podmanu (`DockerSockets`, čisté funkce nad prostředím a domovem); chybová hláška nevypisuje tucet neexistujících cest. Testy: `DockerEndpointTest`.
+- **Priorita**: `setpriority(PRIO_PROCESS, 0)` snižuje na Linuxu jen volající vlákno; vlákna JVM vzniklá dřív (GC, kompilátor) zůstávala normální. `ProcessPriority` nyní snižuje i každé vlákno z `/proc/self/task`
+  ve dvou průchodech (vlákno vzniklé během prvního zdědí normální). Test (`ProcessPriorityTest`) čte nice každého vlákna sondy na Linuxu, `ps` na macOS, `PriorityClass` na Windows.
+- **Smazaný cwd**: `/proc/<pid>/cwd` smazaného adresáře končí ` (deleted)`; přípona se odřízne, jen když takto pojmenovaná cesta neexistuje (`ProcFsProcessDetails.withoutDeleted`), takže se proces přiřadí svému workspace.
+
 ### Výsledek CL-150 — AOT cache pro CLI a start daemona (2026-10-09)
 
 - **Zapnuto.** Launchery předají CLI `-Dcodeloupe.aot=<home>/aot/<instalace>-<build>` a použijí `<…>.cli.aot`, pokud existuje (`-XX:AOTCache`; JVM s ním odmítne `-Xshare`, proto skripty `-Xshare` už nedávají).
@@ -1389,6 +1402,7 @@ rozhoduje launcher.
   (`bundle-smoke --aot`: 318 / 187 / 148, tj. **−21 %** proti dynamickému; další běhy −23 % a −25 %); cache 22,2 MB (CLI) a 51,1 MB (daemon). Vytvoření: nahrání daemona ~4 s a zastavení 0,9 s, vytvoření CLI cache 1,1 s a daemona 1,3 s;
   `aotReadySeconds` 20–23 (z toho 10 s čekání). Start daemona do naslouchání **1 031 → 559 ms (−46 %)** (medián ze 6), RSS po čtyřech dotazech 118 → 115 MB; `tools/rss-mix.mjs` (50 dotazů, 3 série střídavě) 147 / 144 / 142 MB bez cache
   proti 144 / 145 / 147 s cache, tedy v šumu. `codeloupe stop` 264–291 ms (beze změny). Vestavěné jednorázové vytvoření uvnitř prvního volání bylo horší: +2,7 s a JVM píše hlášky na stdout i s `-Xlog:disable`, proto se trénuje zvlášť.
+- **Nález po CL-158 (token API): trénink nesměl daemona zastavit.** Trénující daemon dostal `/shutdown` bez tokenu, odmítl ho (401), po čase ho trenér zabil a nahrávka (zapisuje se při ukončení JVM) byla prázdná: `the JVM did not create …daemon.aot` na všech třech OS v CI. Trenér teď posílá token z home trénujícího daemona a poznámka `.failed` nese posledních šest řádků výstupu JVM (dřív se zahazoval), takže příště je důvod vidět.
 - **Mimo rozsah**: desktopová aplikace spouští přibalený jar přímo, ne launcherem, takže její daemon cache nepoužije (její `stop` trénink ukončí); parse worker a build worker jsou další JVM a cache nemají.
 - **Testy**: `AotCachesTest`, `AotLockTest` (souběh, mrtvý a starý držitel, `cancel` jen trénink a ne cizí pid), `AotLauncherTest` (jeden trénink pro dvanáct souběžných startů, hotovo / selhání / více cest), `LauncherScriptsTest` (příznaky skriptů
   a `CliJvm` stejné, žádný `-Xshare` ani dump archivu), `AotTrainingTest` (skutečné JVM na instalovaných jarech: dvě první volání naráz, jeden trénink, jeden čistý pár cache, volání s cache z přesunuté kopie, s poškozenými soubory a daemon s cache
@@ -1433,6 +1447,15 @@ rozhoduje launcher.
   položky už ukazuje jako `auto`; vázat na hash tedy nelze a není co.
 - CLI: `ws reconcile --confirm|--workspace` vyžaduje `--plan <hash>` z výpisu suchého běhu (řádek `plan <hash>`); na 409 vypíše nový plán.
   Aplikace posílá hash plánu, který vypsal její nativní dialog, a odmítne požadavek, jehož hash stránky se liší od čerstvého plánu.
+
+### Výsledek CL-172 — velikost písmen v id rozsahu tajemství (2026-10-09)
+
+- `SecretScope.normalize` zmenšuje id jen tam, kde souborový systém velikost písmen nerozlišuje (Windows, macOS s výchozím svazkem); na Linuxu
+  zůstává `/x/Proj` a `/x/proj` dvojice různých rozsahů. macOS se svazkem citlivým na velikost se bere jako výchozí (neprobíhá zjišťování svazku).
+- Starší trezory mají id malými písmeny: `SecretStore.pick` bere i položky pod `SecretScope.legacy()` (id malými), při stejné hodnosti vyhrává
+  přesné id; `holds` a `remove` hledají nejdřív přesné id, pak staré. Nový zápis jde pod přesné id, nic se nepřešifrovává (id je v AAD, takže
+  přepsání by vyžadovalo nové šifrování; záměrně ne). Nevýhoda: starý a nový záznam téhož klíče mohou existovat vedle sebe, dokud staré nesmažeš.
+- Čtení uloženého textu rozsahu se nikdy nezmenšuje (`parse(…, foldCase = false)`), jinak by AAD záznamu s velkými písmeny na Windows nesedělo.
 
 ## 10. Rizika
 

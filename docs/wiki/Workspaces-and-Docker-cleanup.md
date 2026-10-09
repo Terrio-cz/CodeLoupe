@@ -43,8 +43,14 @@ codeloupe ws resources [--class owned|adopted|unowned] [--json]     # GET /resou
 ```
 
 `ws volume create` and the inventory use the Docker Engine API (named pipe `\\.\pipe\dockerDesktopLinuxEngine` /
-`docker_engine`, or a unix socket; `DOCKER_HOST` with `npipe://` or `unix://` is honoured): no `docker` process, no
-output parsing. Compose, build and the full `docker run` command line are client side, so those three call `docker`
+`docker_engine`, or a unix socket): no `docker` process, no output parsing. `DOCKER_HOST` with `npipe://` or `unix://` decides
+alone (`tcp://` and `ssh://` are not supported and are named as such). Without it the endpoint of the Docker context in use
+comes first (`DOCKER_CONTEXT`, else `currentContext` in `config.json` of `DOCKER_CONFIG` or `~/.docker`, when the context points at a
+local socket or pipe), then the first socket that answers of: `/var/run/docker.sock`, `~/.docker/run/docker.sock` and
+`~/.docker/desktop/docker.sock` (Docker Desktop), `$XDG_RUNTIME_DIR/docker.sock` (rootless Docker), `~/.colima/default/docker.sock`
+and `~/.colima/docker.sock` (Colima), `~/.orbstack/run/docker.sock` (OrbStack), `~/.rd/docker.sock` (Rancher Desktop), and
+Podman's `podman.sock` under `$XDG_RUNTIME_DIR/podman` and `/run/podman`. An Engine anywhere else (a remote host, a TCP port) needs a
+local socket that forwards to it and `DOCKER_HOST` naming that socket. Compose, build and the full `docker run` command line are client side, so those three call `docker`
 with the labels added and check the result through the API: `ws up` reads `docker compose config --format json` and adds
 the labels through a generated override file to every service (containers), to `build` (images the project builds),
 and to the project's own volumes and networks (not to `external` ones); `ws build` passes `--label` and verifies the
