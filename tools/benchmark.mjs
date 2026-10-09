@@ -25,6 +25,7 @@ import crypto from 'node:crypto';
 import { spawn, spawnSync, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CHARTS, THEMES, chartPath, renderChart } from './benchmarkCharts.mjs';
+import { daemonTokenHeader } from './daemon-token.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -309,7 +310,7 @@ class CodeLoupe {
   }
   async status() { return (await fetch(`${this.base}/status`)).json(); }
   async mcp(method, params) {
-    const res = await fetch(`${this.base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'x-codeloupe': '1' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++this.id, method, params }) });
+    const res = await fetch(`${this.base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'x-codeloupe': '1', ...daemonTokenHeader(this.home) }, body: JSON.stringify({ jsonrpc: '2.0', id: ++this.id, method, params }) });
     const body = await res.text();
     const json = JSON.parse(body.startsWith('{') ? body : body.split('\n').find(l => l.startsWith('data:')).slice(5));
     if (json.error) throw new Error(`${method}: ${JSON.stringify(json.error)}`);

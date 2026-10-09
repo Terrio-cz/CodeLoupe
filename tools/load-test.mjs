@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { daemonTokenHeader } from './daemon-token.mjs';
 
 const args = {};
 for (let i = 2; i < process.argv.length; i++) if (process.argv[i].startsWith('--')) args[process.argv[i].slice(2)] = process.argv[i + 1]?.startsWith('--') ? true : process.argv[++i] ?? true;
@@ -47,7 +48,7 @@ async function call(tool, body) {
   // Like an MCP client, retry once when the connection broke before an answer came (a socket the server just closed).
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await fetch(`${base}/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-codeloupe': '1' }, body: JSON.stringify(body) });
+      const res = await fetch(`${base}/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-codeloupe': '1', ...daemonTokenHeader(home) }, body: JSON.stringify(body) });
       const json = await res.json();
       return { ms: performance.now() - t, ok: !!json.ok, text: json.text ?? json.error ?? '' };
     } catch (e) {

@@ -18,6 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { noJavaEnv } from './no-java-env.mjs';
+import { daemonTokenHeader } from './daemon-token.mjs';
 
 const [target, ...rest] = process.argv.slice(2);
 const opt = name => (rest.includes(`--${name}`) ? rest[rest.indexOf(`--${name}`) + 1] : undefined);
@@ -162,7 +163,7 @@ function cli(args, cwd) {
 async function mcp(tool, args) {
   const r = await fetch(`http://127.0.0.1:${port}/mcp`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'x-codeloupe': '1' },
+    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'x-codeloupe': '1', ...daemonTokenHeader(home) },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: tool, arguments: args } }),
     signal: AbortSignal.timeout(60_000),
   });

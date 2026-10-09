@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { daemonTokenHeader } from './daemon-token.mjs';
 
 const args = {};
 for (let i = 2; i < process.argv.length; i++) if (process.argv[i].startsWith('--')) args[process.argv[i].slice(2)] = process.argv[i + 1]?.startsWith('--') ? true : process.argv[++i] ?? true;
@@ -41,7 +42,7 @@ const status = async () => (await fetch(`${base}/status`, { headers: { 'x-codelo
 async function call(tool, body) {
   const t = performance.now();
   for (;;) {
-    const res = await fetch(`${base}/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-codeloupe': '1' }, body: JSON.stringify(body) });
+    const res = await fetch(`${base}/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-codeloupe': '1', ...daemonTokenHeader(home) }, body: JSON.stringify(body) });
     const json = await res.json();
     if (!json.ok && /^busy/.test(json.text ?? '')) { await sleep(1000); continue; }
     return { ms: performance.now() - t, ok: !!json.ok, text: json.text ?? json.error ?? '' };
