@@ -60,6 +60,7 @@ class ReconcilePlanner(
         }
         return PlanEntry(
             key, kind, name, resource.repo, resource.workspace, resource.ownership, resource.workspaceState, verdict, reason, released = release != null,
+            running = resource.kind == ResourceKind.CONTAINER && resource.state in RUNNING,
         )
     }
 
@@ -112,7 +113,7 @@ class ReconcilePlanner(
         )
     }
 
-    private companion object {
+    internal companion object {
         val RUNNING = setOf("running", "restarting", "paused")
     }
 }

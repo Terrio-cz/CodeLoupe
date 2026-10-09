@@ -30,6 +30,18 @@ class DockerApi(private val endpoint: DockerEndpoint) {
         )
     }
 
+    /** The container [id] as it is now (state and labels), null when there is none. */
+    fun container(id: String): DockerObject? {
+        val reply = http.request("GET", "/containers/${encode(id)}/json")
+        if (reply.status == 404) return null
+        check200(reply, "inspect container $id")
+        val c = JsonFormat.json.parseToJsonElement(reply.text).jsonObject
+        val state = (c["State"] as? JsonObject)?.get("Status")?.jsonPrimitive?.contentOrNull
+        return DockerObject(
+            ResourceKind.CONTAINER, id.take(SHORT), listOf(c.str("Name").removePrefix("/")), (c["Config"] as? JsonObject)?.labels().orEmpty(), state = state,
+        )
+    }
+
     fun images(): List<DockerObject> = array("/images/json").map { i ->
         DockerObject(
             ResourceKind.IMAGE, i.str("Id").removePrefix("sha256:").take(SHORT), i.strings("RepoTags").filter { it != "<none>:<none>" },

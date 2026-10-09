@@ -34,6 +34,9 @@ Every container, image, volume and network that is made through CodeLoupe carrie
 (the workspace's task id, empty for one without). The workspace is the one of the directory you run in (`--dir` names
 another), found through the registry above.
 
+Two limits follow from labels being plain names. A container or image built `FROM` a labelled image inherits its labels (clear them with `LABEL codeloupe.workspace=""` in the
+Dockerfile of an unrelated project), and two repositories whose main directories have the same name share an owner (`protect` in the config keeps what must stay).
+
 ```
 codeloupe ws up [-f compose.yaml] [-p project] [--profile x] [--env-file f] [--project-directory d] [-- up-args]   # default: -d
 codeloupe ws run [--dir d] <docker run arguments>
@@ -89,7 +92,8 @@ directory it says what the policy does and why. Unowned resources are not in it 
 what is named (`"auto": false` leaves the `auto` entries out; the app sends it, so it removes only what the person confirmed). A named `keep` or `protected` entry is refused. The plan is re-read from the registry and Docker for every
 run, so a stale key removes nothing it should not. Removal goes through the Engine API, containers first (stopped, removed
 with their anonymous volumes), then networks, volumes, images, never forced: a resource that is in use is *blocked*, not
-killed. An orphan directory is deleted without following links; a file that is still locked (Windows) leaves it blocked.
+killed. A container is read again just before it is stopped: one that was stopped when planned and has been started since, or whose labels no longer name the workspace, is left (blocked) until the next plan.
+An orphan directory is deleted without following links; a file that is still locked (Windows) leaves it blocked.
 
 Blocked and failed targets are retried with a growing wait (`retryBaseMinutes`, doubling up to `retryMaxMinutes`), kept
 in `<home>/reconcile-state.json`, so the backoff survives a restart of the daemon or the PC. A removal someone confirmed

@@ -10,6 +10,7 @@ import codeloupe.metrics.TranscriptFile
 import codeloupe.metrics.TranscriptReader
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -129,6 +130,58 @@ class IngestTest {
             assertEquals(1, run.turns)
             assertEquals("fresh start", run.title)
             assertEquals(0, rig.steps(run.id).size)
+        }
+    }
+
+    @Test
+    fun `a transcript rewritten to a larger size is read anew, not continued inside a line`() {
+        IngestRig().use { rig ->
+            val target = session(rig)
+            rig.ingest.passNow()
+            val rewritten = TranscriptBuilder(today).prompt("fresh start").turn()
+            repeat(6) { rewritten.turn(tools = arrayOf(Triple("r$it", "Read", args("file_path" to "a.kt")))).result("r$it", "z".repeat(300)) }
+            rewritten.write(target)
+            assertTrue(Files.size(target) > rig.scalar("SELECT offset FROM files"))
+            rig.ingest.passNow()
+
+            val run = rig.runs().single()
+            assertEquals("fresh start", run.title)
+            assertEquals(7, run.turns)
+        }
+    }
+
+    @Test
+    fun `a transcript rewritten to the same size is read anew`() {
+        IngestRig().use { rig ->
+            val target = session(rig)
+            rig.ingest.passNow()
+            val text = Files.readString(target)
+            val edited = text.substring(0, text.lastIndexOf("not found")) + "NOT found" + text.substring(text.lastIndexOf("not found") + "not found".length)
+            assertEquals(text.length, edited.length)
+            Files.writeString(target, edited)
+            Files.setLastModifiedTime(target, FileTime.from(Files.getLastModifiedTime(target).toInstant().plusSeconds(10)))
+            rig.ingest.passNow()
+
+            assertTrue(rig.steps(rig.runs().single().id).any { it.errorText?.contains("NOT found") == true })
+        }
+    }
+
+    @Test
+    fun `a database from before the tail hash gets the column and keeps resuming`() {
+        val root = TestRepos.tmpDir("ingest-old")
+        java.sql.DriverManager.getConnection("jdbc:sqlite:${root.resolve("transcripts.db")}").use { c ->
+            c.createStatement().use {
+                it.execute(
+                    "CREATE TABLE files (path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime INTEGER NOT NULL, offset INTEGER NOT NULL, " +
+                        "kind TEXT NOT NULL, project TEXT NOT NULL, session TEXT NOT NULL, ter TEXT, state TEXT)",
+                )
+            }
+        }
+        IngestRig(root).use { rig ->
+            session(rig)
+            rig.ingest.passNow()
+            assertEquals(1, rig.runs().size)
+            assertTrue(rig.db.reader.createStatement().use { s -> s.executeQuery("SELECT tail FROM files").use { it.next() && it.getString(1) != null } })
         }
     }
 
