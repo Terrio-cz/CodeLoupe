@@ -51,6 +51,8 @@ class Reconciler(
      */
     suspend fun run(trigger: String, auto: Boolean, confirm: Set<String> = emptySet(), workspaces: Set<String> = emptySet()): ReconcileRun = lock.withLock {
         val first = snapshot(registry)
+        // A protect rule that could not be read protects nothing: removing anything on the strength of the others would fail open.
+        if (config.invalidProtect > 0) return@withLock ReconcileRun(IsoTime.now(), trigger, emptyList(), first.plan)
         val entries = first.entries
         val wanted = workspaces.mapTo(HashSet()) { it.lowercase() }
         val results = ArrayList<ActionResult>()
@@ -112,6 +114,9 @@ class Reconciler(
     // The plan with the backoff state merged in; also forgets the state of what is no longer planned.
     private class Snapshot(val entries: List<PlanEntry>, val plan: ReconcilePlan, val complete: Boolean)
 
+    private fun protectProblem(): List<String> =
+        if (config.invalidProtect > 0) listOf("config workspaces.reconcile.protect has ${config.invalidProtect} rule(s) that cannot be read (an invalid regex?): nothing is removed until it is fixed") else emptyList()
+
     private suspend fun snapshot(read: suspend () -> WorkspaceList): Snapshot {
         val list = read()
         val report = inventory(list)
@@ -124,6 +129,6 @@ class Reconciler(
         if (complete) state.retain(entries.filter { it.verdict == Verdict.AUTO || it.verdict == Verdict.CONFIRM }.mapTo(HashSet()) { it.key })
         val counts = entries.groupingBy { it.verdict.name.lowercase() }.eachCount().toSortedMap()
         if (report.engine != null) latest = entries
-        return Snapshot(entries, ReconcilePlan(IsoTime.now(), config.auto, counts, entries, report.problems + running.problems.filter { it !in report.problems }), complete)
+        return Snapshot(entries, ReconcilePlan(IsoTime.now(), config.auto, counts, entries, report.problems + running.problems.filter { it !in report.problems } + protectProblem()), complete)
     }
 }

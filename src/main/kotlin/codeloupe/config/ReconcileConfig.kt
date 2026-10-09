@@ -18,18 +18,23 @@ data class ReconcileConfig(
     val retryBaseMinutes: Int = 1,
     val retryMaxMinutes: Int = 360,
     val protect: List<ProtectRule> = emptyList(),
+    /** Entries of `protect` that could not be read (a regex that does not compile): while there are any, nothing is removed. */
+    val invalidProtect: Int = 0,
 ) {
     companion object {
         fun parse(section: JsonObject?): ReconcileConfig {
             section ?: return ReconcileConfig()
             fun minutes(key: String, default: Int, min: Int = 1) = (section[key] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it >= min } ?: default
+            val rules = (section["protect"] as? JsonArray).orEmpty()
+            val protect = rules.mapNotNull { (it as? JsonObject)?.let(ProtectRule::parse) }
             return ReconcileConfig(
                 auto = (section["auto"] as? JsonPrimitive)?.content == "true",
                 intervalMinutes = minutes("intervalMinutes", 30),
                 graceMinutes = minutes("graceMinutes", 60, min = 0),
                 retryBaseMinutes = minutes("retryBaseMinutes", 1),
                 retryMaxMinutes = minutes("retryMaxMinutes", 360),
-                protect = (section["protect"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(ProtectRule::parse) },
+                protect = protect,
+                invalidProtect = rules.size - protect.size,
             )
         }
     }
