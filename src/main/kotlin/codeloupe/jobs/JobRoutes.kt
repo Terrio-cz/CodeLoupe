@@ -1,10 +1,10 @@
 package codeloupe.jobs
 
 import codeloupe.JsonFormat
+import codeloupe.daemon.receiveBoundedText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
-import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -20,7 +20,7 @@ import kotlinx.serialization.json.put
  */
 fun Route.jobRoutes(jobs: JobRunner) {
     post("/jobs") {
-        val request = runCatching { JsonFormat.json.decodeFromString(JobRequest.serializer(), call.receiveText()) }.getOrElse {
+        val request = runCatching { JsonFormat.json.decodeFromString(JobRequest.serializer(), call.receiveBoundedText()) }.getOrElse {
             return@post call.respondJson(error("send {\"command\": [...], \"cwd\": \"…\"}: ${it.message?.lineSequence()?.first()}"), HttpStatusCode.BadRequest)
         }
         val submission = try {

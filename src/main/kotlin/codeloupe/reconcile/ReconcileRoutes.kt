@@ -1,9 +1,9 @@
 package codeloupe.reconcile
 
 import codeloupe.JsonFormat
+import codeloupe.daemon.receiveBoundedText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -26,7 +26,7 @@ fun Route.reconcileRoutes(reconciler: Reconciler) {
         call.respondText(JsonFormat.json.encodeToString(ReconcilePlan.serializer(), reconciler.plan()), ContentType.Application.Json, HttpStatusCode.OK)
     }
     post("/reconcile/run") {
-        val body = runCatching { call.receiveText().ifBlank { "{}" }.let { JsonFormat.json.parseToJsonElement(it).jsonObject } }.getOrNull()
+        val body = runCatching { call.receiveBoundedText().ifBlank { "{}" }.let { JsonFormat.json.parseToJsonElement(it).jsonObject } }.getOrNull()
             ?: return@post call.respondText("""{"error":"send {\"confirm\": [keys], \"workspaces\": [names]}"}""", ContentType.Application.Json, HttpStatusCode.BadRequest)
         val confirm = strings(body, "confirm")
         val workspaces = strings(body, "workspaces")

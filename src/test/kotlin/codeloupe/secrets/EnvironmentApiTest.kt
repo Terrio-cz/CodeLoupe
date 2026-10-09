@@ -77,7 +77,7 @@ class EnvironmentApiTest {
 
         val ws = keys.getValue("WS_KEY")
         assertEquals("workspace", ws.getValue("scope").jsonPrimitive.content)
-        assertEquals("c:/work/terrio", ws.getValue("scopeRef").jsonPrimitive.content)
+        assertEquals(SecretScope.workspace("C:/Work/Terrio").id, ws.getValue("scopeRef").jsonPrimitive.content)
         assertEquals("file", ws.getValue("source").jsonPrimitive.content)
         assertEquals("C:/old/.env", ws.getValue("sourceRef").jsonPrimitive.content)
 

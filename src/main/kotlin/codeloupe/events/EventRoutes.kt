@@ -1,10 +1,10 @@
 package codeloupe.events
 
 import codeloupe.JsonFormat
+import codeloupe.daemon.receiveBoundedText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
-import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondBytesWriter
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
@@ -49,7 +49,7 @@ fun Route.eventRoutes(bus: EventBus, webhooks: Webhooks, key: WebhookKey) {
         call.respondJson(buildJsonObject { put("items", JsonFormat.json.encodeToJsonElement(ListSerializer(Webhook.serializer()), webhooks.list())) })
     }
     post("/webhooks") {
-        val body = runCatching { JsonFormat.json.parseToJsonElement(call.receiveText()).jsonObject }.getOrNull()
+        val body = runCatching { JsonFormat.json.parseToJsonElement(call.receiveBoundedText()).jsonObject }.getOrNull()
             ?: return@post call.respondJson(error("send {\"url\": …, \"events\": [\"job.finished\"]}"), HttpStatusCode.BadRequest)
         val url = (body["url"] as? JsonPrimitive)?.content.orEmpty()
         val events = (body["events"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }

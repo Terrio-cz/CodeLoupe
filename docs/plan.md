@@ -1487,6 +1487,29 @@ rozhoduje launcher.
   přepsání by vyžadovalo nové šifrování; záměrně ne). Nevýhoda: starý a nový záznam téhož klíče mohou existovat vedle sebe, dokud staré nesmažeš.
 - Čtení uloženého textu rozsahu se nikdy nezmenšuje (`parse(…, foldCase = false)`), jinak by AAD záznamu s velkými písmeny na Windows nesedělo.
 
+### Výsledek CL-161 — nízká bezpečnostní zátěž z revize (2026-10-09)
+
+- Docker: štítek `codeloupe.install` (náhodné id v `<home>/install-id`); kontejner dědí štítky obrazu, takže jen s naším id se počítá za náš
+  (volume/síť/obraz s naším id nebo bez id, cizí id ne). Dvě registrovaná repa se stejným jménem a rozdílným stavem téhož workspace nechají stav
+  neznámý. Klíč podle `commonDir` by znamenal nový štítek a migraci všech existujících zdrojů; místo toho se kolize pozná a stav se nepoužije.
+- Zastavení procesu: kontrola build klientů se opakuje po sondě CPU, nečitelný čas startu = blokováno.
+- Těla požadavků: `receiveBoundedText` (8 MB) na všech trasách, které čtou text; chunked tělo bez délky se taky ořízne.
+- Háčky: `transcript_path` i `GET /session-weight?path=` jen pro absolutní lokální `.jsonl` (síťové `\\host\sdílení` a `//host/…` se neotevřou);
+  kontext SessionStart prochází `HookText` (bez řídicích znaků, bidi, dlouhé řádky se zkrátí) a cesty s řídicím znakem se do indexu ani do
+  seznamů změn nedostanou (`PathNames`). Omezení transcriptů na `~/.claude` jsme nedali: daemon nemusí znát `CLAUDE_CONFIG_DIR` a volající teď musí
+  mít token (CL-158).
+- Zápisy: dočasný soubor `CREATE_NEW`, úklid starých `.X.*.codeloupe-tmp` při dalším zápisu téhož souboru, a kontrola obsahu cíle těsně před
+  přejmenováním. Zápis více souborů přerušený mezi přejmenováními zůstává částečný (vrací se jen při chybě uvnitř procesu): zápis do žurnálu
+  před zápisem by zdvojil formát žurnálu, a `git status` ukáže, co se změnilo.
+- Git na cizím adresáři: `--no-ext-diff --no-textconv` u všech `git diff`. Filtry `clean` z `.git/config` cizího adresáře se tím nezastaví
+  (vypnout je znamená rozbít LFS); `safe.directory` v gitu odmítne adresáře jiného vlastníka a adresář, který si uživatel stáhl sám, je stejné
+  riziko jako každý jeho vlastní `git status`.
+- Electron: pojistky `runAsNode`, `NODE_OPTIONS` a `--inspect` vypnuté v `afterPack` (`app/scripts/after-pack.mjs`, před ad hoc podpisem: `electronFuses` z konfigurace se překlápí až po podpisu a na macOS rozbil podpis; CI je čte z postaveného instalátoru na všech třech
+  systémech); `claudeAdd` odmítne síťové cesty. `in-process-gpu` a `NetworkServiceInProcess` zůstávají (rozpočet RAM ≤ 300 MB, `docs/ui-spec.md`
+  § 11, vykreslování je v sandboxu). `CODELOUPE_UPDATE_*` a `CODELOUPE_APP_CLI` zůstávají: prostředí aplikace řídí ten, kdo ji spouští, a ten už
+  umí spustit cokoli jako uživatel; „podepsaný testovací háček“ by byl obřad bez hranice.
+- Ingest: `seen` (5 000) a `pending` (1 000) ve snímku parseru jsou omezené, `.meta.json` se čte nejvýš 64 kB (`BoundedRead`).
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

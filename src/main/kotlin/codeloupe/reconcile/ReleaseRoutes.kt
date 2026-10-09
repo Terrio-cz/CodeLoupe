@@ -1,11 +1,11 @@
 package codeloupe.reconcile
 
 import codeloupe.JsonFormat
+import codeloupe.daemon.receiveBoundedText
 import codeloupe.workspace.WorkspaceRef
 import codeloupe.workspace.Workspaces
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -25,7 +25,7 @@ import kotlinx.serialization.json.put
  */
 fun Route.releaseRoutes(workspaces: Workspaces, releases: ReleaseStore, reconciler: Reconciler, onReleased: (WorkspaceRef) -> Unit) {
     post("/workspaces/release") {
-        val body = runCatching { call.receiveText().ifBlank { "{}" }.let { JsonFormat.json.parseToJsonElement(it).jsonObject } }.getOrNull()
+        val body = runCatching { call.receiveBoundedText().ifBlank { "{}" }.let { JsonFormat.json.parseToJsonElement(it).jsonObject } }.getOrNull()
         val target = (body?.get("target") as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
         if (body == null || target == null) return@post respond(call, HttpStatusCode.BadRequest, error("""send {"target": "<worktree directory, name or task id>", "repo": "<path>"}"""))
         val repo = (body["repo"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }

@@ -20,6 +20,8 @@ class ResourceInventory(
     private val adoption: List<AdoptionRule>,
     private val recent: suspend () -> WorkspaceList,
     private val connect: () -> DockerApi = DockerApi::connect,
+    /** This installation's id ([InstallId]); resources labelled by another one, and containers without ours, are not ours. */
+    private val installId: (() -> String)? = null,
 ) {
     /**
      * [registry]: the workspace list to join with, when the caller has read it already. [memory]: also read the memory of
@@ -47,9 +49,14 @@ class ResourceInventory(
         }
         val list = registry()
         problems += list.problems
-        val states = HashMap<Pair<String, String>, WorkspaceState>()
-        for (repo in list.repos) for (workspace in repo.workspaces) states[repo.name.lowercase() to workspace.name.lowercase()] = workspace.state
-        val classified = ResourceClassifier(adoption) { repo, workspace -> states[repo.lowercase() to workspace.lowercase()] }.classify(objects)
+        // Labels name the repository by its folder name: two registered repositories with the same name and workspace but different states
+        // cannot be told apart, and one of them must not decide the fate of the other's resources, so that state is left unknown.
+        val states = HashMap<Pair<String, String>, WorkspaceState?>()
+        for (repo in list.repos) for (workspace in repo.workspaces) {
+            val key = repo.name.lowercase() to workspace.name.lowercase()
+            states[key] = if (states.containsKey(key) && states[key] != workspace.state) null else workspace.state
+        }
+        val classified = ResourceClassifier(adoption, installId?.invoke()) { repo, workspace -> states[repo.lowercase() to workspace.lowercase()] }.classify(objects)
         val entries = if (memory) withMemory(api, classified) else classified
         val counts = entries.groupingBy { "${it.ownership.name.lowercase()}/${it.kind.name.lowercase()}" }.eachCount().toSortedMap()
         ResourceReport(IsoTime.now(), "${api.address} (Docker ${runCatching { api.version() }.getOrDefault("?")})", counts, entries, problems)

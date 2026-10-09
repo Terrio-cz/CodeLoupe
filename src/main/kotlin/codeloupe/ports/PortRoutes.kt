@@ -1,11 +1,11 @@
 package codeloupe.ports
 
 import codeloupe.JsonFormat
+import codeloupe.daemon.receiveBoundedText
 import codeloupe.workspace.WorkspaceRef
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
-import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -43,7 +43,7 @@ fun Route.portRoutes(ports: PortRegistry) {
 }
 
 private suspend fun read(call: ApplicationCall): Pair<WorkspaceRef, JsonObject>? {
-    val body = runCatching { call.receiveText().ifBlank { "{}" }.let { JsonFormat.json.parseToJsonElement(it).jsonObject } }.getOrNull()
+    val body = runCatching { call.receiveBoundedText().ifBlank { "{}" }.let { JsonFormat.json.parseToJsonElement(it).jsonObject } }.getOrNull()
     val repo = body?.let { text(it, "repo") }
     val workspace = body?.let { text(it, "workspace") }
     if (body == null || repo == null || workspace == null) {

@@ -64,10 +64,10 @@ class EnvSurfacesTest {
 
     @Test
     fun `the env tool and the CLI report list names, scopes, sources and use, never a value`() {
-        val answer = tool("env", buildJsonObject { put("root", JsonPrimitive(work.toString())); put("workspace", JsonPrimitive("c:/work/terrio")) })
+        val answer = tool("env", buildJsonObject { put("root", JsonPrimitive(work.toString())); put("workspace", JsonPrimitive("C:/Work/Terrio")) })
         assertContains(answer, "2 names (values are never shown):")
         assertContains(answer, "PROBE_SECRET  global  C:/x/.env")
-        assertContains(answer, "WS_ONLY  workspace:c:/work/terrio  manual")
+        assertContains(answer, "WS_ONLY  ${SecretScope.workspace("C:/Work/Terrio")}  manual")
         assertFalse(secret in answer || wsSecret in answer)
         val globalOnly = tool("env", buildJsonObject { put("root", JsonPrimitive(work.toString())) })
         assertFalse("WS_ONLY" in globalOnly, "a workspace secret does not apply without its workspace")

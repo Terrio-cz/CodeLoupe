@@ -4,6 +4,7 @@ import codeloupe.JsonFormat
 import codeloupe.metrics.Categorizer
 import codeloupe.metrics.ParserSnapshot
 import codeloupe.metrics.TranscriptParser
+import codeloupe.platform.BoundedRead
 import codeloupe.platform.IsoTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -162,7 +163,7 @@ class TranscriptIngest(
         if (f.kind != "subagent") return "main" to null
         val file = f.path.resolveSibling("${f.path.nameWithoutExtension}.meta.json")
         if (!Files.exists(file) && now() - f.mtime < META_GRACE_MS) return null
-        val meta = runCatching { Json.parseToJsonElement(Files.readString(file)) as JsonObject }.getOrNull()
+        val meta = BoundedRead.text(file)?.let { text -> runCatching { Json.parseToJsonElement(text) as JsonObject }.getOrNull() }
         fun text(key: String) = (meta?.get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content
         return (text("agentType") ?: "unknown") to text("description")?.let { TER.find(it)?.value }
     }

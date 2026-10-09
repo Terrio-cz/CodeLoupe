@@ -5,6 +5,7 @@ import codeloupe.JsonFormat
 import codeloupe.config.Config
 import codeloupe.config.PortPolicy
 import codeloupe.docker.DockerApi
+import codeloupe.docker.InstallId
 import codeloupe.docker.ResourceKind
 import codeloupe.docker.ResourceInventory
 import codeloupe.docker.resourceRoutes
@@ -144,7 +145,7 @@ class Daemon private constructor(
     private fun tools(): List<Tool> = offered.tools
     private val workspaces = Workspaces(config, registry, trackers)
     private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets, ::log)
-    private val resources = ResourceInventory(config.workspaces.adoption, workspaces::recent)
+    private val resources = ResourceInventory(config.workspaces.adoption, workspaces::recent, installId = { InstallId.of(config.home) })
     private val processSource = SystemProcesses(GradleDaemonLog.homes(config.workspaces.gradleUserHome))
     private val processes = ProcessInventory(workspaces, processSource)
     private val reconcileConfig = config.workspaces.reconcile

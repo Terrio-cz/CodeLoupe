@@ -33,8 +33,9 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
     private val startTracker = StartTracker(from?.startCtx)
 
     private var emitted = from?.emitted ?: 0
-    private val seen = HashSet<Long>().apply { from?.seen?.let(::addAll) }
-    private val pending = HashMap<String, Pending>().apply { from?.pending?.forEach { put(it.id, Pending(it.name, it.input, it.atMs, it.turn)) } }
+    // Both are bounded: a message repeats on neighbouring lines only, and a call whose result never comes is not worth carrying for ever.
+    private val seen = LinkedHashSet<Long>().apply { from?.seen?.let(::addAll) }
+    private val pending = LinkedHashMap<String, Pending>().apply { from?.pending?.forEach { put(it.id, Pending(it.name, it.input, it.atMs, it.turn)) } }
     private val results = ArrayList<ToolResult>()
     private val usages = ArrayList<UsageAt>()
 
@@ -74,7 +75,7 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
     private fun assistant(message: JsonObject, timestamp: String?) {
         if (model == null) model = message["model"].str()
         val id = message["id"].str()?.takeIf { it.isNotEmpty() }
-        if (id != null && seen.add(hash(id))) {
+        if (id != null && remember(hash(id))) {
             turns++
             val u = message["usage"].obj()
             val written = u?.get("cache_creation").obj()
@@ -92,8 +93,16 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
             if (b["type"].str() == "tool_use") {
                 val toolId = b["id"].str() ?: continue
                 pending[toolId] = Pending(b["name"].str().orEmpty(), b["input"].obj() ?: JsonObject(emptyMap()), millis(timestamp), turns)
+                if (pending.size > MAX_PENDING) pending.remove(pending.keys.first())
             }
         }
+    }
+
+    /** False for a message id seen before; the oldest ids are forgotten past [MAX_SEEN]. */
+    private fun remember(hash: Long): Boolean {
+        if (!seen.add(hash)) return false
+        if (seen.size > MAX_SEEN) seen.remove(seen.first())
+        return true
     }
 
     private fun result(b: JsonObject, timestamp: String?) {
@@ -134,6 +143,8 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
 
     private companion object {
         const val PROMPT_CHARS = 400
+        const val MAX_SEEN = 5_000
+        const val MAX_PENDING = 1_000
         const val ERROR_CHARS = 80
         const val HEAD_CHARS = 200
         const val IMAGE_CHARS = 6000

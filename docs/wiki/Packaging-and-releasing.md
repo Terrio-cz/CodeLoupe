@@ -107,7 +107,7 @@ an outward-facing step the owner takes. Names and licence (`PolyForm-Noncommerci
 winget-pkgs' policy before the first submission. The Scoop manifest unpacks the NSIS installer as an archive instead of
 running it, so a Scoop install is portable and Scoop alone updates it.
 
-macOS builds are signed ad hoc by the `afterPack` hook `app/scripts/ad-hoc-sign.mjs`; the `bundle` job checks
+macOS builds are signed ad hoc by the `afterPack` hook `app/scripts/after-pack.mjs` (it first flips the Electron fuses `RunAsNode`, `NODE_OPTIONS` and `--inspect` off, then `ad-hoc-sign.mjs` seals the result; flipping after the signature would invalidate it); the `bundle` job checks
 `codesign -dv` (`Signature=adhoc`) and `codesign --verify --deep --strict` on both macOS runners, and the installer smoke
 test verifies the installed copy. The manual allow steps for a browser download are in [Installers and updates](Installers-and-updates#installing-without-a-warning).
 

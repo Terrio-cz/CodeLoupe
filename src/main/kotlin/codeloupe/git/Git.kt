@@ -39,7 +39,7 @@ object Git {
             .split('\u0000')
             .filter { it.isNotEmpty() }
             .map(TreeEntry::parse)
-            .filter { it.type == "blob" }
+            .filter { it.type == "blob" && PathNames.plain(it.path) }
 
     /** Size in bytes of each blob, read from the object store without the content. */
     fun blobSizes(cwd: String, shas: Collection<String>): Map<String, Long> {
@@ -53,5 +53,5 @@ object Git {
 
     /** Files that differ between two commits. */
     fun diff(cwd: String, from: String, to: String): List<DiffEntry> =
-        DiffEntry.parse(run(cwd, "diff", "--raw", "-z", "--no-renames", "--no-abbrev", from, to, "--")!!)
+        DiffEntry.parse(run(cwd, "diff", "--raw", "-z", "--no-renames", "--no-abbrev", "--no-ext-diff", "--no-textconv", from, to, "--")!!)
 }

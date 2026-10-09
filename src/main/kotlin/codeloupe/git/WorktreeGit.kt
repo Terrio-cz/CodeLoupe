@@ -4,7 +4,7 @@ package codeloupe.git
 object WorktreeGit {
     /** Tracked paths whose content in the worktree differs from [commit]: modified, added to the index or deleted. */
     fun changedSince(worktree: String, commit: String): List<String> =
-        names(Git.run(worktree, "diff", "--name-only", "-z", "--no-renames", commit, "--")!!)
+        names(Git.run(worktree, "diff", "--name-only", "-z", "--no-renames", "--no-ext-diff", "--no-textconv", commit, "--")!!)
 
     /** Untracked files git does not ignore. */
     fun untracked(worktree: String): List<String> = names(Git.run(worktree, "ls-files", "--others", "--exclude-standard", "-z")!!)
@@ -38,7 +38,7 @@ object WorktreeGit {
             .filter { it.startsWith("worktree ") }
             .map { it.removePrefix("worktree ") }
 
-    private fun names(out: String): List<String> = out.split('\u0000').filter { it.isNotEmpty() }
+    private fun names(out: String): List<String> = out.split('\u0000').filter { it.isNotEmpty() && PathNames.plain(it) }
 
     private const val PATHS_PER_CALL = 100
 }

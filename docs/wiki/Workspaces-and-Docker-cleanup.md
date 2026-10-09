@@ -34,8 +34,15 @@ Every container, image, volume and network that is made through CodeLoupe carrie
 (the workspace's task id, empty for one without). The workspace is the one of the directory you run in (`--dir` names
 another), found through the registry above.
 
-Two limits follow from labels being plain names. A container or image built `FROM` a labelled image inherits its labels (clear them with `LABEL codeloupe.workspace=""` in the
-Dockerfile of an unrelated project), and two repositories whose main directories have the same name share an owner (`protect` in the config keeps what must stay).
+A fourth label, `codeloupe.install`, holds a random id of this installation (`<home>/install-id`). A container inherits the labels of
+its image, so an image that somebody else published with `codeloupe.repo` and `codeloupe.workspace` labels would make every container started
+from it look like yours (and removable when that workspace lands). A **container counts as yours only with your id**; a volume, network or
+image carries it or none at all (made before the id existed), and one with another installation's id is left alone. Containers made by an
+earlier version have no id and are therefore not cleaned automatically any more: remove them once by hand or recreate the stack. Labels
+name the repository by its folder name; when two registered repositories share a name and a workspace name and disagree about its state,
+the state is left unknown (so nothing of it is removed on its own) instead of letting one decide for the other.
+
+An image built `FROM` a labelled image inherits its labels too (clear them with `LABEL codeloupe.workspace=""` in the Dockerfile of an unrelated project); that no longer makes a container yours, but it can still make the image look like yours. `protect` in the config keeps what must stay.
 
 ```
 codeloupe ws up [-f compose.yaml] [-p project] [--profile x] [--env-file f] [--project-directory d] [-- up-args]   # default: -d

@@ -19,7 +19,7 @@ data class DiffEntry(val status: Char, val blob: String?, val path: String, val 
                     val (oldMode, newMode, oldSha, newSha, status) = fields[i].removePrefix(":").split(' ')
                     val blob = newSha.takeIf { newMode in BLOB_MODES && it != NO_BLOB }
                     val oldBlob = oldSha.takeIf { oldMode in BLOB_MODES && it != NO_BLOB }
-                    add(DiffEntry(status[0], blob, fields[i + 1], oldBlob))
+                    if (PathNames.plain(fields[i + 1])) add(DiffEntry(status[0], blob, fields[i + 1], oldBlob))
                     i += 2
                 }
             }
