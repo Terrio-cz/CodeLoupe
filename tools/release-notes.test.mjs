@@ -21,6 +21,13 @@ test('renders a heading, the base and one line per card', () => {
   assert.match(text, /- \*\*\[CL-1\]\(https:\/\/github\.com\/Terrio-cz\/CodeLoupe\/commits\?q=CL-1\)\*\* first thing; second thing/);
 });
 
+test('tells how to verify the files when the repository is known', () => {
+  const text = render({ version: '1.0.0', from: null, repo: 'Terrio-cz/CodeLoupe', subjects: ['CL-1 first'] });
+  assert.match(text, /### Verify the files/);
+  assert.match(text, /gh attestation verify <file> --repo Terrio-cz\/CodeLoupe/);
+  assert.doesNotMatch(render({ version: '1.0.0', from: null, subjects: [] }), /Verify/);
+});
+
 test('says so when there is nothing to list', () => {
   assert.match(render({ version: '1.0.0', from: null, subjects: [] }), /First release\.\n\nNo changes recorded\./);
 });
