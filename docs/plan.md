@@ -401,7 +401,44 @@ codeloupe): reviewer a planner. Stejný model a effort. Výstup: tabulka metrik 
 
 Veřejné měření nástroje (CL-123): `node tools/benchmark.mjs` → [benchmarks.md](benchmarks.md). Na veřejných
 repozitářích (Exposed, CodeLoupe) srovnává velikost odpovědí a zdroje proti grepu a GitNexu; neměří chování agenta,
-takže tento řízený benchmark agentů zůstává nespuštěný.
+takže řízený benchmark agentů je samostatné měření, první běh je níže.
+
+**První běh (CL-23, 2026-10-09).** 5 uzavřených tasků Terrio (TER-321 bezpečnostní hlavičky a swagger assety, TER-62 vyhledávání
+lokalit, TER-324 validace vstupů účtu, TER-637 kontrola názvů indexů při startu, TER-559 čekání na databázi při startu) na
+commitech těsně před zalandováním, v odlehlých klonech (základ i špička), 24 běhů `claude -p` (Opus, effort high, stejný packet,
+stejný klon, stejná workspace kopie bez poznámek o těchto taskech). Varianta A = agenti před CodeLoupe (reviewer před CL-60,
+planner před CL-95; `rg` + Read + git), B = dnešní agenti s CodeLoupe MCP na odděleném daemonu. Součet za 5 tasků, jeden běh na
+dvojici (u reviewera TER-321 a TER-62 první ze dvou opakování):
+
+| Role | Var. | Cena USD | Vážené jednotky (tis.) | Volání modelu | Peak kontext (tis. tokenů, max) | Wall (s) | Čtení kódu (rg/git/Read) | Volání CodeLoupe |
+|---|---|---|---|---|---|---|---|---|
+| reviewer | A | 5,83 | 1 628 | 58 | 102 | 1 037 | 55 | 0 |
+| reviewer | B | 4,89 | 1 352 | 48 | 94 | 893 | 40 | 1 |
+| planner | A | 6,56 | 1 814 | 76 | 92 | 1 632 | 96 | 0 |
+| planner | B | 6,38 | 1 828 | 102 | 87 | 1 310 | 101 | 10 |
+
+Po tascích (cena USD / vážené jednotky v tis. / volání modelu / peak kontext v tis. / wall s), reviewer A → B:
+TER-321 1,20/330/11/81/209 → 0,86/231/7/69/159; TER-62 1,18/337/13/89/158 → 1,34/385/15/94/197;
+TER-324 0,88/247/12/63/180 → 0,75/202/7/58/161; TER-637 1,44/403/12/102/272 → 0,80/211/6/67/161;
+TER-559 1,13/311/10/90/218 → 1,14/323/13/84/215. Planner A → B:
+TER-321 1,55/418/13/92/372 → 1,45/416/22/81/341; TER-62 1,46/413/18/86/383 → 1,31/382/24/74/249;
+TER-324 1,02/288/16/65/238 → 0,96/267/15/69/204; TER-637 1,31/366/18/78/396 → 1,33/379/21/86/259;
+TER-559 1,22/329/11/89/243 → 1,33/385/20/87/257. Druhé opakování reviewera (jednotky v tis.): TER-321 A 286 / B 253,
+TER-62 A 278 / B 320; rozptyl mezi opakováním téže varianty je 15–20 %, tedy stejně velký jako většina rozdílů A proti B.
+
+**Nálezy reviewera.** Proti známým nálezům reálných kol: TER-62 (6 nálezů na špičce) A i B 6/6 v obou opakováních;
+TER-321 (4 nálezy) A 4/4 v obou opakováních, **B 3/4 v obou opakováních**: chybí návrh dvojice `Public-Change` / `Public-Change-Cs`
+pro `git land`. Příčina není CodeLoupe, ale tělo agenta: dnešní `terrio-reviewer-opus` (8,6 tis. znaků proti 13,9 tis.) tuto
+kontrolu jen odkazuje do referenčního souboru, který reviewer ve zkontrolovaných bězích (TER-321 a TER-62, první opakování) nečetl. Reviewer B je tedy na jednom známém nálezu horší
+a kritérium „nálezy nejsou horší“ se neplní. Na špičkách TER-324, TER-637 a TER-559 (v reálu `rev=ok`) vrátili A/B 1/1, 2/1
+a 1/2 nálezů (nejvyšší P3, B u TER-324 jeden P2); nebyly posouzeny, jen spočítány.
+
+**Co z toho plyne.** (1) Agenti B CodeLoupe téměř nepoužili: 1 volání v 7 během reviewera, 10 volání v 5 během planneru
+(`find`, `outline`), jinak `rg`/`git`/Read. Rozdíly A proti B proto měří hlavně změnu těla agentů, ne nástroj; úsporu reviewera
+(−16 % ceny, −17 % jednotek) nelze přičíst CodeLoupe. (2) U planneru cena beze změny (−3 % USD, +1 % jednotek), víc volání modelu
+(+34 %), kratší wall (−20 %). (3) Omezení: jeden běh na buňku (reviewer TER-321/62 dva), 2 běhy souběžně na vytížené mašině
+(wall je orientační), YouTrack issue obsahuje kritéria „found: round 1“, takže TER-321 a TER-62 reviewer částečně ověřuje
+známá kritéria. Navazuje kontrola adopce nástroje v reviewerovi a doplnění `Public-Change` do těla (CL-179, CL-180).
 
 ### 8.5 Živé porovnání
 
