@@ -32,14 +32,13 @@ internal object SearchQuery {
         if (terms.isEmpty()) return "no searchable words in \"${args.q}\""
         val match = terms.keys.joinToString(" OR ", transform = ::expression)
         val filter = DeclFilter.of(args.kind, args.module, args.test, locals = false)
-        val masked = view.overlayPaths()
 
         val rows = ArrayList<DeclRow>()
         val ranks = HashMap<Pair<String, Long>, Double>()
-        for ((hits, src) in listOf(view.baseSearch(match, CANDIDATES) to "base", view.overlaySearch(match, CANDIDATES) to "ov")) {
+        for ((hits, src) in listOf(view.baseSearch(match, CANDIDATES, filter) to "base", view.overlaySearch(match, CANDIDATES, filter) to "ov")) {
             if (hits.isEmpty()) continue
-            val where = "d.id IN (${hits.joinToString(",") { it.id.toString() }})${filter.sql}"
-            val found = if (src == "ov") view.overlayDecls(where, filter.params) else view.baseDecls(where, filter.params).filter { it.path !in masked }
+            val where = "d.id IN (${hits.joinToString(",") { it.id.toString() }})"
+            val found = if (src == "ov") view.overlayDecls(where) else view.baseDecls(where)
             hits.forEach { ranks[src to it.id] = it.rank }
             rows += found
         }

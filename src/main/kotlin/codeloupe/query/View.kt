@@ -211,20 +211,25 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
         return query(sql, emptyMap()) { RefCount(it.getString("path"), it.getString("name"), it.getInt("n")) }
     }
 
-    /** The best [limit] declarations of the base for the FTS5 expression [match], ranked by FTS5; masking is the caller's. */
-    internal fun baseSearch(match: String, limit: Int): List<SearchHit> = searchIn("main", match, limit)
+    /**
+     * The best [limit] declarations of the base for the FTS5 expression [match], ranked by FTS5, among those [filter] lets through and
+     * whose file the overlay does not replace: the cut comes after both, so a filtered search is not left with what ranked below sixty.
+     */
+    internal fun baseSearch(match: String, limit: Int, filter: DeclFilter): List<SearchHit> =
+        searchIn("main", match, limit, filter, if (overlay) " AND f.path NOT IN (SELECT path FROM ov.files)" else "")
 
-    /** The best [limit] declarations of the overlay for [match]; none without one. */
-    internal fun overlaySearch(match: String, limit: Int): List<SearchHit> = if (overlay) searchIn("ov", match, limit) else emptyList()
+    /** The best [limit] declarations of the overlay for [match] that [filter] lets through; none without an overlay. */
+    internal fun overlaySearch(match: String, limit: Int, filter: DeclFilter): List<SearchHit> = if (overlay) searchIn("ov", match, limit, filter, "") else emptyList()
 
     /** How many declarations of the base [match] hits, and how many it holds: what a word's rarity is measured with. */
     internal fun baseSearchCounts(match: String?): Int =
         if (match == null) query("SELECT count(*) FROM main.search", emptyMap()) { it.getInt(1) }.single()
         else query("SELECT count(*) FROM main.search WHERE search MATCH :m", mapOf("m" to match)) { it.getInt(1) }.single()
 
-    private fun searchIn(db: String, match: String, limit: Int): List<SearchHit> = query(
-        "SELECT rowid, bm25(search, 10.0, 4.0, 2.0, 3.0, 1.0) AS rank FROM $db.search WHERE search MATCH :m ORDER BY rank LIMIT :n",
-        mapOf("m" to match, "n" to limit),
+    private fun searchIn(db: String, match: String, limit: Int, filter: DeclFilter, also: String): List<SearchHit> = query(
+        "SELECT search.rowid, bm25(search, 10.0, 4.0, 2.0, 3.0, 1.0) AS rank FROM $db.search JOIN $db.decls d ON d.id = search.rowid JOIN $db.files f ON f.id = d.file_id " +
+            "WHERE search MATCH :m${filter.sql}$also ORDER BY rank LIMIT :n",
+        filter.params + mapOf("m" to match, "n" to limit),
     ) { SearchHit(it.getLong(1), it.getDouble(2)) }
 
     /** Every module of the index (`importers/ruian`), the root module as an empty string. */
