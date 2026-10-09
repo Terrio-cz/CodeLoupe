@@ -131,6 +131,8 @@ internal class JavaExtractor(private val source: Source) {
     }
 
     private fun method(element: PsiMethod) {
+        // Half-typed `void (int x) {}`: no name to declare, but what is inside it still refers to things.
+        if (element.nameIdentifier == null) return walkChildren(element)
         val components = if (element.isConstructor) componentParams(element.containingClass) else emptyList()
         val listed = element.parameterList.parameters.map(shapes::param)
         val bindings = bindings((listed.ifEmpty { components }).map { it.name to it.type })
