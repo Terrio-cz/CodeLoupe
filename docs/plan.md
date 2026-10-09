@@ -1231,6 +1231,28 @@ rozhoduje launcher.
   nečitelný `config.json` = výchozí hodnoty, skript `start-daemon.sh` bez `codeloupe` v PATH, mrtvý port, `CODELOUPE_HOOKS=off`), `OrientationScanTest`.
 - **Zbytek**: měření „s a bez“ na pěti úkolech potřebuje relace, které háček skutečně dostaly; kritérium je přepsáno na základní stav a hotový nástroj a srovnání přešlo do karty CL-148.
 
+### Výsledek CL-148 — relace s mapou na začátku a bez ní: mapa zůstává vypnutá (2026-10-09)
+
+- **Postup**: Claude Code 2.1.295, model `sonnet`, celý plugin (`--plugin-dir plugin`, MCP i všechny háčky), dvě jednorázová daemony (porty 47662 s `hooks.sessionStart.map: true` a 47663 s `false`, každý vlastní domovina), dva worktrees CodeLoupe
+  na `a63b6a2` (každá varianta svůj, aby měla vlastní adresář transkriptů). Deset jen čtecích otázek o kódu CodeLoupe (šest úzkých: kdo rozhoduje, kde se čte klíč; čtyři širší: „jsem tu nový“, přehled balíčků), **každá dvakrát v obou variantách = 20 relací na variantu**,
+  dvojice stejné otázky běžely naráz. Stav worktree dostaly obě varianty (`changes` zapnuté), liší se jen mapou. Transkripty: `metrics collect --dir` a `metrics orientation --dir` (rozdělení podle řádku „CodeLoupe orientation for“ tu nerozliší, stav je v obou) a skript,
+  který z transkriptu spočítá prvních 8 tahů (tah = jedno volání API) podle ceny `input` 1, `cw5m` 1,25, `cw1h` 2, `cacheRead` 0,1, `output` 5.
+- **Výsledek** (průměr na relaci; relace měly 2 až 5 tahů, takže prvních 8 tahů je celá relace):
+
+  | | bez mapy | s mapou |
+  |---|---|---|
+  | kontext háčku na startu | ≈ 60 tokenů | ≈ 1 220 tokenů |
+  | orientační volání (`ls`, `find`, `Glob`) | 0,25 (5 z 20 relací) | 0,15 (3 z 20) |
+  | čtení souborů (`Read`, `cat`…) | 0,9 | 0,9 |
+  | hledání (`Grep`, `grep`, `rg`) | 2,0 | 2,0 |
+  | tahy | 3,4 | 3,3 |
+  | vážená cena relace, průměr / medián | 44 451 / 39 172 | 47 366 / 43 370 (**+6,6 % / +10,7 %**) |
+
+  Po otázkách je mapa dražší u 7 z 10 (průměrně +8,7 %), levnější u 3 (−1,8 až −18 %). Čtení ani hledání nenahradila, orientačních volání ubylo o 0,1 na relaci (pár set tokenů proti 1 200 navíc ve vozeném kontextu každého tahu).
+- **Omezení měření**: model v žádné z 40 relací nezavolal nástroj CodeLoupe (80× `Grep`, 35× `Read`, 4× `Bash`, 4× `Glob`, 3× `PowerShell`), přestože byl připojený; nástroje index tedy nepoužily a mapa nemá co vést. Relace jsou krátké (medián 3 až 4 tahy).
+  Základní stav z Terria (0,38 orientačního volání na relaci, CL-136) odpovídá řádu tady naměřeného (0,25), takže orientace není místo, kde se platí.
+- **Rozhodnutí**: `hooks.sessionStart.map` zůstává **`false`**; stav worktree (≈ 60 tokenů) zůstává zapnutý. Mapu má smysl zkusit znovu až u relací, kde model nástroje CodeLoupe skutečně volá (sledovat `metrics hooks`), nebo až se kontext háčku nebude vozit celou relaci.
+
 ### Výsledek CL-146 — háček `http` místo procesu: nepoužitelný, zůstává skript (2026-10-09)
 
 - **Co se zkoušelo**: pluginový `PreToolUse` typu `http` s `url` na `http://127.0.0.1:47391/hook` a hlavičkou `x-codeloupe: 1`. Živý test nebyl možný (účet `claude -p` je na týdenním limitu do 2026-10-11 20:00),

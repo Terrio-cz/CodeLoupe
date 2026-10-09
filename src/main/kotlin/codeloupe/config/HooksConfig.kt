@@ -25,7 +25,7 @@ data class HooksConfig(
     /**
      * The context a session starts with: the worktree's state - branch, task and, when [changes] is on, the changed declarations
      * (at most [changesLimit] lines) - and, when [map] is on, the ranked map of the repository (a fresh session only), all within
-     * [budget] tokens. The map is off until the comparison of sessions with and without it (`codeloupe metrics orientation`) says it pays.
+     * [budget] tokens. The map is off: in 20 paired sessions it cost about 7 % more and displaced no reads or searches (docs/plan.md, CL-148).
      */
     data class SessionStartConfig(val enabled: Boolean = true, val map: Boolean = false, val budget: Int = 1_200, val changes: Boolean = true, val changesLimit: Int = 12)
 
