@@ -64,7 +64,7 @@ describe('reconcile', () => {
     expect(r.ok).toBe(true);
     expect(r.message).toBe('Removed 2.');
     expect(asked[0].message).toBe('Remove 2 resources?');
-    expect(posts).toEqual([{ path: '/reconcile/run', body: { confirm: keys } }]);
+    expect(posts).toEqual([{ path: '/reconcile/run', body: { confirm: keys, auto: false } }]);
   });
 
   it('says what stays when a resource is in use', async () => {

@@ -19,7 +19,9 @@ class PassphraseProtector(private val passphrase: CharArray, private val iterati
     override fun unwrap(blob: String): ByteArray {
         val parts = blob.split(':')
         require(parts.size == 5 && parts[0] == "pbkdf2") { "not a passphrase-wrapped key" }
-        val key = derive(Base64.getDecoder().decode(parts[2]), parts[1].toInt())
+        val rounds = parts[1].toIntOrNull()
+        require(rounds != null && rounds in 1..MAX_ITERATIONS) { "not a passphrase-wrapped key" }
+        val key = derive(Base64.getDecoder().decode(parts[2]), rounds)
         val plain = try {
             SecretCrypto.open(key, SecretCrypto.Sealed(parts[3], parts[4]), AAD)
         } catch (e: java.security.GeneralSecurityException) {
@@ -32,7 +34,9 @@ class PassphraseProtector(private val passphrase: CharArray, private val iterati
         SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(PBEKeySpec(passphrase, salt, rounds, SecretCrypto.KEY_BYTES * 8)).encoded
 
     companion object {
-        const val ITERATIONS = 310_000
+        /** The cost of a new vault; the count is stored with the key, so a vault made with fewer keeps opening. */
+        const val ITERATIONS = 600_000
+        private const val MAX_ITERATIONS = 20_000_000
         private const val AAD = "codeloupe-vault-key"
     }
 }

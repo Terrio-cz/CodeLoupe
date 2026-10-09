@@ -2,6 +2,7 @@ package codeloupe.secrets
 
 import codeloupe.JsonFormat
 import codeloupe.platform.IsoTime
+import codeloupe.platform.OwnerOnly
 import kotlinx.serialization.Serializable
 import java.nio.channels.FileChannel
 import java.nio.file.Files
@@ -142,7 +143,7 @@ class SecretStore(val file: Path, private val protector: KeyProtector, val audit
 
     /** [body] while no other process (or store instance) changes the vault. */
     private fun <T> locked(body: () -> T): T {
-        Files.createDirectories(file.parent)
+        OwnerOnly.folder(file.parent)
         val lockFile = file.resolveSibling(file.fileName.toString() + ".lock")
         return JVM_LOCKS.computeIfAbsent(lockFile.toAbsolutePath().toString()) { ReentrantLock() }.withLock {
             FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel -> channel.lock().use { body() } }
@@ -165,18 +166,36 @@ class SecretStore(val file: Path, private val protector: KeyProtector, val audit
     }
 
     private fun write(vault: Vault) {
-        Files.createDirectories(file.parent)
+        OwnerOnly.folder(file.parent)
         val temp = Files.createTempFile(file.parent, "vault", ".tmp")
         try {
             runCatching { Files.setPosixFilePermissions(temp, PosixFilePermissions.fromString("rw-------")) }
-            Files.writeString(temp, JsonFormat.json.encodeToString(Vault.serializer(), vault))
-            try {
-                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-            } catch (e: java.nio.file.AtomicMoveNotSupportedException) {
-                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING)
+            // Forced to disk before the rename, so a crash leaves the old vault or the new one, never an empty file.
+            FileChannel.open(temp, StandardOpenOption.WRITE).use { channel ->
+                channel.write(java.nio.ByteBuffer.wrap(JsonFormat.json.encodeToString(Vault.serializer(), vault).toByteArray(Charsets.UTF_8)))
+                channel.force(true)
             }
+            replace(temp)
         } finally {
             Files.deleteIfExists(temp)
+        }
+    }
+
+    // Windows refuses to replace a file while another process has just opened it to read (a scanner, a second CodeLoupe process): a moment later it works.
+    private fun replace(temp: Path) {
+        var attempt = 0
+        while (true) {
+            try {
+                try {
+                    Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                } catch (e: java.nio.file.AtomicMoveNotSupportedException) {
+                    Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING)
+                }
+                return
+            } catch (e: java.nio.file.AccessDeniedException) {
+                if (++attempt >= REPLACE_ATTEMPTS) throw e
+                Thread.sleep(REPLACE_PAUSE_MS * attempt)
+            }
         }
     }
 
@@ -185,6 +204,8 @@ class SecretStore(val file: Path, private val protector: KeyProtector, val audit
     companion object {
         private val NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
         private const val USED_BY = 5
+        private const val REPLACE_ATTEMPTS = 8
+        private const val REPLACE_PAUSE_MS = 25L
         private val JVM_LOCKS = ConcurrentHashMap<String, ReentrantLock>()
 
         /** The scopes that apply to a caller, widest first: global, then its workspace, then its repository. */

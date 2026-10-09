@@ -20,10 +20,13 @@ object Scrubber {
         Regex("""(?i)(authorization"?\s*[:=]\s*)(?:(?:bearer|basic|token|digest)\s+)?[^\s'",;]+""") to "$1$MASK",
         Regex("""(?i)\b(bearer|basic|token)\s+[A-Za-z0-9._~+/=-]{8,}""") to "$1 $MASK",
         // --password x, --api-key=x, -token x
-        Regex("""(?i)(--?[\w-]*(?:passw(?:or)?d|secret|token|api-?key|credential)[\w-]*)(=|\s+)("[^"]*"|'[^']*'|\S+)""") to "$1$2$MASK",
+        Regex("""(?i)(--?[\w-]*(?:passw(?:or)?d|passphrase|secret|token|api-?key|credential)[\w-]*)(=|\s+)("[^"]*"|'[^']*'|\S+)""") to "$1$2$MASK",
         // PASSWORD=x, api_key: x, "token": "x", Authorization: x
-        Regex("""(?i)([\w.-]*(?:passw(?:or)?d|secret|token|api[_-]?key|credential|authorization)[\w.-]*"?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;&'"]+)""") to "$1$MASK",
-        Regex("""\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|perm:[A-Za-z0-9._=-]{10,})""") to MASK,
+        Regex("""(?i)([\w.-]*(?:passw(?:or)?d|passphrase|secret|token|api[_-]?key|private[_-]?key|credential|authorization)[\w.-]*"?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;&'"]+)""") to "$1$MASK",
+        Regex("""\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|perm:[A-Za-z0-9._=-]{10,}|[sr]k_(?:live|test)_[A-Za-z0-9]{16,}|npm_[A-Za-z0-9]{30,}|AIza[0-9A-Za-z_-]{30,}|SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,})""") to MASK,
+        // curl -u user:pass, mysql -u root -pSECRET
+        Regex("""(\b(?:curl|wget|http)\b[^|;&\n]*?\s(?:-u|--user)[\s=])[^\s:'"]+:[^\s'"]+""") to "$1$MASK",
+        Regex("""(\bmysql(?:dump)?\b[^|;&\n]*?\s-p)[^\s'"]+""") to "$1$MASK",
         Regex("""\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}""") to MASK,
     )
 
@@ -38,7 +41,11 @@ object Scrubber {
 
     /** [text] with only the given secret [values] masked, for output that must otherwise stay as it is. */
     fun mask(text: String, values: Collection<String>): String =
-        values.filter { it.length >= MIN_KNOWN }.sortedByDescending { it.length }.fold(text) { acc, secret -> if (secret in acc) acc.replace(secret, MASK) else acc }
+        needles(values).fold(text) { acc, secret -> if (secret in acc) acc.replace(secret, MASK) else acc }
+
+    /** A multi-line value (a key file) is also masked line by line, as output is read one line at a time. */
+    private fun needles(values: Collection<String>): List<String> =
+        values.flatMap { if ('\n' in it) it.lines() + it else listOf(it) }.map { it.trim('\r') }.filter { it.length >= MIN_KNOWN }.distinct().sortedByDescending { it.length }
 
     private fun known(text: String): String = mask(text, runCatching { knownValues() }.getOrDefault(emptyList()))
 

@@ -1,6 +1,7 @@
 package codeloupe.ingest
 
 import codeloupe.JsonFormat
+import codeloupe.events.Scrubber
 import codeloupe.metrics.Categorizer
 import codeloupe.metrics.GapDetector
 import codeloupe.metrics.LocatedGap
@@ -94,8 +95,8 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
                 s.setLong(9, r.ms)
                 s.setInt(10, if (r.err) 1 else 0)
                 s.setString(11, r.errText?.let { StepText.clean(it, ERROR_CHARS) })
-                s.setString(12, if (forGaps) r.input.plain().toString() else null)
-                s.setString(13, if (category == "codeloupe") r.head else null)
+                s.setString(12, if (forGaps) Scrubber.json(r.input.plain()).toString() else null)
+                s.setString(13, if (category == "codeloupe") r.head?.let(Scrubber::text) else null)
                 s.addBatch()
             }
             s.executeBatch()
@@ -199,10 +200,16 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
             s.setString(6, d.found.project)
             s.setString(7, d.found.session)
             s.setString(8, d.ter)
-            s.setString(9, JsonFormat.json.encodeToString(codeloupe.metrics.ParserSnapshot.serializer(), d.parser.snapshot()))
+            s.setString(9, JsonFormat.json.encodeToString(codeloupe.metrics.ParserSnapshot.serializer(), scrubbed(d.parser.snapshot())))
             s.executeUpdate()
         }
     }
+
+    /** What is kept of a conversation to resume reading it holds no secret a person pasted into it. */
+    private fun scrubbed(s: codeloupe.metrics.ParserSnapshot) = s.copy(
+        firstPrompt = Scrubber.text(s.firstPrompt),
+        pending = s.pending.map { it.copy(input = Scrubber.json(it.input) as JsonObject) },
+    )
 
     private fun runId(c: Connection, key: String): Long? = c.prepareStatement("SELECT id FROM runs WHERE path = ?").use { s ->
         s.setString(1, key)

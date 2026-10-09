@@ -14,6 +14,8 @@ export interface EnvContext {
   homeDir(): string;
   port(): number;
   source(): ApiSource;
+  /** The daemon on the port is the one this app started or found through daemon.json, not a stranger that took the port. */
+  trusted(): boolean;
 }
 
 /** Registers the channels of shared/envActions.ts; `handle` checks the sender, as for every other channel. */
@@ -74,6 +76,8 @@ async function readToken(ctx: EnvContext): Promise<string | null> {
 
 /** One value through the daemon's token-guarded route, as the consumer [usedBy] named in the audit. */
 export async function fetchValue(ctx: EnvContext, key: { name: string; scope: string }, usedBy: string): Promise<string | null> {
+  // The token is a key to every global value: it goes only to the daemon that daemon.json names.
+  if (!ctx.trusted()) return null;
   const token = await readToken(ctx);
   if (!token) return null;
   const [kind, ...rest] = key.scope.split(':');

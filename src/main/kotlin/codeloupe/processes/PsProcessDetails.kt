@@ -1,6 +1,6 @@
 package codeloupe.processes
 
-import java.util.concurrent.TimeUnit
+import codeloupe.platform.ToolOutput
 
 /** macOS (and other Unix without `/proc`): one `ps` for resident sizes and one `lsof` for the working directories of this user's processes. */
 internal object PsProcessDetails {
@@ -20,12 +20,7 @@ internal object PsProcessDetails {
         return (rss.keys + cwd.keys).associateWith { ProcessDetails(cwd[it], null, rss[it]) }
     }
 
-    private fun run(vararg command: String): String = runCatching {
-        val process = ProcessBuilder(*command).redirectErrorStream(false).redirectError(ProcessBuilder.Redirect.DISCARD).start()
-        val output = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
-        if (!process.waitFor(TIMEOUT_S, TimeUnit.SECONDS)) process.destroyForcibly()
-        output
-    }.getOrDefault("")
+    private fun run(vararg command: String): String = ToolOutput.read(TIMEOUT_S, *command)
 
     private const val KB = 1024L
     private const val TIMEOUT_S = 10L

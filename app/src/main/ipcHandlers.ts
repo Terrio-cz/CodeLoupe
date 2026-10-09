@@ -51,7 +51,7 @@ export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
     for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(JOB_CH.livePush, e);
   });
   const live = registerLive(stream, new JobLogReader(ctx.client, () => ctx.home.dir), handle, () => ctx.source().kind === 'daemon' && ctx.manager.trusted);
-  const envContext = { settings: () => ctx.store.get(), homeDir: () => ctx.home.dir, port: () => ctx.manager.port(), source: ctx.source };
+  const envContext = { settings: () => ctx.store.get(), homeDir: () => ctx.home.dir, port: () => ctx.manager.port(), source: ctx.source, trusted: () => ctx.manager.trusted };
   registerEnv(envContext, handle);
   registerAccounts({ ...envContext, restartDaemon: () => ctx.manager.restart() }, handle);
   registerOnboarding(envContext, handle);

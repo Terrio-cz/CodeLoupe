@@ -8,7 +8,7 @@ import java.io.BufferedWriter
 import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
-import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,7 +26,7 @@ class ParseWorkerClient(
     private var input: BufferedReader? = null
     private var output: BufferedWriter? = null
     private var next = 0L
-    private val killer = Executors.newSingleThreadScheduledExecutor { Thread(it, "codeloupe-parse-watch").apply { isDaemon = true } }
+    private val killer = ScheduledThreadPoolExecutor(1) { Thread(it, "codeloupe-parse-watch").apply { isDaemon = true } }.apply { removeOnCancelPolicy = true }
 
     /** The process id of the running worker, or null when none runs. */
     @get:Synchronized
@@ -37,7 +37,8 @@ class ParseWorkerClient(
         repeat(ATTEMPTS) { attempt ->
             try {
                 return roundTrip(path, text)
-            } catch (e: IOException) {
+            } catch (e: Exception) {
+                // Also a reply that is not what was asked for (a serializer error): the worker is not trusted after it.
                 log("parse worker: ${e.message.orEmpty().lineSequence().first()}" + if (attempt + 1 < ATTEMPTS) "; starting another" else "")
                 stop()
             }
@@ -83,6 +84,7 @@ class ParseWorkerClient(
     private fun stop() {
         process?.destroyForcibly()
         runCatching { output?.close() }
+        runCatching { input?.close() }
         process = null
         input = null
         output = null

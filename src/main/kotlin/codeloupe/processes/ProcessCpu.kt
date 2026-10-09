@@ -1,7 +1,7 @@
 package codeloupe.processes
 
 import java.time.Duration
-import java.util.concurrent.TimeUnit
+import codeloupe.platform.ToolOutput
 
 /** CPU time a process has used, in ms: from the JDK, else (macOS reports none) from `ps`. 0 when nothing says. */
 internal object ProcessCpu {
@@ -22,10 +22,5 @@ internal object ProcessCpu {
         return (((days * 24 + hours) * 60 + minutes) * 60_000 + Math.round(seconds * 1000))
     }
 
-    private fun ps(pid: Long): Long? = runCatching {
-        val process = ProcessBuilder("ps", "-o", "time=", "-p", pid.toString()).redirectError(ProcessBuilder.Redirect.DISCARD).start()
-        val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
-        if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly()
-        parse(out)
-    }.getOrNull()
+    private fun ps(pid: Long): Long? = parse(ToolOutput.read(5, "ps", "-o", "time=", "-p", pid.toString()))
 }

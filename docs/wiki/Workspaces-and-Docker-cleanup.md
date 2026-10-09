@@ -86,7 +86,7 @@ directory it says what the policy does and why. Unowned resources are not in it 
 | `protected` | a `protect` rule of the config matches | never touched, whatever else holds |
 
 `--run` (or `POST /reconcile/run` with `{"confirm": [keys], "workspaces": [names]}`) does it now: the `auto` entries plus
-what is named. A named `keep` or `protected` entry is refused. The plan is re-read from the registry and Docker for every
+what is named (`"auto": false` leaves the `auto` entries out; the app sends it, so it removes only what the person confirmed). A named `keep` or `protected` entry is refused. The plan is re-read from the registry and Docker for every
 run, so a stale key removes nothing it should not. Removal goes through the Engine API, containers first (stopped, removed
 with their anonymous volumes), then networks, volumes, images, never forced: a resource that is in use is *blocked*, not
 killed. An orphan directory is deleted without following links; a file that is still locked (Windows) leaves it blocked.

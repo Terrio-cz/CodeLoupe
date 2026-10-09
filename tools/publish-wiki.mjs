@@ -21,9 +21,9 @@ const MISSING = /repository .*(not found|does not exist)|does not appear to be a
 
 export class PublishError extends Error {}
 
-/** Every file below `dir`, as paths relative to it with forward slashes. */
+/** Every file below `dir`, as paths relative to it with forward slashes. A link is skipped: it could point at a file of the runner. */
 export function listFiles(dir, base = dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+  return fs.readdirSync(dir, { withFileTypes: true }).filter(e => !e.isSymbolicLink()).flatMap(e => {
     const full = path.join(dir, e.name);
     return e.isDirectory() ? listFiles(full, base) : [path.relative(base, full).split(path.sep).join('/')];
   });

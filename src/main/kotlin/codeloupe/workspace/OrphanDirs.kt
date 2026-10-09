@@ -4,6 +4,7 @@ import codeloupe.git.GitLayout
 import codeloupe.platform.IsoTime
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -20,7 +21,8 @@ internal object OrphanDirs {
     fun under(root: String, commonDir: String, registered: Set<String>): List<Workspace> {
         val dir = Path.of(root)
         if (!dir.isDirectory()) return emptyList()
-        return dir.listDirectoryEntries().filter { it.isDirectory() }.sortedBy { it.name }.mapNotNull { child ->
+        // A link is not a directory of this root: it would be offered for removal, and what it points to is not ours.
+        return dir.listDirectoryEntries().filter { Files.isDirectory(it, LinkOption.NOFOLLOW_LINKS) }.sortedBy { it.name }.mapNotNull { child ->
             if (key(child) in registered) return@mapNotNull null
             val reason = reason(child, commonDir)
             Workspace(

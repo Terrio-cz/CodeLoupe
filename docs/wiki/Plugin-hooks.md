@@ -3,7 +3,9 @@ The plugin registers two hooks: `SessionStart` starts the daemon ([Hooks and tok
 Agents still reach for `rg`, `grep`, `cat` and whole-file reads. A hook runs outside the model and costs no tokens, so the
 plugin points those calls at the CodeLoupe call that answers them. All hooks go through one script (`plugin/hooks/hook.sh`:
 `curl` to `POST /hook` of the local daemon, a few hundred microseconds of work in the daemon) and fail open: no daemon, no `curl`,
-a daemon that does not know the repository, a malformed input or a timeout all mean "say nothing", never an error.
+a daemon that does not know the repository, a malformed input or a timeout all mean "say nothing", never an error. The script
+calls the daemon without any proxy and prints only the three shapes the daemon writes (added context, a notice, a refusal with
+its reason); anything else that answers on the port is dropped, so a stranger there cannot approve or rewrite a tool call.
 
 **Steering** (`PreToolUse` on `Bash`, `PowerShell` and `Read`). It looks at the call:
 

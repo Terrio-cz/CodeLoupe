@@ -22,6 +22,8 @@ permissions:
 
 jobs:
   publish:
+    # Only what main holds is published: a manual run from another branch would write that branch's pages and script.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Writing to the wiki repository is a contents: write on this job only.

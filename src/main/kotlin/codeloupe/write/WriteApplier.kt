@@ -20,16 +20,20 @@ internal class WriteApplier(private val policy: WritePolicy, private val journal
         return locks.withAll(paths) {
             for (change in changes) check(worktree, change)
             val done = ArrayList<FileChange>()
+            val written = changes.flatMap { written(it) }
             try {
                 for (change in changes) {
                     write(worktree, change)
                     done += change
                 }
+                // A write that cannot be logged is not kept: the journal is how a write is found and undone by hand.
+                journal.append(op, root, note, written)
             } catch (e: Exception) {
-                done.asReversed().forEach { restore(worktree, it) }
+                val stuck = done.asReversed().mapNotNull { restore(worktree, it) }
+                if (stuck.isNotEmpty()) throw WriteRefused("write failed (${e.message}) and could not be fully undone: ${stuck.joinToString()}; check git status")
                 throw if (e is WriteRefused) e else WriteRefused("write failed and was undone: ${e.message}")
             }
-            changes.flatMap { written(it) }.also { journal.append(op, root, note, it) }
+            written
         }
     }
 
@@ -47,14 +51,24 @@ internal class WriteApplier(private val policy: WritePolicy, private val journal
         val target = worktree.resolve(change.target)
         Files.createDirectories(target.parent)
         AtomicWrite.replace(target, change.text.toByteArray(Charsets.UTF_8))
-        if (change.movedTo != null) Files.delete(worktree.resolve(change.path))
+        if (change.movedTo != null) {
+            try {
+                Files.delete(worktree.resolve(change.path))
+            } catch (e: Exception) {
+                // The new file is written but the old one stays: a half-moved file is not in `done`, so it is put back here.
+                restore(worktree, change)
+                throw e
+            }
+        }
     }
 
-    private fun restore(worktree: Path, change: FileChange) {
-        runCatching {
-            if (change.movedTo != null) Files.deleteIfExists(worktree.resolve(change.movedTo))
-            if (change.original != null) AtomicWrite.replace(worktree.resolve(change.path), change.original.bytes) else Files.deleteIfExists(worktree.resolve(change.path))
-        }
+    // The path that could not be put back, or null.
+    private fun restore(worktree: Path, change: FileChange): String? = try {
+        if (change.movedTo != null) Files.deleteIfExists(worktree.resolve(change.movedTo))
+        if (change.original != null) AtomicWrite.replace(worktree.resolve(change.path), change.original.bytes) else Files.deleteIfExists(worktree.resolve(change.path))
+        null
+    } catch (e: Exception) {
+        change.path
     }
 
     private fun written(change: FileChange): List<WrittenFile> {

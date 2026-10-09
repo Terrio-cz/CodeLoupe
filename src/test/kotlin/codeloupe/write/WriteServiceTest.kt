@@ -1,7 +1,10 @@
 package codeloupe.write
 
 import codeloupe.config.WriteConfig
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -123,6 +126,23 @@ class WriteServiceTest {
         val ownRules = WriteHarness("write/kotlin", extra = mapOf(".codeloupe.json" to """{"write": {"deny": ["**/Entry.kt"]}}"""))
         val entry = ownRules.read("Entry.signed")
         assertContains(refusal(ownRules) { ownRules.service.replace(ownRules.root, "Entry.signed", entry.hash, entry.code) }, "denied by the write policy")
+    }
+
+    @Test
+    fun `a path that leaves the worktree is refused before anything at it is read, and a huge file is not read at all`() {
+        val outside = Files.createTempFile("outside", ".kt").also { it.writeText("package x\n") }
+        val way = kotlin.repo.relativize(outside).toString().replace('\\', '/')
+        // Same answer whether the file exists or not: nothing says what is at that path.
+        val there = refusal(kotlin) { kotlin.service.addImports(kotlin.root, way, listOf("java.util.UUID")) }
+        val missing = refusal(kotlin) { kotlin.service.addImports(kotlin.root, "../nowhere-at-all/x.kt", listOf("java.util.UUID")) }
+        assertContains(there, "not a path inside the worktree")
+        assertContains(missing, "not a path inside the worktree")
+        assertContains(refusal(kotlin) { kotlin.service.createFile(kotlin.root, "../nowhere-at-all/y.kt", "package y\n") }, "not a path inside the worktree")
+        assertEquals("package x\n", outside.toFile().readText())
+
+        val big = kotlin.repo.resolve("src/main/kotlin/com/example/bank/Huge.kt")
+        FileChannel.open(big, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { it.write(ByteBuffer.wrap(byteArrayOf(32)), 8_999_999L) }
+        assertContains(refusal(kotlin) { kotlin.service.addImports(kotlin.root, "src/main/kotlin/com/example/bank/Huge.kt", listOf("java.util.UUID")) }, "over 8 MB")
     }
 
     @Test

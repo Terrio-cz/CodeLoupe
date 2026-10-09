@@ -75,7 +75,7 @@ export class WorkspaceActions {
     });
     if (!ok) return { ok: false, message: 'Cancelled.', results: [] };
 
-    const run = await this.daemon.post<{ actions: ReconcileAction[] }>('/reconcile/run', { confirm: entries.map(e => e.key) });
+    const run = await this.daemon.post<{ actions: ReconcileAction[] }>('/reconcile/run', { confirm: entries.map(e => e.key), auto: false });
     const named = new Set(entries.map(e => e.key));
     const results = run.actions.filter(a => named.has(a.key));
     const count = (o: ReconcileAction['outcome']) => results.filter(a => a.outcome === o).length;

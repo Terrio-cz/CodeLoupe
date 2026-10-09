@@ -2,6 +2,7 @@ package codeloupe.reconcile
 
 import java.io.IOException
 import java.nio.file.AccessDeniedException
+import java.nio.file.DirectoryNotEmptyException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -20,6 +21,10 @@ object DirectoryRemover {
         Files.walkFileTree(
             directory,
             object : SimpleFileVisitor<Path>() {
+                // The JDK reports a Windows junction as a plain directory (isOther), and walks into it without FOLLOW_LINKS.
+                override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult =
+                    if (attrs.isOther && removedAsLink(dir)) FileVisitResult.SKIP_SUBTREE else FileVisitResult.CONTINUE
+
                 override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
                     delete(file)
                     return FileVisitResult.CONTINUE
@@ -32,6 +37,14 @@ object DirectoryRemover {
                 }
             },
         )
+    }
+
+    // A junction is deleted as an entry whatever its target holds; a real directory with a reparse tag (cloud placeholder) is not empty and is walked.
+    private fun removedAsLink(dir: Path): Boolean = try {
+        Files.delete(dir)
+        true
+    } catch (e: DirectoryNotEmptyException) {
+        false
     }
 
     // Read-only files (git's object files on Windows) refuse deletion until the flag is cleared.

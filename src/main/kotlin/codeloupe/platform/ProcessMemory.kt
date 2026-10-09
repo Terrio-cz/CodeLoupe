@@ -39,9 +39,7 @@ object ProcessMemory {
 
     private fun psRssMb(): Long? {
         psSample?.takeIf { System.currentTimeMillis() - it.first < PS_TTL_MS }?.let { return it.second }
-        val process = ProcessBuilder("ps", "-o", "rss=", "-p", ProcessHandle.current().pid().toString()).start()
-        val kb = process.inputStream.readAllBytes().toString(Charsets.UTF_8).trim().toLongOrNull()
-        process.waitFor()
+        val kb = ToolOutput.read(PS_TIMEOUT_S, "ps", "-o", "rss=", "-p", ProcessHandle.current().pid().toString()).trim().toLongOrNull()
         return kb?.div(1024).also { psSample = System.currentTimeMillis() to it }
     }
 
@@ -56,6 +54,7 @@ object ProcessMemory {
     }
 
     private const val PS_TTL_MS = 10_000L
+    private const val PS_TIMEOUT_S = 5L
     private const val COUNTERS_SIZE = 72L
     private const val PEAK_WORKING_SET = 8L
     private const val WORKING_SET = 16L

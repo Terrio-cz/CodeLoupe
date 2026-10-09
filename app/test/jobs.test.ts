@@ -64,6 +64,8 @@ describe('redactLine', () => {
     ['Authorization: Bearer abcdef1234567890abcdef', 'Authorization: ***'],
     ['export YOUTRACK_TOKEN=perm:abcdefghijklmnop', 'export YOUTRACK_TOKEN=***'],
     ['password: "hunter2 hunter2"', 'password: ***'],
+    ['pay sk_' + 'live_4eC39HqLyjWDarjtT1zdp7dc now', 'pay *** now'],
+    ['CODELOUPE_PASSPHRASE=correct-horse', 'CODELOUPE_PASSPHRASE=***'],
     ['clone https://user:secret@github.com/a/b.git', 'clone https://***@github.com/a/b.git'],
     ['\u001B[31mFAILED\u001B[0m OrderTest', 'FAILED OrderTest'],
     ['412 tests completed, 2 failed', '412 tests completed, 2 failed'],

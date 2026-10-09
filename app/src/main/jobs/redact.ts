@@ -4,10 +4,10 @@ const MASK = '***';
 
 // Values the daemon masks only when it knows them; these are the shapes of the common ones, as a second line of defence.
 const TOKENS = [
-  /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|perm:[A-Za-z0-9._=-]{10,})/g,
+  /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|perm:[A-Za-z0-9._=-]{10,}|[sr]k_(?:live|test)_[A-Za-z0-9]{16,}|npm_[A-Za-z0-9]{30,}|AIza[0-9A-Za-z_-]{30,})/g,
   /\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/gi,
 ];
-const ASSIGNED = /\b([A-Za-z0-9_.-]*(?:token|secret|password|passwd|api[_-]?key|credential)[A-Za-z0-9_.-]*)(\s*[=:]\s*)("[^"]*"|'[^']*'|\S+)/gi;
+const ASSIGNED = /\b([A-Za-z0-9_.-]*(?:token|secret|password|passwd|passphrase|api[_-]?key|private[_-]?key|credential)[A-Za-z0-9_.-]*)(\s*[=:]\s*)("[^"]*"|'[^']*'|\S+)/gi;
 const URL_USER = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi;
 
 /** One log line without terminal codes and with anything that looks like a credential masked. */

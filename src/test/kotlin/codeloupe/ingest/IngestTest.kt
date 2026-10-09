@@ -180,6 +180,31 @@ class IngestTest {
     }
 
     @Test
+    fun `the database file keeps no secret either, not in the stored inputs nor in the state it resumes from`() {
+        IngestRig().use { rig ->
+            val first = "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"
+            val second = "sk-ant-" + "zZ9yY8xX7wW6vV5uU4tT3sS2rR1q"
+            TranscriptBuilder(today)
+                .prompt("deploy with token $first please")
+                .turn(
+                    tools = arrayOf(
+                        Triple("a", "Bash", args("command" to "grep -rn --password $second src")),
+                        Triple("b", "Bash", args("command" to "grep -rn TOKEN=$second src")),
+                    ),
+                )
+                .result("a", "ok")
+                .write(rig.project.resolve("s1.jsonl"))
+            rig.ingest.passNow()
+            val stored = rig.db.reader.createStatement().use { s ->
+                s.executeQuery("SELECT group_concat(coalesce(input, '') || coalesce(head, ''), ' ') FROM steps").use { it.next(); it.getString(1).orEmpty() } +
+                    s.executeQuery("SELECT group_concat(state, ' ') FROM files").use { it.next(); it.getString(1).orEmpty() }
+            }
+            assertTrue("grep" in stored, "the inputs are stored: $stored")
+            assertFalse(first in stored || second in stored, stored)
+        }
+    }
+
+    @Test
     fun `a long step summary is cut to 200 characters and never carries the content of an edit`() {
         IngestRig().use { rig ->
             TranscriptBuilder(today)
