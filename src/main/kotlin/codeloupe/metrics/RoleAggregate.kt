@@ -24,4 +24,6 @@ data class RoleAggregate(
     val toolResultCostPct: Double,
     val topCommands: List<TopCommand>,
     val categories: Map<String, CategoryShare>,
+    /** The starting contexts of the role's runs; null when none of them has a first turn. */
+    val start: StartBlock? = null,
 )

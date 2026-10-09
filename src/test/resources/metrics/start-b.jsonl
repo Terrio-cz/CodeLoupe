@@ -1,0 +1,8 @@
+{"type":"attachment","timestamp":"2026-10-06T10:00:00Z","attachment":{"type":"prompt_snapshot","systemPrompt":["Short prompt."]}}
+{"type":"attachment","timestamp":"2026-10-06T10:00:01Z","attachment":{"type":"skill_listing","content":"- alpha only"}}
+{"type":"attachment","timestamp":"2026-10-06T10:00:02Z","attachment":{"type":"mcp_instructions_delta","addedBlocks":["use the index first"]}}
+{"type":"attachment","timestamp":"2026-10-06T10:00:03Z","attachment":{"type":"environment","platform":"win32"}}
+{"type":"user","timestamp":"2026-10-06T10:00:04Z","message":{"content":[{"type":"text","text":"review it"},{"type":"image","source":"x"},{"type":"text","text":" please"}]}}
+{"type":"assistant","timestamp":"2026-10-06T10:00:10Z","message":{"id":"n1","model":"claude-test","usage":{"input_tokens":300,"output_tokens":10,"cache_read_input_tokens":0,"cache_creation_input_tokens":4000,"cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":4000}},"content":[{"type":"text","text":"ok"}]}}
+{"type":"assistant","timestamp":"2026-10-06T10:00:20Z","message":{"id":"n2","model":"claude-test","usage":{"input_tokens":5,"output_tokens":5,"cache_read_input_tokens":4300,"cache_creation_input_tokens":50,"cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":50}},"content":[{"type":"text","text":"done"}]}}
+{"type":"assistant","timestamp":"2026-10-06T10:00:30Z","message":{"id":"n3","model":"claude-test","usage":{"input_tokens":5,"output_tokens":5,"cache_read_input_tokens":4350,"cache_creation_input_tokens":10,"cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":10}},"content":[{"type":"text","text":"done"}]}}

@@ -90,7 +90,8 @@ class MetricsTest {
         session(dir)
         val a = MetricsCollector(categorizer).collect(listOf(dir.resolve("project")), "a", null, null).aggregate
         val compared = MetricsRender.compare(a, a)
-        assertTrue(compared.startsWith("main  runs 1 -> 1\n   cost 390→390 (+0%)  peakContext 160→160 (+0%)  turns 3→3 (+0%)"), compared)
+        assertTrue(compared.startsWith("main  runs 1 -> 1\n   start S 160→160 (+0%)"), compared)
+        assertContains(compared, "\n   cost 390→390 (+0%)  peakContext 160→160 (+0%)  turns 3→3 (+0%)")
         assertContains(compared, "codeReadChars 440→440 (+0%)")
         assertContains(compared, "codeEditErrors 1→1 (+0%)")
         assertContains(MetricsRender.summary(a), "main  runs 1  cost med 390 p75 390 Σ 390  peakCtx med 160  turns med 3")

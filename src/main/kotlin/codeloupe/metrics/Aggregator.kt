@@ -1,13 +1,18 @@
 package codeloupe.metrics
 
+import codeloupe.platform.Hundredths
 import codeloupe.platform.Tenths
 
 /** Sums run summaries up per role. */
 object Aggregator {
     private const val TOP_COMMANDS = 15
 
-    fun aggregate(runs: List<RunSummary>): Map<String, RoleAggregate> =
-        runs.groupBy { it.role }.mapValues { (_, rs) -> role(rs) }
+    fun aggregate(runs: List<RunSummary>): Map<String, RoleAggregate> {
+        val roles = runs.groupBy { it.role }.mapValues { (_, rs) -> role(rs) }
+        // The share of the whole period's cost that starting contexts make up needs every role's cost.
+        val total = roles.values.sumOf { it.cost.sum }.let { if (it == 0L) 1 else it }
+        return roles.mapValues { (_, a) -> a.start?.let { s -> a.copy(start = s.copy(startPct = Hundredths.of(100.0 * s.costSum / total))) } ?: a }
+    }
 
     private fun role(rs: List<RunSummary>): RoleAggregate {
         val cats = LinkedHashMap<String, CatStats>()
@@ -34,6 +39,7 @@ object Aggregator {
             categories = cats.entries.sortedByDescending { it.value.carried }.associate { (c, v) ->
                 c to CategoryShare(v.calls, v.chars, v.carried, v.attr, v.errors, v.ms, pct(v.chars, totalChars), pct(v.carried, totalCarried), pct(v.attr, costSum))
             },
+            start = StartAggregate.of(rs),
         )
     }
 
