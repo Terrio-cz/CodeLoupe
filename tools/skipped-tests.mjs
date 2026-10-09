@@ -38,7 +38,8 @@ export function skippedIn(xml) {
 
 export function render(skipped, title) {
   if (skipped.length === 0) return `### ${title}\n\nNothing was skipped.\n`;
-  const rows = skipped.map((s) => `| ${s.cls} | ${s.name.replace(/\|/g, '\\|')} | ${s.reason.replace(/\|/g, '\\|')} |`);
+  const cell = (value) => value.replace(/[\\|]/g, (c) => `\\${c}`);
+  const rows = skipped.map((s) => `| ${s.cls} | ${cell(s.name)} | ${cell(s.reason)} |`);
   return `### ${title}\n\n${skipped.length} skipped.\n\n| Class | Test | Reason |\n| --- | --- | --- |\n${rows.join('\n')}\n`;
 }
 
