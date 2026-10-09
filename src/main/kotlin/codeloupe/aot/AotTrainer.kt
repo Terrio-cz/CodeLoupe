@@ -4,6 +4,7 @@ import codeloupe.CodeLoupe
 import codeloupe.cli.CliJvm
 import codeloupe.cli.DaemonJvm
 import codeloupe.cli.LocalHttp
+import codeloupe.daemon.DaemonToken
 import codeloupe.platform.JavaProcess
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.PersonIdent
@@ -30,6 +31,7 @@ internal class AotTrainer(
 ) {
     private val id = System.nanoTime().toString(36)
     private val work: Path = caches.suffixed(".work-$id")
+    private val stepLog: Path get() = work.resolve("step.log")
 
     /** True when both caches are in place and marked ready. */
     fun train(): Boolean {
@@ -70,21 +72,30 @@ internal class AotTrainer(
             val cli = listOf(java) + CliJvm.args + record(cliRecording) + listOf("-jar", classPath, "find", "greet")
             check(run(cli, env, repo) == 0) { "the recorded CLI call failed" }
             val root = repo.toString().replace("\\", "\\\\")
-            http.request("POST", "/api/outline", """{"root":"$root","target":"Greeter"}""", HEADERS, readTimeoutMs = 60_000)
+            http.request("POST", "/api/outline", """{"root":"$root","target":"Greeter"}""", authorized(home) + HEADERS, readTimeoutMs = 60_000)
         } finally {
             // The workers the daemon started end with it; they are not waited for, as they would keep the work directory open.
             val workers = daemon.descendants().toList()
-            runCatching { http.request("POST", "/shutdown?force=1", headers = mapOf(CodeLoupe.HEADER to "1"), readTimeoutMs = 5_000) }
+            runCatching { http.request("POST", "/shutdown?force=1", headers = authorized(home), readTimeoutMs = 5_000) }
             if (!daemon.waitFor(stepSeconds, TimeUnit.SECONDS)) daemon.destroyForcibly().waitFor()
             workers.forEach { it.destroyForcibly() }
         }
         check(Files.exists(daemonRecording) && Files.exists(cliRecording)) { "the JVM wrote no recording" }
     }
 
+    // The training daemon is the home's own: its token is a file next to it.
+    private fun authorized(home: Path): Map<String, String> =
+        mapOf(CodeLoupe.HEADER to "1") + listOfNotNull(DaemonToken.read(home)?.let { CodeLoupe.TOKEN_HEADER to it })
+
     private fun create(jvm: List<String>, launch: List<String>, recording: Path, target: Path) {
         val command = listOf(java) + jvm + listOf("-XX:AOTMode=create", "-XX:AOTConfiguration=$recording", "-XX:AOTCache=$target") + launch
-        check(run(command, emptyMap(), work) == 0 && Files.exists(target)) { "the JVM did not create ${target.name}" }
+        val code = run(command, emptyMap(), work, stepLog)
+        check(code == 0 && Files.exists(target)) { "the JVM did not create ${target.name} (exit $code): ${lastOutput()}" }
     }
+
+    // The JVM prints why it cannot make a cache; the last lines go into the failure note.
+    private fun lastOutput(): String =
+        runCatching { Files.readAllLines(stepLog).takeLast(6).joinToString(" | ") { it.take(300) } }.getOrDefault("no output")
 
     private fun install(temp: Path, target: Path) {
         Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
@@ -94,8 +105,8 @@ internal class AotTrainer(
 
     private fun record(recording: Path) = listOf("-XX:AOTMode=record", "-XX:AOTConfiguration=$recording")
 
-    private fun run(command: List<String>, env: Map<String, String>, dir: Path): Int {
-        val process = start(command, env, dir)
+    private fun run(command: List<String>, env: Map<String, String>, dir: Path, log: Path? = null): Int {
+        val process = start(command, env, dir, log)
         if (!process.waitFor(stepSeconds, TimeUnit.SECONDS)) {
             process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly().waitFor()
@@ -104,9 +115,10 @@ internal class AotTrainer(
         return process.exitValue()
     }
 
-    private fun start(command: List<String>, env: Map<String, String>, dir: Path): Process =
+    private fun start(command: List<String>, env: Map<String, String>, dir: Path, log: Path? = null): Process =
         ProcessBuilder(command).directory(dir.toFile()).apply { environment().putAll(env) }
-            .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+            .redirectErrorStream(true)
+            .redirectOutput(log?.let { ProcessBuilder.Redirect.to(it.toFile()) } ?: ProcessBuilder.Redirect.DISCARD).start()
             .also { it.outputStream.close() }
 
     private fun waitFor(condition: () -> Boolean): Boolean {
