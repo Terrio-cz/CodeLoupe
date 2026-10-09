@@ -14,6 +14,12 @@ vault, and on macOS and Linux the key in the keychain or secret service is left 
 more (the daemon, the CLI and the app must all use it). Moving the vault by default needs a migration across versions of the daemon, the CLI and the app that
 share it, and is not done.
 
+**Scope ids and case.** A `workspace:<id>` or `repo:<id>` is a folder path with forward slashes and no trailing slash. On Windows and macOS (default volumes)
+paths compare without regard to case, so the id is lower-cased; on Linux `/x/Proj` and `/x/proj` are two folders and two scopes, and the id keeps its
+case (a macOS volume formatted case sensitive is treated like the default one). A vault written by an earlier version holds lower-cased ids: on Linux
+those entries are still found for a caller whose path has capitals (the entry under the exact id wins at the same rank), `env unset` removes the exact
+one first and then the old one, and nothing is re-encrypted. A value you store afterwards goes under the exact id; the old entry stays until you unset it.
+
 | | |
 |---|---|
 | `codeloupe env set NAME --scope global\|workspace:<id>\|repo:<id> [--source …]` | stores or rotates a value; read from stdin (a hidden prompt on a terminal), never from an argument |

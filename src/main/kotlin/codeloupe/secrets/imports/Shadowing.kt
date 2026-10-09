@@ -10,7 +10,7 @@ import codeloupe.secrets.SecretScope
  */
 class Shadowing(stored: Collection<SecretMeta>) {
     private val storedByName: Map<String, List<SecretScope>> =
-        stored.mapNotNull { m -> runCatching { m.name to SecretScope.parse(m.scope) }.getOrNull() }.groupBy({ it.first }, { it.second })
+        stored.mapNotNull { m -> runCatching { m.name to SecretScope.parse(m.scope, foldCase = false) }.getOrNull() }.groupBy({ it.first }, { it.second })
 
     /** The wider scopes (as text, sorted) whose stored secret of this name [variable] would hide; empty when it hides nothing. */
     fun of(variable: FoundVariable): List<String> = of(variable.name, variable.scope)
@@ -23,7 +23,7 @@ class Shadowing(stored: Collection<SecretMeta>) {
 
     private fun applies(wider: SecretScope, narrow: SecretScope): Boolean = when (wider.kind) {
         SecretScope.Kind.GLOBAL -> true
-        SecretScope.Kind.WORKSPACE -> narrow.kind == SecretScope.Kind.REPOSITORY && narrow.id.orEmpty().startsWith(wider.id.orEmpty().trimEnd('/') + "/")
+        SecretScope.Kind.WORKSPACE -> narrow.kind == SecretScope.Kind.REPOSITORY && narrow.id.orEmpty().startsWith(wider.id.orEmpty().trimEnd('/') + "/", ignoreCase = true)
         SecretScope.Kind.REPOSITORY -> false
     }
 }

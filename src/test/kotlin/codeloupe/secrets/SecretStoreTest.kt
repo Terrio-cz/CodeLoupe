@@ -49,7 +49,7 @@ class SecretStoreTest {
         store.set("OTHER_WS", SecretScope.workspace("elsewhere"), "not-visible-here")
         fun url(workspace: String?, repo: String?) = store.resolve(SecretStore.chain(workspace, repo)).getValue("API_URL").value
         assertEquals("https://global.example", url(null, null))
-        assertEquals("https://workspace.example", url("c:/work/terrio", null), "ids compare with / and lower case")
+        assertEquals("https://workspace.example", url("C:/Work/Terrio", null), "ids compare with / for \\ and without a trailing slash")
         assertEquals("https://repo.example", url("C:/Work/Terrio", "terrio-importer"))
         assertEquals("https://global.example", url("C:/Work/Terrio/other", "no-such-repo"))
         val names = store.resolve(SecretStore.chain("C:/Work/Terrio", null)).keys
@@ -101,7 +101,7 @@ class SecretStoreTest {
         assertFailsWith<IllegalArgumentException> { store.set("HAS SPACE", SecretScope.GLOBAL, "x") }
         assertFailsWith<IllegalArgumentException> { store.set("EMPTY", SecretScope.GLOBAL, "") }
         assertFailsWith<IllegalArgumentException> { SecretScope.parse("team:x") }
-        assertEquals(SecretScope.repository("a/b"), SecretScope.parse("repository:A\\B"))
+        assertEquals(SecretScope.repository("A/B"), SecretScope.parse("repository:A\\B"))
         store.set("TOKEN", SecretScope.GLOBAL, "super-secret-token-value")
         val wrong = SecretStore(file, PassphraseProtector("wrong".toCharArray(), iterations = 1_000))
         val failure = assertFailsWith<IllegalStateException> { wrong.resolve(SecretStore.chain()) }

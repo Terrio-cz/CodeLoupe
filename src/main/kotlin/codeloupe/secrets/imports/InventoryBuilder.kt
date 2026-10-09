@@ -34,7 +34,7 @@ object InventoryBuilder {
     }
 
     private fun storeState(store: SecretStore?, first: FoundVariable, members: List<FoundVariable>, stored: Set<Pair<String, String>>): String {
-        if (first.name to first.scope.toString() !in stored) return "new"
+        if (listOf(first.scope, first.scope.legacy()).none { first.name to it.toString() in stored }) return "new"
         val same = runCatching { members.any { store?.holds(first.name, first.scope, it.value) == true } }.getOrDefault(false)
         return if (same) "same" else "differs"
     }
