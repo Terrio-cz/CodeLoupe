@@ -48,7 +48,7 @@ use; commercial use needs an agreement with the licensor.
 | The daemon will not start on 47391 | A daemon with another `CODELOUPE_HOME` refuses 47391 and the port configured in the default home: give it a port of its own (`CODELOUPE_PORT`), and set the same variable for Claude Code ([Configuration](Configuration)). |
 | The desktop app does not start the daemon | After `codeloupe stop` (or a stop in the app) the app leaves it stopped until the next `codeloupe start`. |
 | `codeloupe stop` refuses | Jobs are running; `--force` ends them. |
-| The first query is slow | It builds the repository's index (seconds; longer for large repositories), and the first call after an install creates the class-data archive (~1.5 s). Later queries take milliseconds. |
+| The first query is slow | It builds the repository's index (seconds; longer for large repositories), and for about 20 s after an install a call takes ~0.3 s while the daemon makes the JVM's AOT caches. Later queries take milliseconds. |
 | An answer says `busy` | The daemon had no result within the query wait (10 s), for instance while an index was building; ask again. `queryTimeoutMs` and `maxParallelQueries` are in [Configuration](Configuration). |
 | `usages` lists hits marked `?` | They are candidates: the syntax cannot tell which declaration they mean. Qualify the name (`Type.member`) to narrow it. |
 | A job was refused (exit 2) | The `policyHook` denied it, crashed, timed out or printed unreadable output; the command never ran ([Jobs and events](Jobs-and-events)). |

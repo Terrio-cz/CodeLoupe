@@ -1,5 +1,6 @@
 package codeloupe.cli
 
+import codeloupe.aot.AotLauncher
 import codeloupe.config.Config
 import codeloupe.config.ConfigLoader
 import com.github.ajalt.clikt.core.CliktCommand
@@ -15,6 +16,8 @@ class StopCommand(private val load: () -> Config = { ConfigLoader.load() }) : Cl
 
     override fun run() {
         val config = load()
+        // A training holds the jars open, which an update cannot replace.
+        AotLauncher.cancel(config.home)
         // Before the daemon goes down, so the app never sees a stopped daemon without the marker.
         StopMarker.write(config.home)
         val stopped = try {

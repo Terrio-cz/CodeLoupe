@@ -9,7 +9,10 @@ when a question arrives. This page is the model in the head; the numbers are mea
   (`--force` ends them).
 - **Stateless MCP over HTTP** (Streamable HTTP) on `127.0.0.1:47391`, plus the same tools on the CLI. A restart of the
   daemon does not break an agent window: its next call simply reaches the new process. Only requests with the
-  `x-codeloupe` header, no `Origin` and a local `Host` are served ([Configuration](Configuration#listening-logs-and-status)).
+  `x-codeloupe` header, no `Origin` and a local `Host` are served, and everything that acts for the user also needs the token of
+  `<home>/daemon.token` ([Configuration](Configuration#who-may-call-the-daemon)). `daemon.json` (pid, port, start time) names the
+  daemon; the CLI and the app refuse an answer from a process it does not name, and `hook.sh` and the CLI send the token only to a
+  daemon that proves it holds it.
 - **Idle costs nothing**: no file watchers and no timers that wake it. A worktree is checked when a query arrives, a
   tracker is polled only while tool calls arrive.
 - **Small by design**: builds of an index run one at a time in a short-lived child JVM at low priority, so the daemon
@@ -70,7 +73,7 @@ the daemon's heap limit is 64 MB, with `parseWorkerIdleSeconds` 0 it is 80.
 |---|---|
 | `config.json` | the settings ([Configuration](Configuration)) |
 | `daemon.json`, `daemon.log`, `calls.jsonl` | the running daemon's pid, port and version; its log; tool, latency and size of every call |
-| base and overlay databases, `cds/` | the indexes ([Worktrees and overlays](Worktrees-and-overlays)); the JVM class-data archive |
+| base and overlay databases, `aot/` | the indexes ([Worktrees and overlays](Worktrees-and-overlays)); the JVM AOT caches of the CLI and the daemon |
 | `jobs.db`, `jobs/`, `events.db` | jobs, their logs and the event log ([Jobs and events](Jobs-and-events)) |
 | `trackers/` | tracker mirrors ([Trackers](Trackers)) |
 | `secrets/` | the encrypted store and its audit ([Environment and secrets](Environment-and-secrets)) |

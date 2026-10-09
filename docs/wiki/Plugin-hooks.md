@@ -6,6 +6,16 @@ plugin points those calls at the CodeLoupe call that answers them. All hooks go 
 a daemon that does not know the repository, a malformed input or a timeout all mean "say nothing", never an error. The script
 calls the daemon without any proxy and prints only the three shapes the daemon writes (added context, a notice, a refusal with
 its reason); anything else that answers on the port is dropped, so a stranger there cannot approve or rewrite a tool call.
+When `<home>/daemon.token` exists the script first sends `GET /status` with a nonce and goes on only if the answer proves that the daemon
+holds the token (a process that took the port after a crash cannot, and then receives no prompt or command); the token goes to `curl` as a
+header file (`-H @daemon.token`), never on a command line. It needs `sha256sum`, `shasum` or `openssl` for that and does nothing without
+one. With no token file (a daemon from before the token) it behaves as it always did. The hook endpoint accepts a caller without the token
+unless `api.strict` is on ([Configuration](Configuration#who-may-call-the-daemon)).
+
+Claude Code also has an `http` hook type, which would save starting `bash` (a call takes ~10 ms instead of ~80 ms on a busy
+Windows machine). The plugin does not use it: Claude Code takes the reply as it is, so whatever listens on the port when the daemon
+is down could approve or rewrite a tool call; the URL takes no variables, so a daemon on another port would still need the script;
+and a hook cannot be switched off for the default port only, so both handlers would run. Details in `docs/plan.md` (CL-146).
 
 **Steering** (`PreToolUse` on `Bash`, `PowerShell` and `Read`). It looks at the call:
 

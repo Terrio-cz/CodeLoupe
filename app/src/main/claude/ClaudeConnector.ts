@@ -23,9 +23,19 @@ export function mcpUrl(port: number): string {
   return `http://127.0.0.1:${port}/mcp`;
 }
 
+/**
+ * The user-level MCP entry. With a [helper] command (`codeloupe mcp-headers`) Claude Code asks it for the headers on each connection,
+ * so the daemon token reaches the entry without being written into Claude Code's configuration; without one only the plain header
+ * is sent, which the daemon accepts for the read-only code tools.
+ */
+export function mcpEntry(port: number, helper: string | null): string {
+  return JSON.stringify({ type: 'http', url: mcpUrl(port), headers: { 'x-codeloupe': '1' }, ...(helper ? { headersHelper: helper } : {}) });
+}
+
 /** The commands the Connect buttons run, as the user would type them (shown in the dialog and as a fallback). */
-export function commandLines(kind: ClaudeConnectKind, port: number, marketplace: string | null): string[] {
+export function commandLines(kind: ClaudeConnectKind, port: number, marketplace: string | null, helper: string | null = null): string[] {
   if (kind === 'mcp') {
+    if (helper) return [`claude mcp add-json --scope user ${SERVER_NAME} '${mcpEntry(port, helper)}'`];
     return [`claude mcp add --transport http --scope user ${SERVER_NAME} ${mcpUrl(port)} --header "${HEADER}"`];
   }
   return [
@@ -46,10 +56,16 @@ export class ClaudeConnector {
     private readonly run: ClaudeRunner,
     /** The marketplace folder shipped with the app (or the repository root in development); null when absent. */
     private readonly marketplace: () => string | null,
+    /** The command that prints the MCP headers with the daemon token (`<cli> mcp-headers`); null when the CLI cannot be written as one. */
+    private readonly helper: () => string | null = () => null,
   ) {}
 
   marketplaceDir(): string | null {
     return this.marketplace();
+  }
+
+  helperCommand(): string | null {
+    return this.helper();
   }
 
   async status(): Promise<ClaudeStatus> {
@@ -64,7 +80,7 @@ export class ClaudeConnector {
 
   async connect(kind: ClaudeConnectKind, port: number): Promise<ClaudeConnectResult> {
     const marketplace = this.marketplace();
-    const manual = commandLines(kind, port, marketplace);
+    const manual = commandLines(kind, port, marketplace, this.helper());
     if (kind === 'plugin' && !marketplace) {
       return { ok: false, message: 'The plugin folder (marketplace) was not found; install the plugin manually as described at https://github.com/Terrio-cz/CodeLoupe/wiki/Claude-Code-integration.', manual };
     }
@@ -87,7 +103,9 @@ export class ClaudeConnector {
     const existing = await this.run(['mcp', 'get', SERVER_NAME]).catch(() => null);
     const steps: string[][] = [];
     if (existing?.code === 0) steps.push(['mcp', 'remove', '--scope', 'user', SERVER_NAME]);
-    steps.push(['mcp', 'add', '--transport', 'http', '--scope', 'user', SERVER_NAME, mcpUrl(port), '--header', HEADER]);
+    const helper = this.helper();
+    if (helper) steps.push(['mcp', 'add-json', '--scope', 'user', SERVER_NAME, mcpEntry(port, helper)]);
+    else steps.push(['mcp', 'add', '--transport', 'http', '--scope', 'user', SERVER_NAME, mcpUrl(port), '--header', HEADER]);
     return steps;
   }
 

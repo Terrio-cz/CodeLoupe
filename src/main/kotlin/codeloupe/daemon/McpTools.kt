@@ -19,7 +19,8 @@ import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 
 /** An MCP server exposing the tool catalog; stateless HTTP builds one per request. */
 internal class McpTools(private val runner: ToolRunner, private val tools: () -> List<Tool>, private val jobTool: JobTool? = null) {
-    fun server(): Server {
+    /** [authenticated] says the caller presented the daemon's token: without it a tool that is [Tool.mutating] answers with the way to get one. */
+    fun server(authenticated: Boolean = true): Server {
         val server = Server(
             Implementation(name = CodeLoupe.NAME, version = CodeLoupe.VERSION),
             ServerOptions(capabilities = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = false))),
@@ -30,13 +31,14 @@ internal class McpTools(private val runner: ToolRunner, private val tools: () ->
                 description = tool.description,
                 inputSchema = ToolSchema(properties = Tools.properties(tool), required = tool.required),
             ) { request ->
+                if (tool.mutating && !authenticated) return@addTool result(RequestGuard.NEEDS_TOKEN, isError = true)
                 when (val checked = ArgsValidator.validate(tool, request.arguments)) {
                     is ArgsValidator.Result.Invalid -> result(checked.message, isError = true)
                     is ArgsValidator.Result.Valid -> runner.run(tool, ToolArgs(checked.args), "mcp").let { result(it.text, isError = !it.ok) }
                 }
             }
         }
-        jobTool?.register(server)
+        jobTool?.register(server, denial = RequestGuard.NEEDS_TOKEN.takeUnless { authenticated })
         return server
     }
 

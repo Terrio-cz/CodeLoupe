@@ -49,7 +49,7 @@ export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
   }, handle);
   const stream = new EventStream(() => ctx.manager.port(), e => {
     for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(JOB_CH.livePush, e);
-  });
+  }, () => ctx.client.authHeaders());
   const live = registerLive(stream, new JobLogReader(ctx.client, () => ctx.home.dir), handle, () => ctx.source().kind === 'daemon' && ctx.manager.trusted);
   const envContext = { settings: () => ctx.store.get(), homeDir: () => ctx.home.dir, port: () => ctx.manager.port(), source: ctx.source, trusted: () => ctx.manager.trusted };
   registerEnv(envContext, handle);
@@ -85,7 +85,7 @@ export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
     return ctx.store.save({ ...ctx.store.get(), cliCommand: (command as string).trim(), cliArgs: args });
   });
   handle(CH.claudeStatus, () => ctx.claude.status());
-  handle(CH.claudeManual, (kind: unknown) => commandLines(claudeKind(kind), ctx.manager.port(), ctx.claude.marketplaceDir()));
+  handle(CH.claudeManual, (kind: unknown) => commandLines(claudeKind(kind), ctx.manager.port(), ctx.claude.marketplaceDir(), ctx.claude.helperCommand()));
   handle(CH.claudeConnect, async (kind: unknown) => {
     const k = claudeKind(kind);
     const port = ctx.manager.port();
@@ -98,7 +98,7 @@ export function registerIpc(ctx: IpcContext): { onWindowClosed(): void } {
       cancelId: 1,
       title: 'CodeLoupe',
       message: k === 'mcp' ? 'Add CodeLoupe to Claude Code as an MCP server (user level)?' : 'Install the CodeLoupe plugin into Claude Code?',
-      detail: commandLines(k, port, ctx.claude.marketplaceDir()).join('\n'),
+      detail: commandLines(k, port, ctx.claude.marketplaceDir(), ctx.claude.helperCommand()).join('\n'),
     };
     const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
     if (response !== 0) return 'cancelled' as const;

@@ -1,9 +1,12 @@
 #!/bin/sh
 # Start script of the codeloupe CLI (replaces the one Gradle generates; build.gradle.kts copies it into bin/).
 #
-# The JVM maps a class-data archive kept under the CodeLoupe home instead of loading and verifying ~1500 classes on
-# every call. It creates the archive itself on the first run (that run is slower) and again whenever the jars or the
-# JDK change. One archive per install directory, so two installs do not keep replacing each other's.
+# The JVM maps an AOT cache kept under the CodeLoupe home instead of loading and verifying ~1500 classes on every call.
+# The daemon makes the cache in the background a little after it started (codeloupe.aot.AotLauncher; `-Dcodeloupe.aot`
+# names its files), one per install directory and build, so two installs do not keep replacing each other's. Until it is
+# there a call runs on the JDK's own class-data archive: it takes ~100 ms longer, but there is nothing to dump at its end,
+# and two calls that start together have no file to write together (a dynamic archive dumped by both was torn, and the
+# next JVM that mapped it crashed).
 
 app_path=$0
 while
@@ -41,25 +44,16 @@ else
     home=${XDG_CACHE_HOME:-$HOME/.cache}/codeloupe
 fi
 key=$( printf %s "$APP_HOME" | tr -c 'A-Za-z0-9' _ | tail -c 60 )
-mkdir -p "$home/cds" 2> /dev/null
+mkdir -p "$home/aot" 2> /dev/null
+aot=$home/aot/$key-@BUILD@
 
-# A JVM that cannot write the archive it wants to create exits with 127, so without a writable directory it runs
-# without one.
-cds1=-Xshare:auto
-cds2=-Xshare:auto
-if [ -w "$home/cds" ]; then
-    # A JVM does not rebuild an archive whose jars changed, it just stops using it: every build has an archive of its own.
-    archive=$home/cds/$key-@BUILD@.jsa
-    for old in "$home/cds/$key"-*.jsa; do
-        [ "$old" = "$archive" ] || rm -f "$old"
-    done
-    cds1=-XX:+AutoCreateSharedArchive
-    cds2=-XX:SharedArchiveFile=$archive
-fi
+# A JVM that cannot use the cache (another JDK, a damaged header) runs without it. -Xshare cannot be given with it.
+cache=-XX:-UsePerfData
+[ -f "$aot.cli.aot" ] && cache=-XX:AOTCache=$aot.cli.aot
 
-# The CLI is short-lived: small heap, no C2, serial GC. -Xlog:disable keeps JVM notes (an archive that no longer
-# fits) out of the output; the JVM then simply runs without it.
+# The CLI is short-lived: small heap, no C2, serial GC (codeloupe.cli.CliJvm lists these flags too). -Xlog:disable keeps
+# JVM notes (a cache that no longer fits) out of the output; the JVM then simply runs without it.
 # shellcheck disable=SC2086
-exec "$JAVACMD" -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xshare:auto -Xss512k -Xmx128m -XX:-UsePerfData \
-    "$cds1" "$cds2" -Xlog:disable \
+exec "$JAVACMD" -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k -Xmx128m -XX:-UsePerfData \
+    "$cache" -Xlog:disable -Dcodeloupe.aot="$aot" \
     $JAVA_OPTS $CODELOUPE_OPTS -jar "$APP_HOME/lib/@JAR@" "$@"

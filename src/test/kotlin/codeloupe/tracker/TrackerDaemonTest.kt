@@ -86,7 +86,7 @@ class TrackerDaemonTest {
     private fun call(tool: String, vararg args: Pair<String, String>): JsonObject = callJson(tool, buildJsonObject { args.forEach { (k, v) -> put(k, v) } })
 
     private fun callJson(tool: String, body: JsonObject): JsonObject {
-        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$tool")).header(CodeLoupe.HEADER, "1")
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$tool")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token)
             .POST(HttpRequest.BodyPublishers.ofString(body.toString())).build()
         val text = http.send(request, HttpResponse.BodyHandlers.ofString()).body()
         outputs += text

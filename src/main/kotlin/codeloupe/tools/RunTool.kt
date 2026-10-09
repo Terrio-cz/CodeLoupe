@@ -22,6 +22,7 @@ import java.nio.file.Path
  */
 class RunTool(private val jobs: JobRunner) : Tool {
     override val name = "run"
+    override val mutating = true
     override val description = "Run a command that ends soon (git status / log / diff, a gradle build or test run, any CLI) and get a summary " +
         "instead of its output: git status as counts and names, git log one line per commit, diff --stat the totals and biggest files, " +
         "gradle as the build result, failed tests with first-party frames and compiler errors, other tests as counts and failures, anything " +

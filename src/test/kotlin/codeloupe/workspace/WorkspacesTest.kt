@@ -50,7 +50,7 @@ class WorkspacesTest {
         val daemon = Daemon.start(config)
         try {
             val http = HttpClient.newHttpClient()
-            fun get(path: String) = http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").build(), HttpResponse.BodyHandlers.ofString())
+            fun get(path: String) = http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).build(), HttpResponse.BodyHandlers.ofString())
 
             val response = get("/workspaces?size=1")
             assertEquals(200, response.statusCode(), response.body())
