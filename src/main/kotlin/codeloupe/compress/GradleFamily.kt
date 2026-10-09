@@ -48,7 +48,7 @@ object GradleFamily : Family {
         wentWrong(lines).take(if (errors.isEmpty()) WENT_WRONG else 2).takeIf { it.isNotEmpty() }?.let { out += "what went wrong:"; out += it }
         // Anything else that looks like an error and is not yet shown: kept, never dropped silently.
         val shown = out.joinToString("\n")
-        val other = lines.filter { ErrorLines.isError(it) && !CHATTER.containsMatchIn(it) && !it.startsWith("e: ") && !FAILED_TEST.matches(it) && !it.startsWith("BUILD ") && !it.startsWith("> Task ") && !it.startsWith("FAILURE:") }
+        val other = lines.filterIndexed { i, it -> ErrorLines.isErrorAt(lines, i) && !CHATTER.containsMatchIn(it) && !it.startsWith("e: ") && !FAILED_TEST.matches(it) && !it.startsWith("BUILD ") && !it.startsWith("> Task ") && !it.startsWith("FAILURE:") }
             .map { ErrorLines.shorten(ErrorLines.relative(it, cwd)) }.distinct().filter { it !in shown }
         if (other.isNotEmpty()) out += other.take(ERRORS) + listOfNotNull(other.size.takeIf { it > ERRORS }?.let { "… +${it - ERRORS} more error lines in the full output" })
         return out.joinToString("\n")
