@@ -74,7 +74,7 @@ class UiApiTasksTest {
     }
 
     private fun get(path: String): HttpResponse<String> =
-        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").build(), HttpResponse.BodyHandlers.ofString())
+        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).build(), HttpResponse.BodyHandlers.ofString())
 
     private fun json(path: String): JsonObject {
         val r = get(path)
@@ -84,7 +84,7 @@ class UiApiTasksTest {
 
     private fun load() {
         // The UI API never asks the tracker: the first tool call fills the mirror.
-        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/tasks")).header(CodeLoupe.HEADER, "1")
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/tasks")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token)
             .POST(HttpRequest.BodyPublishers.ofString("""{"query":"epic: CL-4","mode":"ready","root":"C:/work/a"}""")).build()
         assertTrue(http.send(request, HttpResponse.BodyHandlers.ofString()).body().contains("\"ok\":true"))
     }

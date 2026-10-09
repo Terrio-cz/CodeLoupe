@@ -164,10 +164,15 @@ class Daemon private constructor(
     private val mcp = McpTools(runner, ::tools, JobTool(jobs))
     private val toolListFingerprint = mcp.fingerprint()
     private val hooks = Hooks.create(config, registry, scope, runner::callsOn) { trackers.projects() }
-    private val guard = RequestGuard(config.port)
+    private val mutatingTools = (baseTools + editTool).filter { it.mutating }.map { it.name }.toSet()
+    private lateinit var daemonToken: DaemonToken
+    private lateinit var guard: RequestGuard
     private val infoFile = config.home.resolve("daemon.json")
     private val pid = ProcessHandle.current().pid()
     private lateinit var server: EmbeddedServer<*, *>
+
+    /** The secret clients present in `x-codeloupe-token`; what `<home>/daemon.token` holds. For tests and the process that started the daemon. */
+    val token: String get() = daemonToken.current()
 
     fun status(): DaemonStatus {
         val runtime = Runtime.getRuntime()
@@ -183,7 +188,7 @@ class Daemon private constructor(
             calls = runner.stats(), latency = latency, budgets = BudgetState.check(config.budgets, latency, rss, queueSnapshot.waitMsMax),
             queue = queueSnapshot, repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
             gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(), portAllocations = ports.allocated,
-            hooks = hooks.stats(), toolList = ToolListStatus(toolListFingerprint, mcp.server().tools.size, offered.editOffered),
+            hooks = hooks.stats(), toolList = ToolListStatus(toolListFingerprint, mcp.server().tools.size, offered.editOffered), auth = guard.summary(),
         )
     }
 
@@ -218,6 +223,8 @@ class Daemon private constructor(
 
     private fun start() {
         OwnerOnly.home(config.home)
+        daemonToken = DaemonToken.open(config.home)
+        guard = RequestGuard(config.port, daemonToken, config.api.strict) { mutatingTools }
         // The compiler's parser lives in a child process that ends when it has had nothing to parse for a while.
         if (config.parseWorkerIdleSeconds > 0) Extraction.useWorker(ParseWorkerClient(config.parseWorkerIdleSeconds.toLong(), log = ::log))
         // Class-data archives of earlier versions; the daemon no longer writes one.
@@ -261,7 +268,7 @@ class Daemon private constructor(
             lastClientCall = Instant.now()
             call.response.header(HttpHeaders.Connection, "close")
             guard.refusal(call)?.let {
-                call.respondJson(RequestGuard.STATUS, error(it))
+                call.respondJson(it.status, error(it.message))
                 return@intercept finish()
             }
             try {
@@ -275,9 +282,12 @@ class Daemon private constructor(
                 if (!call.response.isCommitted) call.respondJson(HttpStatusCode.InternalServerError, error(reason))
             }
         }
-        mcpStatelessStreamableHttp(path = "/mcp") { mcp.server() }
+        mcpStatelessStreamableHttp(path = "/mcp") { mcp.server(authenticated = RequestGuard.authenticated(call)) }
         routing {
-            get("/status") { call.respondJson(HttpStatusCode.OK, DaemonStatus.serializer(), status()) }
+            get("/status") {
+                call.request.headers[CodeLoupe.NONCE_HEADER]?.let { nonce -> daemonToken.proof(nonce)?.let { call.response.header(CodeLoupe.PROOF_HEADER, it) } }
+                call.respondJson(HttpStatusCode.OK, DaemonStatus.serializer(), status())
+            }
             get("/status/history") { call.respondJson(HttpStatusCode.OK, ListSerializer(ResourceSample.serializer()), history.list()) }
             post("/api/{tool}") {
                 val name = call.parameters["tool"].orEmpty()

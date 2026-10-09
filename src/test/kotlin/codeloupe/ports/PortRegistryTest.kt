@@ -126,7 +126,7 @@ class PortRegistryTest {
             val status = registry.status().allocations.single()
             assertEquals(PortState.CONFLICT, status.state)
             assertTrue(status.usedBy != null)
-            if (System.getProperty("os.name").lowercase().startsWith("windows")) assertTrue(status.usedBy!!.contains("pid ${ProcessHandle.current().pid()}"), status.usedBy)
+            LocalPorts().listeners()[free]?.pid?.let { pid -> assertTrue(status.usedBy!!.contains("pid $pid"), status.usedBy) }
         }
     }
 

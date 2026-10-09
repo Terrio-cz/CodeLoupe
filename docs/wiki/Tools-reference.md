@@ -76,3 +76,4 @@ The CLI has a few more commands; they talk to the daemon but are not offered to 
 | `env set\|unset\|run\|import\|audit` | write to the secret store, run a command with secrets | [Environment and secrets](Environment-and-secrets) |
 | `metrics collect\|compare\|gaps\|boilerplate` | measure agent runs from Claude Code transcripts | [Metrics and savings](Metrics-and-savings) |
 | `mcp-config` | print the `.mcp.json` entry for Claude Code | [Claude Code integration](Claude-Code-integration) |
+| `mcp-headers` | print the headers an MCP client sends (the daemon token among them), for the `headersHelper` of that entry | [Who may call the daemon](Configuration#who-may-call-the-daemon) |

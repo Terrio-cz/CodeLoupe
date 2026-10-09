@@ -221,7 +221,7 @@ class JobsTest {
 
     @Test
     fun `a batch file never gets arguments cmd_exe would run as commands`() {
-        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"))
+        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"), "batch files run through cmd.exe, which exists on Windows only")
         Files.writeString(work.resolve("tool.cmd"), "@echo %*\r\n")
         val (status, body) = post("/jobs", request(listOf("./tool", "test&calc")))
         assertEquals(400, status)
@@ -235,6 +235,7 @@ class JobsTest {
         val client = Client(Implementation(name = "test", version = "0"))
         val transport = StreamableHttpClientTransport(HttpClient(CIO) { install(SSE) }, "http://127.0.0.1:$port/mcp") {
             headers.append(CodeLoupe.HEADER, "1")
+            headers.append(CodeLoupe.TOKEN_HEADER, daemon.token)
         }
         client.connect(transport)
         assertTrue("job" in client.listTools().tools.map { it.name })
@@ -287,7 +288,7 @@ class JobsTest {
             .let { (it as Submission.Accepted).job.id }
         val pid = waitFor(id, first) { it.status == JobStatus.RUNNING && "working" in runCatching { Files.readString(Path.of(it.log)) }.getOrDefault("") }.pid!!
         val refused = http.send(
-            HttpRequest.newBuilder(URI("http://127.0.0.1:$port3/shutdown")).header(CodeLoupe.HEADER, "1").POST(HttpRequest.BodyPublishers.noBody()).build(),
+            HttpRequest.newBuilder(URI("http://127.0.0.1:$port3/shutdown")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, first.token).POST(HttpRequest.BodyPublishers.noBody()).build(),
             HttpResponse.BodyHandlers.ofString(),
         )
         assertEquals(409, refused.statusCode())
@@ -357,7 +358,7 @@ class JobsTest {
     private fun get(path: String): Pair<Int, JsonObject> = send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).GET())
 
     private fun send(request: HttpRequest.Builder): Pair<Int, JsonObject> {
-        val response = http.send(request.header(CodeLoupe.HEADER, "1").header("content-type", "application/json").build(), HttpResponse.BodyHandlers.ofString())
+        val response = http.send(request.header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).header("content-type", "application/json").build(), HttpResponse.BodyHandlers.ofString())
         return response.statusCode() to JsonFormat.json.parseToJsonElement(response.body()).jsonObject
     }
 

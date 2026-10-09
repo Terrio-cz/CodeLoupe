@@ -9,7 +9,7 @@ export interface BundledDaemon {
   version: string;
 }
 
-// The launcher's flags for a short-lived CLI (gradle/start/codeloupe) without its class-data archive.
+// The launcher's flags for a short-lived CLI (gradle/start/codeloupe) without its AOT cache.
 const JVM_FLAGS = ['-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-Xshare:auto', '-Xss512k', '-Xmx128m', '-XX:-UsePerfData', '-Xlog:disable'];
 
 export interface BundleOptions {

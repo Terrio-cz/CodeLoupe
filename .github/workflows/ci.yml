@@ -94,6 +94,12 @@ jobs:
         run: ./gradlew test --console=plain --no-daemon
         shell: bash
 
+      # A test that cannot run on this OS says so with a reason (assumeTrue); the job summary lists them (CL-166).
+      - name: Skipped tests
+        if: always()
+        shell: bash
+        run: node tools/skipped-tests.mjs build/test-results/test --title "Skipped tests (${{ matrix.os }})" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -104,6 +110,42 @@ jobs:
             build/test-results/
           if-no-files-found: ignore
           retention-days: 14
+
+  # The libsecret key store (CL-166): ubuntu-latest has neither secret-tool nor a keyring, so in the matrix above its tests
+  # are skipped. A throwaway GNOME Keyring on a private session bus runs them here; the probe fails the job when it is not up.
+  libsecret:
+    name: libsecret (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-read-only: false
+
+      - name: Install a keyring
+        run: sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring dbus-user-session
+
+      - name: Key store tests
+        run: |
+          dbus-run-session -- bash -c '
+            set -e
+            eval "$(printf "" | gnome-keyring-daemon --unlock --components=secrets)"
+            eval "$(printf "" | gnome-keyring-daemon --start --components=secrets)"
+            printf probe | secret-tool store --label=probe service ci account probe
+            test "$(secret-tool lookup service ci account probe)" = probe
+            ./gradlew test --console=plain --no-daemon --tests "codeloupe.secrets.KeyProtectorTest" --tests "codeloupe.secrets.SecretAccessTest"
+            node tools/skipped-tests.mjs build/test-results/test --title "Skipped tests (libsecret)" | tee -a "$GITHUB_STEP_SUMMARY"
+            if node tools/skipped-tests.mjs build/test-results/test | grep -qE "secret service|key store"; then echo "a key store test was skipped"; exit 1; fi
+          '
 
   app:
     name: app (${{ matrix.os }})
@@ -186,7 +228,7 @@ jobs:
         run: |
           dir=$(ls -d build/bundle/codeloupe-*/ | head -n 1)
           zip=$(ls build/distributions/codeloupe-*.zip | head -n 1)
-          node tools/bundle-smoke.mjs "$dir" --zip "$zip" --out bundle-report.json
+          node tools/bundle-smoke.mjs "$dir" --zip "$zip" --out bundle-report.json --aot
           {
             echo "### Bundle ${{ matrix.os }}"
             echo '```json'

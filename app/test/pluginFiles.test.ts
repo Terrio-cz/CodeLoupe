@@ -26,6 +26,16 @@ describe('Claude Code plugin files', () => {
     expect(server.headers).toEqual({ 'x-codeloupe': '1' });
   });
 
+  it('gets the daemon token for the MCP entry from a helper script that exists, not from the configuration', () => {
+    const server = JSON.parse(fs.readFileSync(path.join(pluginDir, '.mcp.json'), 'utf8')).mcpServers[SERVER_NAME];
+    expect(server.headersHelper).toContain('${CLAUDE_PLUGIN_ROOT}/hooks/mcp-headers.sh');
+    const script = fs.readFileSync(path.join(pluginDir, 'hooks', 'mcp-headers.sh'), 'utf8');
+    expect(script.trimEnd().endsWith('exit 0')).toBe(true);
+    expect(script).toContain('codeloupe_prove');
+    expect(fs.existsSync(path.join(pluginDir, 'hooks', 'daemon-auth.sh'))).toBe(true);
+    expect(JSON.stringify(server)).not.toMatch(/[0-9a-f]{32}/);
+  });
+
   it('starts the daemon from a SessionStart hook whose script exists and never fails the session', () => {
     const hooks = JSON.parse(fs.readFileSync(path.join(pluginDir, 'hooks', 'hooks.json'), 'utf8')).hooks.SessionStart[0].hooks[0];
     expect(hooks.type).toBe('command');

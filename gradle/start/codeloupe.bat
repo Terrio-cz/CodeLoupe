@@ -1,8 +1,11 @@
 @rem Start script of the codeloupe CLI (replaces the one Gradle generates; build.gradle.kts copies it into bin\).
 @rem
-@rem The JVM maps a class-data archive kept under the CodeLoupe home instead of loading and verifying ~1500 classes on
-@rem every call. It creates the archive itself on the first run (that run is slower) and again whenever the jars or the
-@rem JDK change. One archive per install directory, so two installs do not keep replacing each other's.
+@rem The JVM maps an AOT cache kept under the CodeLoupe home instead of loading and verifying ~1500 classes on every call.
+@rem The daemon makes the cache in the background a little after it started (codeloupe.aot.AotLauncher; -Dcodeloupe.aot
+@rem names its files), one per install directory and build, so two installs do not keep replacing each other's. Until it is
+@rem there a call runs on the JDK's own class-data archive: it takes ~100 ms longer, but there is nothing to dump at its end,
+@rem and two calls that start together have no file to write together (a dynamic archive dumped by both was torn, and the
+@rem next JVM that mapped it crashed).
 @rem No parenthesised blocks below: a path such as "Program Files (x86)" would end them early.
 @echo off
 setlocal
@@ -27,21 +30,17 @@ set "KEY=%KEY::=_%"
 set "KEY=%KEY: =_%"
 set "KEY=%KEY:.=_%"
 set "KEY=%KEY:~-60%"
-if not exist "%CL_HOME%\cds" mkdir "%CL_HOME%\cds" 2>nul
+if not exist "%CL_HOME%\aot" mkdir "%CL_HOME%\aot" 2>nul
+set "AOT=%CL_HOME%\aot\%KEY%-@BUILD@"
 
-@rem A JVM that cannot write the archive it wants to create exits with 127, so without a writable directory it runs
-@rem without one.
-set "CDS1=-Xshare:auto"
-set "CDS2=-Xshare:auto"
-set "ARCHIVE=%CL_HOME%\cds\%KEY%-@BUILD@.jsa"
-(type nul >>"%CL_HOME%\cds\.probe") 2>nul && set "CDS1=-XX:+AutoCreateSharedArchive" && set "CDS2=-XX:SharedArchiveFile=%ARCHIVE%"
-@rem A JVM does not rebuild an archive whose jars changed, it just stops using it: every build has an archive of its own.
-if "%CDS1%"=="-XX:+AutoCreateSharedArchive" for %%F in ("%CL_HOME%\cds\%KEY%-*.jsa") do if /i not "%%~fF"=="%ARCHIVE%" del "%%~fF" 2>nul
+@rem A JVM that cannot use the cache (another JDK, a damaged header) runs without it. -Xshare cannot be given with it.
+set "CACHE=-XX:-UsePerfData"
+if exist "%AOT%.cli.aot" set "CACHE=-XX:AOTCache=%AOT%.cli.aot"
 
-@rem The CLI is short-lived: small heap, no C2, serial GC. -Xlog:disable keeps JVM notes (an archive that no longer
-@rem fits) out of the output; the JVM then simply runs without it.
-"%JAVA_EXE%" -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xshare:auto -Xss512k -Xmx128m -XX:-UsePerfData ^
-    "%CDS1%" "%CDS2%" -Xlog:disable ^
+@rem The CLI is short-lived: small heap, no C2, serial GC (codeloupe.cli.CliJvm lists these flags too). -Xlog:disable keeps
+@rem JVM notes (a cache that no longer fits) out of the output; the JVM then simply runs without it.
+"%JAVA_EXE%" -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k -Xmx128m -XX:-UsePerfData ^
+    "%CACHE%" -Xlog:disable "-Dcodeloupe.aot=%AOT%" ^
     %JAVA_OPTS% %CODELOUPE_OPTS% -jar "%APP_HOME%\lib\@JAR@" %*
 exit /b %ERRORLEVEL%
 

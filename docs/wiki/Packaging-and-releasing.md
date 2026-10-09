@@ -13,8 +13,10 @@ files jlink leaves that nothing uses: the class-data archive for heaps over 32 G
 (`java.desktop` has to stay: without it the parser worker returns no facts, which `tools/bundle-smoke.mjs` would show). The launchers prefer `runtime/` to any JDK on the machine, so the
 bundle runs without Java. jlink output runs only on the OS it was built on, so CI builds one bundle per OS
 (`bundle` job in [ci.yml](https://github.com/Terrio-cz/CodeLoupe/blob/main/.github/workflows/ci.yml)); the Electron installer takes the same directory (see [Installers](#installers)).
-`node tools/bundle-smoke.mjs <bundle dir>` runs a query on a PATH without any Java and prints the sizes and the
-daemon's RSS; CI runs it on every push and keeps the numbers as `bundle-report-<os>` artifacts.
+`node tools/bundle-smoke.mjs <bundle dir>` runs a query on a PATH without any Java (two first calls at once) and prints the sizes and the
+daemon's RSS; CI runs it on every push and keeps the numbers as `bundle-report-<os>` artifacts. With `--aot` it also waits for the
+AOT caches the daemon makes in the background (`<home>/aot/`), checks that they are one clean pair, that a copy of the jars and a damaged
+cache run without a message, and times a CLI call with no archive, with a dynamic class-data archive and with the AOT cache.
 
 Measured in CI on 2026-10-08 (Temurin 25.0.4, tiny repository, daemon idle after its first index build):
 
@@ -26,7 +28,7 @@ Measured in CI on 2026-10-08 (Temurin 25.0.4, tiny repository, daemon idle after
 | macOS x64 | 125.0 MB | 163 MB (69 MB) | 91 MB | 8.1 s / 0.50 s |
 
 (The same run on 2026-10-08, before the runtime was trimmed: runtime 105 / 92 / 95 / 97 MB, zip 142 / 138 / 137 / 138 MB.) The
-first query includes starting the daemon and creating the class-data archive. Runners differ from run to run by a factor of two
+first query includes starting the daemon. Runners differ from run to run by a factor of two
 (the first query of seven earlier runs: Linux 2.3-3.3 s, Windows 4.7-7.0 s, macOS arm64 2.9-6.4 s, macOS x64 4.0-12.5 s).
 
 ## Installers

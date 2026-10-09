@@ -140,7 +140,7 @@ class EventsTest {
         val first = runJob("print=one")
         val lines = CopyOnWriteArrayList<String>()
         val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/events/stream"))
-            .header(CodeLoupe.HEADER, "1").header("Last-Event-ID", since.toString()).GET().build()
+            .header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).header("Last-Event-ID", since.toString()).GET().build()
         val reader = thread {
             runCatching {
                 http.send(request, HttpResponse.BodyHandlers.ofLines()).body().use { stream ->
@@ -186,14 +186,14 @@ class EventsTest {
             .let { JsonFormat.json.decodeFromJsonElement(ListSerializer(Delivery.serializer()), it) }
 
     private fun get(path: String) = JsonFormat.json.parseToJsonElement(
-        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").GET().build(), HttpResponse.BodyHandlers.ofString()).body(),
+        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).GET().build(), HttpResponse.BodyHandlers.ofString()).body(),
     ).jsonObject
 
     private fun post(path: String, body: String) = http.send(
-        HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+        HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).POST(HttpRequest.BodyPublishers.ofString(body)).build(),
         HttpResponse.BodyHandlers.ofString(),
     )
 
     private fun delete(path: String) =
-        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").DELETE().build(), HttpResponse.BodyHandlers.discarding()).statusCode()
+        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).DELETE().build(), HttpResponse.BodyHandlers.discarding()).statusCode()
 }

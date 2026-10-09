@@ -1,10 +1,10 @@
 package codeloupe.processes
 
 import codeloupe.events.Scrubber
+import codeloupe.platform.PathCase
 import codeloupe.workspace.OrphanDirs
 import codeloupe.workspace.Workspace
 import codeloupe.workspace.WorkspaceList
-import java.io.File
 import java.nio.file.Path
 
 /**
@@ -75,7 +75,7 @@ object ProcessAttribution {
         return rest.fold(real) { acc, name -> acc.resolve(name) }
     }
 
-    private fun normalise(text: String): String = text.replace('\\', '/').let { if (File.separatorChar == '\\') it.lowercase() else it }
+    private fun normalise(text: String): String = PathCase.fold(text.replace('\\', '/'))
 
     private const val MB = 1024L * 1024
     private const val MAX_LINE = 4_000

@@ -66,7 +66,7 @@ class UiApiTest {
 
     private fun get(path: String, header: Boolean = true, method: String = "GET"): HttpResponse<String> {
         val builder = HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path"))
-        if (header) builder.header(CodeLoupe.HEADER, "1")
+        if (header) builder.header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token)
         builder.method(method, if (method == "GET") HttpRequest.BodyPublishers.noBody() else HttpRequest.BodyPublishers.ofString("{}"))
         return http.send(builder.build(), HttpResponse.BodyHandlers.ofString())
     }
@@ -81,7 +81,7 @@ class UiApiTest {
 
     private fun tool(name: String, vararg args: Pair<String, String>) {
         val body = buildJsonObject { args.forEach { (k, v) -> put(k, v) } }
-        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$name")).header(CodeLoupe.HEADER, "1").POST(HttpRequest.BodyPublishers.ofString(body.toString())).build()
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$name")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).POST(HttpRequest.BodyPublishers.ofString(body.toString())).build()
         val reply = http.send(request, HttpResponse.BodyHandlers.ofString()).body()
         assertTrue(reply.contains("\"ok\":true"), reply)
     }
