@@ -10,12 +10,15 @@ internal object ProcFsProcessDetails {
     fun read(pid: Long): ProcessDetails? {
         val dir = Path.of("/proc/$pid")
         val cwd = runCatching { Files.readSymbolicLink(dir.resolve("cwd")).toString() }.getOrNull()
-        val commandLine = runCatching { String(Files.readAllBytes(dir.resolve("cmdline")), Charsets.UTF_8).split('\u0000').filter { it.isNotEmpty() }.joinToString(" ") }.getOrNull()?.ifEmpty { null }
+        val commandLine = runCatching { commandLine(Files.readAllBytes(dir.resolve("cmdline"))) }.getOrNull()?.ifEmpty { null }
         val rss = runCatching {
             Files.readAllLines(dir.resolve("status")).firstOrNull { it.startsWith("VmRSS:") }?.filter(Char::isDigit)?.toLong()?.times(KB)
         }.getOrNull()
         return if (cwd == null && commandLine == null && rss == null) null else ProcessDetails(cwd, commandLine, rss)
     }
+
+    /** `/proc/<pid>/cmdline`: the arguments, each ended by a NUL, as one line. */
+    internal fun commandLine(raw: ByteArray): String = String(raw, Charsets.UTF_8).split('\u0000').filter { it.isNotEmpty() }.joinToString(" ")
 
     private const val KB = 1024L
 }

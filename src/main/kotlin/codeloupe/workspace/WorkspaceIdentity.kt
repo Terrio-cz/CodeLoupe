@@ -1,7 +1,7 @@
 package codeloupe.workspace
 
 import codeloupe.docker.Ownership
-import java.io.File
+import codeloupe.platform.PathCase
 import java.nio.file.Path
 
 /** Which workspace of the registry a directory is in. */
@@ -18,6 +18,6 @@ object WorkspaceIdentity {
 
     private fun key(path: String): String {
         val normal = Path.of(path).toAbsolutePath().normalize().toString().replace('\\', '/').trimEnd('/')
-        return if (File.separatorChar == '\\') normal.lowercase() else normal
+        return PathCase.fold(normal)
     }
 }

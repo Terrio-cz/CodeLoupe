@@ -53,6 +53,21 @@ class WriteApplierTest {
     }
 
     @Test
+    fun `an old file in a folder that cannot be changed leaves no copy under the new name`() {
+        val old = source("old/Old.kt", "class Old\n")
+        val folder = worktree.resolve("old")
+        folder.toFile().setWritable(false)
+        try {
+            assumeTrue(!Files.isWritable(folder), "this user can change a read-only folder (root, or a file system without such modes)")
+            assertFailsWith<WriteRefused> { applier().apply("rename", "r", worktree, main, listOf(FileChange("old/Old.kt", old, "class New\n", movedTo = "new/New.kt")), "n") }
+            assertFalse(worktree.resolve("new/New.kt").exists(), "half of a move was left behind")
+            assertEquals("class Old\n", worktree.resolve("old/Old.kt").readText())
+        } finally {
+            folder.toFile().setWritable(true)
+        }
+    }
+
+    @Test
     fun `a write that cannot be logged is not kept`() {
         val a = source("A.kt", "class A\n")
         val journal = WriteJournal(worktree.resolveSibling("journal-dir").also { it.createDirectories() })
