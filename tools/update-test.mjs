@@ -206,10 +206,17 @@ function cli(root, cliArgs, options = {}) {
   const [java, pre] = cliPrefix(root);
   return spawnSync(java, [...pre, ...cliArgs], { env: appEnv(), encoding: 'utf8', input: options.input, cwd: options.cwd });
 }
+// The daemon wants its token on code queries too (CL-158); the file holds the header line itself.
+function daemonTokenHeader() {
+  try {
+    const [name, value] = fs.readFileSync(path.join(dirs.home, 'daemon.token'), 'utf8').trim().split(/:\s*/);
+    return value ? { [name]: value } : {};
+  } catch { return {}; } // a daemon from before the token has no file
+}
 async function mcpFind(repo) {
   const r = await fetch(`http://127.0.0.1:${daemonPort}/mcp`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'x-codeloupe': '1' },
+    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'x-codeloupe': '1', ...daemonTokenHeader() },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'find', arguments: { root: repo, q: 'greet' } } }),
     signal: AbortSignal.timeout(90_000),
   });
