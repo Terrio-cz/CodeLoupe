@@ -91,7 +91,7 @@ class DockerApi(private val endpoint: DockerEndpoint) {
 
     /** Stops a running container; a stopped or missing one is fine. The Engine waits [seconds] for it to exit before it kills it. */
     fun stopContainer(id: String, seconds: Int = 10) {
-        val reply = http.request("POST", "/containers/${encode(id)}/stop?t=$seconds")
+        val reply = http.request("POST", "/containers/${encode(id)}/stop?t=$seconds", timeoutMs = (seconds + SLOW_SECONDS) * 1000L)
         if (reply.status !in setOf(204, 304, 404)) throw DockerUnavailable("stop container $id: HTTP ${reply.status} ${message(reply)}")
     }
 
@@ -107,7 +107,7 @@ class DockerApi(private val endpoint: DockerEndpoint) {
 
     // 404: already gone, which is what was wanted. 409 (and 403 for a network with endpoints): in use, retry later.
     private fun remove(path: String, what: String): Removal {
-        val reply = http.request("DELETE", path)
+        val reply = http.request("DELETE", path, timeoutMs = SLOW_SECONDS * 1000L)
         return when (reply.status) {
             200, 204 -> Removal.REMOVED
             404 -> Removal.GONE
@@ -143,6 +143,9 @@ class DockerApi(private val endpoint: DockerEndpoint) {
 
     companion object {
         private const val SHORT = 12
+
+        // Removing a big volume or image, or a container that is shutting down, legitimately takes longer than a listing.
+        private const val SLOW_SECONDS = 60
         private val BUILT_IN_NETWORKS = setOf("bridge", "host", "none")
 
         /** The Engine on this machine, or [DockerUnavailable]. */

@@ -142,7 +142,7 @@ class Daemon private constructor(
     private fun tools(): List<Tool> = offered.tools
     private val workspaces = Workspaces(config, registry, trackers)
     private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets, ::log)
-    private val resources = ResourceInventory(config, workspaces)
+    private val resources = ResourceInventory(config.workspaces.adoption, workspaces::recent)
     private val processSource = SystemProcesses(GradleDaemonLog.homes(config.workspaces.gradleUserHome))
     private val processes = ProcessInventory(workspaces, processSource)
     private val reconcileConfig = config.workspaces.reconcile
