@@ -1,0 +1,10 @@
+{"type":"attachment","timestamp":"2026-10-05T10:00:00Z","attachment":{"type":"prompt_snapshot","systemPrompt":["You are a coding assistant.","Use tools \"carefully\"."]}}
+{"type":"attachment","timestamp":"2026-10-05T10:00:01Z","attachment":{"type":"skill_listing","content":"- alpha: does \"things\"\n- beta: ünï ✓ 😀\ttab"}}
+{"type":"attachment","timestamp":"2026-10-05T10:00:02Z","attachment":{"type":"hook_additional_context","content":["x","yy"]}}
+{"type":"attachment","timestamp":"2026-10-05T10:00:03Z","attachment":{"type":"deferred_tools_delta","addedNames":["a","b"],"addedLines":["- a","- b"]}}
+{"type":"attachment","timestamp":"2026-10-05T10:00:04Z","attachment":{"type":"date","date":"2026-10-05","n":1.50,"k":-0,"big":1e21,"flag":true,"none":null}}
+{"type":"attachment","timestamp":"2026-10-05T10:00:05Z","attachment":{"type":"instructions","content":"# Rules\nBe brief."}}
+{"type":"user","timestamp":"2026-10-05T10:00:06Z","message":{"content":"work on TER-12"}}
+{"type":"assistant","timestamp":"2026-10-05T10:00:10Z","message":{"id":"m1","model":"claude-test","usage":{"input_tokens":500,"output_tokens":20,"cache_read_input_tokens":2000,"cache_creation_input_tokens":3000,"cache_creation":{"ephemeral_1h_input_tokens":2000,"ephemeral_5m_input_tokens":1000}},"content":[{"type":"text","text":"ok"}]}}
+{"type":"attachment","timestamp":"2026-10-05T10:00:11Z","attachment":{"type":"skill_listing","content":"after the first turn, ignored"}}
+{"type":"assistant","timestamp":"2026-10-05T10:00:20Z","message":{"id":"m2","model":"claude-test","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":5500,"cache_creation_input_tokens":100,"cache_creation":{"ephemeral_1h_input_tokens":100,"ephemeral_5m_input_tokens":0}},"content":[{"type":"text","text":"done"}]}}

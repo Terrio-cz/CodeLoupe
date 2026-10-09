@@ -50,7 +50,7 @@ class DaemonTest {
     @AfterAll
     fun stop() = daemon.stop()
 
-    private fun api(tool: String, args: JsonObject, headers: Map<String, String> = mapOf(CodeLoupe.HEADER to "1")): HttpResponse<String> {
+    private fun api(tool: String, args: JsonObject, headers: Map<String, String> = mapOf(CodeLoupe.HEADER to "1", CodeLoupe.TOKEN_HEADER to daemon.token)): HttpResponse<String> {
         val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$tool")).header("content-type", "application/json")
         headers.forEach { (k, v) -> request.header(k, v) }
         return http.send(request.POST(HttpRequest.BodyPublishers.ofString(args.toString())).build(), HttpResponse.BodyHandlers.ofString())
@@ -144,6 +144,7 @@ class DaemonTest {
         val client = Client(Implementation(name = "test", version = "0"))
         val transport = StreamableHttpClientTransport(HttpClient(ClientCIO) { install(SSE) }, "http://127.0.0.1:$port/mcp") {
             headers.append(CodeLoupe.HEADER, "1")
+            headers.append(CodeLoupe.TOKEN_HEADER, daemon.token)
         }
         client.connect(transport)
         assertEquals(listOf("calls", "changes", "context", "doc", "env", "find", "grep", "hierarchy", "job", "outline", "run", "symbol", "task_code", "usages"), client.listTools().tools.map { it.name }.sorted())

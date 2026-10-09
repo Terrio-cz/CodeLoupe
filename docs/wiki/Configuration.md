@@ -59,14 +59,17 @@ logs or the audit.
 |---|---|
 | `GET /status` | no (so that anything can find the daemon); it answers a client's nonce with a proof (below) |
 | `GET /env/values` | its own token (`x-codeloupe-env-token`) |
-| `/mcp`, `POST /api/<tool>` of a read-only tool, `POST /hook` | only when `api.strict` is on |
+| `/mcp`, `POST /api/<tool>` of a read-only tool, `POST /hook` | yes; only with `api.strict` set to `false` does a caller with `x-codeloupe` alone get these |
 | a mutating tool (`run`, `env`, `update`, `edit`, and the MCP `job` tool) over MCP or `/api` | yes: over MCP the call is answered with the way to get it |
 | everything else: `/jobs`, `/workspaces`, `/resources`, `/processes`, `/reconcile`, `/ports`, `/events`, `/webhooks`, `/ui-api`, `/shutdown`, `/status/history`, `/session-weight` | yes |
 
-A wrong token is refused wherever it is sent (401), so a client that holds an old one learns it at once. **The default is not
-strict**: a read-only code query (`find`, `outline`, `symbol`, ...) that comes with `x-codeloupe` only is still answered, so that the MCP entry
-you made before the token existed keeps working. `/status` counts those calls (`auth.withoutToken`); on a machine other people log in to,
-update the clients and set `{ "api": { "strict": true } }` in `config.json` (restart the daemon), and the token is required there too.
+A wrong token is refused wherever it is sent (401), so a client that holds an old one learns it at once. **The default is strict**: a
+read-only code query (`find`, `outline`, `symbol`, ...) needs the token as well, because the index shows another user the file and symbol
+names of your repositories. The price is one step after an update: an MCP entry made before the token existed
+(`--header "x-codeloupe: 1"` only) is answered 401 until you replace it with the entry `codeloupe mcp-config` prints. On a machine that only
+you use you can instead keep the old entry by setting `{ "api": { "strict": false } }` in `config.json` (restart the daemon); the read-only
+tools then answer a caller with `x-codeloupe` alone, `run`, `env`, `edit` and `job` still want the token, and `/status` counts the
+read-only calls without it (`auth.withoutToken`).
 
 Clients prove who they talk to before they send it. The CLI, the desktop app and `hook.sh` put a random nonce in the header
 `x-codeloupe-nonce` of `GET /status`; the daemon answers in `x-codeloupe-proof` with SHA-256 of `codeloupe-proof:<token>:<nonce>`, which only
@@ -77,9 +80,8 @@ What you see after an update:
 
 - **An old daemon still running** has no token file; the new CLI, app and hook send only `x-codeloupe`, as before. Restart it (`codeloupe stop`,
   then `codeloupe start`) to get the token.
-- **An old MCP entry** (`--header "x-codeloupe: 1"` only) keeps the read-only tools; `run`, `env`, `edit` and `job` answer *this needs the daemon
-  token ...*. Run `codeloupe mcp-config` and add the entry it prints; its `headersHelper` (`codeloupe mcp-headers`) gives Claude Code the token
+- **An old MCP entry** (`--header "x-codeloupe: 1"` only) is answered *this needs the daemon token ...*. Run `codeloupe mcp-config` and add the entry it prints; its `headersHelper` (`codeloupe mcp-headers`) gives Claude Code the token
   on every connection, without writing it into Claude Code's configuration. The plugin does the same with `hooks/mcp-headers.sh`
   once the plugin is updated from the marketplace.
 - **An old desktop app** against a new daemon gets 401 on its screens; update the app together with the CLI (the installers do).
-- **An old `hook.sh`** against a new daemon keeps working (the hook endpoint is in the read tier) until `api.strict` is on.
+- **An old `hook.sh`** against a new daemon sends no token and is refused (401): update the plugin, or set `api.strict` to `false`.

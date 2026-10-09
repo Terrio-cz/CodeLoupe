@@ -16,7 +16,9 @@ class Steering(private val sources: SourceFiles, private val paths: ShellPaths) 
 
     fun judge(tool: String, input: JsonObject, cwd: String, minLines: Int): Verdict = when (tool) {
         "Read" -> read(input, cwd, minLines)
-        "Bash", "PowerShell" -> (input["command"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { shell(it, cwd, minLines) } ?: skip(Verdict.NOT_A_SEARCH)
+        "Bash", "PowerShell" ->
+            (input["command"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { shell(it, cwd, minLines, if (tool == "PowerShell") ShellDialect.POWERSHELL else ShellDialect.POSIX) }
+                ?: skip(Verdict.NOT_A_SEARCH)
         else -> skip(Verdict.NOT_A_SEARCH)
     }
 
@@ -30,9 +32,9 @@ class Steering(private val sources: SourceFiles, private val paths: ShellPaths) 
         return wholeFile(paths.resolve(cwd, path) ?: return skip(Verdict.NOT_INDEXED), minLines)
     }
 
-    private fun shell(command: String, cwd: String, minLines: Int): Verdict {
+    private fun shell(command: String, cwd: String, minLines: Int, dialect: ShellDialect): Verdict {
         var furthest: Verdict.Skip = skip(Verdict.NOT_A_SEARCH)
-        for (intent in intents.parse(command, cwd)) {
+        for (intent in intents.parse(command, cwd, dialect)) {
             val verdict = when (intent) {
                 is ShellIntent.Search -> search(intent)
                 is ShellIntent.FileList -> fileList(intent)

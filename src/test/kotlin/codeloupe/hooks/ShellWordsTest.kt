@@ -55,4 +55,53 @@ class ShellWordsTest {
         assertEquals(listOf(listOf("cat", "$(git ls-files | head -1)")), words("cat \$(git ls-files | head -1)"))
         assertEquals(listOf(listOf("rg", "foo")), words("rg foo # find it"))
     }
+
+    private fun psWords(line: String) = ShellWords.split(line, ShellDialect.POWERSHELL).map { it.words }
+
+    @Test
+    fun `PowerShell - a backslash is a path separator and a backtick the escape`() {
+        assertEquals(listOf(listOf("cat", """src\a b.kt""")), psWords("""cat "src\a b.kt""""))
+        assertEquals(listOf(listOf("cat", """src\a.kt""", "-TotalCount", "5")), psWords("cat src\\a.kt `\n  -TotalCount 5"))
+        assertEquals(listOf(listOf("echo", "a b")), psWords("echo a` b"))
+        assertEquals(listOf(listOf("echo", "say \"hi\"")), psWords("echo \"say `\"hi`\"\""))
+        assertEquals(listOf(listOf("echo", "it's")), psWords("echo 'it''s'"))
+    }
+
+    @Test
+    fun `PowerShell - a parenthesised expression is one word and keeps the pipe after it`() {
+        val commands = ShellWords.split("(Get-Content a.kt) -replace 'Foo','Bar' | Set-Content a.kt", ShellDialect.POWERSHELL)
+        assertEquals(listOf(listOf("(Get-Content a.kt)", "-replace", "Foo,Bar"), listOf("Set-Content", "a.kt")), commands.map { it.words })
+        assertEquals(listOf(false, true), commands.map { it.piped })
+        assertEquals(listOf(listOf("rg", "(a|b)")), psWords("rg '(a|b)'"))
+        assertEquals(listOf(listOf("x", "(f (g 'a)b'))", "y")), psWords("x (f (g 'a)b')) y"))
+    }
+
+    @Test
+    fun `PowerShell - control keywords keep their condition apart and the call operator is no separator`() {
+        assertEquals(listOf(listOf("if", "Test-Path", "a"), listOf("{", "cat", "a.kt", "}")), psWords("if (Test-Path a) { cat a.kt }"))
+        assertEquals(listOf(listOf("cat", "a.kt")), psWords("& cat a.kt"))
+        assertEquals(listOf(listOf("cat", "a.kt"), listOf("ls")), psWords("& cat a.kt; ls"))
+    }
+
+    @Test
+    fun `PowerShell - here-strings are words, not commands`() {
+        assertEquals(
+            listOf(listOf("Set-Content", "a.txt", "-Value", "rg foo\ncat b.kt"), listOf("ls")),
+            psWords("Set-Content a.txt -Value @'\nrg foo\ncat b.kt\n'@\nls"),
+        )
+    }
+
+    @Test
+    fun `PowerShell - unterminated constructs end with the line and never throw`() {
+        listOf("(", "(a (b", "(a 'b", "@'", "@'\nabc", "@\"\nx\n", "`", "a `", "'", "\"", "\"a`", "& ", "&", "if (", "cat (", "x ''", "x \"\"\"").forEach { line ->
+            ShellWords.split(line, ShellDialect.POWERSHELL)
+            ShellWords.split(line)
+        }
+    }
+
+    @Test
+    fun `Bash keeps its parentheses, backticks and backslashes`() {
+        assertEquals(listOf(listOf("echo", "`date`")), words("echo `date`"))
+        assertEquals(listOf(listOf("a"), listOf("b")), words("(a; b)"))
+    }
 }

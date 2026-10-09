@@ -22,6 +22,7 @@ data class RunSummary(
     val codeRead: CodeReads,
     val codeEdit: CodeEdits,
     val toolErrors: Int,
+    val startCtx: StartCtx? = null,
 ) {
     companion object {
         fun of(run: Run): RunSummary {
@@ -40,7 +41,7 @@ data class RunSummary(
                 toolSec = Math.round(run.tools.sumOf { it.ms } / 1000.0), byCat = byCat, cmds = cmds,
                 codeRead = CodeReads(reads.size, perFile.size, perFile.values.sumOf { it - 1 }, reads.count { !it.partial }, reads.sumOf { it.chars.toLong() }),
                 codeEdit = CodeEdits(edits.size, edits.count { it.err }, edits.filter { it.err }.take(SAMPLES).map { it.errText }),
-                toolErrors = run.tools.count { it.err },
+                toolErrors = run.tools.count { it.err }, startCtx = run.startCtx,
             )
         }
 

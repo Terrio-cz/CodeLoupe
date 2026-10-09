@@ -1,5 +1,7 @@
 package codeloupe.hooks
 
+import codeloupe.hooks.ShellCommandWords.program
+import codeloupe.hooks.ShellCommandWords.unwrap
 import codeloupe.hooks.ShellIntent.Filter
 
 /**
@@ -7,9 +9,10 @@ import codeloupe.hooks.ShellIntent.Filter
  * reads of whole files or ranges. Anything else (builds, git, a search over a pipe, a read that a pipe cuts short) yields nothing.
  */
 class ShellIntents(private val paths: ShellPaths) {
-    fun parse(command: String, cwd: String): List<ShellIntent> = parse(ShellWords.split(command), cwd, 0)
+    fun parse(command: String, cwd: String, dialect: ShellDialect = ShellDialect.POSIX): List<ShellIntent> =
+        parse(ShellWords.split(command, dialect), cwd, 0, dialect)
 
-    private fun parse(commands: List<SimpleCommand>, start: String, depth: Int): List<ShellIntent> {
+    private fun parse(commands: List<SimpleCommand>, start: String, depth: Int, dialect: ShellDialect): List<ShellIntent> {
         var cwd = start
         val found = ArrayList<ShellIntent>()
         commands.forEachIndexed { index, raw ->
@@ -18,16 +21,18 @@ class ShellIntents(private val paths: ShellPaths) {
             val program = program(words.firstOrNull())
             val rest = words.drop(1)
             val next = commands.getOrNull(index + 1)?.takeIf { it.piped }
-            when (program) {
+            // `rg -l Foo | xargs sed -i …` names the files to change, it asks nothing of the index.
+            val feedsEdit = program in LISTERS && ShellEdits.fedBy(commands, index)
+            when (if (feedsEdit) "" else program) {
                 "cd", "pushd", "set-location", "sl" -> rest.firstOrNull { !it.startsWith("-") }?.let { target -> paths.resolve(cwd, target)?.let { cwd = it } }
-                "bash", "sh", "zsh", "dash" -> if (depth < MAX_DEPTH) found += nested(rest, cwd, depth)
-                "powershell", "pwsh" -> if (depth < MAX_DEPTH) found += nested(rest, cwd, depth)
-                "cmd" -> if (depth < MAX_DEPTH) found += nested(rest, cwd, depth)
+                "bash", "sh", "zsh", "dash", "cmd" -> if (depth < MAX_DEPTH) found += nested(rest, cwd, depth, ShellDialect.POSIX)
+                "powershell", "pwsh" -> if (depth < MAX_DEPTH) found += nested(rest, cwd, depth, ShellDialect.POWERSHELL)
                 "rg", "ripgrep" -> found += ripgrep(command, rest, cwd, next)
                 "grep", "egrep", "fgrep", "ag", "ack" -> found += grep(command, rest, cwd, program)
                 "git" -> found += gitGrep(command, rest, cwd)
                 "find" -> found += find(rest, cwd, depth)
-                "cat", "bat", "batcat", "less", "more", "nl", "type" -> if (!command.writes && next == null) found += cat(rest, cwd)
+                "cat", "type" -> if (!command.writes && next == null) found += if (dialect == ShellDialect.POWERSHELL) getContent(rest, cwd) else cat(rest, cwd)
+                "bat", "batcat", "less", "more", "nl" -> if (!command.writes && next == null) found += cat(rest, cwd)
                 "head" -> if (next == null) found += headTail(rest, cwd, head = true)
                 "tail" -> if (next == null) found += headTail(rest, cwd, head = false)
                 "sed" -> if (next == null) found += sed(rest, cwd)
@@ -38,30 +43,10 @@ class ShellIntents(private val paths: ShellPaths) {
         return found
     }
 
-    private fun nested(rest: List<String>, cwd: String, depth: Int): List<ShellIntent> {
+    private fun nested(rest: List<String>, cwd: String, depth: Int, dialect: ShellDialect): List<ShellIntent> {
         val at = rest.indexOfFirst { SHELL_COMMAND_FLAG.matches(it) }
         val script = rest.getOrNull(at + 1)?.takeIf { at >= 0 } ?: return emptyList()
-        return parse(ShellWords.split(script), cwd, depth + 1)
-    }
-
-    private fun program(word: String?): String =
-        word?.replace('\\', '/')?.substringAfterLast('/')?.lowercase()?.removeSuffix(".exe")?.removeSuffix(".cmd").orEmpty()
-
-    /** The command without what runs it: variable assignments, `time`, `timeout 60`, `env`, `sudo`. */
-    private fun unwrap(words: List<String>): List<String> {
-        var rest = words
-        while (rest.isNotEmpty()) {
-            val first = rest.first()
-            rest = when {
-                ASSIGNMENT.matches(first) -> rest.drop(1)
-                program(first) in PREFIXES -> rest.drop(1)
-                program(first) == "timeout" -> rest.drop(1).dropWhile { it.startsWith("-") }.drop(1)
-                program(first) == "nice" -> rest.drop(1).let { if (it.firstOrNull() == "-n") it.drop(2) else it.dropWhile { w -> w.startsWith("-") } }
-                first in LOOP_WORDS -> rest.drop(1)
-                else -> return rest
-            }
-        }
-        return rest
+        return parse(ShellWords.split(script, dialect), cwd, depth + 1, dialect)
     }
 
     // --- rg, grep ---------------------------------------------------------------------------------------------------
@@ -71,15 +56,19 @@ class ShellIntents(private val paths: ShellPaths) {
         val patterns = ArrayList<String>()
         val globs = ArrayList<String>()
         val flags = HashSet<String>()
+
+        /** The patterns come from a file (`-f`): which ones, the command line does not say. */
+        var patternFile = false
     }
 
     /** The options of a grep-like command: [valued] take an argument; short flags may be bundled (`-rn`, `-A3`). */
-    private fun options(words: List<String>, shortValued: String, longValued: Set<String>): Options {
+    private fun options(words: List<String>, shortValued: String, longValued: Set<String>, patternFiles: Boolean = true): Options {
         val out = Options()
         var k = 0
         fun value(name: String, value: String) {
             when (name) {
                 "e", "regexp" -> out.patterns += value
+                "f", "file" -> if (patternFiles) out.patternFile = true
                 "g", "glob", "iglob", "include", "t", "type" -> out.globs += if (name == "t" || name == "type") "type:$value" else value
             }
         }
@@ -112,7 +101,7 @@ class ShellIntents(private val paths: ShellPaths) {
 
     private fun ripgrep(command: SimpleCommand, rest: List<String>, cwd: String, next: SimpleCommand?): List<ShellIntent> {
         val o = options(rest, "ABCEefgjMmrTtd", RG_VALUED)
-        val explicit = o.patterns.isNotEmpty() || "regexp" in o.flags
+        val explicit = o.patterns.isNotEmpty() || "regexp" in o.flags || o.patternFile
         val positional = o.positionals
         val files = "files" in o.flags
         val pattern = if (explicit || files) null else positional.firstOrNull()
@@ -137,8 +126,9 @@ class ShellIntents(private val paths: ShellPaths) {
     private fun typeExtension(type: String) = when (type.lowercase()) { "kotlin" -> "kt"; else -> type.lowercase() }
 
     private fun grep(command: SimpleCommand, rest: List<String>, cwd: String, program: String): List<ShellIntent> {
-        val o = options(rest, "efmABCdD", GREP_VALUED)
-        val explicit = o.patterns.isNotEmpty()
+        val searcher = program == "ag" || program == "ack"
+        val o = options(rest, if (searcher) "emABCdD" else "efmABCdD", GREP_VALUED, patternFiles = !searcher)
+        val explicit = o.patterns.isNotEmpty() || o.patternFile
         val operands = if (explicit) o.positionals else o.positionals.drop(1)
         val pattern = if (explicit) null else o.positionals.firstOrNull()
         val recursive = "r" in o.flags || "R" in o.flags || "recursive" in o.flags || "dereference-recursive" in o.flags || program == "ag" || program == "ack"
@@ -161,7 +151,7 @@ class ShellIntents(private val paths: ShellPaths) {
         }
         if (k >= rest.size) return emptyList()
         val o = options(rest.drop(k + 1), "efmABCc", GREP_VALUED)
-        val explicit = o.patterns.isNotEmpty()
+        val explicit = o.patterns.isNotEmpty() || o.patternFile
         val operands = (if (explicit) o.positionals else o.positionals.drop(1)).filter { it != "--" }
         val pattern = if (explicit) null else o.positionals.firstOrNull()
         val targets = operands.mapNotNull { paths.resolve(dir, it) }
@@ -203,7 +193,7 @@ class ShellIntents(private val paths: ShellPaths) {
         }
         val where = roots.ifEmpty { listOf(cwd) }
         val search = inner?.takeIf { depth < MAX_DEPTH }?.let { words ->
-            val innerIntents = parse(listOf(SimpleCommand(words.map { if (it == "{}") where.first() else it })), cwd, depth + 1)
+            val innerIntents = parse(listOf(SimpleCommand(words.map { if (it == "{}") where.first() else it })), cwd, depth + 1, ShellDialect.POSIX)
             innerIntents.filterIsInstance<ShellIntent.Search>().map { it.copy(targets = it.targets.ifEmpty { where }, filter = if (names.any(SourceNames::mentionsSource)) Filter.SOURCE else Filter.OTHER) }
         }.orEmpty()
         if (search.isNotEmpty()) return search
@@ -326,9 +316,8 @@ class ShellIntents(private val paths: ShellPaths) {
         const val MAX_DEPTH = 2
         const val DEFAULT_LINES = 10
         val SHELL_COMMAND_FLAG = Regex("""(?i)-[a-z]*c|-command|/[ck]""")
-        val ASSIGNMENT = Regex("""^[A-Za-z_][A-Za-z0-9_]*=.*""")
-        val PREFIXES = setOf("time", "command", "builtin", "exec", "nohup", "env", "sudo", "stdbuf")
-        val LOOP_WORDS = setOf("do", "then", "else", "!", "{", "}")
+        // Commands whose output is a list of places that a following command may act on.
+        val LISTERS = setOf("rg", "ripgrep", "grep", "egrep", "fgrep", "ag", "ack", "git", "find", "select-string", "sls")
         val RG_VALUED = setOf(
             "after-context", "before-context", "context", "glob", "iglob", "type", "type-not", "type-add", "regexp", "file", "max-count", "max-depth",
             "maxdepth", "max-filesize", "replace", "threads", "sort", "sortr", "encoding", "engine", "colors", "color", "context-separator",
