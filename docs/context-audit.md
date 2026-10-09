@@ -130,6 +130,32 @@ Co nedoporučuji:
   zůstane v kontextu; při 1–2 MCP nástrojích na roli (po #1) je pevný výčet levnější.
 - **Kratší zadání/packety** — 0,3 % celkem, packety už jsou kompaktní.
 
+## Výsledek CL-59: užší výbava main session (změřeno 2026-10-09)
+
+Měřeno `run/startpayload.mjs` (workspace Terrio) nad čerstvými desktopovými sessions před prvním tahem; jen počty znaků a tokenů,
+žádný obsah přepisů. Základ: šest nejnovějších main sessions před změnou.
+
+| Položka | Před | Po (projektové `.claude/settings.json`) |
+|---|---:|---:|
+| Start main session (tokeny) | 73–77k | **61k** |
+| Listing skills (znaky) | 29 957 | **14 001** |
+| MCP instrukce (znaky) | 8 036 | 6 775 (Claude Docs 1 914 → 653; computer-use 5 100 a claude-in-chrome 1 022 beze změny) |
+
+Co funguje na úrovni projektu (a je nastaveno):
+
+- `permissions.deny` pro `mcp__computer-use__*`, `mcp__claude-in-chrome__*`, konektory Claude Docs a visualize, `Workflow`,
+  `SuggestPluginInstall`, `SuggestSkills`, `SearchPlugins`: nástroje zmizí z kontextu (−4 až −5k tokenů).
+- `env.SLASH_COMMAND_TOOL_CHAR_BUDGET=14000`: listing se vejde do rozpočtu, popisy se zkrátí a zůstanou jen jména; popisy
+  často volaných skillů (`terrio-*`) se zachovají, popisy pluginových skillů (engineering, data, design, figma, desktop-commander,
+  cowork) zmizí. Skills se pořád dají volat jménem.
+- `skillOverrides: off` pro vlastní skills, které se v tomto workspace nepoužívají (`dataviz`, `gsap-*`, `workflow-authoring`).
+- `env.CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH=600`: zkrátí instrukce claude.ai konektorů.
+
+Co v desktopové aplikaci na úrovni projektu nefunguje (vyzkoušeno v čerstvých sessions): `enabledPlugins` (`<jméno>@synced`),
+`syncClaudeAiPlugins`, `disableClaudeAiConnectors`, `deniedMcpServers`, `skillOverrides` a `Skill(...)` deny pro pluginové skills,
+`CLAUDE_CODE_DISABLE_CFC_PROMPT`. Pluginy a instrukce vestavěných serverů computer-use a claude-in-chrome (6,1k znaků, ~1,9k tokenů)
+se vypínají jen přepínači aplikace, tedy pro všechny projekty.
+
 ## Reprodukce a trend
 
 ```bash
