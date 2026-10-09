@@ -16,7 +16,12 @@ export class EventStream {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
 
-  constructor(private readonly port: () => number, private readonly onEvent: (e: LiveEvent) => void) {}
+  constructor(
+    private readonly port: () => number,
+    private readonly onEvent: (e: LiveEvent) => void,
+    /** The token header, once the daemon has proved it holds the token (DaemonClient.authHeaders). */
+    private readonly auth: () => Promise<Record<string, string>> = async () => ({}),
+  ) {}
 
   get open(): boolean {
     return this.running;
@@ -38,8 +43,12 @@ export class EventStream {
   }
 
   private connect(): void {
+    void this.auth().catch(() => ({})).then(auth => { if (this.running) this.connectWith(auth); });
+  }
+
+  private connectWith(auth: Record<string, string>): void {
     const port = this.port();
-    const headers: Record<string, string> = { host: `${HOST}:${port}`, 'x-codeloupe': '1', accept: 'text/event-stream' };
+    const headers: Record<string, string> = { host: `${HOST}:${port}`, 'x-codeloupe': '1', accept: 'text/event-stream', ...auth };
     if (this.lastSeq !== null) headers['last-event-id'] = String(this.lastSeq);
     const req = http.request({ host: HOST, port, path: '/events/stream', method: 'GET', agent: false, headers }, res => {
       if (res.statusCode !== 200) { res.resume(); this.retry(); return; }

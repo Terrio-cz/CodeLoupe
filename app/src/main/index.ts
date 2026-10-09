@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   let win: BrowserWindow | null = null;
   let quitting = false;
 
-  const client = new DaemonClient(() => manager.port());
+  const client = new DaemonClient(() => manager.port(), () => home.dir);
   const manager: DaemonManager = new DaemonManager(client, home, () => store.get(), () => (win && win.isVisible() ? 5_000 : 15_000));
   const daemonApi = new DaemonApi(client);
   let mock: MockApi | null = null;
@@ -84,7 +84,10 @@ async function main(): Promise<void> {
   });
   updates.service.on('state', s => { if (win && !win.isDestroyed()) win.webContents.send(CH.updatePush, s); });
 
-  const claude = new ClaudeConnector(execClaude(), () => findMarketplace({ resources: app.isPackaged ? process.resourcesPath : null, appDir: __dirname }));
+  const claude = new ClaudeConnector(execClaude(), () => findMarketplace({ resources: app.isPackaged ? process.resourcesPath : null, appDir: __dirname }), () => {
+    const s = store.get();
+    return s.cliArgs.length === 0 ? `${/\s/.test(s.cliCommand) ? `"${s.cliCommand}"` : s.cliCommand} mcp-headers` : null;
+  });
 
   const ipc = registerIpc({
     store, manager, client, home, claude, source, update: updates.service,

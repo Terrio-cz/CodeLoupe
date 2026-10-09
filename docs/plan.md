@@ -141,6 +141,20 @@ CLI `codeloupe …` ──HTTP (spustí daemon, když neběží)─────�
 - Bezstavové HTTP: restart daemonu nerozbije okna. **Ověřit ve fázi 1**; jinak záložní stdio shim (~40 MB/okno).
 - Localhost bezpečnost: bind 127.0.0.1, kontrola `Host`/`Origin`, povinná hlavička `X-CodeLoupe`, CORS
   preflight odmítnut.
+- Volající (CL-158): hlavička `x-codeloupe` je konstanta a chrání jen před prohlížečem, ne před jiným lokálním procesem nebo uživatelem.
+  Proto `<home>/daemon.token` (náhodných 32 B hex, vzniká s právy jen pro vlastníka, přežije restart, změna souboru platí bez restartu)
+  a hlavička `x-codeloupe-token` na všem, co jedná za uživatele: `/jobs`, `/workspaces`, `/reconcile`, `/ports`, `/events`, `/webhooks`,
+  `/ui-api`, `/shutdown`, mutující nástroje (`run`, `env`, `edit`, `update`, MCP `job`). Čtecí dotazy na kód (`/mcp`, `/api/<nástroj>`,
+  `/hook`) projdou i bez tokenu, dokud `config.json` `api.strict` není `true`; stávající záznam MCP (`--header x-codeloupe:1`) tak
+  funguje dál a `/status` počítá volání bez tokenu (`auth.withoutToken`), aby bylo vidět, kdy lze `strict` zapnout. Volba tokenu místo
+  kontroly vlastníka spojení (Windows `GetExtendedTcpTable`, Linux `/proc/net/tcp`, macOS `lsof`): jeden mechanismus pro tři systémy,
+  žádný nativní kód ani závod o PID/port, a MCP klient ho dostane přes `headersHelper` (`codeloupe mcp-headers`, v pluginu
+  `hooks/mcp-headers.sh`), takže tajemství není v konfiguraci Claude Code.
+- Totožnost daemonu: klient pošle `x-codeloupe-nonce` na `GET /status`, daemon odpoví `x-codeloupe-proof` = SHA-256 z
+  `codeloupe-proof:<token>:<nonce>`; token se pošle jen tomu, kdo důkaz dal (CLI, aplikace, `hook.sh`). CLI navíc odmítne daemon, kterého
+  `daemon.json` nejmenuje. `hook.sh` předává token přes `curl -H @soubor`, ne na příkazové řádce (vidí ji ostatní uživatelé).
+- Zbývá: hash plánu pro `/reconcile/run` (potvrzení vázané na plán, který člověk viděl) je CL-169; `/workspaces/release` plán nemá
+  (jen označí workspace, úklid řídí reconcile). `/status` zůstává otevřený, aby šel daemon najít.
 
 | Priorita | Úloha | Souběh | Pravidlo |
 |---|---|---|---|

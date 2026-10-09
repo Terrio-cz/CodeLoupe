@@ -12,6 +12,7 @@ import codeloupe.secrets.SecretStore
  */
 class EnvTool(private val access: SecretAccess) : Tool {
     override val name = "env"
+    override val mutating = true
     override val description = "Names of the environment variables and secrets the CodeLoupe store holds for a workspace and repository — " +
         "scope (global < workspace < repository, the narrowest wins), source, created, rotated, last use and by what, and ROTATE on a name older than the configured age. Never a value: " +
         "start a process with them through `codeloupe env run --workspace <w> --repo <r> -- <command>`. all=true lists every scope."

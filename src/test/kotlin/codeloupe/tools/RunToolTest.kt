@@ -43,7 +43,7 @@ class RunToolTest {
 
     private fun call(tool: String, args: JsonObject): String {
         val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$tool")).POST(HttpRequest.BodyPublishers.ofString(args.toString()))
-            .header(CodeLoupe.HEADER, "1").header("content-type", "application/json").build()
+            .header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).header("content-type", "application/json").build()
         val body = JsonFormat.json.parseToJsonElement(http.send(request, HttpResponse.BodyHandlers.ofString()).body()).jsonObject
         return body.getValue("text").jsonPrimitive.content
     }

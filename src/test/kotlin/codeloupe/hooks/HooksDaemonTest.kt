@@ -44,7 +44,7 @@ class HooksDaemonTest {
 
     private fun post(body: String, path: String = "/hook", header: Boolean = true): HttpResponse<String> {
         val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header("content-type", "application/json")
-        if (header) request.header(CodeLoupe.HEADER, "1")
+        if (header) request.header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token)
         return http.send(request.POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString())
     }
 
@@ -57,7 +57,7 @@ class HooksDaemonTest {
     }.toString()
 
     private fun index() {
-        val find = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1")
+        val find = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token)
             .POST(HttpRequest.BodyPublishers.ofString("""{"root":"${repo.toString().replace("\\", "/")}","q":"Big"}""")).build()
         assertContains(http.send(find, HttpResponse.BodyHandlers.ofString()).body(), "class Big")
     }
@@ -114,7 +114,8 @@ class HooksDaemonTest {
 
     private fun script(bash: String, env: Map<String, String>, stdin: String): Pair<Int, String> {
         val file = Path.of(System.getProperty("codeloupe.projectDir"), "plugin", "hooks", "hook.sh").toString().replace("\\", "/")
-        val process = ProcessBuilder(bash, file).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment().putAll(env) }.start()
+        // Without a CODELOUPE_HOME of its own the script looks in an empty folder, not in the machine's real daemon directory.
+        val process = ProcessBuilder(bash, file).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment()["CODELOUPE_HOME"] = TestRepos.tmpDir("hook-home").toString(); environment().putAll(env) }.start()
         process.outputStream.use { it.write(stdin.toByteArray()) }
         val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
         assertTrue(process.waitFor(20, TimeUnit.SECONDS), "the script finishes")
@@ -129,7 +130,7 @@ class HooksDaemonTest {
         bash!!
         index()
         val call = preToolUse(repo, "Read", "file_path", big.toString(), session = "script")
-        val (code, out) = script(bash, mapOf("CODELOUPE_PORT" to port.toString()), call)
+        val (code, out) = script(bash, mapOf("CODELOUPE_PORT" to port.toString(), "CODELOUPE_HOME" to config.home.toString()), call)
         assertEquals(0, code)
         assertContains(out, "additionalContext")
 
@@ -143,8 +144,8 @@ class HooksDaemonTest {
         assertEquals(0 to "", script(bash, mapOf("CODELOUPE_PORT" to closed.toString()), call), "nothing listens")
         assertTrue((System.nanoTime() - started) / 1_000_000 < 5_000)
         assertEquals(0 to "", script(bash, mapOf("CODELOUPE_HOME" to TestRepos.tmpDir("nodaemon").toString(), "CODELOUPE_PORT" to ""), call), "no daemon.json")
-        assertEquals(0 to "", script(bash, mapOf("CODELOUPE_PORT" to port.toString(), "CODELOUPE_HOOKS" to "off"), call), "switched off")
-        assertEquals(0 to "", script(bash, mapOf("CODELOUPE_PORT" to port.toString()), "garbage"), "malformed input")
+        assertEquals(0 to "", script(bash, mapOf("CODELOUPE_PORT" to port.toString(), "CODELOUPE_HOME" to config.home.toString(), "CODELOUPE_HOOKS" to "off"), call), "switched off")
+        assertEquals(0 to "", script(bash, mapOf("CODELOUPE_PORT" to port.toString(), "CODELOUPE_HOME" to config.home.toString()), "garbage"), "malformed input")
     }
 
     @Test

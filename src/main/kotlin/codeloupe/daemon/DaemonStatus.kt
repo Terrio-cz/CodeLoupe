@@ -41,4 +41,6 @@ data class DaemonStatus(
     val hooks: HookStats = HookStats(),
     /** The MCP tool list this daemon serves; it does not change while the daemon runs. */
     val toolList: ToolListStatus = ToolListStatus(),
+    /** Whether the token is required for read-only calls too, and how many of those came without it. */
+    val auth: AuthStatus = AuthStatus(),
 )
