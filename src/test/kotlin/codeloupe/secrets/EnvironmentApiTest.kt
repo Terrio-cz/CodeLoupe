@@ -47,7 +47,7 @@ class EnvironmentApiTest {
     fun stop() = daemon.stop()
 
     private fun get(path: String, headers: Map<String, String> = emptyMap()): HttpResponse<String> {
-        val builder = HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1")
+        val builder = HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token)
         headers.forEach { (k, v) -> builder.header(k, v) }
         return http.send(builder.GET().build(), HttpResponse.BodyHandlers.ofString())
     }

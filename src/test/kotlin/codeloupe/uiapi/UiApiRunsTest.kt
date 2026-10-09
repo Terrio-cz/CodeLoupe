@@ -51,7 +51,7 @@ class UiApiRunsTest {
     fun stop() = daemon.stop()
 
     private fun get(path: String): HttpResponse<String> =
-        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/ui-api/v1/$path")).header(CodeLoupe.HEADER, "1").GET().build(), HttpResponse.BodyHandlers.ofString())
+        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/ui-api/v1/$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).GET().build(), HttpResponse.BodyHandlers.ofString())
 
     private fun json(path: String): JsonObject {
         val r = get(path)

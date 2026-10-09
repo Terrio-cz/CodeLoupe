@@ -56,7 +56,7 @@ class DockerApiIntegrationTest {
             val daemon = Daemon.start(config)
             try {
                 val response = HttpClient.newHttpClient().send(
-                    HttpRequest.newBuilder(URI("http://127.0.0.1:$port/resources")).header(CodeLoupe.HEADER, "1").build(), HttpResponse.BodyHandlers.ofString(),
+                    HttpRequest.newBuilder(URI("http://127.0.0.1:$port/resources")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).build(), HttpResponse.BodyHandlers.ofString(),
                 )
                 assertEquals(200, response.statusCode(), response.body())
                 val report = JsonFormat.json.decodeFromString(ResourceReport.serializer(), response.body())

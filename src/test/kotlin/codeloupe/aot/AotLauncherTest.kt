@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class AotLauncherTest {
     private val dir = TestRepos.tmpDir("aot-launcher").resolve("aot")
     private val caches = AotCaches(dir.resolve("C__Apps_codeloupe-0123456789ab"), "jvm-1")
-    private val jar = "C:/Apps/codeloupe/lib/codeloupe-0.1.0.jar"
+    private val jar = "/apps/codeloupe/lib/codeloupe-0.1.0.jar"
     private val spawned = AtomicInteger()
 
     private fun start(classPath: String = jar) =
@@ -48,7 +48,7 @@ class AotLauncherTest {
 
     @Test
     fun `a class path that is not a single jar cannot be trained`() {
-        assertFalse(start(classPath = "build/classes;lib/a.jar"))
+        assertFalse(start(classPath = listOf("build/classes", "lib/a.jar").joinToString(java.io.File.pathSeparator)))
         assertFalse(start(classPath = "build/classes"))
         assertEquals(0, spawned.get())
     }
