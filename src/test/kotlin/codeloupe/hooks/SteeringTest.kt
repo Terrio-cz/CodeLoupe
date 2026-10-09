@@ -68,6 +68,13 @@ class SteeringTest {
     }
 
     @Test
+    fun `find that deletes or runs something on the files is no listing`() {
+        assertEquals(null, shell("""find . -name "*.java" -delete"""))
+        assertEquals(null, shell("""find src -name '*.kt' -exec sed -i 's/a/b/' {} +"""))
+        assertEquals(null, shell("""find . -name '*.kt' -exec rm {} +"""))
+    }
+
+    @Test
     fun `whole-file reads are answered by outline`() {
         assertEquals("""outline target="$big"""", shell("cat $big"))
         assertEquals("""outline target="$big"""", shell("cat -n $big"))
