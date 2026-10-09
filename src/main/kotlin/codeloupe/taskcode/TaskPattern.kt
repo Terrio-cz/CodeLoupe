@@ -13,9 +13,24 @@ import java.nio.file.Path
  */
 class TaskPattern private constructor(val regex: Regex, val source: String, val hint: String) {
     /** Task ids mentioned in [text], upper case, in order of appearance, each once. */
-    fun idsIn(text: String): List<String> = regex.findAll(text).map { it.value.uppercase() }.filter { it.substringBefore('-') !in NOISE }.distinct().toList()
+    fun idsIn(text: String): List<String> = bounded(emptyList()) {
+        regex.findAll(TimedText(text)).map { it.value.uppercase() }.filter { it.substringBefore('-') !in NOISE }.distinct().toList()
+    }
 
-    fun isId(text: String): Boolean = regex.matchEntire(text.trim()) != null && text.trim().substringBefore('-').uppercase() !in NOISE
+    fun isId(text: String): Boolean = bounded(false) { regex.matchEntire(TimedText(text.trim())) != null && text.trim().substringBefore('-').uppercase() !in NOISE }
+
+    // The pattern may come from the repository: one that cannot finish in time is given up for good, and finds nothing.
+    @Volatile private var expired = false
+
+    private fun <T> bounded(otherwise: T, body: () -> T): T {
+        if (expired) return otherwise
+        return try {
+            body()
+        } catch (_: TimedText.Expired) {
+            expired = true
+            otherwise
+        }
+    }
 
     companion object {
         private val GENERIC = Regex("(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9_]*-\\d+(?![0-9A-Za-z])")

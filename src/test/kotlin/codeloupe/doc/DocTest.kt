@@ -174,4 +174,19 @@ class DocTest {
         val answer = runBlocking { allowed.answer(registry, dir.toString(), ToolArgs(buildJsonObject { put("path", JsonPrimitive(outside.resolve("note.md").toString())) })) }
         assertContains(answer, "note.md")
     }
+
+    @Test
+    fun `the daemon's own folder and credential files of other tools are never read`() {
+        val home = dir.resolve("home").also { it.resolve("secrets").createDirectories() }
+        home.resolve("secrets").resolve("api-token.env").writeText("0123456789abcdef")
+        dir.resolve(".npmrc").writeText("//registry.npmjs.org/:_authToken=x")
+        dir.resolve(".docker").createDirectories()
+        dir.resolve(".docker").resolve("config.json").writeText("{}")
+        val guarded = DocTool(DocMemory(), DocFiles(emptyList(), listOf(home)))
+        fun read(path: String) = runBlocking { guarded.answer(registry, dir.toString(), ToolArgs(buildJsonObject { put("path", JsonPrimitive(path)) })) }
+        assertContains(assertFailsWith<IllegalArgumentException> { read("home/secrets/api-token.env") }.message!!, "own folder")
+        assertContains(assertFailsWith<IllegalArgumentException> { read("home/../home/secrets/api-token.env") }.message!!, "own folder")
+        assertContains(assertFailsWith<IllegalArgumentException> { read(".npmrc") }.message!!, "secret store")
+        assertContains(assertFailsWith<IllegalArgumentException> { read(".docker/config.json") }.message!!, "secret store")
+    }
 }

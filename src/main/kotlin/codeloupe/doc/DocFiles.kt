@@ -8,8 +8,9 @@ import java.nio.file.Path
  * Loads a text file as a [Doc]: a plan, a brain note, a persisted tool output. Only files under the caller's own root
  * or under [roots] (where the agent harness keeps its outputs and plans) are read, links resolved first, and never a
  * file that looks like a secret store: the daemon is a local reader of text, not a way to any file of the machine.
+ * [withheld] are folders never read whatever root asks for them (the daemon's own home: its vault and its API token).
  */
-class DocFiles(private val roots: List<Path>) {
+class DocFiles(private val roots: List<Path>, private val withheld: List<Path> = emptyList()) {
     fun load(root: String, path: String): Doc {
         val given = path.trim()
         require(given.isNotEmpty()) { "pass path: a text file, relative to root or absolute" }
@@ -20,6 +21,7 @@ class DocFiles(private val roots: List<Path>) {
         val allowed = (listOfNotNull(base) + roots).mapNotNull { runCatching { it.toRealPath() }.getOrNull() }
         require(allowed.any { real.startsWith(it) }) { "$given is outside root and the allowed folders (${roots.joinToString(", ") { it.toString().replace('\\', '/') }})" }
         require(Files.isRegularFile(real)) { "$given is not a file" }
+        require(withheld.mapNotNull { runCatching { it.toRealPath() }.getOrNull() }.none { real.startsWith(it) }) { "${real.fileName} is in the daemon's own folder; not read" }
         require(!SECRET.containsMatchIn(real.fileName.toString()) && !SECRET_DIR.containsMatchIn(real.toString().replace('\\', '/'))) { "${real.fileName} looks like a secret store; not read" }
         require(Files.size(real) <= MAX_BYTES) { "$given is over ${MAX_BYTES / 1_000_000} MB; read a window with a tool that streams" }
         val bytes = Files.readAllBytes(real)
@@ -47,9 +49,9 @@ class DocFiles(private val roots: List<Path>) {
     companion object {
         const val MAX_BYTES = 8_000_000L
         private const val PROBE = 4_096
-        private val SECRET = Regex("(?i)^\\.env(\\.|$)|\\.(pem|key|pfx|p12|kdbx|keystore)$|^id_(rsa|ed25519|ecdsa)|credentials|secrets?\\.")
+        private val SECRET = Regex("(?i)^\\.env(\\.|$)|\\.(pem|key|pfx|p12|kdbx|keystore)$|^id_(rsa|ed25519|ecdsa)|credentials|secrets?\\.|^\\.(npmrc|netrc|git-credentials|pgpass|pypirc|htpasswd|dockercfg)$")
 
-        private val SECRET_DIR = Regex("(?i)/(\\.ssh|\\.aws|\\.gnupg|\\.kube|\\.azure)/")
+        private val SECRET_DIR = Regex("(?i)/(\\.ssh|\\.aws|\\.gnupg|\\.kube|\\.azure|\\.docker|\\.config/gh|\\.config/gcloud)/")
 
         /** What a daemon on this machine may read besides the caller's root: the agent harness's own folder and its temporary outputs. */
         fun defaultRoots(): List<Path> = listOf(

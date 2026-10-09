@@ -18,7 +18,7 @@ internal object DefaultRef {
     }
 
     private fun configured(file: Path): String? = runCatching {
-        Json.parseToJsonElement(Files.readString(file)).jsonObject["baseBranch"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
+        Json.parseToJsonElement(Files.readString(file)).jsonObject["baseBranch"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() && !it.startsWith("-") && it.none(Char::isISOControl) }
     }.getOrNull()
 
     private val CANDIDATES = listOf("origin/main", "origin/master", "main", "master")

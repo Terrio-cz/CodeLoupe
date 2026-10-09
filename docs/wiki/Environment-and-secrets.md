@@ -34,4 +34,5 @@ Every text that leaves the daemon (events, webhooks, summaries, `run` answers, `
 values replaced by `***`, byte exact otherwise. Masking is by value: a program that transforms a secret before printing it (base64,
 split over lines) is not covered. A value on a command line is visible to this user's other processes while the command runs; use `env run`
 or the API instead. A guard hook that denies reads of secret files should also cover `<home>/secrets/` (the daemon's home, `…/codeloupe/secrets/`); without one only a
-`Read(**/*.env)` deny rule of Claude Code's `settings.json` covers the Read tool.
+`Read(**/*.env)` deny rule of Claude Code's `settings.json` covers the Read tool. The `doc` tool never reads the daemon's own folder, whatever `root` it is given, and refuses the
+credential files of other tools (`.npmrc`, `.netrc`, `.git-credentials`, `.docker/`, the `gh` and `gcloud` configuration). The daemon's folder and the vault folder are created for the owner only on systems with POSIX permissions; on Windows they inherit the user-only access of `%LOCALAPPDATA%`.

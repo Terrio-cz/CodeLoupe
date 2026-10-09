@@ -26,6 +26,7 @@ import codeloupe.ports.LocalPorts
 import codeloupe.ports.PortRegistry
 import codeloupe.ports.PortStore
 import codeloupe.ports.portRoutes
+import codeloupe.secrets.KeyProtectors
 import codeloupe.secrets.SecretAccess
 import codeloupe.secrets.SecretStore
 import codeloupe.secrets.envRoutes
@@ -39,6 +40,7 @@ import codeloupe.reconcile.releaseRoutes
 import codeloupe.reconcile.Reconciler
 import codeloupe.reconcile.reconcileRoutes
 import codeloupe.platform.IsoTime
+import codeloupe.platform.OwnerOnly
 import codeloupe.processes.GradleDaemonLog
 import codeloupe.processes.ProcessInventory
 import codeloupe.processes.ProcessStopper
@@ -129,7 +131,7 @@ class Daemon private constructor(
     private val secrets = SecretAccess(config.home, preset = secretStore, rotationDays = config.secrets.rotationDays)
     private val trackerSettings = TrackerSettingsLoader.load(config.home, store = { secrets.store })
     private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
-    private val baseTools = Tools.catalog(trackers, jobs, secrets)
+    private val baseTools = Tools.catalog(trackers, jobs, secrets, config.home)
     private val writeGate = WriteGate(config.write, config.home.resolve("write-gate.json")) { since ->
         val setup = MetricsSetup(config)
         MetricsCollector(setup.categorizer()).runs(setup.projectDirs(emptyList()), since, null)
@@ -215,7 +217,7 @@ class Daemon private constructor(
     private fun log(message: String) = log.append("${IsoTime.now()} $message")
 
     private fun start() {
-        Files.createDirectories(config.home)
+        OwnerOnly.home(config.home)
         // The compiler's parser lives in a child process that ends when it has had nothing to parse for a while.
         if (config.parseWorkerIdleSeconds > 0) Extraction.useWorker(ParseWorkerClient(config.parseWorkerIdleSeconds.toLong(), log = ::log))
         // Class-data archives of earlier versions; the daemon no longer writes one.
@@ -248,7 +250,7 @@ class Daemon private constructor(
         val info = DaemonInfo(pid, config.port, CodeLoupe.VERSION, IsoTime.of(started))
         Files.writeString(infoFile, JsonFormat.json.encodeToString(DaemonInfo.serializer(), info))
         // Every outgoing text is masked of the values in the vault; nothing is opened while there is no vault yet.
-        Scrubber.knownValues = { if (secrets.vaultExists()) secrets.store?.knownValues().orEmpty() else emptyList() }
+        Scrubber.knownValues = { (if (secrets.vaultExists()) secrets.store?.knownValues().orEmpty() else emptyList()) + listOfNotNull(System.getenv(KeyProtectors.PASSPHRASE_VARIABLE)) }
         log("daemon ${CodeLoupe.VERSION} pid $pid listening on 127.0.0.1:${config.port}")
     }
 

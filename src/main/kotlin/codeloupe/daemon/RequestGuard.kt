@@ -20,10 +20,13 @@ internal class RequestGuard(private val port: Int) {
         if (call.request.headers[HttpHeaders.Origin] != null) return "browser requests are not accepted"
         if (call.request.httpMethod == HttpMethod.Get && call.request.path() == "/status") return null
         if (call.request.headers[CodeLoupe.HEADER] == null) return "missing ${CodeLoupe.HEADER} header"
+        // Most routes read the whole body into memory; a size that is declared too large is not read at all.
+        if ((call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull() ?: 0) > MAX_BODY) return "body too large"
         return null
     }
 
     companion object {
         val STATUS = HttpStatusCode.Forbidden
+        const val MAX_BODY = 8L * 1024 * 1024
     }
 }

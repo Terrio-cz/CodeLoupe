@@ -17,12 +17,17 @@ enum class ProcessKind(val buildTool: Boolean) {
 
     companion object {
         /** The kind a command line says; only the main classes and jars the build tools are started with count. */
-        fun of(commandLine: String): ProcessKind = when {
-            "org.gradle.launcher.daemon.bootstrap.GradleDaemon" in commandLine -> GRADLE_DAEMON
-            "KotlinCompileDaemon" in commandLine -> KOTLIN_DAEMON
-            "GradleWorkerMain" in commandLine -> GRADLE_WORKER
-            "org.gradle.launcher.GradleMain" in commandLine || "org.gradle.wrapper.GradleWrapperMain" in commandLine || "gradle-wrapper.jar" in commandLine -> GRADLE_CLIENT
-            else -> OTHER
+        fun of(commandLine: String): ProcessKind {
+            // An argument that ends in the name, not any text that holds it: a prompt or a file name that mentions a build tool is not one.
+            val arguments = commandLine.split(' ', '\t').map { it.trim('"', '\'') }
+            fun runs(vararg names: String) = arguments.any { argument -> names.any { argument.endsWith(it) } }
+            return when {
+                runs("org.gradle.launcher.daemon.bootstrap.GradleDaemon") -> GRADLE_DAEMON
+                runs("org.jetbrains.kotlin.daemon.KotlinCompileDaemon") -> KOTLIN_DAEMON
+                runs("org.gradle.process.internal.worker.GradleWorkerMain") -> GRADLE_WORKER
+                runs("org.gradle.launcher.GradleMain", "org.gradle.wrapper.GradleWrapperMain", "gradle-wrapper.jar") -> GRADLE_CLIENT
+                else -> OTHER
+            }
         }
     }
 }

@@ -1,8 +1,8 @@
 package codeloupe.secrets
 
+import codeloupe.platform.OwnerOnly
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.PosixFilePermissions
 import java.security.SecureRandom
 
 /** The daemon's handle on the vault: opened on first use (an OS key store probe is not free), and the reason when it cannot be. */
@@ -25,11 +25,14 @@ class SecretAccess(private val home: Path, private val env: Map<String, String> 
     /** The token a local MCP server or script presents to `/env/values`; made on first use, readable by this user only. */
     @Synchronized
     fun token(): String {
-        if (Files.isRegularFile(tokenFile)) return Files.readString(tokenFile).trim()
-        Files.createDirectories(tokenFile.parent)
+        // A file that is empty or damaged (a crash while it was made) would otherwise be a token anyone can present.
+        runCatching { Files.readString(tokenFile).trim() }.getOrNull()?.takeIf { TOKEN.matches(it) }?.let { return it }
         val token = ByteArray(32).also(SecureRandom()::nextBytes).joinToString("") { "%02x".format(it) }
-        Files.writeString(tokenFile, token)
-        runCatching { Files.setPosixFilePermissions(tokenFile, PosixFilePermissions.fromString("rw-------")) }
+        OwnerOnly.write(tokenFile, token)
         return token
+    }
+
+    private companion object {
+        val TOKEN = Regex("[0-9a-f]{64}")
     }
 }

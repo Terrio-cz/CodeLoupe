@@ -1310,6 +1310,8 @@ rozhoduje launcher.
 | MCP obchází guard hooky klienta | zápisová politika v daemonu; testy guardů; každý job (i následný a znovu po čekání na slot) projde `policyHook` jako PreToolUse Bash, selhání hooku = deny (CL-84) |
 | Job daemonu přežije daemon jako sirotek | Windows: joby v job objectu daemonu s KILL_ON_JOB_CLOSE; po restartu daemon ukončí přeživší podle pid + času startu a job označí `lost` |
 | Lokální stránka volá daemon | bind 127.0.0.1, Host/Origin, vlastní hlavička, bez preflightu |
+| Jiný uživatel nebo proces na stejném stroji volá daemon, nebo zaujme jeho port | home a trezor jen pro vlastníka, `hook.sh` bez proxy a jen tři tvary odpovědi, tělo nad 8 MB se nečte; ověření volajících: CL-158 |
+| Odkaz (junction, symlink) v úklidovém adresáři ukazuje jinam | mazání odstraní odkaz jako odkaz a cíl nechá; seznam osiřelých adresářů odkazy nenabízí |
 | Rozdíly OS (cesty, CRLF, zámky souborů) | normalizace cest, EOL podle souboru, retry rename; testy Windows + Linux |
 | Generičnost zesložití Terrio | Terrio = jen `.codeloupe.json` + skill; jádro nezná TER, brain ani YouTrack |
 | Úspora menší, než čekáme | baseline + benchmark + detektor mezer ukáže proč; cíle § 2 vychází z naměřeného stropu |

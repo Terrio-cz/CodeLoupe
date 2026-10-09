@@ -15,6 +15,7 @@ class EnvRunner(private val store: SecretStore) {
         val values = store.resolve(SecretStore.chain(workspace, repository), usedBy = "env run: $program")
         val known = store.knownValues()
         val builder = ProcessBuilder(command).redirectInput(ProcessBuilder.Redirect.INHERIT)
+        builder.environment().remove(KeyProtectors.PASSPHRASE_VARIABLE)
         builder.environment().putAll(values.mapValues { it.value.value })
         val process = builder.start()
         val pumps = listOf(pump(process.inputStream, out, known), pump(process.errorStream, err, known))

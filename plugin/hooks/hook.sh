@@ -33,5 +33,28 @@ IFS= read -r -d '' body
 wait=2
 case "$body" in *SessionStart*) wait=10 ;; esac
 
-curl -sf --connect-timeout 0.3 -m "$wait" -H 'x-codeloupe: 1' -H 'content-type: application/json' --data-binary @- "http://127.0.0.1:$port/hook" <<<"$body" 2>/dev/null
+# No proxy: the body holds prompts and commands and goes to this machine only.
+reply=$(curl -sf --noproxy '*' --connect-timeout 0.3 -m "$wait" -H 'x-codeloupe: 1' -H 'content-type: application/json' --data-binary @- "http://127.0.0.1:$port/hook" <<<"$body" 2>/dev/null) || exit 0
+
+# True when $1 is the inside of a JSON string: every quote in it is escaped.
+plain() { local s=${1//\\?/}; [[ $s != *\"* ]]; }
+
+# Only the three shapes the daemon writes go on to Claude Code. Whatever else listens on the port cannot approve a tool call
+# (permissionDecision allow), rewrite its input (updatedInput) or stop the session (continue).
+safe() {
+  local r=$1 rest event text
+  case $r in
+    '{"systemMessage":"'*'"}')
+      text=${r#'{"systemMessage":"'}; plain "${text%'"}'}" ;;
+    '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"'*'"}}')
+      text=${r#'{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"'}; plain "${text%'"}}'}" ;;
+    '{"hookSpecificOutput":{"hookEventName":"'*'","additionalContext":"'*'"}}')
+      rest=${r#'{"hookSpecificOutput":{"hookEventName":"'}; event=${rest%%\"*}
+      [[ $event =~ ^[A-Za-z]+$ ]] || return 1
+      text=${rest#"$event"'","additionalContext":"'}; plain "${text%'"}}'}" ;;
+    *) return 1 ;;
+  esac
+}
+
+safe "$reply" && printf '%s' "$reply"
 exit 0

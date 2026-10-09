@@ -24,9 +24,12 @@ class SourceText private constructor(val bytes: ByteArray, val text: String) {
         }
 
     companion object {
+        private const val MAX_BYTES = 8_000_000L
+
         /** Null when the file is not there; refused when it is not valid UTF-8, so a file in another encoding is never rewritten. */
         fun read(path: Path): SourceText? {
             if (!Files.isRegularFile(path)) return null
+            if (Files.size(path) > MAX_BYTES) throw WriteRefused("$path is over ${MAX_BYTES / 1_000_000} MB; edit it by hand")
             val bytes = Files.readAllBytes(path)
             val decoder = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
             return try {

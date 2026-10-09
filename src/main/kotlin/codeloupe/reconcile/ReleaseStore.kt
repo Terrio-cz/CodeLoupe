@@ -24,7 +24,8 @@ class ReleaseStore(private val file: Path, private val now: () -> Instant = Inst
 
     init {
         runCatching { JsonFormat.json.decodeFromString(SERIALIZER, Files.readString(file)).forEach { items[key(it.repo, it.workspace)] = it } }
-        if (items.values.removeAll { Duration.between(Instant.parse(it.at), now()) > MAX_AGE }) save()
+        // A mark whose time cannot be read is dropped with the old ones: a damaged file must not stop the daemon from starting.
+        if (items.values.removeAll { runCatching { Duration.between(Instant.parse(it.at), now()) > MAX_AGE }.getOrDefault(true) }) save()
     }
 
     /** Marks [ref] released now; releasing again moves the mark to now. */
