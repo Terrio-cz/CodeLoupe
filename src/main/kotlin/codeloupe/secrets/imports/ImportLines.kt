@@ -23,5 +23,6 @@ object ImportLines {
 
     fun rolledBack(result: ImportBackups.RollbackResult): List<String> =
         listOf("restored ${result.restored} files, ${result.alreadyOriginal} were already as before" + if (result.complete) "; the backup is gone" else "") +
-            result.changedSince.map { "left alone, edited since the import: $it (use --force to restore it anyway)" }
+            result.changedSince.map { "left alone, edited since the import: $it (use --force to restore it anyway)" } +
+            result.failed.map { "could not be written back: $it (run the rollback again when it is free)" }
 }

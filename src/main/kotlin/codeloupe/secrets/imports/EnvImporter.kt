@@ -2,6 +2,7 @@ package codeloupe.secrets.imports
 
 import codeloupe.secrets.SecretScope
 import codeloupe.secrets.SecretStore
+import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -69,8 +70,13 @@ class EnvImporter(private val store: SecretStore, private val backups: ImportBac
         if (!text.toByteArray(StandardCharsets.UTF_8).contentEquals(bytes)) return "not valid UTF-8"
         val rewritten = SourceRewriter.rewrite(text, variables).toByteArray(StandardCharsets.UTF_8)
         session.add(file, bytes, ValueFingerprint.sha256(rewritten))
-        AtomicFile.write(file, rewritten)
-        return null
+        // A file that refuses the write (locked, read-only) is reported, and the files already rewritten stay under their backup.
+        return try {
+            AtomicFile.write(file, rewritten)
+            null
+        } catch (e: IOException) {
+            "cannot be written: ${e::class.simpleName}"
+        }
     }
 
     private companion object {

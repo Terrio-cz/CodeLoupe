@@ -4,6 +4,7 @@ import codeloupe.JsonFormat
 import codeloupe.platform.IsoTime
 import codeloupe.secrets.SecretStore
 import kotlinx.serialization.Serializable
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.SecureRandom
@@ -34,6 +35,8 @@ class ImportBackups(private val dir: Path, private val store: SecretStore, priva
         val changedSince: List<String>,
         /** True when every file is back and the copies are gone. */
         val complete: Boolean,
+        /** Files that could not be written back (locked, read-only); the copies stay, run the rollback again. */
+        val failed: List<String> = emptyList(),
     )
 
     /** A backup being made: files are added one by one, each copy on disk before the file is rewritten. */
@@ -63,6 +66,7 @@ class ImportBackups(private val dir: Path, private val store: SecretStore, priva
         var restored = 0
         var original = 0
         val changed = mutableListOf<String>()
+        val failed = mutableListOf<String>()
         for (entry in manifest.files) {
             val file = Path.of(entry.path)
             val current = runCatching { ValueFingerprint.sha256(Files.readAllBytes(file)) }.getOrNull()
@@ -70,22 +74,26 @@ class ImportBackups(private val dir: Path, private val store: SecretStore, priva
                 current == entry.originalSha256 -> original++
                 current == entry.replacedSha256 || force || current == null -> {
                     val bytes = store.openBlob("${manifest.id}/${entry.backup}", Files.readString(dir.resolve(manifest.id).resolve(entry.backup)))
-                    AtomicFile.write(file, bytes)
-                    restored++
+                    try {
+                        AtomicFile.write(file, bytes)
+                        restored++
+                    } catch (e: IOException) {
+                        failed += entry.path
+                    }
                 }
                 else -> changed += entry.path
             }
         }
-        val complete = changed.isEmpty()
+        val complete = changed.isEmpty() && failed.isEmpty()
         if (complete) forget(manifest.id)
-        return RollbackResult(manifest.id, restored, original, changed, complete)
+        return RollbackResult(manifest.id, restored, original, changed, complete, failed)
     }
 
     /** Drops the copies without restoring anything. */
     fun forget(id: String): Boolean {
         val folder = dir.resolve(safe(id))
         if (!Files.isDirectory(folder)) return false
-        Files.walk(folder).sorted(Comparator.reverseOrder()).forEach(Files::delete)
+        Files.walk(folder).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach(Files::delete) }
         return true
     }
 
