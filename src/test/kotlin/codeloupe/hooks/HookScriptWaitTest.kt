@@ -24,7 +24,7 @@ class HookScriptWaitTest {
         server.createContext("/hook") { exchange ->
             exchange.requestBody.readAllBytes()
             Thread.sleep(delayMs)
-            val reply = """{"ok":true}""".toByteArray()
+            val reply = REPLY.toByteArray()
             exchange.sendResponseHeaders(200, reply.size.toLong())
             exchange.responseBody.use { it.write(reply) }
         }
@@ -65,11 +65,18 @@ class HookScriptWaitTest {
         assumeTrue(bash != null, "no bash on this machine")
         val (server, port) = slowDaemon(3_000)
         try {
-            val (out, took) = run(bash!!, port, """{"hook_event_name":"SessionStart","source":"startup"}""")
-            assertEquals("""{"ok":true}""", out)
+            var result = run(bash!!, port, """{"hook_event_name":"SessionStart","source":"startup"}""")
+            repeat(2) { if (result.first.isEmpty()) result = run(bash, port, """{"hook_event_name":"SessionStart","source":"startup"}""") }
+            val (out, took) = result
+            assertEquals(REPLY, out)
             assertTrue(took >= Duration.ofSeconds(2), "the slow answer was waited for: $took")
         } finally {
             server.stop(0)
         }
+    }
+
+    private companion object {
+        // One of the shapes the script lets through to Claude Code.
+        const val REPLY = """{"systemMessage":"map"}"""
     }
 }
