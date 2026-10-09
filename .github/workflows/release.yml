@@ -168,6 +168,31 @@ jobs:
           name: release-files
           path: out
 
+      # Detached Ed25519 signatures of the two update feeds (CL-174): the app verifies `latest.yml.sig` and `latest-linux.yml.sig`
+      # against the public key it embeds before it looks at an installer. Only this job holds the private key, and it runs
+      # nothing but openssl and gh with it. Without the secret nothing is signed and the log says so; a build that embeds a
+      # key refuses an unsigned feed, so the secret has to exist before such a release is tagged (docs/wiki/Security.md).
+      - name: Sign the update feeds
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "::notice title=Update feeds not signed::The UPDATE_SIGNING_KEY secret of the release environment is not set, so latest.yml and latest-linux.yml carry no signature."
+            exit 0
+          fi
+          umask 077
+          dir=$(mktemp -d)
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$dir/key.pem"
+          openssl pkey -in "$dir/key.pem" -pubout -out "$dir/pub.pem"
+          for feed in latest.yml latest-linux.yml; do
+            openssl pkeyutl -sign -rawin -inkey "$dir/key.pem" -in "out/assets/$feed" -out "$dir/sig"
+            openssl pkeyutl -verify -rawin -pubin -inkey "$dir/pub.pem" -in "out/assets/$feed" -sigfile "$dir/sig"
+            base64 -w0 "$dir/sig" > "out/assets/$feed.sig"
+          done
+          rm -rf "$dir"
+          (cd out/assets && sha256sum latest.yml.sig latest-linux.yml.sig >> SHA256SUMS.txt)
+          echo "::notice title=Update feeds signed::latest.yml.sig and latest-linux.yml.sig are in the release."
+
       # Build provenance for every file of the release (SLSA, signed through Sigstore, bound to this workflow and commit):
       # `gh attestation verify <file> --repo <owner>/<repo>` tells that a file was built here from this tag and not replaced.
       - name: Attest the release files

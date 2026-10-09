@@ -7,6 +7,9 @@
 //     repository with an older format is rebuilt;
 //   - the updater asked only the feed host (every request is logged), without cookies or an identifying header;
 //   - a tampered installer is refused; with automatic updates off the app asks for nothing;
+//   - the feed is signed with a key pair made here (CL-174; the app is given its public half through the loopback-only
+//     CODELOUPE_UPDATE_PUBLIC_KEY): a feed without a signature, or changed after signing, is refused before any installer
+//     is requested;
 //   - with --bad (an installer whose daemon cannot start) the app falls back to the previous daemon bundle.
 //
 //   node tools/update-test.mjs --old <installer N> --new <installer N+1> [--bad <installer N+2 with a broken daemon>]
@@ -59,13 +62,19 @@ const failures = [];
 
 // ---- the feed -----------------------------------------------------------------------------------------------------------
 let tamper = false;
+/** null (the feed is served as signed), 'unsigned' (its .sig answers 404) or 'tampered' (latest*.yml differs from what was signed). */
+let feedFault = null;
 let served = [];
+const signing = crypto.generateKeyPairSync('ed25519');
+const publicKey = signing.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
 const server = http.createServer((req, res) => {
   const entry = { method: req.method, path: req.url, headers: { ...req.headers } };
   report.requests.push(entry);
   const file = path.join(dirs.feed, decodeURIComponent(new URL(req.url, feedUrl).pathname).replace(/^\/+/, ''));
-  if (!file.startsWith(dirs.feed) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404).end(); entry.status = 404; return; }
+  const unsigned = feedFault === 'unsigned' && file.endsWith('.sig');
+  if (unsigned || !file.startsWith(dirs.feed) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404).end(); entry.status = 404; return; }
   let data = fs.readFileSync(file);
+  if (feedFault === 'tampered' && path.basename(file) === ymlName) data = Buffer.from(data.toString('utf8').replace(/size: (\d+)/, (_, n) => `size: ${Number(n) + 1}`));
   if (tamper && /\.(exe|AppImage)$/.test(file)) { data = Buffer.from(data); data[Math.floor(data.length / 2)] ^= 0xff; }
   const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? '');
   if (range) {
@@ -84,8 +93,14 @@ const server = http.createServer((req, res) => {
 await new Promise((resolve, reject) => { server.once('error', reject); server.listen(feedPort, '127.0.0.1', resolve); });
 
 const ymlName = platform === 'win32' ? 'latest.yml' : 'latest-linux.yml';
-/** Publishes one installer as the release: its file and the feed file (electron-builder's own, or one made here). */
+/** Publishes one installer as the release: its file, the feed file (electron-builder's own, or one made here) and its signature. */
 function publish(installer) {
+  const how = publishFiles(installer);
+  const feed = fs.readFileSync(path.join(dirs.feed, ymlName));
+  fs.writeFileSync(path.join(dirs.feed, `${ymlName}.sig`), crypto.sign(null, feed, signing.privateKey).toString('base64'));
+  return how;
+}
+function publishFiles(installer) {
   for (const f of fs.readdirSync(dirs.feed)) fs.rmSync(path.join(dirs.feed, f), { force: true });
   fs.copyFileSync(installer, path.join(dirs.feed, path.basename(installer)));
   const blockmap = `${installer}.blockmap`;
@@ -156,6 +171,7 @@ function startApp(extra = {}) {
     // The installer would start the new app through the shell with the user's own environment, an AppImage without the
     // arguments of this test: the harness starts the new version itself.
     CODELOUPE_UPDATE_RELAUNCH: '0',
+    CODELOUPE_UPDATE_PUBLIC_KEY: publicKey,
     ...extra,
   });
   if (platform === 'linux') {
@@ -263,6 +279,21 @@ try {
   // -- N starts, finds the release in the local feed, downloads, verifies and installs it.
   const how = publish(newInstaller);
   report.feedFile = how;
+  // A feed that is not signed by the key the app trusts is refused before an installer is requested: a release without the
+  // signature, then a feed changed after it was signed.
+  for (const [fault, expected] of [['unsigned', /no signature/], ['tampered', /not signed by a key/]]) {
+    feedFault = fault;
+    const asked = report.requests.length;
+    startApp();
+    await waitFor(`the refusal of a ${fault} feed`, () => expected.test(updateLog()) && /state error/.test(updateLog()), 120);
+    check(`${fault} feed refused`, true);
+    check(`no installer requested after the ${fault} feed`, report.requests.slice(asked).every(r => !/\.(exe|AppImage)/.test(r.path)), JSON.stringify(report.requests.slice(asked).map(r => r.path)));
+    check(`nothing installed after the ${fault} feed`, isInstalled(oldInstaller, vOld) && appAlive() && !fs.existsSync(updateFile('pending.json')));
+    killApp();
+    await sleep(2000);
+    fs.rmSync(updateFile('update.log'), { force: true });
+  }
+  feedFault = null;
   // A tampered installer must be refused: same size, one byte flipped, the feed's SHA-512 is the original's.
   tamper = true;
   startApp();
@@ -300,7 +331,7 @@ try {
   const updateRequests = report.requests.slice(mark);
   const sums = updateRequests.filter(r => r.status === 200 || r.status === 206).map(r => r.path);
   report.updateRequests = updateRequests.map(r => ({ method: r.method, path: r.path, status: r.status, ua: r.headers['user-agent'], staging: r.headers['x-user-staging-id'], cookie: !!r.headers.cookie, auth: !!r.headers.authorization }));
-  check('the updater asked only the feed, for the feed file and the installer', updateRequests.length > 0 && updateRequests.every(r => r.headers.host === `127.0.0.1:${feedPort}` && (new URL(r.path, feedUrl).pathname === `/${ymlName}` || /^\/CodeLoupe-[^/]+\.(exe|AppImage)(\.blockmap)?$/.test(r.path))), JSON.stringify(sums));
+  check('the updater asked only the feed, for the feed file, its signature and the installer', updateRequests.length > 0 && updateRequests.every(r => r.headers.host === `127.0.0.1:${feedPort}` && ([`/${ymlName}`, `/${ymlName}.sig`].includes(new URL(r.path, feedUrl).pathname) || /^\/CodeLoupe-[^/]+\.(exe|AppImage)(\.blockmap)?$/.test(r.path))), JSON.stringify(sums));
   // Standard HTTP headers (host, accept-encoding, sec-fetch-*) aside, nothing is sent but a bare User-Agent, an English
   // Accept-Language (not the system's) and a constant where electron-updater would put a per-installation id.
   const plain = new Set(['host', 'connection', 'accept', 'accept-encoding', 'accept-language', 'cache-control', 'user-agent', 'range', 'if-range', 'x-user-staging-id', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest']);

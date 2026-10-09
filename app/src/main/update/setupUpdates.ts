@@ -8,6 +8,7 @@ import { createEngine, fetchText } from './ElectronEngine';
 import { feedOverride } from './feedOverride';
 import { UpdateDir, type RollbackRecord } from './UpdateDir';
 import { UpdateGuard } from './UpdateGuard';
+import { UPDATE_PUBLIC_KEYS } from './updateKeys';
 import { detectMode } from './updateMode';
 import { UpdateService } from './UpdateService';
 
@@ -38,7 +39,11 @@ export function setupUpdates(w: UpdateWiring): Updates {
   // update that installs at once.
   const override = mode.kind === 'unavailable' ? null : feedOverride(w.env.CODELOUPE_UPDATE_FEED);
   const log = fileLog(path.join(files.dir, 'update.log'));
-  const engine = mode.kind === 'install' ? createEngine(mode.engine, log) : null;
+  // The local-feed test may add a key of its own (never remove the embedded ones): it can only be set where the feed is already
+  // a loopback address, so the variable leads no update from anywhere else.
+  const testKey = override ? w.env.CODELOUPE_UPDATE_PUBLIC_KEY?.trim() : undefined;
+  const keys = testKey ? [...UPDATE_PUBLIC_KEYS, testKey] : UPDATE_PUBLIC_KEYS;
+  const engine = mode.kind === 'install' ? createEngine(mode.engine, log, keys) : null;
 
   const service = new UpdateService({
     current: w.version,

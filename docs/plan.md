@@ -1442,6 +1442,22 @@ rozhoduje launcher.
   jako tajemství prostředí `release`, proto je to samostatná karta. Do té doby platí SHA-512 z feedu stejného vydání a ruční `gh attestation verify`.
 - Neověřeno: job `publish` s atestací se spustí poprvé na skutečném tagu; kontrola je v `docs/repository-hardening.md`, sekce „After the first release“.
 
+### Výsledek CL-174 — odpojený podpis feedů aktualizací (2026-10-09)
+
+- Co se ověřuje: updater před čtením `latest.yml` / `latest-linux.yml` stáhne vedle něj `<feed>.sig` (base64 surového podpisu Ed25519) a ověří ho nad
+  přesně tím textem, který pak parsuje (`SignedFeedProvider`, podtřída `GenericProvider`, přepisuje `httpRequest`, takže není druhé stažení, které by se
+  mohlo lišit). Chybějící podpis, podpis klíčem mimo seznam (i starým) a feed změněný po podpisu se odmítnou ještě před žádostí o instalátor.
+- Klíče: seznam `UPDATE_PUBLIC_KEYS` v `app/src/main/update/updateKeys.ts` (base64 DER SubjectPublicKeyInfo); je prázdný, dokud vlastník nevytvoří pár klíčů.
+  Bez klíče se build chová jako dřív (SHA-512 z feedu) a do `update.log` napíše, že podpis nekontroluje. S klíčem je podpis povinný: tag prvního vydání
+  s klíčem proto nesmí vzniknout dřív než tajemství `UPDATE_SIGNING_KEY` (jinak by každá nainstalovaná aplikace feed odmítla).
+- Podepisování: job `publish` (jediný, kdo tajemství čte; spouští jen `openssl` a `gh`) podepíše oba feedy před atestací, podpis sám ověří veřejnou
+  částí a přidá hashe do `SHA256SUMS.txt`; bez tajemství vypíše upozornění a nic nepodepíše. Podpis z `openssl pkeyutl -sign -rawin` ověřuje Node
+  `crypto.verify` (fixture `app/test/fixtures/signed-feed`).
+- Rotace klíče podpisem nového starým není; nový veřejný klíč se přidá vedle starého v jednom vydání a v dalším se starý vyřadí.
+- Test s lokálním feedem (`tools/update-test.mjs`) podepisuje feed klíčem vygenerovaným pro běh (aplikaci ho dá proměnná
+  `CODELOUPE_UPDATE_PUBLIC_KEY`, čtená jen při loopback feedu, klíče jen přidává) a ověřuje odmítnutí feedu bez podpisu a feedu změněného po podpisu.
+- Neověřeno: skutečný tag s tajemstvím (krok `publish` běží jen na push tagu); zbytek (pár klíčů, tajemství, veřejný klíč v aplikaci) je karta pro vlastníka.
+
 ### Výsledek CL-160 — zbytky po bezpečnostní revizi trezoru (2026-10-09)
 
 - macOS: klíč trezoru se do `security` posílá přes `security -i` na standardním vstupu, takže není na příkazové řádce, kterou vidí `ps` jiného

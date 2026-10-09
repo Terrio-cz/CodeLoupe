@@ -14,3 +14,5 @@ plugin/skills/**/*.md text eol=lf
 *.ico binary
 *.icns binary
 *.woff2 binary
+# The signature covers these bytes exactly (a signature made with openssl, as the release workflow does).
+app/test/fixtures/signed-feed/** text eol=lf

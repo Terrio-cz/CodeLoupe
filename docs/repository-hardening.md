@@ -82,5 +82,8 @@ this repository or plan; apply it in the web interface (Settings, Rules; Setting
    ([Security](https://github.com/Terrio-cz/CodeLoupe/wiki/Security#verifying-a-release)). The `publish` job has never run against a
    real tag, so this is the first proof that the attestation is created; if it is not, the job log says which permission is missing.
 2. Publish the draft only when row 6 is on, so that the published release is immutable.
-3. The updater still trusts whatever the release holds (a SHA-512 from the same release). A detached signature over `latest.yml` closes
-   that and needs a key pair kept by the owner: see "How far the updater is trusted" in the Security wiki page.
+3. The updater verifies a signature of the feed once the build embeds a key (CL-174: built, off until you make the pair). Create the key
+   pair (`openssl genpkey -algorithm ED25519 -out update-signing.pem`), store the PEM text as the `UPDATE_SIGNING_KEY` secret of the
+   `release` environment, put `openssl pkey -in update-signing.pem -pubout -outform DER | base64 -w0` into `UPDATE_PUBLIC_KEYS` in
+   `app/src/main/update/updateKeys.ts`, and tag. The secret must exist before the tag of that release, or every installed app refuses its
+   feed. Then check that `latest.yml.sig` is among the release assets. See "How far the updater is trusted" in the Security wiki page.

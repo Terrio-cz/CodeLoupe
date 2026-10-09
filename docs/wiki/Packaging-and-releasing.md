@@ -123,6 +123,13 @@ installer). electron-builder writes the feed files next to the installers (`publ
 - **Publishing the draft is what makes an update visible**; until then no installed app sees the release.
 - A released feed is trusted by every installed app: do not edit `latest.yml` or the installers in a published release (the
   checks of `tools/feed-check.mjs` run in the release job before the draft is created).
+- **Signed feeds.** The `publish` job signs the two feed files when the `UPDATE_SIGNING_KEY` secret of the `release` environment
+  exists and adds `latest.yml.sig` / `latest-linux.yml.sig` (without the secret it prints a notice and signs nothing). A build whose
+  `app/src/main/update/updateKeys.ts` lists a public key refuses a feed without a matching signature, so **set the secret before the
+  tag of the first release that embeds a key**, and never embed a key whose private half is not the secret. Make a pair with
+  `openssl genpkey -algorithm ED25519 -out update-signing.pem`; the constant is
+  `openssl pkey -in update-signing.pem -pubout -outform DER | base64 -w0`; the secret is the PEM text. How it is checked and what
+  is verified: [Security](Security#how-far-the-updater-is-trusted).
 
 #### Testing an update locally
 
@@ -133,7 +140,9 @@ node tools/update-test.mjs --old CodeLoupe-0.9.0-rc.1-win-x64.exe --new CodeLoup
 Build the installers as the `update-test` job in [ci.yml](https://github.com/Terrio-cz/CodeLoupe/blob/main/.github/workflows/ci.yml) does: `./gradlew bundle
 -PreleaseVersion=<v>` and `npm run dist -- -c.extraMetadata.version=<v>` once per version, and for `--bad` the stage of the
 second with a jar that cannot start (`node tools/break-bundle.mjs app/stage/codeloupe 0.9.0-rc.3`, then `electron-builder`).
-The test serves `latest.yml` and the installer from a throwaway server on 127.0.0.1 (`--port`, default 47550, and the next
+The test serves `latest.yml`, its signature (made with a key pair generated for the run; the app is given the public half through
+`CODELOUPE_UPDATE_PUBLIC_KEY`, which like the feed variable is read only when the feed is a loopback address, and which only adds a key to the
+embedded ones) and the installer from a throwaway server on 127.0.0.1 (`--port`, default 47550, and the next
 port for the daemon) and starts the app with `CODELOUPE_UPDATE_FEED` pointing at it. The variable accepts a loopback address
 only, so it cannot make the updater talk to another host; it is not a way to update from somewhere else. The test installs N,
 stores a settings file, a secret and an indexed repository, and checks that
