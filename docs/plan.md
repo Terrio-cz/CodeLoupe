@@ -1369,6 +1369,19 @@ rozhoduje launcher.
   (dekodér je testován fixturou), zamčený Keychain / KWallet, pád démona mimo Windows (jen job objekty hlídají vnuky; jinak je při dalším startu ukončí pid),
   start démona mimo Windows jako obyčejné dítě ve skupině volajícího (bez `setsid`).
 
+### Výsledek CL-165 — Linux a macOS: klíč repozitáře, domov hooku, sockety Dockeru, priorita vláken, smazaný cwd (2026-10-09)
+
+- **Klíč repozitáře** (`RepoKey`): id adresáře indexu je SHA-1 cesty složené podle file systému (`PathCase`: Windows a macOS ignorují velikost písmen, Linux ne), takže na Linuxu
+  `/src/Foo` a `/src/foo` už nesdílejí `repo.json` a základ. Migrace bez přeindexování: existující adresář, jehož `repo.json` jmenuje tuto cestu (pod starým klíčem s malými písmeny nebo
+  pod novým), se použije dál; adresář jiného pravopisu se nepřebírá. `repos add` skládá velikost podle téhož pravidla (`RepoConfig`). Testy: `RepoKeyTest`, `RegistryTest`, `RepoConfigTest`.
+- **Domov**: JVM bere na Linuxu a macOS `user.home` z passwd, `hook.sh`, launcher a git z `$HOME`; s přepsaným `HOME` (izolovaný profil, `sudo -E`) hook nenašel `daemon.json` a mlčel.
+  `UserHome.adopt()` na začátku `main` nastaví `user.home` podle `$HOME`, když jmenuje adresář. Testy: `UserHomeTest`, `HookScriptHomeTest` (skutečný skript s přepsaným `HOME`).
+- **Docker**: bez `DOCKER_HOST` se zkouší nejdřív endpoint aktuálního kontextu (`DOCKER_CONTEXT` / `currentContext`, adresář kontextu je SHA-256 jména), pak sockety Docker Desktopu, rootless Dockeru,
+  Colimy, OrbStacku, Rancher Desktopu a Podmanu (`DockerSockets`, čisté funkce nad prostředím a domovem); chybová hláška nevypisuje tucet neexistujících cest. Testy: `DockerEndpointTest`.
+- **Priorita**: `setpriority(PRIO_PROCESS, 0)` snižuje na Linuxu jen volající vlákno; vlákna JVM vzniklá dřív (GC, kompilátor) zůstávala normální. `ProcessPriority` nyní snižuje i každé vlákno z `/proc/self/task`
+  ve dvou průchodech (vlákno vzniklé během prvního zdědí normální). Test (`ProcessPriorityTest`) čte nice každého vlákna sondy na Linuxu, `ps` na macOS, `PriorityClass` na Windows.
+- **Smazaný cwd**: `/proc/<pid>/cwd` smazaného adresáře končí ` (deleted)`; přípona se odřízne, jen když takto pojmenovaná cesta neexistuje (`ProcFsProcessDetails.withoutDeleted`), takže se proces přiřadí svému workspace.
+
 ### Výsledek CL-150 — AOT cache pro CLI a start daemona (2026-10-09)
 
 - **Zapnuto.** Launchery předají CLI `-Dcodeloupe.aot=<home>/aot/<instalace>-<build>` a použijí `<…>.cli.aot`, pokud existuje (`-XX:AOTCache`; JVM s ním odmítne `-Xshare`, proto skripty `-Xshare` už nedávají).
