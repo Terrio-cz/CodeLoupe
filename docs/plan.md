@@ -904,6 +904,24 @@ rozhoduje launcher.
   Zamítnuto: odložený zápis snapshotu na pozadí (testy restartu Registry v jednom JVM by závodily o soubor kvůli 3 ms), trvale otevřené spojení overlay storu
   (stránková cache 2 MB na worktree × 16, soubor držený při `collect`), čtení souboru pro porovnání a parse jedním čtením (ušetří čtení z cache OS, ~0,2 ms).
 
+### Výsledek CL-149 — obnova overlaye po editaci, co zbývá za průchodem (2026-10-09)
+
+- **Rozpis serverové strany** (dočasné značky, TerrioImporter klon, klidnější okamžik; jeden editovaný soubor): průchod 20–37 ms, zbytek kontroly (`gitState` 0,6, porovnání s bází 1,6–8, `change` ~0) 3–10,
+  předání jobu 1 + `start` 1, **otevření overlay storu 5–9 ms**, zápis do storu 11 ms (round trip parse workeru 5,5–8,5, z toho parse 4–6,5; zbytek zápis do SQLite), zavření ~1, commit se snapshotem 2,6–3,8.
+  Otevření je skoro celé tím, že store nemá otevřené žádné jiné spojení: `-wal` a `-shm` se zakládají a při zavření mažou (mikrobenchmark: ro bez držitele 6 ms, s držitelem 0,5 ms).
+- **Nejvíc stálo `FactSources`**: obnova pro jeden soubor otevřela před prvním parse **všechny ostatní overlay stores** repozitáře jen pro čtení, na Windows 5–9 ms každý. Se 8 dalšími overlayi (úkoly s rozdělanou prací)
+  to bylo **60–70 ms** na jedinou editaci (refresh 94 místo 25 ms), parse jednoho souboru přitom stojí ~5 ms. Store se teď zkouší jen tehdy, když overlay jeho worktree (který daemon od startu zkontroloval) obsahuje
+  některou z cest k parse; store worktree, který daemon ještě nekontroloval, se nezkouší (otevírat ho kvůli nahlédnutí by stálo víc než ušetřený parse). Zbytek zůstal: dvě stejné editace ve dvou worktrees se parsují jednou
+  (test), synchronizace báze po přistání zkouší dál všechny stores (`BaseBuilds`).
+- **Spojení pro zápis zůstává otevřené** 30 s po obnově (`OverlayWriters`, `IdleTimer` jako u JGit repozitářů: nic se nedrží, když nikdo needituje); po každém použití `PRAGMA shrink_memory`, zavře se před smazáním
+  souboru (`collect`, `deleteFile`), s `Registry.close()` a po chybě. Další editace téhož worktree tak nezaplatí otevření (−7 ms u obnovy po vrácení editace 11,6 → 4,5 ms, měřeno v jednom daemonu střídavě).
+- **Měření** (`tools/profile.mjs --only edit --edits 12`, střídavě starý/nový build, každý na čerstvé kopii home, stroj zatížený ostatními okny, p50 klienta): jeden overlay: edit **68 / 73 / 76 / 73 → 49 / 66 / 65 / 76 ms**,
+  vrácení editace 46 / 59 / 63 / 59 → 36 / 50 / 51 / 50 ms; s 8 dalšími overlay stores: edit **160 / 146 / 171 → 67 / 73 / 75 ms**, vrácení 67 / 62 / 68 → 53 / 48 / 54 ms. Absolutní hranice 100 ms tedy platí všude, kde starý build
+  měří do 110 ms (jeden overlay, 68–76) i tam, kde měří 146–171 (8 stores).
+  `tools/load-test.mjs --seconds 90 --sync-files 12` (dvě série střídavě): RSS ustáleně **193 / 186 → 184 / 189 MB**, špička 196 / 189 → 188 / 193, p95 60 / 82 → 79 / 108 ms (šum mezi sériemi je větší než rozdíl), 0 busy, 0 failed.
+- **Zamítnuto měřením**: levnější round trip workeru (režie mimo parse 1,5–2 ms; parse 4–6,5 ms a klesá s rozehřátím JIT), řidší zápis snapshotu (2,6–3,8 ms; neshoda snapshotu s overlayem se pozná, ale testy restartu Registry v jednom JVM by
+  závodily o soubor, jako v CL-134), zápis snapshotu na pozadí z téhož důvodu. Nezměněno: žádné watchery, nulové CPU v klidu, hranice paměti (CL-125).
+
 ### Výsledek CL-71 — build daemony a procesy po workspacech (2026-10-08)
 
 - **Procesy po workspacech** (`codeloupe.processes`, `GET /processes`, `ws processes`, `workspaces --ram`): proces patří workspace,

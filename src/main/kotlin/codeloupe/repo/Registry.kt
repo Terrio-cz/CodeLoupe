@@ -202,6 +202,7 @@ class Registry(
     /** Closes the open read views and git repositories; the next query opens them again. */
     fun close() {
         views.closeAll()
+        overlays.close()
         taskCodes.close()
         JGitRepos.closeIdle()
     }
