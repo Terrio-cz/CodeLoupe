@@ -145,11 +145,13 @@ class UsagesTest {
 
     @Test
     fun `hierarchy - subtypes, supertypes and overrides`() {
-        assertContains(HierarchyQuery.run(view, "com.example.model.Account"), "subtypes:\n  ./Account.kt:20  class SavingsAccount(…)")
-        assertContains(HierarchyQuery.run(view, "AccountStore"), "supertypes:\n  src/main/kotlin/com/example/model/Account.kt:3  interface Store<T>")
+        assertContains(HierarchyQuery.run(view, "com.example.model.Account", supers = true), "subtypes:\n  ./Account.kt:20  class SavingsAccount(…)")
+        assertEquals("subtypes:\n  src/main/kotlin/com/example/model/Account.kt:20  class SavingsAccount(…)", HierarchyQuery.run(view, "com.example.model.Account"), "the direct subtypes, no head, no supertypes")
+        assertTrue("supertypes" !in HierarchyQuery.run(view, "AccountStore"), "supertypes only on request")
+        assertContains(HierarchyQuery.run(view, "AccountStore", supers = true), "supertypes:\n  src/main/kotlin/com/example/model/Account.kt:3  interface Store<T>")
         assertContains(HierarchyQuery.run(view, "Account.describe"), "overridden by:\n  ./Account.kt:21  [SavingsAccount] override fun describe()")
         assertContains(HierarchyQuery.run(view, "AccountStore.find"), "overrides:\n  src/main/kotlin/com/example/model/Account.kt:5  [Store] fun find(…)")
-        assertContains(HierarchyQuery.run(view, "Shape"), "subtypes:\n  ./Shapes.kt:23  class Circle : Shape()")
+        assertContains(HierarchyQuery.run(view, "Shape", supers = true), "subtypes:\n  ./Shapes.kt:23  class Circle : Shape()")
         assertContains(HierarchyQuery.run(view, "Named"), "subtypes:\n  src/main/kotlin/com/example/other/Edge.kt:22  [Edge.lit] object : Named", message = "an object expression")
         val validator = HierarchyQuery.run(view, "Validator")
         assertContains(validator, "lambda implementations (Validator { … }):\n  = src/main/kotlin/com/example/other/Edge.kt:45  val positive = Validator { it > 0 }")

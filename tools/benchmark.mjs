@@ -665,7 +665,7 @@ function renderMarkdown(d) {
     verdicts.push(`- ${label}: CodeLoupe's median answer is ${word} (${num(p.codeloupe)} against ${num(p.minimal)} tokens); smaller than minimal grep in ${p.clBeatsMinimal} of ${p.n} answers${p.typicalRows ? `, smaller than grep + read in ${p.clBeatsTypical} of ${p.typicalRows}` : ''}.`);
   }
   L.push(...verdicts, '');
-  L.push('Where the CodeLoupe answer is larger it carries more than the grep lines: usages and callers name the enclosing declaration of every hit and mark exact against candidate references, `changes` lists the changed declarations with their callers and tests where `git diff --stat` lists files, subtypes include supertypes and transitive links.', '');
+  L.push('Where the CodeLoupe answer is larger it carries more than the grep lines: usages and callers name the enclosing declaration of every hit and mark exact against candidate references, `changes` lists the changed declarations where `git diff --stat` lists files (callers and tests of each come with `callers=true`), and `hierarchy` lists the direct subtypes (`supers=true` adds the supertypes, `deep=true` the transitive links).', '');
   const gnWins = KINDS.map(([k, label]) => [label, pooled(results, k)]).filter(([, p]) => p.gitnexus != null && p.gitnexus < p.codeloupe);
   if (gnWins.length) L.push('GitNexus returned a smaller median answer than CodeLoupe for: ' + gnWins.map(([l, p]) => `${l.toLowerCase()} (${num(p.gitnexus)} against ${num(p.codeloupe)} tokens)`).join('; ') + '.', '');
 

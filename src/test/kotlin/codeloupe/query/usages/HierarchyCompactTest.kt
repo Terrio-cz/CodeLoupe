@@ -25,12 +25,15 @@ class HierarchyCompactTest {
         val db = TestRepos.tmpDir("hierarchy-compact").resolve("base.db")
         BaseBuilder.build(repo.toString(), TestRepos.git(repo, "rev-parse", "HEAD"), db)
         View(db).use { view ->
-            val text = HierarchyQuery.run(view, "Family")
+            val text = HierarchyQuery.run(view, "Family", supers = true)
             assertContains(text, "$dir/Family.kt:3  interface Family")
             assertContains(text, "subtypes (under $impl/):")
             assertContains(text, "  ./Beside.kt:3  object Beside : Family")
             assertContains(text, "  AFamily.kt:5  object AFamily : Family")
             assertFalse("$impl/AFamily.kt" in text, text)
+            val plain = HierarchyQuery.run(view, "Family")
+            assertFalse("interface Family" in plain, "no head line by default: $plain")
+            assertContains(plain, "subtypes (under src/main/kotlin/demo/):")
         }
     }
 
@@ -48,10 +51,13 @@ class HierarchyCompactTest {
         val db = TestRepos.tmpDir("hierarchy-deep").resolve("base.db")
         BaseBuilder.build(repo.toString(), TestRepos.git(repo, "rev-parse", "HEAD"), db)
         View(db).use { view ->
-            val direct = HierarchyQuery.run(view, "Leaf")
+            assertFalse("supertypes" in HierarchyQuery.run(view, "Leaf"), "supertypes only on request")
+            val direct = HierarchyQuery.run(view, "Leaf", supers = true)
             assertContains(direct, "interface Middle")
             assertFalse("interface Top" in direct, direct)
             assertContains(HierarchyQuery.run(view, "Leaf", deep = true), "interface Top")
+            assertFalse("class Leaf" in HierarchyQuery.run(view, "Top"), "direct subtypes only")
+            assertContains(HierarchyQuery.run(view, "Top", deep = true), "class Leaf")
         }
     }
 }

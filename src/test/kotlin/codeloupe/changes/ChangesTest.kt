@@ -47,14 +47,16 @@ class ChangesTest {
         write(repo, "src/main/kotlin/demo/Extra.kt", "package demo\n\nclass Extra\n")
         commit(repo, "main moves")
 
-        val text = changes()
+        val plain = changes()
+        assertFalse("callers" in plain || "      tests" in plain, "callers and tests come on request: $plain")
+        val text = changes(callers = true)
         assertContains(text, Regex("^changes vs main \\(merge-base [0-9a-f]{7}\\): 3 source files, 7 declarations \\(\\+3 ~1 \\^1 -2\\)"))
-        assertContains(text, "  ~ 4-6  [Billing] fun total(a: Int): Int")
+        assertContains(text, "  [Billing]\n    ~ 4-6  fun total(a: Int): Int")
         assertContains(text, "      callers 1: useAll (Use.kt)")
         assertContains(text, "      tests 1: BillingTest")
-        assertContains(text, "  ^ 8  [Billing] fun tax(a: Int, rate: Int): Int\n      was: fun tax(a: Int): Int")
-        assertContains(text, Regex("  - \\d+  \\[Billing\\] fun legacy\\(\\): Int\n      still referenced by name 1: useAll \\(Use.kt\\)"))
-        assertContains(text, "  + 12  [Billing] fun discount(): Int")
+        assertContains(text, "    ^ 8  fun tax(a: Int, rate: Int): Int\n      was: fun tax(a: Int): Int")
+        assertContains(text, Regex("    - \\d+  fun legacy\\(\\): Int\n      still referenced by name 1: useAll \\(Use.kt\\)"))
+        assertContains(text, "    + 12  fun discount(): Int")
         assertContains(text, "./${NEW.substringAfterLast('/')}  (new)\n  + 3-5  class Fresh  (with 1 member)\n")
         assertContains(text, "./${OLD.substringAfterLast('/')}  (deleted)\n  - 3  class Old")
         assertFalse("keep()" in text.substringBefore(NEW), "an unchanged member is not listed, line ends do not count")
@@ -103,7 +105,7 @@ class ChangesTest {
         commit(repo, "pay")
         git(feature, "merge", "-q", "main")
         write(feature, PAY, "package demo\n\nclass Pay {\n    fun pay(a: Int, c: Int): Int = a + c\n\n    fun pay(a: String, b: Int = 0): Int = b\n}\n")
-        val text = changes()
+        val text = changes(callers = true)
         assertContains(text, "  ^ 4  [Pay] fun pay(a: Int, c: Int): Int\n      was: fun pay(a: Int): Int")
         assertContains(text, "may be redirected (fit the old signature, now resolve to another overload) 2: payAll (PayUse.kt) ×2")
     }
@@ -160,7 +162,7 @@ class ChangesTest {
     fun `callers of an added declaration come on request`() {
         write(feature, BILLING, billing(extra = "\n    fun discount(): Int = 5\n"))
         write(feature, USE, USE_TEXT.replace("Billing().legacy()", "Billing().legacy() + Billing().discount()"))
-        assertFalse("callers" in changes(), "no callers line under an added declaration")
+        assertFalse("callers" in changes(), "no callers line unless asked")
         assertContains(changes(callers = true), "  + 14  [Billing] fun discount(): Int\n      callers 1: useAll (Use.kt)")
     }
 

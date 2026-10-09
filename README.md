@@ -49,7 +49,7 @@ claude plugin install codeloupe@codeloupe
 ## What it does
 
 - **Navigate and review**: `find`, `outline`, `symbol`, `context`, `usages`, `calls`, `hierarchy`, `grep`, and `changes` (the
-  declarations a branch changed, with callers and tests). Unsure references are marked `candidate`, never dropped.
+  declarations a branch changed; `callers=true` adds callers and tests). Unsure references are marked `candidate`, never dropped.
 - **Steer**: the plugin's hook points shell searches and whole-file reads of indexed source at the call that answers them.
 - **Edit by declaration**: `edit` replaces, inserts, deletes and renames declarations, verified before anything is written.
 - **Run long commands**: `job` runs builds and tests in the daemon so an agent's turn can end; `run` answers a short command
@@ -74,7 +74,7 @@ Every tool is on MCP and on the CLI (`codeloupe <tool> --help`); details in the
 | `context` | a declaration's source with its callers and callees in one answer |
 | `usages` | every reference to a declaration, `=` exact or `?` candidate |
 | `calls` | callers or callees as a tree |
-| `hierarchy` | supertypes and subtypes of a type, overrides of a member |
+| `hierarchy` | direct subtypes of a type (`supers=true`: its supertypes too, `deep=true`: transitively), overrides of a member |
 | `grep` | text search in indexed source, hits grouped by enclosing declaration |
 | `changes` | what a worktree changed against the merge-base, by declaration |
 | `edit` | change source by declaration: replace, insert, delete, add imports, create a file, rename |

@@ -68,7 +68,7 @@ accounting (`--jvm-opts` to try flags, `--skip` to leave tools out, `--histogram
 | `index` | SQLite store, base build from git objects, build worker entry point, parse worker (`ParseWorker`) and its client |
 | `repo` | repositories and worktrees → base index, base syncs, child-process builds |
 | `overlay` | per-worktree overlays: change checks, refreshes, cleanup of removed worktrees |
-| `changes` | a worktree's declarations compared with the merge-base: matching, line diffs, callers and tests |
+| `changes` | a worktree's declarations compared with the merge-base: matching, line diffs, callers and tests on request |
 | `taskcode` | `task_code`: history of the default branch by task id, changed declarations per landing, touch-set prediction from issue text |
 | `query` | read view (with worktree overlays), `find` / `outline` / `symbol` |
 | `query.usages` | resolver for references: scopes, receivers, type specs; `usages` / `calls` / `hierarchy` |

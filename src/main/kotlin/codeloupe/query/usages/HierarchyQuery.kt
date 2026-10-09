@@ -14,7 +14,8 @@ object HierarchyQuery {
     private const val MAX_CODE = 100
     private val FUN_INTERFACE = Regex("""(^|\s)fun interface\s""")
 
-    fun run(view: View, name: String?, deep: Boolean = false): String {
+    /** [supers]: also the type's direct supertypes; [deep]: supertypes and subtypes transitively. */
+    fun run(view: View, name: String?, supers: Boolean = false, deep: Boolean = false): String {
         val query = name.orEmpty()
         val found = Resolver.resolve(view, query)
         if (found.isEmpty()) return "no declaration \"$query\"" + Members.suggest(view, query)
@@ -23,9 +24,11 @@ object HierarchyQuery {
         val target = targets.single()
         val finder = UsageFinder(view)
         val isType = target.kind in Kinds.CLASSIFIERS
-        val lines = arrayListOf("${target.path}:${Format.range(target)}  ${if (isType) typeHead(target) else ShortSignature.of(target)}")
         val dir = target.path.substringBeforeLast('/', "")
-        if (isType) type(target, finder.context.types, deep, dir, lines) else member(target, finder.context.overrides, dir, lines)
+        // The subtypes of a type name it in the question; the head line and the supertypes come on request.
+        val lines = arrayListOf<String>()
+        if (!isType || supers || deep) lines += "${target.path}:${Format.range(target)}  ${if (isType) typeHead(target) else ShortSignature.of(target)}"
+        if (isType) type(target, finder.context.types, supers || deep, deep, dir, lines) else member(target, finder.context.overrides, dir, lines)
         if (target.kind == "interface" && FUN_INTERFACE.containsMatchIn(target.sig)) lambdas(finder, target, lines)
         return lines.take(MAX_LINES).joinToString("\n") + Format.more(lines.size, MAX_LINES)
     }
@@ -33,8 +36,8 @@ object HierarchyQuery {
     /** A line of a list: a declaration at a nesting depth, or a supertype name the index does not hold. */
     private class Entry(val depth: Int, val decl: DeclRow?, val unresolved: String = "")
 
-    /** [deep]: the supertypes of the supertypes too; by default only the ones the type names itself. */
-    private fun type(type: DeclRow, types: Types, deep: Boolean, dir: String, lines: MutableList<String>) {
+    /** Direct subtypes; with [supers] the direct supertypes too; with [deep] the links of the links in both directions. */
+    private fun type(type: DeclRow, types: Types, supers: Boolean, deep: Boolean, dir: String, lines: MutableList<String>) {
         val supertypes = ArrayList<Entry>()
         fun up(t: DeclRow, depth: Int, seen: MutableSet<DeclRow>) {
             for ((name, resolved) in types.direct(t)) {
@@ -45,17 +48,17 @@ object HierarchyQuery {
                 }
             }
         }
-        up(type, 1, hashSetOf(type))
+        if (supers) up(type, 1, hashSetOf(type))
         lines += section("supertypes", supertypes, dir)
         val subtypes = ArrayList<Entry>()
         fun down(t: DeclRow, depth: Int, seen: MutableSet<DeclRow>) {
             for (s in types.directSubtypes(t)) {
                 subtypes += Entry(depth, s)
-                if (seen.add(s)) down(s, depth + 1, seen)
+                if (deep && seen.add(s)) down(s, depth + 1, seen)
             }
         }
         down(type, 1, hashSetOf(type))
-        lines += if (subtypes.isEmpty()) listOf("subtypes: (none indexed)") else section("subtypes", subtypes, dir)
+        lines += if (subtypes.isEmpty()) listOf("subtypes of ${type.name}: (none indexed)") else section("subtypes", subtypes, if (supers || deep) dir else "")
     }
 
     /**

@@ -39,14 +39,14 @@ class JavaChangesTest {
         // Uncommitted: a new file.
         write(feature, NEW, "package demo;\n\nclass Fresh {\n    int hello() {\n        return new Billing().keep();\n    }\n}\n")
 
-        val text = changes()
+        val text = changes(callers = true)
         assertContains(text, Regex("^changes vs main \\(merge-base [0-9a-f]{7}\\): 3 source files, 7 declarations \\(\\+3 ~1 \\^1 -2\\)"))
-        assertContains(text, "  ~ 4-6  [Billing] int total(int a)")
+        assertContains(text, "  [Billing]\n    ~ 4-6  int total(int a)")
         assertContains(text, "callers 1: Use.useAll")
         assertContains(text, "tests 1: BillingTest")
-        assertContains(text, "  ^ 8  [Billing] int tax(int a, int rate)\n      was: int tax(int a)")
-        assertContains(text, Regex("  - \\d+  \\[Billing\\] int legacy\\(\\)\n      still referenced by name 1: Use.useAll"))
-        assertContains(text, "  + 12  [Billing] int discount()")
+        assertContains(text, "    ^ 8  int tax(int a, int rate)\n      was: int tax(int a)")
+        assertContains(text, Regex("    - \\d+  int legacy\\(\\)\n      still referenced by name 1: Use.useAll"))
+        assertContains(text, "    + 12  int discount()")
         assertContains(text, "(new)")
         assertContains(text, "class Fresh  (with 1 member)")
         assertContains(text, "(deleted)")
@@ -56,7 +56,7 @@ class JavaChangesTest {
     @Test
     fun `a Java signature change lists the Kotlin call it may have broken`() {
         write(feature, BILLING, billing(tax = "int tax(int a, int rate) { return a * rate / 100; }"))
-        val text = changes()
+        val text = changes(callers = true)
         assertContains(text, "  ^ 8  [Billing] int tax(int a, int rate)\n      was: int tax(int a)")
         assertContains(text, "callers 2: Use.useAll, useKotlin (UseKotlin.kt)")
     }
@@ -66,11 +66,15 @@ class JavaChangesTest {
         write(feature, BILLING, billing(total = "return a + 1"))
         val text = changes(bodies = true)
         assertContains(text, "    - return a;\n    + return a + 1;".replace("return", "        return"))
-        assertEquals(1, Regex("callers").findAll(text).count())
+        assertEquals(0, Regex("callers").findAll(text).count(), "callers come on request")
+        assertEquals(1, Regex("callers").findAll(changes(callers = true, bodies = true)).count())
     }
 
-    private fun changes(bodies: Boolean = false): String = runBlocking {
-        ChangesTool.answer(registry, feature.toString(), ToolArgs(buildJsonObject { put("bodies", kotlinx.serialization.json.JsonPrimitive(bodies)) }))
+    private fun changes(bodies: Boolean = false, callers: Boolean = false): String = runBlocking {
+        ChangesTool.answer(registry, feature.toString(), ToolArgs(buildJsonObject {
+            put("bodies", kotlinx.serialization.json.JsonPrimitive(bodies))
+            put("callers", kotlinx.serialization.json.JsonPrimitive(callers))
+        }))
     }
 
     private fun write(root: Path, path: String, text: String) {

@@ -38,8 +38,7 @@ class SessionContext(private val registry: Registry, private val projects: () ->
 
     private suspend fun changes(worktree: String, limit: Int): Changed? = runCatching {
         registry.changes(worktree) { set, after, before ->
-            // The callers under each declaration are what a long session asks `changes` for; a start only needs to know what moved.
-            val lines = ChangesQuery.run(set, after, before, ChangesQuery.Args(limit = limit)).lines().filterNot { it.startsWith("      ") }
+            val lines = ChangesQuery.run(set, after, before, ChangesQuery.Args(limit = limit)).lines()
             Changed(lines.take(limit + 1 + EXTRA_LINES).joinToString("\n"), set.files.map { it.path }.take(MAX_FOCUS))
         }
     }.getOrNull()

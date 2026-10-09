@@ -22,8 +22,8 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 | Before changing `X`: its source, callers and callees | `context` (`name`; one call instead of `symbol` + `calls` twice) | three separate calls |
 | Who uses `X` | `usages` (`name`; exact `=` and candidate `?` hits grouped by enclosing declaration; `all=true` adds references that resolve elsewhere) | `grep -w` |
 | Who calls `f`, or what `f` calls | `calls` (`name`, `direction` = `callers` or `callees`, `depth` ≤ 3) | chains of greps |
-| Supertypes, subtypes, overrides | `hierarchy` (`name`) | grepping `: Type` |
-| What did my branch change | `changes` (by declaration against the merge-base, with callers and tests; `bodies=true` for line diffs) | `git diff` of whole files |
+| Subtypes, overrides (`supers=true` adds supertypes, `deep=true` goes transitive) | `hierarchy` (`name`) | grepping `: Type` |
+| What did my branch change | `changes` (by declaration against the merge-base; `callers=true` adds callers and tests, `bodies=true` line diffs) | `git diff` of whole files |
 | Which tests to run for my change | `changes` with `tests=true` (the Gradle `--tests` command per module for the test classes that use the changed declarations; says when it widens to a module or the full suite) | running the whole suite |
 | Which task touched this code, or which code a task touched | `task_code` (`query` = a task id, a declaration or a path) | `git log --grep` and guessing |
 | Read an issue | `issue` (`id`; `view=brief` first, then `sections=[…]`) | opening the tracker |

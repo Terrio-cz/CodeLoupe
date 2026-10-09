@@ -142,13 +142,13 @@ class JavaUsagesTest {
 
     @Test
     fun `hierarchy - subtypes, supertypes and overrides`() {
-        assertContains(HierarchyQuery.run(view, "com.example.model.Account"), "subtypes:\n  ./SavingsAccount.java:3  public class SavingsAccount extends Account")
-        assertContains(HierarchyQuery.run(view, "AccountStore"), "supertypes:\n  src/main/java/com/example/model/Store.java:3  public interface Store<T>")
+        assertContains(HierarchyQuery.run(view, "com.example.model.Account", supers = true), "subtypes:\n  ./SavingsAccount.java:3  public class SavingsAccount extends Account")
+        assertContains(HierarchyQuery.run(view, "AccountStore", supers = true), "supertypes:\n  src/main/java/com/example/model/Store.java:3  public interface Store<T>")
         assertContains(HierarchyQuery.run(view, "Account.describe"), "overridden by:\n  ./SavingsAccount.java:8  [SavingsAccount] public String describe()")
         assertContains(HierarchyQuery.run(view, "AccountStore.find"), "overrides:\n  src/main/java/com/example/model/Store.java:6  [Store] T find(…)")
-        assertContains(HierarchyQuery.run(view, "Shape"), "subtypes:\n  ./Circle.java:3  public class Circle extends Shape")
+        assertContains(HierarchyQuery.run(view, "Shape", supers = true), "subtypes:\n  ./Circle.java:3  public class Circle extends Shape")
         assertContains(HierarchyQuery.run(view, "Named"), "subtypes:\n  src/main/java/com/example/other/Edge.java:39  [Edge.lit] new Named()", message = "an anonymous class")
-        assertContains(HierarchyQuery.run(view, "Level"), "subtypes:\n  ./Level.java:4  [Level] LOW", message = "enum constants")
+        assertContains(HierarchyQuery.run(view, "Level", supers = true), "subtypes:\n  ./Level.java:4  [Level] LOW", message = "enum constants")
         assertContains(HierarchyQuery.run(view, "Named.label"), "overridden by:\n  src/main/java/com/example/other/Edge.java:40  [Edge.lit.<anonymous>] public String label()")
     }
 

@@ -8,8 +8,8 @@ import codeloupe.query.usages.UsageFinder
 
 /**
  * `changes`: the declarations a worktree changed against the merge-base with the default branch — `+` added, `~` body
- * changed, `^` signature changed, `-` removed — each with its callers and the tests that use it. The answer grows with
- * the changed declarations, not with the size of the files; files are compared one at a time.
+ * changed, `^` signature changed, `-` removed. With `callers` each also carries its callers and the tests that use it.
+ * The answer grows with the changed declarations, not with the size of the files; files are compared one at a time.
  */
 object ChangesQuery {
     data class Args(val bodies: Boolean = false, val limit: Int = 60, val callers: Boolean = false, val tests: Boolean = false)
@@ -17,7 +17,7 @@ object ChangesQuery {
     /** [after] reads the worktree as it is now, [before] the merge-base version of the changed files. */
     fun run(set: ChangeSet, after: View, before: View?, args: Args): String {
         if (args.tests) return TestSelection.run(set, after, before)
-        val callers = Callers(UsageFinder(after))
+        val callers by lazy { Callers(UsageFinder(after)) }
         val counts = LinkedHashMap(MARKS.associateWith { 0 })
         val shown = ArrayList<String>()
         val quiet = ArrayList<String>()
@@ -32,7 +32,10 @@ object ChangesQuery {
                 continue
             }
             changes.forEach { counts.merge(it.mark, 1, Int::plus) }
-            for ((change, nested) in collapse(changes)) {
+            val items = collapse(changes)
+            var group = ""
+            for ((at, item) in items.withIndex()) {
+                val (change, nested) = item
                 if (listed++ >= args.limit) continue
                 if (headed != file.path) {
                     shown += heading(file, previousDir)
@@ -40,10 +43,13 @@ object ChangesQuery {
                     previousDir = file.path.substringBeforeLast('/', "")
                 }
                 val (sig, was) = signatures(change)
-                shown += line(change, sig) + note(change, nested)
+                val container = change.current.row.container
+                val grouped = container.isNotEmpty() && (container == group || items.getOrNull(at + 1)?.first?.current?.row?.container == container)
+                if (grouped && container != group) shown += "  [$container]"
+                group = if (grouped) container else ""
+                shown += line(change, sig, grouped) + note(change, nested)
                 if (was != null) shown += "      was: $was"
-                // An added declaration has no callers yet that the change did not bring; `callers` asks for them anyway.
-                if (change.mark != DeclChange.ADDED || args.callers) callerLines(change, callers).forEach { shown += "      $it" }
+                if (args.callers) callerLines(change, callers).forEach { shown += "      $it" }
                 if (args.bodies) body(change, old, new)?.let { shown += it }
             }
         }
@@ -111,11 +117,14 @@ object ChangesQuery {
         else -> ""
     }
 
-    /** `  ^ 120-140  [Container] signature` with the line range of the current version (the old one when removed). */
-    private fun line(change: DeclChange, sig: String): String {
+    /**
+     * `  ^ 120-140  [Container] signature` with the line range of the current version (the old one when removed). Two or
+     * more declarations in a row of one container are [grouped] under a `  [Container]` line of their own.
+     */
+    private fun line(change: DeclChange, sig: String, grouped: Boolean): String {
         val row = change.current.row
-        val container = if (row.container.isNotEmpty()) "[${row.container}] " else ""
-        return "  ${change.mark} ${Format.range(row)}  $container$sig"
+        val container = if (row.container.isNotEmpty() && !grouped) "[${row.container}] " else ""
+        return "${if (grouped) "    " else "  "}${change.mark} ${Format.range(row)}  $container$sig"
     }
 
     /** The signature to print and, for a changed one, the old one beside it: whole when short, else around the difference. */

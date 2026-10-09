@@ -60,9 +60,9 @@ class MixedLanguageTest {
 
     @Test
     fun `hierarchy and calls cross the language line`() = query { view ->
-        val hierarchy = HierarchyQuery.run(view, "Greeter")
+        val hierarchy = HierarchyQuery.run(view, "Greeter", supers = true)
         assertContains(hierarchy, "Shouter.java:5  public class Shouter extends Greeter")
-        assertContains(HierarchyQuery.run(view, "Shouter"), "Greeter.kt:3  open class Greeter")
+        assertContains(HierarchyQuery.run(view, "Shouter", supers = true), "Greeter.kt:3  open class Greeter")
         assertContains(HierarchyQuery.run(view, "Greeter.greet"), "Shouter.java:10  [Shouter] public String greet(…)")
         val callers = CallsQuery.run(view, CallsQuery.Args("Greeter.greet", depth = 1))
         assertContains(callers, "Greeter.kt")
