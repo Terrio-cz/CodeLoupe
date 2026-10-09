@@ -7,11 +7,11 @@ export const groupKey = (g: Group): string => `${g.name}|${g.scope}`;
 /** Which source ids are ticked per name and scope. A group in conflict holds at most one: choosing it is the resolution. */
 export type Picks = Record<string, string[]>;
 
-/** Credentials that no source contradicts and the store does not hold yet are ticked; the rest waits for the user. */
+/** Credentials that no source contradicts, the store does not hold yet and that hide no wider secret are ticked; the rest waits for the user. */
 export function defaultPicks(inventory: EnvInventory): Picks {
   const picks: Picks = {};
   for (const g of inventory.variables) {
-    if (g.sensitive && !g.conflict && g.store === 'new') picks[groupKey(g)] = g.sources.map(s => s.id);
+    if (g.sensitive && !g.conflict && g.store === 'new' && !g.shadows?.length) picks[groupKey(g)] = g.sources.map(s => s.id);
   }
   return picks;
 }

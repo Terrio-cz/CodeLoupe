@@ -167,6 +167,7 @@ export class AccountsManager {
     if (bad) return fail(bad);
     const entry = this.load().youtrack.find(y => y.id === id);
     if (!entry) return fail('The account does not exist.');
+    if (!(await this.deps.confirm(`Replace the token of ${entry.label}?`, `${entry.url}\nThe stored token is overwritten and cannot be restored.`, 'Replace'))) return fail('Rotation cancelled.');
     const stored = await this.storeToken(entry.token, token);
     return stored.ok ? ok(`Token of account ${entry.label} rotated.`) : stored;
   }

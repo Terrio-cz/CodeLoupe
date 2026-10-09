@@ -161,6 +161,7 @@ function GroupRow({ g, picks, setPicks }: { g: EnvInventory['variables'][number]
           {g.sensitive && <StatusBadge tone="neutral">sensitive</StatusBadge>}
           {g.conflict && <StatusBadge tone="serious">different values</StatusBadge>}
           {g.duplicate && <StatusBadge tone="neutral">repeated</StatusBadge>}
+          {!!g.shadows?.length && <span title={`Would hide the stored ${g.shadows.join(', ')} value of ${g.name} inside this scope`}><StatusBadge tone="warning">hides {g.shadows.map(s => s.split(':')[0]).join(', ')} key</StatusBadge></span>}
           {g.store === 'same' && <StatusBadge tone="ok">in store</StatusBadge>}
           {g.store === 'differs' && <StatusBadge tone="warning">store differs</StatusBadge>}
         </span>
