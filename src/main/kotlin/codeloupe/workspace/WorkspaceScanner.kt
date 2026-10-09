@@ -27,13 +27,15 @@ class WorkspaceScanner(
     private val tasks: (String) -> TaskRow?,
     private val landed: (String) -> Boolean = { false },
     private val now: () -> Instant = Instant::now,
+    /** Whether the worktrees of a repository are read on a few threads; the result is the same either way. */
+    private val parallel: Boolean = true,
 ) {
     fun scan(commonDir: String, mainWorktree: Path, pattern: TaskPattern, roots: List<String>, withSize: Boolean): RepoWorkspaces {
         val defaultRef = DefaultRef.of(commonDir)
         val defaultTip = GitObjects.resolve(commonDir, defaultRef)
         val registrations = GitLayout.registrations(commonDir) ?: viaGit(commonDir)
         val known = registrations.mapTo(HashSet()) { OrphanDirs.key(Path.of(it.path)) }
-        val registered = registrations.mapIndexed { i, r -> registered(commonDir, r, i == 0, defaultRef, defaultTip, pattern) }
+        val registered = ScanPool.map(registrations, parallel) { i, r -> registered(commonDir, r, i == 0, defaultRef, defaultTip, pattern) }
         val orphans = roots.flatMap { OrphanDirs.under(it, commonDir, known) }
         val all = (registered + orphans).map { if (withSize) it.copy(sizeBytes = DiskSize.of(Path.of(it.path))) else it }
             .sortedWith(compareBy({ it.role != "main" }, { it.state.ordinal }, { it.name.lowercase() }))
