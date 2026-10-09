@@ -38,8 +38,48 @@ desktop app's first-run onboarding reads. The running daemon already knows a rep
 ## Listening, logs and status
 
 The daemon listens on 127.0.0.1 only and refuses requests with a foreign `Host`, any `Origin`, or
-without the `x-codeloupe` header; responses carry `Connection: close`. Calls are logged (tool, latency,
+without the `x-codeloupe` header, and most routes also want the token ([below](#who-may-call-the-daemon)); responses carry `Connection: close`. Calls are logged (tool, latency,
 size — no content) to `<home>/calls.jsonl`, the daemon to `<home>/daemon.log`. `/status` adds `latency` (p50/p95 ms,
 p95 chars, empty and busy rate of the last 1000 calls, per tool) and `budgets` (`ok` and the `warnings` for what exceeds
 `config.json` `budgets`); `/status/history` lists RSS, heap and CPU readings taken while the daemon is used (one a minute,
 the last 240).
+
+## Who may call the daemon
+
+Host, `Origin` and the `x-codeloupe` header keep a web page out; they do not tell one local process from another. Another user
+of the machine (RDP, fast user switching, a shared Linux box) could otherwise call `run`, `/jobs` or the release routes as you. So the
+daemon makes a **token** on its first start, `<home>/daemon.token` (readable by its owner only, mode set at creation; on Windows the
+folder's per-user ACL), and every route that acts for you or shows what you did wants it in the header `x-codeloupe-token`. The file is
+that header line, so `curl -H @<home>/daemon.token -H "x-codeloupe: 1" http://127.0.0.1:47391/jobs` presents it without the secret on a
+command line. It is kept across restarts. To rotate it, write a new value of 32 to 128 letters, digits, `-` or `_` into the file: the
+daemon notices on the next request and no restart is needed (clients read the file again). The token never appears in `/status`, the
+logs or the audit.
+
+| Route | Needs the token |
+|---|---|
+| `GET /status` | no (so that anything can find the daemon); it answers a client's nonce with a proof (below) |
+| `GET /env/values` | its own token (`x-codeloupe-env-token`) |
+| `/mcp`, `POST /api/<tool>` of a read-only tool, `POST /hook` | only when `api.strict` is on |
+| a mutating tool (`run`, `env`, `update`, `edit`, and the MCP `job` tool) over MCP or `/api` | yes: over MCP the call is answered with the way to get it |
+| everything else: `/jobs`, `/workspaces`, `/resources`, `/processes`, `/reconcile`, `/ports`, `/events`, `/webhooks`, `/ui-api`, `/shutdown`, `/status/history`, `/session-weight` | yes |
+
+A wrong token is refused wherever it is sent (401), so a client that holds an old one learns it at once. **The default is not
+strict**: a read-only code query (`find`, `outline`, `symbol`, ...) that comes with `x-codeloupe` only is still answered, so that the MCP entry
+you made before the token existed keeps working. `/status` counts those calls (`auth.withoutToken`); on a machine other people log in to,
+update the clients and set `{ "api": { "strict": true } }` in `config.json` (restart the daemon), and the token is required there too.
+
+Clients prove who they talk to before they send it. The CLI, the desktop app and `hook.sh` put a random nonce in the header
+`x-codeloupe-nonce` of `GET /status`; the daemon answers in `x-codeloupe-proof` with SHA-256 of `codeloupe-proof:<token>:<nonce>`, which only
+a holder of the token can compute. A process that took the port after a crash cannot, and gets neither the token nor a prompt. The CLI also
+refuses a daemon whose pid is not the one in `daemon.json`.
+
+What you see after an update:
+
+- **An old daemon still running** has no token file; the new CLI, app and hook send only `x-codeloupe`, as before. Restart it (`codeloupe stop`,
+  then `codeloupe start`) to get the token.
+- **An old MCP entry** (`--header "x-codeloupe: 1"` only) keeps the read-only tools; `run`, `env`, `edit` and `job` answer *this needs the daemon
+  token ...*. Run `codeloupe mcp-config` and add the entry it prints; its `headersHelper` (`codeloupe mcp-headers`) gives Claude Code the token
+  on every connection, without writing it into Claude Code's configuration. The plugin does the same with `hooks/mcp-headers.sh`
+  once the plugin is updated from the marketplace.
+- **An old desktop app** against a new daemon gets 401 on its screens; update the app together with the CLI (the installers do).
+- **An old `hook.sh`** against a new daemon keeps working (the hook endpoint is in the read tier) until `api.strict` is on.

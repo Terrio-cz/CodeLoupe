@@ -51,7 +51,7 @@ class EnvSurfacesTest {
     fun stop() = daemon.stop()
 
     private fun send(request: HttpRequest.Builder, token: String? = null): Pair<Int, String> {
-        val builder = request.header(CodeLoupe.HEADER, "1").header("content-type", "application/json")
+        val builder = request.header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).header("content-type", "application/json")
         token?.let { builder.header(TOKEN_HEADER, it).header(USED_BY_HEADER, "youtrack-mcp") }
         val response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString())
         return response.statusCode() to response.body()

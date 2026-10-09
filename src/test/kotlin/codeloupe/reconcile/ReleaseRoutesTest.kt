@@ -5,6 +5,7 @@ import codeloupe.TestRepos
 import codeloupe.config.Config
 import codeloupe.config.WorkspacesConfig
 import codeloupe.daemon.Daemon
+import codeloupe.daemon.TestToken
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -23,7 +24,7 @@ import kotlin.test.assertTrue
 
 class ReleaseRoutesTest {
     private fun post(port: Int, body: String): HttpResponse<String> = HttpClient.newHttpClient().send(
-        HttpRequest.newBuilder(URI("http://127.0.0.1:$port/workspaces/release")).header(CodeLoupe.HEADER, "1").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+        HttpRequest.newBuilder(URI("http://127.0.0.1:$port/workspaces/release")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, TestToken.of(port)).POST(HttpRequest.BodyPublishers.ofString(body)).build(),
         HttpResponse.BodyHandlers.ofString(),
     )
 

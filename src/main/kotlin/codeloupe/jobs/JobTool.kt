@@ -17,9 +17,11 @@ import kotlinx.serialization.json.putJsonObject
  * `codeloupe job wait <id>` in a background Bash task, or the `job.finished` event.
  */
 class JobTool(private val jobs: JobRunner) {
-    fun register(server: Server) {
+    /** A [denial] answers every call with that text instead of touching a job: the caller has not shown it may. */
+    fun register(server: Server, denial: String? = null) {
         server.addTool(name = NAME, description = DESCRIPTION, inputSchema = ToolSchema(properties = PROPERTIES, required = listOf("action"))) { request ->
             val args = request.arguments ?: JsonObject(emptyMap())
+            if (denial != null) return@addTool result(denial, isError = true)
             try {
                 when (string(args, "action")) {
                     "start" -> start(args)
