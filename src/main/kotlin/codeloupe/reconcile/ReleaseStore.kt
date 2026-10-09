@@ -39,7 +39,7 @@ class ReleaseStore(private val file: Path, private val now: () -> Instant = Inst
 
     /** When the workspace was released, or null. */
     @Synchronized
-    fun releasedAt(repo: String, workspace: String): Instant? = items[key(repo, workspace)]?.let { Instant.parse(it.at) }
+    fun releasedAt(repo: String, workspace: String): Instant? = items[key(repo, workspace)]?.let { instant(it.at) }
 
     @Synchronized
     fun complete(repo: String, workspace: String) {
@@ -51,6 +51,8 @@ class ReleaseStore(private val file: Path, private val now: () -> Instant = Inst
 
     @Synchronized
     fun isEmpty(): Boolean = items.isEmpty()
+
+    private fun instant(text: String): Instant? = runCatching { Instant.parse(text) }.getOrNull()
 
     private fun key(repo: String, workspace: String) = "${repo.lowercase()}/${workspace.lowercase()}"
 
