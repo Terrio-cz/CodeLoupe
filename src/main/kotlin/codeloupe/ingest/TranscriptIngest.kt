@@ -116,14 +116,14 @@ class TranscriptIngest(
 
     private fun read(f: FoundTranscript, known: MutableMap<String, FileState>): List<GapRecord> {
         var state = known[f.key]
-        if (state != null && f.size < state.offset) {
+        if (state != null && (f.size < state.offset || !TailHash.intact(f.path, state))) {
             writer.forget(f.key)
             known.remove(f.key)
             state = null
         }
         if (state != null && f.size == state.offset) {
             writer.touch(f)
-            known[f.key] = FileState(f.size, f.mtime, state.offset, state.ter, state.state)
+            known[f.key] = FileState(f.size, f.mtime, state.offset, state.ter, state.state, state.tail)
             return emptyList()
         }
         val snapshot = state?.state?.let { JsonFormat.json.decodeFromString(ParserSnapshot.serializer(), it) }
@@ -136,9 +136,9 @@ class TranscriptIngest(
         }
         val (results, usages) = parser.drain()
         val ter = metaTer ?: TER.find(parser.firstPrompt)?.value
-        val delta = FileDelta(f, ter, parser, results, usages, consumed)
+        val delta = FileDelta(f, ter, parser, results, usages, consumed, TailHash.at(f.path, consumed))
         val added = writer.write(delta)
-        known[f.key] = FileState(f.size, f.mtime, consumed, ter, JsonFormat.json.encodeToString(ParserSnapshot.serializer(), parser.snapshot()))
+        known[f.key] = FileState(f.size, f.mtime, consumed, ter, JsonFormat.json.encodeToString(ParserSnapshot.serializer(), parser.snapshot()), delta.tail)
         return added
     }
 

@@ -49,6 +49,8 @@ internal class AotTrainer(
             create(daemonJvm(), listOf("-cp", classPath, MAIN_CLASS), daemonRecording, daemonTemp)
             install(cliTemp, caches.cli)
             install(daemonTemp, caches.daemon)
+            // Before the mark: whoever sees the caches ready also sees nothing else of the training left (Windows holds a directory a moment).
+            deleteSettled(work)
             val readyTemp = caches.suffixed(".ready.tmp-$id")
             Files.writeString(readyTemp, caches.readyContent())
             Files.move(readyTemp, caches.ready, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)

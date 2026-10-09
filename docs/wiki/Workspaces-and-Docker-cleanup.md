@@ -42,6 +42,8 @@ earlier version have no id and are therefore not cleaned automatically any more:
 name the repository by its folder name; when two registered repositories share a name and a workspace name and disagree about its state,
 the state is left unknown (so nothing of it is removed on its own) instead of letting one decide for the other.
 
+An image built `FROM` a labelled image inherits its labels too (clear them with `LABEL codeloupe.workspace=""` in the Dockerfile of an unrelated project); that no longer makes a container yours, but it can still make the image look like yours. `protect` in the config keeps what must stay.
+
 ```
 codeloupe ws up [-f compose.yaml] [-p project] [--profile x] [--env-file f] [--project-directory d] [-- up-args]   # default: -d
 codeloupe ws run [--dir d] <docker run arguments>
@@ -112,7 +114,8 @@ the reconcile plan above, which an `auto` entry of a released workspace already 
 what is named (`"auto": false` leaves the `auto` entries out; the app sends it, so it removes only what the person confirmed). A named `keep` or `protected` entry is refused. The plan is re-read from the registry and Docker for every
 run, so a stale key removes nothing it should not (and a stale plan hash is refused before anything is touched). Removal goes through the Engine API, containers first (stopped, removed
 with their anonymous volumes), then networks, volumes, images, never forced: a resource that is in use is *blocked*, not
-killed. An orphan directory is deleted without following links; a file that is still locked (Windows) leaves it blocked.
+killed. A container is read again just before it is stopped: one that was stopped when planned and has been started since, or whose labels no longer name the workspace, is left (blocked) until the next plan.
+An orphan directory is deleted without following links; a file that is still locked (Windows) leaves it blocked.
 
 Blocked and failed targets are retried with a growing wait (`retryBaseMinutes`, doubling up to `retryMaxMinutes`), kept
 in `<home>/reconcile-state.json`, so the backoff survives a restart of the daemon or the PC. A removal someone confirmed

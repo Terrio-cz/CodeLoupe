@@ -18,8 +18,8 @@ import java.time.Instant
 /** Stores what the ingest read of transcripts: runs, steps, hourly cost and gaps, each file in one transaction. */
 class RunWriter(private val db: TranscriptDb, private val categorizer: Categorizer) {
     fun loadFiles(): MutableMap<String, FileState> = db.writer.createStatement().use { s ->
-        s.executeQuery("SELECT path, size, mtime, offset, ter, state FROM files").use { r ->
-            HashMap<String, FileState>().also { while (r.next()) it[r.getString(1)] = FileState(r.getLong(2), r.getLong(3), r.getLong(4), r.getString(5), r.getString(6)) }
+        s.executeQuery("SELECT path, size, mtime, offset, ter, state, tail FROM files").use { r ->
+            HashMap<String, FileState>().also { while (r.next()) it[r.getString(1)] = FileState(r.getLong(2), r.getLong(3), r.getLong(4), r.getString(5), r.getString(6), r.getString(7)) }
         }
     }
 
@@ -189,8 +189,8 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
 
     private fun saveFile(c: Connection, d: FileDelta) {
         c.prepareStatement(
-            "INSERT INTO files(path, size, mtime, offset, kind, project, session, ter, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) " +
-                "ON CONFLICT(path) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, offset = excluded.offset, ter = excluded.ter, state = excluded.state",
+            "INSERT INTO files(path, size, mtime, offset, kind, project, session, ter, state, tail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+                "ON CONFLICT(path) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, offset = excluded.offset, ter = excluded.ter, state = excluded.state, tail = excluded.tail",
         ).use { s ->
             s.setString(1, d.found.key)
             s.setLong(2, d.found.size)
@@ -201,6 +201,7 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
             s.setString(7, d.found.session)
             s.setString(8, d.ter)
             s.setString(9, JsonFormat.json.encodeToString(codeloupe.metrics.ParserSnapshot.serializer(), scrubbed(d.parser.snapshot())))
+            s.setString(10, d.tail)
             s.executeUpdate()
         }
     }

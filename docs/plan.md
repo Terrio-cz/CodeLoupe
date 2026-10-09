@@ -1369,6 +1369,25 @@ rozhoduje launcher.
   (dekodér je testován fixturou), zamčený Keychain / KWallet, pád démona mimo Windows (jen job objekty hlídají vnuky; jinak je při dalším startu ukončí pid),
   start démona mimo Windows jako obyčejné dítě ve skupině volajícího (bez `setsid`).
 
+### Výsledek CL-167 — úklid a ingest: úzká okna a meze návrhu (2026-10-09)
+
+- **Opraveno (1)**: `ReconcileExecutor` před zastavením kontejneru znovu přečte jeho stav a štítky (`DockerApi.container`, `GET /containers/<id>/json`). Kontejner, který
+  plán viděl zastavený a mezitím znovu nastartoval (compose používá stejné id), se nezastaví (`blocked`, příští plán rozhodne znovu); kontejner, který zmizel, je `gone`;
+  vlastněný kontejner, jehož štítky už nejmenují workspace z plánu, se nechá. Plán si pamatuje, zda kontejner běžel (`PlanEntry.running`), takže potvrzené zastavení
+  běžícího kontejneru funguje dál. Testy: `ReconcileExecutorContainerTest` (falešný Engine).
+- **Opraveno (4)**: přepsaný přepis o stejné nebo větší velikosti se poznal jen podle `size < offset`. `files.tail` drží SHA-1 posledních 64 bajtů před offsetem
+  (`TailHash`); nesouhlasí-li, přepis se zapomene a přečte od začátku. Starší databáze dostanou sloupec `ALTER TABLE` při otevření, řádek bez hashe se bere jako dřív a hash dostane
+  při dalším čtení. Testy v `IngestTest` (větší přepis, přepis stejné velikosti, stará databáze).
+- **Přijato (2) štítky zděděné z obrazu**: kontejner nebo obraz postavený `FROM` obrazu se štítky `codeloupe.*` je zdědí. Rozlišit je od vlastních by vyžadovalo porovnávat štítky
+  kontejneru s obrazem a nové značení (nebo čtení historie vrstev); vlastnictví nese hlavně `docker compose` s přepisem CodeLoupe, který štítky dává kontejneru přímo.
+  Zastavené kontejnery takto přiřazené odejdou s landed workspace, běžící se vždy ptají (`confirm`). Kdo staví z označeného obrazu cizí projekt, ať štítky v `Dockerfile` zruší (`LABEL codeloupe.workspace=""`).
+- **Přijato (3) vlastnictví podle jména**: `repo` je jméno adresáře hlavního worktree, `workspace` jméno adresáře worktree. Dva repozitáře se stejně pojmenovaným hlavním adresářem
+  (`~/a/app`, `~/b/app`) sdílejí vlastnictví a landed workspace stejného jména jednoho by uklidil i zdroje druhého. Cesta nebo hash ve štítcích by přeznačily všechny existující
+  zdroje a rozbily jejich úklid; takový pár je vzácný, tak zůstává jako známá mez (ochrana: `protect` v konfiguraci).
+- **Přijato (5) výpis adresáře selže**: `JdkListing` nepřeskakuje adresář, který selže jinak než zmizením nebo odepřením (zástupný adresář OneDrive s vypnutým poskytovatelem).
+  Přeskočení by soubory v něm vydalo za smazané (`WorktreeScan` to dělá záměrně jen u zmizelého a odepřeného, kde je výsledek při každém průchodu stejný, jako u gitu) a overlay by hlásil
+  smazání, které nenastalo; hlasité selhání (zpráva jmenuje cestu) je poctivější. Obejití: adresář dát do `.gitignore`, `prune` ho pak neprochází.
+
 ### Výsledek CL-165 — Linux a macOS: klíč repozitáře, domov hooku, sockety Dockeru, priorita vláken, smazaný cwd (2026-10-09)
 
 - **Klíč repozitáře** (`RepoKey`): id adresáře indexu je SHA-1 cesty složené podle file systému (`PathCase`: Windows a macOS ignorují velikost písmen, Linux ne), takže na Linuxu

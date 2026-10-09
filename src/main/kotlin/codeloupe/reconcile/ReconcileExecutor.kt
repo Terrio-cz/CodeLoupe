@@ -1,7 +1,10 @@
 package codeloupe.reconcile
 
 import codeloupe.docker.DockerApi
+import codeloupe.docker.DockerObject
 import codeloupe.docker.DockerUnavailable
+import codeloupe.docker.OwnershipClass
+import codeloupe.docker.Ownership
 import codeloupe.processes.ProcessStopper
 import java.io.IOException
 import java.nio.file.Path
@@ -20,12 +23,7 @@ class ReconcileExecutor(
         return try {
             when (entry.kind) {
                 TargetKind.PROCESS -> process(entry, ::result)
-                TargetKind.CONTAINER -> {
-                    val id = entry.key.substringAfter(':')
-                    val api = docker()
-                    api.stopContainer(id)
-                    outcome(api.removeContainer(id), ::result)
-                }
+                TargetKind.CONTAINER -> container(entry, ::result)
                 TargetKind.NETWORK -> outcome(docker().removeNetwork(entry.key.substringAfter(':')), ::result)
                 TargetKind.VOLUME -> outcome(docker().removeVolume(entry.key.substringAfter(':')), ::result)
                 TargetKind.IMAGE -> outcome(docker().removeImage(entry.key.substringAfter(':')), ::result)
@@ -34,6 +32,24 @@ class ReconcileExecutor(
         } catch (e: DockerUnavailable) {
             result(ActionOutcome.FAILED, e.message.orEmpty())
         }
+    }
+
+    // The plan is seconds old: a stopped container that somebody started since (compose reuses the id) is not ours to stop.
+    private fun container(entry: PlanEntry, result: (ActionOutcome, String) -> ActionResult): ActionResult {
+        val id = entry.key.substringAfter(':')
+        val api = docker()
+        val current = api.container(id) ?: return result(ActionOutcome.GONE, "")
+        changedSincePlan(entry, current)?.let { return result(ActionOutcome.BLOCKED, it) }
+        api.stopContainer(id)
+        return outcome(api.removeContainer(id), result)
+    }
+
+    private fun changedSincePlan(entry: PlanEntry, current: DockerObject): String? {
+        if (current.state in ReconcilePlanner.RUNNING && !entry.running) return "it was started again after the plan was made"
+        if (entry.ownership != OwnershipClass.OWNED) return null
+        val owner = Ownership.of(current.labels)
+        val same = owner != null && owner.workspace.equals(entry.workspace, ignoreCase = true) && owner.repo.equals(entry.repo.orEmpty(), ignoreCase = true)
+        return if (same) null else "its labels no longer name ${entry.workspace}"
     }
 
     private fun outcome(removal: DockerApi.Removal, result: (ActionOutcome, String) -> ActionResult): ActionResult = when (removal) {

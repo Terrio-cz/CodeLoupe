@@ -65,7 +65,14 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
     }
 
     private fun open(): Connection = Sqlite.open(file, SCHEMA).also { db ->
+        addTailColumn(db)
         db.createStatement().use { it.execute("PRAGMA cache_size = -2048") }
+    }
+
+    // `files.tail` came after the first databases: the hash of the bytes before the offset, empty for rows written before it.
+    private fun addTailColumn(db: Connection) {
+        val has = db.createStatement().use { s -> s.executeQuery("PRAGMA table_info(files)").use { r -> generateSequence { if (r.next()) r.getString("name") else null }.toList() } }
+        if ("tail" !in has) db.createStatement().use { it.execute("ALTER TABLE files ADD COLUMN tail TEXT") }
     }
 
     private companion object {

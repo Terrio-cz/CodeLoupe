@@ -12,4 +12,5 @@ class FileDelta(
     val results: List<ToolResult>,
     val usages: List<UsageAt>,
     val offset: Long,
+    val tail: String?,
 )
