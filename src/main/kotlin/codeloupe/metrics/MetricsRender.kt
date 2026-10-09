@@ -1,6 +1,6 @@
 package codeloupe.metrics
 
-import java.util.Locale
+import codeloupe.platform.Tenths
 
 /** The text `codeloupe metrics` prints: one block per role, and the change of the medians between two reports. */
 object MetricsRender {
@@ -44,8 +44,8 @@ object MetricsRender {
     }
 
     fun fmt(n: Long): String = when {
-        n >= 1_000_000 -> String.format(Locale.ROOT, "%.1fM", n / 1e6)
-        n >= 1_000 -> String.format(Locale.ROOT, "%.1fk", n / 1e3)
+        n >= 1_000_000 -> Tenths.text(n / 1e6) + "M"
+        n >= 1_000 -> Tenths.text(n / 1e3) + "k"
         else -> n.toString()
     }
 

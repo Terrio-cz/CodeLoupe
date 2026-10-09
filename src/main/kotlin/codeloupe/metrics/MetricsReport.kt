@@ -6,8 +6,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class MetricsReport(
     val label: String,
-    val since: String?,
-    val until: String?,
+    /** `since` and `until` are absent from reports the workspace script wrote without those options. */
+    val since: String? = null,
+    val until: String? = null,
     val generated: String,
     val weights: Map<String, Double>,
     val aggregate: Map<String, RoleAggregate>,

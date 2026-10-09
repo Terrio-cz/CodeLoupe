@@ -87,6 +87,6 @@ object GapDetector {
     private fun week(start: String?): String {
         val at = start?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return "unknown"
         val date = at.atOffset(ZoneOffset.UTC)
-        return "%d-W%02d".format(date.get(IsoFields.WEEK_BASED_YEAR), date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR))
+        return "%d-W%02d".format(java.util.Locale.ROOT, date.get(IsoFields.WEEK_BASED_YEAR), date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR))
     }
 }

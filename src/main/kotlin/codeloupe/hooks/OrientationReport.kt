@@ -17,7 +17,7 @@ data class OrientationReport(val turns: Int, val withHook: Group, val withoutHoo
     fun render(): String = buildString {
         appendLine("orientation commands (ls, find, tree, Glob) in the first $turns turns of a session")
         fun line(name: String, g: Group) = appendLine(
-            "  $name: ${g.sessions} sessions, ${g.calls} calls (%.2f per session), ${g.withAny} sessions with at least one".format(g.perSession) +
+            "  $name: ${g.sessions} sessions, ${g.calls} calls (%.2f per session), ${g.withAny} sessions with at least one".format(java.util.Locale.ROOT, g.perSession) +
                 if (g.byKind.isEmpty()) "" else "; " + g.byKind.entries.sortedByDescending { it.value }.joinToString(", ") { "${it.key} ${it.value}" },
         )
         line("without the hook's context", withoutHook)
