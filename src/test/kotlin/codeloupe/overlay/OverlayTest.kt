@@ -333,6 +333,26 @@ class OverlayTest {
         assertEquals(parsed, codeloupe.index.Extraction.parsed.get(), "nothing was parsed for the landing")
     }
 
+    @Test
+    fun `an edit another worktree made the same way is copied from its overlay, an edit nobody else made is parsed`() {
+        val other = worktree("other")
+        val registry = Registry(config, queue)
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertContains(find(registry, other, "Alpha.one"), "fun one")
+        write(feature, BETA, "package demo\n\nclass Beta\n")
+        assertContains(find(registry, feature, "Beta"), "class Beta")
+
+        val parsed = codeloupe.index.Extraction.parsed.get()
+        write(other, BETA, "package demo\n\nclass Beta\n")
+        assertContains(find(registry, other, "Beta"), "class Beta")
+        assertEquals(parsed, codeloupe.index.Extraction.parsed.get(), "the facts came from the feature overlay")
+
+        write(other, DELTA, "package demo\n\nclass Delta\n")
+        assertContains(find(registry, other, "Delta"), "class Delta")
+        assertEquals(parsed + 1, codeloupe.index.Extraction.parsed.get(), "no other store has this file: parsed")
+        registry.close()
+    }
+
     private fun overlayFiles(): List<Path> = Files.walk(config.home).use { paths ->
         paths.filter { it.parent.fileName.toString() == "overlays" && it.toString().endsWith(".db") }.toList()
     }

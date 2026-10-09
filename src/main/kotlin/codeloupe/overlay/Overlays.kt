@@ -7,6 +7,7 @@ import codeloupe.git.GitObjects
 import codeloupe.git.WorktreeGit
 import codeloupe.index.InlineParse
 import codeloupe.index.Store
+import codeloupe.index.StoreUpdate
 import codeloupe.index.StoreUpdater
 import codeloupe.platform.NativeCalls
 import codeloupe.platform.Sha1
@@ -53,6 +54,9 @@ class Overlays(
     private val emit: (String, JsonObject) -> Unit = { _, _ -> },
 ) {
     private val states = ConcurrentHashMap<String, OverlayState>()
+
+    // The write connection stays open a while after a refresh: an agent edits the same worktree again within seconds.
+    private val writers = OverlayWriters(WRITER_IDLE_MS)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // After a landing every idle worktree re-derives its overlay (git processes, parsing); a few at a time keep the queries that are
@@ -113,6 +117,9 @@ class Overlays(
         return StaleRead(previousCommit!!, previousFile, view)
     }
 
+    /** Closes the kept write connections; the next refresh opens its store again. */
+    fun close() = writers.close()
+
     /** Queries answered from the previous base while an overlay was re-derived (telemetry and tests). */
     val staleReads = AtomicInteger()
 
@@ -150,13 +157,14 @@ class Overlays(
     fun collect(repo: RepoState) {
         val worktrees = GitLayout.worktrees(repo.commonDir) ?: WorktreeGit.list(repo.commonDir)
         val live = worktrees.filter { Path.of(it).exists() }.mapTo(HashSet(), ::key)
-        states.entries.removeIf { (key, state) -> state.repoId == repo.id && key !in live }
+        states.entries.removeIf { (key, state) -> (state.repoId == repo.id && key !in live).also { dead -> if (dead) writers.drop(state.file) } }
         val dir = repo.dir.resolve(DIR)
         if (!dir.exists()) return
         val keep = live.mapTo(HashSet(), ::nameOf)
         val gone = dir.listDirectoryEntries().filter { it.name.substringBefore('.') !in keep }
         // Windows refuses to delete a file a reader still has open: best effort, the next collection retries.
         for (file in gone) {
+            writers.drop(file)
             release(file)
             runCatching { Files.deleteIfExists(file) }
         }
@@ -241,7 +249,7 @@ class Overlays(
 
     /** The refresh job that writes [change], or null when nothing needs writing and [change] is already committed. */
     private fun start(repo: RepoState, state: OverlayState, change: OverlayChange): Deferred<*>? {
-        val update = change.update.copy(factSources = stores(repo).filter { it != state.file.toString() })
+        val update = change.update.copy(factSources = factSources(repo, state, change.update))
         val base = update.meta.getValue("base")
         if (update.size == 0 && (change.entries.isEmpty() || state.fileBase == base)) {
             commit(state, change, emptyList())
@@ -255,7 +263,7 @@ class Overlays(
                     if (heavy) {
                         launcher.update(repo.commonDir, null, state.file, update, repo.dir)
                     } else {
-                        Store.open(state.file).use { StoreUpdater.apply(it, update, GitObjects.blobs(repo.commonDir)) }
+                        writers.use(state.file) { StoreUpdater.apply(it, update, GitObjects.blobs(repo.commonDir)) }
                     }
                 } catch (e: Exception) {
                     state.mustCheck = true
@@ -285,6 +293,13 @@ class Overlays(
         }
         state.running = job
         return job
+    }
+
+    // Other worktrees' stores that may already hold the facts of a file about to be parsed.
+    private fun factSources(repo: RepoState, state: OverlayState, update: StoreUpdate): List<String> {
+        if (update.puts.isEmpty()) return emptyList()
+        val others = stores(repo).filter { it != state.file.toString() }
+        return OverlaySources.relevant(others, OverlaySources.known(states.values), update.puts.mapTo(HashSet()) { it.path })
     }
 
     private fun commit(state: OverlayState, change: OverlayChange, unread: List<String>) {
@@ -319,6 +334,7 @@ class Overlays(
     private fun busy(state: OverlayState) = BusyException("indexing the changes of ${state.worktree}; retry in a few seconds")
 
     private fun deleteFile(state: OverlayState) {
+        writers.drop(state.file)
         release(state.file)
         ScanSnapshot.delete(ScanSnapshot.fileOf(state.file))
         for (suffix in listOf("", "-wal", "-shm")) Files.deleteIfExists(Path.of("${state.file}$suffix"))
@@ -346,6 +362,7 @@ class Overlays(
         /** Worktrees whose last walk stays in memory (~150 B per file each). */
         private const val MAX_STATES = 16
         private const val REBASES_AT_ONCE = 2
+        private const val WRITER_IDLE_MS = 30_000L
 
         /** The overlay stores of [repo], whoever's worktree they belong to: they hold the facts of files already parsed. */
         internal fun stores(repo: RepoState): List<String> {
