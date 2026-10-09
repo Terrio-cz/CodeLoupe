@@ -151,7 +151,7 @@ export class MockWorkspaces {
     });
     const counts: Record<string, number> = {};
     for (const e of entries) counts[e.verdict] = (counts[e.verdict] ?? 0) + 1;
-    return { generatedAt: iso(this.now), auto: false, counts, entries, problems: [] };
+    return { generatedAt: iso(this.now), auto: false, counts, entries, problems: [], planHash: 'mockplanhash0001' };
   }
 
   releases(): { items: ReleaseStatus[] } {

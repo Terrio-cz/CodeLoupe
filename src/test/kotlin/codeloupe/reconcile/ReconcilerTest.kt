@@ -106,6 +106,40 @@ class ReconcilerTest {
     }
 
     @Test
+    fun `a confirm built on the plan that was shown runs, one built on an older plan refuses and removes nothing`() = runBlocking {
+        add(resource(ResourceKind.VOLUME, "adopted-2", "TER-2", WorkspaceState.LANDED, OwnershipClass.ADOPTED))
+        val reconciler = reconciler()
+        val shown = reconciler.plan()
+        assertTrue(shown.planHash.isNotEmpty())
+        assertEquals(shown.planHash, reconciler.plan().planHash, "the hash does not move with time")
+
+        // Something else appears before the person clicks: the plan they saw is no longer the plan.
+        add(resource(ResourceKind.VOLUME, "abandoned-3", "TER-3", WorkspaceState.ABANDONED))
+        val stale = runCatching { reconciler.run("manual", auto = false, confirm = setOf("volume:adopted-2"), shownPlan = shown.planHash) }.exceptionOrNull()
+        assertTrue(stale is StalePlan, stale.toString())
+        assertEquals(2, stale.current.entries.size)
+        assertEquals(emptyList(), removeCalls)
+        assertEquals(2, docker.size)
+
+        val run = reconciler.run("manual", auto = false, confirm = setOf("volume:adopted-2"), shownPlan = stale.current.planHash)
+        assertEquals(listOf("volume:adopted-2"), run.actions.map { it.key })
+        assertEquals(setOf("volume:abandoned-3"), docker.keys)
+    }
+
+    @Test
+    fun `the plan hash follows the targets and verdicts, not retries or the clock`() = runBlocking {
+        add(resource(ResourceKind.VOLUME, "data-1", "TER-1", WorkspaceState.LANDED))
+        stuck += "volume:data-1"
+        val reconciler = reconciler()
+        val before = reconciler.plan().planHash
+        reconciler.run("start", auto = true)
+        clock = clock.plusSeconds(3_600)
+        val afterRetry = reconciler.plan()
+        assertTrue(afterRetry.entries.single().attempts > 0)
+        assertEquals(before, afterRetry.planHash)
+    }
+
+    @Test
     fun `a blocked resource is retried with a growing wait, also by a new reconciler after a restart, and goes once it is free`() = runBlocking {
         add(resource(ResourceKind.VOLUME, "data-1", "TER-1", WorkspaceState.LANDED))
         stuck += "volume:data-1"

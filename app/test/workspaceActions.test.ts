@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WorkspaceActions, type Confirm, type WorkspaceDaemon } from '../src/main/actions/WorkspaceActions';
 import { MockWorkspaces } from '../src/main/api/mockWorkspaces';
+import { HttpError } from '../src/main/daemon/DaemonClient';
 import type { ReconcilePlan, WorkspaceList } from '../src/shared/workspaces';
 
 const mock = new MockWorkspaces(Date.parse('2026-10-08T12:00:00Z'));
@@ -64,7 +65,40 @@ describe('reconcile', () => {
     expect(r.ok).toBe(true);
     expect(r.message).toBe('Removed 2.');
     expect(asked[0].message).toBe('Remove 2 resources?');
-    expect(posts).toEqual([{ path: '/reconcile/run', body: { confirm: keys, auto: false } }]);
+    expect(posts).toEqual([{ path: '/reconcile/run', body: { confirm: keys, auto: false, planHash: plan.planHash } }]);
+  });
+
+  it('sends the hash of the plan the dialog listed and refuses a screen whose plan is older', async () => {
+    const shown = setup();
+    expect((await shown.actions.reconcile({ keys: [confirmKeys[0]], planHash: plan.planHash })).ok).toBe(true);
+    expect(shown.posts).toHaveLength(1);
+
+    const stale = setup();
+    const r = await stale.actions.reconcile({ keys: [confirmKeys[0]], planHash: 'ffffffffffffffff' });
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain('changed');
+    expect(stale.asked).toEqual([]);
+    expect(stale.posts).toEqual([]);
+
+    for (const planHash of [1, '', 'a b c d e f g h']) {
+      const bad = setup();
+      expect((await bad.actions.reconcile({ keys: [confirmKeys[0]], planHash })).ok).toBe(false);
+      expect(bad.posts).toEqual([]);
+    }
+  });
+
+  it('says nothing was removed when the daemon finds the plan moved on while the dialog was open', async () => {
+    const posts: unknown[] = [];
+    const daemon: WorkspaceDaemon = {
+      async get<T>(path: string) { return (path === '/workspaces' ? registry : plan) as unknown as T; },
+      async post<T>(_path: string, body: unknown): Promise<T> { posts.push(body); throw new HttpError(409, 'http_error', 'the cleanup plan changed since it was shown'); },
+    };
+    const actions = new WorkspaceActions(daemon, async () => true);
+    const r = await actions.reconcile({ keys: [confirmKeys[0]] });
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain('nothing was removed');
+    expect(r.results).toEqual([]);
+    expect(posts).toHaveLength(1);
   });
 
   it('says what stays when a resource is in use', async () => {

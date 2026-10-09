@@ -5,6 +5,7 @@ object ReconcileRender {
     fun plan(plan: ReconcilePlan): String = buildString {
         append(if (plan.auto) "auto cleanup is on" else "auto cleanup is off (workspaces.reconcile.auto); nothing runs unless asked").append('\n')
         append("  ").append(Verdict.entries.joinToString(" · ") { "${plan.counts[it.name.lowercase()] ?: 0} ${it.name.lowercase()}" }).append('\n')
+        if (plan.planHash.isNotEmpty()) append("  plan ").append(plan.planHash).append(" (pass it as --plan to confirm what is listed here)\n")
         for (verdict in listOf(Verdict.AUTO, Verdict.CONFIRM, Verdict.PROTECTED, Verdict.KEEP)) {
             val rows = plan.entries.filter { it.verdict == verdict }.map { row(it) }
             if (rows.isEmpty()) continue

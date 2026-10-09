@@ -22,6 +22,8 @@ export interface ReleaseRequest {
 /** Plan entries (`PlanEntry.key`) the user confirmed for removal. */
 export interface ReconcileRequest {
   keys: string[];
+  /** `planHash` of the plan the screen showed; main refuses the request when the daemon's plan has moved on. */
+  planHash?: string;
 }
 
 export interface ReconcileOutcome extends ActionOutcome {
