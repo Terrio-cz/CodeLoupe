@@ -39,6 +39,9 @@ jobs:
       # Every link of docs/wiki and every wiki link of the README resolves to an existing page, heading or file.
       - run: node tools/check-wiki-links.mjs
 
+      # Workflow rules (CL-159): permissions, actions pinned to a commit, no token left on disk, no pull_request_target.
+      - run: node tools/check-workflows.mjs
+
   # The winget, Scoop and Homebrew manifests of a release (CL-130) from fixture files, checked by the tools that exist on
   # a runner: the generator's own tests above, `brew style` for the cask here. winget has no hosted runner image.
   manifests:

@@ -50,8 +50,11 @@ A release is a tag. `git tag v1.2.3 && git push origin v1.2.3` runs [release.yml
    anything else.
 2. **ci** – the whole of [ci.yml](https://github.com/Terrio-cz/CodeLoupe/blob/main/.github/workflows/ci.yml) with that version: Kotlin tests, app checks, the bundle,
    the installer and the installer smoke test on every OS. A red job stops the release.
-3. **release** – downloads the installers and bundle zips, adds the SBOMs, `SHA256SUMS.txt` and the release notes, and
-   creates a **draft** GitHub Release (a prerelease when the version has a suffix). Publishing it is a person's decision.
+3. **release** – downloads the installers and bundle zips, adds the SBOMs, `SHA256SUMS.txt` and the release notes. It holds a
+   read-only token and runs the build code.
+4. **publish** – in the `release` environment, with the write token and nothing but `gh`: signs a build provenance attestation for
+   every file ([Security](Security#verifying-a-release)) and creates a **draft** GitHub Release (a prerelease when the version has a
+   suffix). Publishing it is a person's decision.
 
 `workflow_dispatch` (Actions → Release → Run workflow, version e.g. `0.0.1-rc1`) is a dry run: the same files as the
 `release-files` artifact, no release.

@@ -36,6 +36,13 @@ export function render({ version, from, repo, subjects }) {
     lines.push(`- **${link}** ${entries.join('; ')}`);
   }
   if (other.length) lines.push('', '### Other', '', ...other.map(s => `- ${s}`));
+  if (repo) {
+    lines.push(
+      '', '### Verify the files', '',
+      '- Checksums: `sha256sum -c SHA256SUMS.txt` in the folder with the downloaded files.',
+      `- Provenance (built by this repository's release workflow from this tag): \`gh attestation verify <file> --repo ${repo}\`.`,
+    );
+  }
   return lines.join('\n') + '\n';
 }
 

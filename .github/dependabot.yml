@@ -1,7 +1,9 @@
 version: 2
 
 # Weekly, grouped: one pull request per ecosystem and week instead of one per package. Security updates are not
-# grouped by this file and open immediately once Dependabot alerts are on for the repository.
+# grouped by this file and open immediately once Dependabot alerts are on for the repository. A version is proposed only
+# after it has been out for a week (cooldown), so that a release that is withdrawn or turns out malicious is not taken at once;
+# security updates ignore the cooldown.
 updates:
   - package-ecosystem: gradle
     directory: /
@@ -9,6 +11,8 @@ updates:
       interval: weekly
     commit-message:
       prefix: deps
+    cooldown:
+      default-days: 7
     groups:
       gradle:
         patterns: ["*"]
@@ -19,6 +23,8 @@ updates:
       interval: weekly
     commit-message:
       prefix: deps
+    cooldown:
+      default-days: 7
     groups:
       npm:
         patterns: ["*"]
@@ -37,6 +43,8 @@ updates:
       interval: weekly
     commit-message:
       prefix: deps
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
