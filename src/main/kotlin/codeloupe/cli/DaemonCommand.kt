@@ -1,5 +1,6 @@
 package codeloupe.cli
 
+import codeloupe.aot.AotLauncher
 import codeloupe.config.ConfigLoader
 import codeloupe.daemon.Daemon
 import codeloupe.platform.JobObjects
@@ -35,6 +36,7 @@ class DaemonCommand : CliktCommand(name = "daemon") {
         } catch (e: IllegalStateException) {
             throw CliktError(e.message)
         }
+        AotLauncher.afterDaemonStart()
         Thread.currentThread().join()
     }
 }

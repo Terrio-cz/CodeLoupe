@@ -12,6 +12,11 @@ header file (`-H @daemon.token`), never on a command line. It needs `sha256sum`,
 one. With no token file (a daemon from before the token) it behaves as it always did. The hook endpoint accepts a caller without the token
 unless `api.strict` is on ([Configuration](Configuration#who-may-call-the-daemon)).
 
+Claude Code also has an `http` hook type, which would save starting `bash` (a call takes ~10 ms instead of ~80 ms on a busy
+Windows machine). The plugin does not use it: Claude Code takes the reply as it is, so whatever listens on the port when the daemon
+is down could approve or rewrite a tool call; the URL takes no variables, so a daemon on another port would still need the script;
+and a hook cannot be switched off for the default port only, so both handlers would run. Details in `docs/plan.md` (CL-146).
+
 **Steering** (`PreToolUse` on `Bash`, `PowerShell` and `Read`). It looks at the call:
 
 | Call | Answer |
