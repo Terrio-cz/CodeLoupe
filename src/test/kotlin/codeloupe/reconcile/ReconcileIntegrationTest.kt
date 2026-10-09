@@ -9,6 +9,7 @@ import codeloupe.config.ProtectRule
 import codeloupe.config.ReconcileConfig
 import codeloupe.config.WorkspacesConfig
 import codeloupe.daemon.Daemon
+import codeloupe.daemon.TestToken
 import codeloupe.docker.DockerObject
 import codeloupe.docker.DockerTestSupport
 import codeloupe.docker.Ownership
@@ -58,7 +59,7 @@ class ReconcileIntegrationTest {
     }
 
     private fun http(config: Config, method: String, path: String, body: String? = null): HttpResponse<String> {
-        val builder = HttpRequest.newBuilder(URI("http://127.0.0.1:${config.port}$path")).header(CodeLoupe.HEADER, "1")
+        val builder = HttpRequest.newBuilder(URI("http://127.0.0.1:${config.port}$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, TestToken.of(config.port))
         builder.method(method, if (body == null) HttpRequest.BodyPublishers.noBody() else HttpRequest.BodyPublishers.ofString(body))
         return HttpClient.newHttpClient().send(builder.build(), HttpResponse.BodyHandlers.ofString())
     }

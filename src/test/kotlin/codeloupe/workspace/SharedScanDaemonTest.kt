@@ -6,6 +6,7 @@ import codeloupe.TestRepos
 import codeloupe.config.Config
 import codeloupe.config.WorkspacesConfig
 import codeloupe.daemon.Daemon
+import codeloupe.daemon.TestToken
 import codeloupe.reconcile.ReconcilePlan
 import codeloupe.reconcile.ReconcileRun
 import java.net.ServerSocket
@@ -23,7 +24,7 @@ class SharedScanDaemonTest {
     private val http = HttpClient.newHttpClient()
 
     private fun send(port: Int, method: String, path: String, body: String = ""): HttpResponse<String> =
-        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").method(method, HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString())
+        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, TestToken.of(port)).method(method, HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString())
 
     private fun list(port: Int, query: String = "") = JsonFormat.json.decodeFromString(WorkspaceList.serializer(), send(port, "GET", "/workspaces$query").body())
 

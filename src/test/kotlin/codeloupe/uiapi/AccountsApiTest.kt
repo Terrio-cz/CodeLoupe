@@ -77,7 +77,7 @@ class AccountsApiTest {
     fun stop() = daemon.stop()
 
     private fun get(path: String): HttpResponse<String> =
-        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/ui-api/v1/$path")).header(CodeLoupe.HEADER, "1").GET().build(), HttpResponse.BodyHandlers.ofString())
+        http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/ui-api/v1/$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).GET().build(), HttpResponse.BodyHandlers.ofString())
 
     private fun json(path: String): JsonObject {
         val r = get(path)
@@ -87,7 +87,7 @@ class AccountsApiTest {
 
     private fun tool(name: String, vararg args: Pair<String, String>) {
         val body = buildJsonObject { args.forEach { (k, v) -> put(k, v) } }
-        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$name")).header(CodeLoupe.HEADER, "1").POST(HttpRequest.BodyPublishers.ofString(body.toString())).build()
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$name")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).POST(HttpRequest.BodyPublishers.ofString(body.toString())).build()
         assertTrue(http.send(request, HttpResponse.BodyHandlers.ofString()).body().contains("\"ok\":true"))
     }
 

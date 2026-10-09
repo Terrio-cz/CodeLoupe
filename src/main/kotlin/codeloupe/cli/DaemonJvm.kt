@@ -3,7 +3,9 @@ package codeloupe.cli
 /**
  * JVM flags of the background daemon. It answers small queries all day, so it trades peak speed for a small
  * footprint: one GC thread, a small heap, C1 only. No dynamic class-data archive: one dumped after a parse holds
- * the parser's classes and maps them into every later run (+30 MB resident) for no measurable start-up gain.
+ * the parser's classes and maps them into every later run (+30 MB resident) for no measurable start-up gain. The AOT cache
+ * of CL-150 is another matter: it is made from a daemon that never parsed (the parse worker does), and the daemon that
+ * serves only reads it (start to listening 1 031 -> 559 ms, resident memory the same within noise).
  *
  * Resident memory after a mixed query load (CL-118, `tools/rss-mix.mjs`): compact object headers shrink every object
  * of the cached rows by a quarter, a 10 MB young generation stops the eden from being touched to its last page, and

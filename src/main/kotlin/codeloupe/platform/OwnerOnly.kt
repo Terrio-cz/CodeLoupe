@@ -43,5 +43,20 @@ object OwnerOnly {
         }
     }
 
-    private val MARKERS = listOf("daemon.json", "config.json", "jobs.db", "events.db", "daemon.log", "secrets")
+    /** Like [write] for a [file] that does not exist yet: false, and nothing changed, when somebody made it first. */
+    fun create(file: Path, text: String): Boolean {
+        folder(file.parent, tighten = false)
+        val temp = Files.createTempFile(file.parent, file.fileName.toString(), ".tmp", *attributes(fileMode))
+        try {
+            Files.writeString(temp, text)
+            Files.move(temp, file)
+            return true
+        } catch (_: java.nio.file.FileAlreadyExistsException) {
+            return false
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
+    private val MARKERS = listOf("daemon.json", "daemon.token", "config.json", "jobs.db", "events.db", "daemon.log", "secrets")
 }

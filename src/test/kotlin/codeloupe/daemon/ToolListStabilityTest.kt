@@ -59,7 +59,7 @@ class ToolListStabilityTest {
     private fun call(config: Config, tool: String, vararg args: Pair<String, String>) {
         val body = args.joinToString(",", "{", "}") { (k, v) -> "\"$k\":\"${v.replace("\\", "/")}\"" }
         http.send(
-            HttpRequest.newBuilder(URI("http://127.0.0.1:${config.port}/api/$tool")).header(CodeLoupe.HEADER, "1").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+            HttpRequest.newBuilder(URI("http://127.0.0.1:${config.port}/api/$tool")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, TestToken.of(config.port)).POST(HttpRequest.BodyPublishers.ofString(body)).build(),
             HttpResponse.BodyHandlers.ofString(),
         )
     }

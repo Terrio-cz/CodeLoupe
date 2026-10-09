@@ -41,6 +41,16 @@ describe('ClaudeConnector', () => {
     expect(f.calls.at(-1)).toEqual(['mcp', 'add', '--transport', 'http', '--scope', 'user', 'codeloupe', mcpUrl(48000), '--header', 'x-codeloupe: 1']);
   });
 
+  it('adds the entry with a headers helper when the CLI can be named, so the token never lands in the Claude Code configuration', async () => {
+    const f = fake({ 'mcp get': { code: 1, stdout: '', stderr: 'No MCP server found' } });
+    await new ClaudeConnector(f.run, () => null, () => 'codeloupe mcp-headers').connect('mcp', 48000);
+    const call = f.calls.at(-1)!;
+    expect(call.slice(0, 4)).toEqual(['mcp', 'add-json', '--scope', 'user']);
+    expect(JSON.parse(call[5])).toEqual({ type: 'http', url: mcpUrl(48000), headers: { 'x-codeloupe': '1' }, headersHelper: 'codeloupe mcp-headers' });
+    expect(commandLines('mcp', 48000, null, 'codeloupe mcp-headers')[0]).toContain('"headersHelper":"codeloupe mcp-headers"');
+    expect(JSON.stringify(call)).not.toMatch(/[0-9a-f]{32}/);
+  });
+
   it('replaces an existing entry so a changed port is picked up', async () => {
     const f = fake();
     await new ClaudeConnector(f.run, () => null).connect('mcp', 47391);

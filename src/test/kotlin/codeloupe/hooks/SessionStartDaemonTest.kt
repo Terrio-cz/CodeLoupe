@@ -44,7 +44,7 @@ class SessionStartDaemonTest {
 
     private fun post(body: String): HttpResponse<String> =
         http.send(
-            HttpRequest.newBuilder(URI("http://127.0.0.1:$port/hook")).header("content-type", "application/json").header(CodeLoupe.HEADER, "1").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+            HttpRequest.newBuilder(URI("http://127.0.0.1:$port/hook")).header("content-type", "application/json").header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).POST(HttpRequest.BodyPublishers.ofString(body)).build(),
             HttpResponse.BodyHandlers.ofString(),
         )
 
@@ -59,7 +59,7 @@ class SessionStartDaemonTest {
         Json.parseToJsonElement(response.body()).jsonObject["hookSpecificOutput"]!!.jsonObject["additionalContext"]!!.jsonPrimitive.content
 
     private fun index() {
-        val find = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1")
+        val find = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token)
             .POST(HttpRequest.BodyPublishers.ofString("""{"root":"${repo.toString().replace("\\", "/")}","q":"Big"}""")).build()
         assertContains(http.send(find, HttpResponse.BodyHandlers.ofString()).body(), "class Big")
     }
@@ -149,9 +149,9 @@ class SessionStartDaemonTest {
             assertEquals(0, process.exitValue())
             return out
         }
-        val out = run(mapOf("CODELOUPE_BIN" to "/nonexistent/codeloupe", "CODELOUPE_PORT" to port.toString()))
+        val out = run(mapOf("CODELOUPE_BIN" to "/nonexistent/codeloupe", "CODELOUPE_HOME" to config.home.toString(), "CODELOUPE_PORT" to port.toString()))
         assertContains(out, "CodeLoupe orientation")
-        assertEquals("", run(mapOf("CODELOUPE_BIN" to "/nonexistent/codeloupe", "CODELOUPE_PORT" to ServerSocket(0).use { it.localPort }.toString())))
-        assertEquals("", run(mapOf("CODELOUPE_BIN" to "/nonexistent/codeloupe", "CODELOUPE_PORT" to port.toString(), "CODELOUPE_HOOKS" to "off")))
+        assertEquals("", run(mapOf("CODELOUPE_BIN" to "/nonexistent/codeloupe", "CODELOUPE_HOME" to config.home.toString(), "CODELOUPE_PORT" to ServerSocket(0).use { it.localPort }.toString())))
+        assertEquals("", run(mapOf("CODELOUPE_BIN" to "/nonexistent/codeloupe", "CODELOUPE_HOME" to config.home.toString(), "CODELOUPE_PORT" to port.toString(), "CODELOUPE_HOOKS" to "off")))
     }
 }

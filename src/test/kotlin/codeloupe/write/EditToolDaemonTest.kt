@@ -5,6 +5,7 @@ import codeloupe.TestRepos
 import codeloupe.config.Config
 import codeloupe.config.WriteConfig
 import codeloupe.daemon.Daemon
+import codeloupe.daemon.TestToken
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
@@ -28,7 +29,7 @@ class EditToolDaemonTest {
     private val http = HttpClient.newHttpClient()
 
     private fun call(port: Int, tool: String, args: JsonObject): Pair<Int, JsonObject> {
-        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$tool")).header("content-type", "application/json").header(CodeLoupe.HEADER, "1")
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/$tool")).header("content-type", "application/json").header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, TestToken.of(port))
         val response = http.send(request.POST(HttpRequest.BodyPublishers.ofString(args.toString())).build(), HttpResponse.BodyHandlers.ofString())
         return response.statusCode() to Json.parseToJsonElement(response.body()).jsonObject
     }
