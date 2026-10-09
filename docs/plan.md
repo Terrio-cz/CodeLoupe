@@ -1409,6 +1409,30 @@ rozhoduje launcher.
   jako tajemství prostředí `release`, proto je to samostatná karta. Do té doby platí SHA-512 z feedu stejného vydání a ruční `gh attestation verify`.
 - Neověřeno: job `publish` s atestací se spustí poprvé na skutečném tagu; kontrola je v `docs/repository-hardening.md`, sekce „After the first release“.
 
+### Výsledek CL-160 — zbytky po bezpečnostní revizi trezoru (2026-10-09)
+
+- macOS: klíč trezoru se do `security` posílá přes `security -i` na standardním vstupu, takže není na příkazové řádce, kterou vidí `ps` jiného
+  uživatele; po zápisu se položka ověří dotazem na Keychain (interaktivní režim má vlastní návratový kód). Nezkoušeno na macOS (okno bez Macu):
+  test běží proti falešnému `security`, skutečné volání musí ověřit vlastník.
+- Import: proměnná, která by ve složce cizího repozitáře zakryla stejně pojmenovaný klíč širšího rozsahu (`global`, `workspace:`), je v inventáři
+  označená (`shadows`), `--all-sensitive` ji vynechá a vypíše co by zakryla; vybrat ji jde jen přes `--select <id>`. Aplikace ji předem neškrtne.
+- Aplikace: `env.set`, přepsání při importu a `youtrackRotate` mají nativní potvrzení jako výměna a smazání. Skrytí hodnoty ve schránce (typ
+  concealed) je CL-171.
+- Trezor leží v `Caches` (macOS) a `~/.cache` (Linux), které čističe mažou. Přesun s migrací mezi verzemi by byl větší zásah, než kolik tato
+  karta unese, proto `env set` při vzniku trezoru v cache složce upozorní (stderr, aplikace to ukáže ve zprávě) a wiki říká, jak složku
+  přesunout (`CODELOUPE_HOME`).
+- Odvozený klíč z passphrase se po použití vynuluje a `PBEKeySpec` smaže heslo; timeout `Exec.run` pokrývá i čtení výstupu (už platilo,
+  `ExecTimeoutTest`). Rozlišení velkých a malých písmen v id rozsahu je CL-172.
+
+### Výsledek CL-172 — velikost písmen v id rozsahu tajemství (2026-10-09)
+
+- `SecretScope.normalize` zmenšuje id jen tam, kde souborový systém velikost písmen nerozlišuje (Windows, macOS s výchozím svazkem); na Linuxu
+  zůstává `/x/Proj` a `/x/proj` dvojice různých rozsahů. macOS se svazkem citlivým na velikost se bere jako výchozí (neprobíhá zjišťování svazku).
+- Starší trezory mají id malými písmeny: `SecretStore.pick` bere i položky pod `SecretScope.legacy()` (id malými), při stejné hodnosti vyhrává
+  přesné id; `holds` a `remove` hledají nejdřív přesné id, pak staré. Nový zápis jde pod přesné id, nic se nepřešifrovává (id je v AAD, takže
+  přepsání by vyžadovalo nové šifrování; záměrně ne). Nevýhoda: starý a nový záznam téhož klíče mohou existovat vedle sebe, dokud staré nesmažeš.
+- Čtení uloženého textu rozsahu se nikdy nezmenšuje (`parse(…, foldCase = false)`), jinak by AAD záznamu s velkými písmeny na Windows nesedělo.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

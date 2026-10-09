@@ -141,8 +141,8 @@ jobs:
         run: |
           dbus-run-session -- bash -c '
             set -e
-            eval "$(printf "" | gnome-keyring-daemon --unlock --components=secrets)"
-            eval "$(printf "" | gnome-keyring-daemon --start --components=secrets)"
+            # An empty password makes the daemon ask for a confirmation through a prompter that needs a display; any password creates the login keyring.
+            eval "$(printf "ci" | gnome-keyring-daemon --unlock --components=secrets)"
             printf probe | secret-tool store --label=probe service ci account probe
             test "$(secret-tool lookup service ci account probe)" = probe
             ./gradlew test --console=plain --no-daemon --tests "codeloupe.secrets.KeyProtectorTest" --tests "codeloupe.secrets.SecretAccessTest"

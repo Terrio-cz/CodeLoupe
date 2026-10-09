@@ -4,8 +4,21 @@ One store for the variables and secrets that Claude workspaces, MCP servers and 
 and an agent never sees a value. `<home>/secrets/vault.env` (JSON) holds one AES-256-GCM ciphertext per name and scope, bound
 to its name and scope, and a random data key that only the OS can open: Windows DPAPI (current user), the macOS login
 Keychain, libsecret (`secret-tool`) on Linux, else a key derived from the passphrase in `CODELOUPE_PASSPHRASE` (PBKDF2-HMAC-SHA256,
-310 000 rounds). A vault is always opened the way it was made. The file name ends in `.env` on purpose: the workspace rules that
+600 000 rounds for a new vault). On macOS the key reaches the `security` tool on its standard input, never on a command line. A vault is always opened the way it was made. The file name ends in `.env` on purpose: the workspace rules that
 deny reading `*.env` cover it.
+
+**Where the vault lives.** It is in the daemon's home, which is a cache folder on macOS (`~/Library/Caches/codeloupe`) and Linux
+(`~/.cache/codeloupe`); Windows uses `%LOCALAPPDATA%`, which cleaners leave alone. A cache cleaner that empties the folder deletes the
+vault, and on macOS and Linux the key in the keychain or secret service is left behind. `codeloupe env set` says so when it creates a vault there
+(the desktop app shows the same note). Keep a copy of `<home>/secrets/`, or set `CODELOUPE_HOME` to a folder outside the cache before you store
+more (the daemon, the CLI and the app must all use it). Moving the vault by default needs a migration across versions of the daemon, the CLI and the app that
+share it, and is not done.
+
+**Scope ids and case.** A `workspace:<id>` or `repo:<id>` is a folder path with forward slashes and no trailing slash. On Windows and macOS (default volumes)
+paths compare without regard to case, so the id is lower-cased; on Linux `/x/Proj` and `/x/proj` are two folders and two scopes, and the id keeps its
+case (a macOS volume formatted case sensitive is treated like the default one). A vault written by an earlier version holds lower-cased ids: on Linux
+those entries are still found for a caller whose path has capitals (the entry under the exact id wins at the same rank), `env unset` removes the exact
+one first and then the old one, and nothing is re-encrypted. A value you store afterwards goes under the exact id; the old entry stays until you unset it.
 
 | | |
 |---|---|
@@ -19,6 +32,12 @@ deny reading `*.env` cover it.
 | `codeloupe env import run --select <id>[=scope] … \| --all-sensitive [--replace] [--overwrite]` | copies the selected occurrences into the store inside the process and reports created / updated / skipped; rerunning changes nothing. Two selected sources with different values for one name and scope are a conflict, stored from neither. `--replace` then swaps each imported value in its source for a reference (a comment in dotenv files, `${NAME}` in JSON) after saving an encrypted copy of the file |
 | `codeloupe env import rollback <backup-id> [--force]`, `backups`, `forget <id>` | puts every replaced file back byte for byte (a file edited since is left alone unless `--force`); lists and drops the copies |
 | `GET /env/values?workspace=&repository=&names=A,B` | for a local MCP server or script: the values, in its own process. Needs `x-codeloupe-env-token` (the contents of `<home>/secrets/api-token.env`, made on first use, readable by this user only) and says who asks in `x-codeloupe-used-by` |
+
+A variable takes the scope of the folder it was found in, and the narrowest scope wins when a command runs, so a `.env` in a repository somebody else wrote
+could replace your global `API_KEY` for everything run inside that folder. The inventory therefore marks a variable that would **hide** a secret the store
+already holds in a wider scope (`shadows` in the JSON, *hides global key* in the app), the app leaves it unticked, and `--all-sensitive` skips it and says
+which ones; `--select <id>` still imports it, as a decision. In the app, saving a key, rotating a YouTrack token and an import with *overwrite*
+ask in a native dialog first, like deleting and replacing sources do.
 
 The import looks under the roots of `envImport` in `<home>/config.json` (`{"roots":[{"path":"~/IdeaProjects","kind":"repositories"}],"exclude":["other-system"]}`; kind
 `home`, `workspaces` or `repositories`). Without it: every `~/.claude*`, `~/Documents/Claude` (each folder one workspace, scope `workspace:<folder>`) and `~/IdeaProjects`

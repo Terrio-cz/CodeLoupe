@@ -9,6 +9,7 @@ import codeloupe.secrets.imports.ImportBackups
 import codeloupe.secrets.imports.ImportLines
 import codeloupe.secrets.imports.ImportResult
 import codeloupe.secrets.imports.ImportSelection
+import codeloupe.secrets.imports.Shadowing
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.UsageError
@@ -31,9 +32,13 @@ class EnvImportRunCommand : CliktCommand(name = "run") {
         val home = ConfigLoader.load().home
         val config = ConfigLoader.envImport(home)
         val scan = EnvScanner(config, home, includeExcluded).scan()
-        val selections = select.map(ImportSelection::parse) + if (allSensitive) scan.found.filter { it.sensitive }.map { ImportSelection(it.id) } else emptyList()
-        if (selections.isEmpty() && !allSensitive) throw UsageError("nothing selected: pass --select <id> (ids come from `env import scan`) or --all-sensitive")
         val store = SecretStore.open(home)
+        val shadowing = Shadowing(runCatching { store.list() }.getOrDefault(emptyList()))
+        val hiding = if (allSensitive) shadowing.hiding(scan.found.filter { it.sensitive }) else emptyList()
+        val selections = select.map(ImportSelection::parse) + if (allSensitive) scan.found.filter { it.sensitive && it !in hiding }.map { ImportSelection(it.id) } else emptyList()
+        if (selections.isEmpty() && !allSensitive) throw UsageError("nothing selected: pass --select <id> (ids come from `env import scan`) or --all-sensitive")
+        // A variable that would hide a wider secret is imported only when asked for by id: a repository nobody vetted must not replace a key.
+        hiding.forEach { echo("not selected: ${it.name} in ${it.file} would hide the ${shadowing.of(it).joinToString(", ")} secret of the same name; import it with --select ${it.id}", err = true) }
         val result = try {
             EnvImporter(store, ImportBackups(home.resolve("secrets").resolve("import-backups"), store)).run(scan, selections, replace, overwrite)
         } catch (e: IllegalArgumentException) {

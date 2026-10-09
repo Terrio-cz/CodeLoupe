@@ -198,9 +198,12 @@ class OverlayTest {
         git(repo, "worktree", "remove", "--force", feature.toString())
         first.close()
         val restartQueue = JobQueue(CoroutineScope(Dispatchers.Default))
-        val restarted = Registry(config, restartQueue)
+        // The collection deletes the file first and writes its log line after; the queue counts the job done only when it returns. A
+        // slow log keeps that gap open, so a test that read the count as soon as the file was gone (CL-157) would fail here every time.
+        val restarted = Registry(config, restartQueue, log = { if ("overlays of removed worktrees deleted" in it) Thread.sleep(300) })
         assertContains(find(restarted, other, "Other"), "class Other")
         waitFor("overlay collected") { overlayFiles().size == 1 }
+        waitFor("collection finished") { restartQueue.snapshot().fast.let { it.running == null && it.waiting.isEmpty() } }
         assertEquals(1, restartQueue.snapshot().fast.done, "the collection only: the live overlay was reused, not rebuilt")
     }
 

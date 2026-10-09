@@ -60,6 +60,8 @@ export interface EnvInventory {
     duplicate: boolean;
     conflict: boolean;
     sources: { id: string; file: string; kind: string; locator: string; hash: string }[];
+    /** Wider scopes whose stored secret of this name the import would hide inside this scope (a folder somebody else wrote replacing a global key). */
+    shadows?: string[];
   }[];
 }
 
