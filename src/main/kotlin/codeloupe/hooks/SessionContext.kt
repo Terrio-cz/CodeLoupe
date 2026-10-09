@@ -27,10 +27,10 @@ class SessionContext(private val registry: Registry, private val projects: () ->
             val state = state(Path.of(location.worktree).fileName.toString(), branch, repo.defaultRef, task, changed?.text)
             val budgetChars = chars(settings.budget)
             val trimmed = if (withMap) cut(state, budgetChars * STATE_SHARE / 100) else cut(state, budgetChars)
-            if (!withMap) return@withTimeoutOrNull trimmed
+            if (!withMap) return@withTimeoutOrNull HookText.block(trimmed)
             val room = settings.budget - tokens(trimmed) - tokens(HINT) - FOOTER_TOKENS
             val map = if (room < MIN_MAP_TOKENS) null else registry.query(location.worktree) { RepoMap.run(it, RepoMap.Args(focus = changed?.files.orEmpty(), budget = room)) }
-            listOfNotNull(trimmed, map, HINT).joinToString("\n")
+            HookText.block(listOfNotNull(trimmed, map, HINT).joinToString("\n"))
         }
     }
 
@@ -50,10 +50,10 @@ class SessionContext(private val registry: Registry, private val projects: () ->
     }
 
     private fun state(name: String, branch: String?, defaultRef: String, task: String?, changes: String?): String = buildString {
-        append("CodeLoupe orientation for $name: ")
-        append(if (branch == null) "no branch checked out" else "branch $branch")
-        if (task != null) append(" (task $task)")
-        append(", default branch $defaultRef.")
+        append("CodeLoupe orientation for ${HookText.line(name)}: ")
+        append(if (branch == null) "no branch checked out" else "branch ${HookText.line(branch)}")
+        if (task != null) append(" (task ${HookText.line(task)})")
+        append(", default branch ${HookText.line(defaultRef)}.")
         if (changes != null) append('\n').append(changes)
     }
 

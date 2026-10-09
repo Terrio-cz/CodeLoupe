@@ -50,7 +50,8 @@ internal class WriteApplier(private val policy: WritePolicy, private val journal
     private fun write(worktree: Path, change: FileChange) {
         val target = worktree.resolve(change.target)
         Files.createDirectories(target.parent)
-        AtomicWrite.replace(target, change.text.toByteArray(Charsets.UTF_8))
+        // The edit was checked against the disk under the lock; checked again just before the rename, the window in which another program can win is a few milliseconds.
+        AtomicWrite.replace(target, change.text.toByteArray(Charsets.UTF_8)) { check(worktree, change) }
         if (change.movedTo != null) {
             try {
                 Files.delete(worktree.resolve(change.path))

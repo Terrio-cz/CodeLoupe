@@ -1,5 +1,6 @@
 package codeloupe.metrics
 
+import codeloupe.platform.BoundedRead
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
@@ -32,7 +33,7 @@ class TranscriptFinder(private val since: Instant?, private val until: Instant?)
         val dir = session.resolve("subagents")
         if (!dir.isDirectory()) return emptyList()
         return dir.listDirectoryEntries("*.jsonl").sortedBy { it.name }.filter(::fresh).map { file ->
-            val meta = runCatching { Json.parseToJsonElement(file.resolveSibling("${file.nameWithoutExtension}.meta.json").readText()).obj() }.getOrNull()
+            val meta = BoundedRead.text(file.resolveSibling("${file.nameWithoutExtension}.meta.json"))?.let { text -> runCatching { Json.parseToJsonElement(text).obj() }.getOrNull() }
             val description = meta?.get("description").str().orEmpty()
             TranscriptFile(file, "subagent", meta?.get("agentType").str() ?: "unknown", TER.find(description)?.value)
         }

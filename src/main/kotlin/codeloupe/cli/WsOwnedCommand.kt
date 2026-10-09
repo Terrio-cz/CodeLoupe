@@ -5,6 +5,7 @@ import codeloupe.config.ConfigLoader
 import codeloupe.docker.DockerApi
 import codeloupe.docker.DockerUnavailable
 import codeloupe.docker.Ownership
+import codeloupe.docker.InstallId
 import codeloupe.workspace.WorkspaceIdentity
 import codeloupe.workspace.WorkspaceList
 import com.github.ajalt.clikt.core.CliktCommand
@@ -38,7 +39,7 @@ abstract class WsOwnedCommand(name: String) : CliktCommand(name = name) {
         val (status, body) = DaemonClient(ConfigLoader.load()).send("GET", "/workspaces?repo=" + URLEncoder.encode(workDir.toString(), Charsets.UTF_8), timeout = null)
         if (status != 200) fail(body["error"]?.jsonPrimitive?.content ?: "HTTP $status")
         return try {
-            WorkspaceIdentity.pick(JsonFormat.json.decodeFromJsonElement(WorkspaceList.serializer(), body), workDir)
+            WorkspaceIdentity.pick(JsonFormat.json.decodeFromJsonElement(WorkspaceList.serializer(), body), workDir, InstallId.of(ConfigLoader.load().home))
         } catch (e: IllegalArgumentException) {
             fail(e.message.orEmpty())
         }.also { note("workspace ${it.workspace} of ${it.repo}" + if (it.task.isNotEmpty()) " (task ${it.task})" else "") }

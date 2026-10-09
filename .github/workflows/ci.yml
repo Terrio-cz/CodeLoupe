@@ -351,6 +351,21 @@ jobs:
           test -f "$(find unpacked -path '*claude-plugin/.claude-plugin/marketplace.json' | head -n 1)"
           ls -l app/dist | grep -E '.(exe|dmg|AppImage|deb)$' | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # The fuses are flipped in the built app (app/electron-builder.yml electronFuses, CL-161): read them back from the unpacked installer.
+      - name: Check the Electron fuses
+        shell: bash
+        working-directory: app
+        run: |
+          case "${{ matrix.os }}" in
+            ubuntu-*) bin=../unpacked/squashfs-root/codeloupe-desktop ;;
+            macos-*) bin=../unpacked/CodeLoupe.app ;;
+            windows-*) bin=$(find ../unpacked/nsis -name CodeLoupe.exe | head -n 1) ;;
+          esac
+          npx electron-fuses read --app "$bin" | tee ../fuses.txt
+          grep -q 'RunAsNode is Disabled' ../fuses.txt
+          grep -q 'EnableNodeOptionsEnvironmentVariable is Disabled' ../fuses.txt
+          grep -q 'EnableNodeCliInspectArguments is Disabled' ../fuses.txt
+
       - name: Upload installers
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

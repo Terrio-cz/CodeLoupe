@@ -59,6 +59,11 @@ describe('Claude accounts', () => {
   it('refuses a relative path, a missing directory without create, a file, a duplicate and the implicit default again', async () => {
     const t = setup();
     expect((await t.manager.claudeAdd({ label: 'x', configDir: 'relative/dir', create: true })).ok).toBe(false);
+    for (const unc of ['\\\\attacker\\share\\claude', '//attacker/share/claude', '\\\\?\\C:\\x']) {
+      const refused = await t.manager.claudeAdd({ label: 'x', configDir: unc, create: true });
+      expect(refused.ok).toBe(false);
+      expect(refused.message).toContain('network path');
+    }
     expect((await t.manager.claudeAdd({ label: 'x', configDir: dir('nope'), create: false })).message).toContain('does not exist');
     fs.writeFileSync(dir('afile'), 'x');
     expect((await t.manager.claudeAdd({ label: 'x', configDir: dir('afile'), create: false })).message).toContain('not a folder');

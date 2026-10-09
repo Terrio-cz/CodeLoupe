@@ -78,7 +78,7 @@ class DockerApi(private val endpoint: DockerEndpoint) {
      */
     fun createVolume(name: String, ownership: Ownership): VolumeOutcome {
         volumeLabels(name)?.let { existing ->
-            return if (Ownership.of(existing) == ownership) VolumeOutcome.ALREADY_OURS else VolumeOutcome.EXISTS_OTHER
+            return if (Ownership.of(existing)?.sameWorkspace(ownership) == true) VolumeOutcome.ALREADY_OURS else VolumeOutcome.EXISTS_OTHER
         }
         val body = buildJsonObject {
             put("Name", name)

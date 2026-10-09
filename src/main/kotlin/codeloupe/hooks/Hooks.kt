@@ -45,7 +45,8 @@ class Hooks(
     /** The weight of the transcript at [path] by the configured sizes (`GET /session-weight`); null for a file that cannot be read. */
     fun weightOf(path: String): SessionWeight? {
         val weight = runCatching(config).getOrDefault(HooksConfig()).weight
-        return runCatching { weights?.weigh(java.nio.file.Path.of(path), weight.warnAt, weight.top) }.getOrNull()
+        val transcript = TranscriptPath.of(path) ?: return null
+        return runCatching { weights?.weigh(transcript, weight.warnAt, weight.top) }.getOrNull()
     }
 
     /** [handle] for every event, the ones that wait for the index included. */
@@ -109,7 +110,7 @@ class Hooks(
     private fun weigh(input: HookInput, json: JsonObject, weight: HooksConfig.WeightConfig, started: Long): JsonObject? {
         if (!weight.enabled || weights == null || warned == null) return pass("off", started)
         if ((json["stop_hook_active"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true") return pass("ignored", started)
-        val path = input.transcriptPath?.let { runCatching { java.nio.file.Path.of(it) }.getOrNull() } ?: return pass("ignored", started)
+        val path = input.transcriptPath?.let(TranscriptPath::of) ?: return pass("ignored", started)
         val measured = weights.weigh(path, weight.warnAt, weight.top) ?: return pass("ignored", started)
         val key = input.session.ifEmpty { path.fileName.toString() }
         if (!warned.reached(key, measured.level)) return pass("below-size", started)

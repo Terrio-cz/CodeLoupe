@@ -71,6 +71,34 @@ class ProcessStopperTest {
     }
 
     @Test
+    fun `a build that starts while the CPU is being watched stops the stop`() {
+        ChildProcesses().use { children ->
+            val daemon = children.start(workspace, GRADLE_DAEMON_MARKER)
+            val listed = children.awaitListed(daemon)
+            val stopper = ProcessStopper(children.world(), probeMs = 200, graceMs = 10_000, sleep = { ms ->
+                Thread.sleep(ms)
+                children.awaitListed(children.start(workspace, GRADLE_CLIENT_MARKER))
+            })
+            val outcome = stopper.stop(listed.pid, listed.startMs, workspace.toString().replace('\\', '/'))
+            assertIs<ProcessStopper.Outcome.Blocked>(outcome)
+            assertEquals("a Gradle build is running", outcome.reason)
+            assertTrue(daemon.isAlive)
+        }
+    }
+
+    @Test
+    fun `a start time that cannot be read is not proof that it is the same process`() {
+        ChildProcesses().use { children ->
+            val daemon = children.start(workspace, GRADLE_DAEMON_MARKER)
+            val listed = children.awaitListed(daemon)
+            val outcome = ProcessStopper(children.world(), probeMs = 200, graceMs = 10_000, startMsOf = { null }).stop(listed.pid, listed.startMs, workspace.toString().replace('\\', '/'))
+            assertIs<ProcessStopper.Outcome.Blocked>(outcome)
+            assertTrue("start time" in outcome.reason, outcome.reason)
+            assertTrue(daemon.isAlive)
+        }
+    }
+
+    @Test
     fun `a process that moved to another workspace, is no build tool, or is gone is not stopped`() {
         ChildProcesses().use { children ->
             val moved = children.start(other, GRADLE_DAEMON_MARKER)

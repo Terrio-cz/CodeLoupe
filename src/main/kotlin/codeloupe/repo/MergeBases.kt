@@ -36,7 +36,7 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
     /** [withBefore] false skips the merge-base index: the caller wants the changed paths only. */
     suspend fun changes(repo: RepoState, worktree: String, withBefore: Boolean = true): ChangeSet = withContext(Dispatchers.IO) {
         val mergeBase = mergeBase(repo, worktree)
-        val diff = DiffEntry.parse(Git.run(worktree, "diff", "--raw", "-z", "--no-renames", "--no-abbrev", mergeBase, "--")!!)
+        val diff = DiffEntry.parse(Git.run(worktree, "diff", "--raw", "-z", "--no-renames", "--no-abbrev", "--no-ext-diff", "--no-textconv", mergeBase, "--")!!)
         val untracked = WorktreeGit.untracked(worktree).toSet()
         val (indexed, other) = (diff.map { it.path } + untracked).distinct().partition { Languages.languageOf(it) != null }
         val status = diff.associate { it.path to it.status }
