@@ -1346,6 +1346,26 @@ rozhoduje launcher.
   22 MB (CLI) a 51 MB (daemon) v home, ne v balíčku. Nezapnuto, protože tři věci nejsou vyřešené (souběžné první volání CLI zapisují jeden soubor,
   zápis při ukončení daemona zdržuje `stop`, platnost po přesunu instalace): karta **CL-150** s měřením.
 
+### Výsledek CL-166 — testy, které mimo Windows nic nedělaly (2026-10-09)
+
+- **Co bylo špatně**: `DirectoryListingTest` (dva testy a větev se symlinkem) končil mimo Windows `return`em, takže v reportu svítil zeleně; několik
+  `assumeTrue` nemělo důvod; `OwnerOnlyTest` kontroloval POSIX režimy až po zbytku testu (při přeskočení zmizel i běžící zbytek); `PortRegistryTest` ověřoval pid
+  poslechu jen na Windows.
+- **Změna**: žádný test se nevrací z OS podmínky, každý `assumeTrue` říká proč (po úpravě 17 přeskočených na Linuxu, každý s důvodem). CI `test` job vypisuje
+  přeskočené testy s důvody do shrnutí jobu (`tools/skipped-tests.mjs`, s testem) a nový job `libsecret` spouští testy úložiště klíčů a otevření trezoru na
+  Ubuntu s dočasným GNOME Keyring na vlastní session sběrnici (job selže, když se některý z těchto testů přeskočí).
+- **Nové testy bez zvláštního stroje**: seznam JDK (jména, druhy, časy, velikosti, `é` v NFC proti `git ls-files`, rozložený název podle toho, co file system
+  nechá), prostředí démona mimo Windows (`DetachedStart.cut`) a skutečný start dítěte, parsery `ps`/`lsof` (včetně `\xHH` z `lsof` v locale C) a `/proc/<pid>/cmdline`,
+  skutečné `/proc` pro adresář s mezerou a diakritikou, pid poslouchajícího procesu přes `netstat`/`ss`/`lsof`, `LocalPorts.inUse` pro adresu rozhraní a IPv6,
+  `ProcessMemory`, `TerminalSignals`, `JobObjects` (Windows: skutečný strom; jinde: nic se neuplatní), `GlobalExcludes` (`env` a `HOME` jsou parametry),
+  otevření trezoru s passphrase a s úložištěm klíčů OS, protějšek testu nesmazatelného souboru pro POSIX (jen čtení adresáře).
+- **Klíče cest podle file systému**: `PathCase` (Windows a macOS ignorují velikost písmen, Linux ne) nahradil pět různých pravidel (`File.separatorChar`,
+  `NativeCalls.isWindows`, `windows` v hooku); `WorktreeId`, klíč overlaye, `WorkspaceIdentity`, `OrphanDirs.key`, shoda příkazové řádky procesu a `PortPolicy`
+  se na macOS skládají jako na Windows. Case-sensitive svazek macOS se bere jako necitlivý (zdokumentováno).
+- **Zůstává nedokázáno** (seznam ve wiki, `Development`): case-sensitive svazek macOS, pid cizího uživatele, `lsof` v locale C proti skutečnému nástroji
+  (dekodér je testován fixturou), zamčený Keychain / KWallet, pád démona mimo Windows (jen job objekty hlídají vnuky; jinak je při dalším startu ukončí pid),
+  start démona mimo Windows jako obyčejné dítě ve skupině volajícího (bez `setsid`).
+
 ### Výsledek CL-150 — AOT cache pro CLI a start daemona (2026-10-09)
 
 - **Zapnuto.** Launchery předají CLI `-Dcodeloupe.aot=<home>/aot/<instalace>-<build>` a použijí `<…>.cli.aot`, pokud existuje (`-XX:AOTCache`; JVM s ním odmítne `-Xshare`, proto skripty `-Xshare` už nedávají).

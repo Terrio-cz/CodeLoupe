@@ -9,7 +9,7 @@ import codeloupe.index.InlineParse
 import codeloupe.index.Store
 import codeloupe.index.StoreUpdate
 import codeloupe.index.StoreUpdater
-import codeloupe.platform.NativeCalls
+import codeloupe.platform.PathCase
 import codeloupe.platform.Sha1
 import codeloupe.platform.TimedPart
 import codeloupe.platform.Timings
@@ -350,10 +350,10 @@ class Overlays(
 
     private fun nameOf(key: String) = Sha1.hex(key).take(12)
 
-    // Windows paths compare case-insensitively; git and the caller may spell the drive letter differently.
+    // Windows and macOS paths compare case-insensitively; git and the caller may spell the drive letter (or a folder) differently.
     private fun key(path: String): String {
         val normal = Path.of(path).toAbsolutePath().normalize().toString().replace('\\', '/')
-        return if (NativeCalls.isWindows) normal.lowercase() else normal
+        return PathCase.fold(normal)
     }
 
     companion object {

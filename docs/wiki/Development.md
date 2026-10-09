@@ -15,6 +15,26 @@ Always run a development daemon with a throwaway `CODELOUPE_HOME` and a port of 
 touches the daemon you use; the scripts below do that themselves. CI ([ci.yml](https://github.com/Terrio-cz/CodeLoupe/blob/main/.github/workflows/ci.yml)) runs the same checks on three
 operating systems; see [Packaging and releasing](Packaging-and-releasing).
 
+## Operating systems
+
+The Kotlin suite runs on Windows, macOS and Linux in CI. A test that needs one OS (or a tool, or a privilege) states it with
+`assumeTrue(condition, "reason")`; it never returns early, so it is reported as skipped, not as passed. Each `test` job lists
+its skipped tests with their reasons in the job summary (`tools/skipped-tests.mjs`), and a `libsecret` job runs the key store
+tests on Ubuntu against a throwaway GNOME Keyring. Parsers and key functions take the OS output or the environment as an
+argument, so their tests run everywhere with fixtures of the other systems' formats (`netstat`, `ss`, `lsof`, `ps`, `/proc`).
+
+What no test proves, because it needs a machine CI does not offer or cannot reproduce:
+
+- A case-sensitive macOS volume: path keys fold case on every macOS volume (`PathCase`), as for the default APFS.
+- NFC/NFD names on macOS beyond one composed name (the file system decides how it spells a decomposed one).
+- The listener pid of a socket owned by another user (`ss` and `lsof` show only your own processes without privileges), and `lsof`
+  escaping under a locale other than the runner's (the decoder is tested with a fixture, not against a real `lsof` in the C locale).
+- The macOS Keychain with a locked login keychain, and libsecret with KWallet instead of GNOME Keyring.
+- A daemon killed without a chance to clean up: only Windows has job objects, so a job's grandchildren outside Windows are found
+  and ended by pid when the daemon starts again, not at the moment it dies. The detached start outside Windows is a plain child
+  in the caller's process group (no `setsid`), so a group kill by an agent host ends it.
+- Docker Desktop for Mac and Colima sockets, rootless Docker and Podman: only the Engine API through a fake is tested.
+
 ## Measuring
 
 `node tools/profile.mjs --cli build/install/codeloupe/bin/codeloupe --home <tmp> --root <repo> --worktree <worktree>`

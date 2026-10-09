@@ -10,11 +10,11 @@ import codeloupe.daemon.DaemonToken
 import codeloupe.daemon.ToolOutcome
 import codeloupe.platform.DetachedStart
 import codeloupe.platform.JavaProcess
+import codeloupe.platform.PathCase
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
@@ -92,7 +92,7 @@ class DaemonClient(private val config: Config) {
         val home = status["home"]?.jsonPrimitive?.content ?: return status
         val ours = config.home.toAbsolutePath().normalize().toString()
         val theirs = Path.of(home).toAbsolutePath().normalize().toString()
-        if (!theirs.equals(ours, ignoreCase = File.separatorChar == '\\')) {
+        if (!theirs.equals(ours, ignoreCase = PathCase.insensitive)) {
             throw IllegalStateException("127.0.0.1:${config.port} is served by a daemon with home $theirs, not $ours")
         }
         return status

@@ -2,7 +2,7 @@ package codeloupe.workspace
 
 import codeloupe.git.GitLayout
 import codeloupe.platform.IsoTime
-import java.io.File
+import codeloupe.platform.PathCase
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
@@ -32,10 +32,10 @@ internal object OrphanDirs {
         }
     }
 
-    /** A path in the form worktree paths are compared in: real, with `/`, and without case on Windows. */
+    /** A path in the form worktree paths are compared in: real, with `/`, and without case where the file system ignores it. */
     fun key(path: Path): String {
         val real = runCatching { path.toRealPath() }.getOrDefault(path.toAbsolutePath().normalize()).toString().replace('\\', '/')
-        return if (File.separatorChar == '\\') real.lowercase() else real
+        return PathCase.fold(real)
     }
 
     private fun reason(child: Path, commonDir: String): String {
