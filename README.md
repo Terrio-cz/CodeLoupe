@@ -25,7 +25,7 @@ questions), measured, not estimated ([Benchmarks](https://github.com/Terrio-cz/C
   from git objects, every worktree adds an overlay of its own edits, checked when a query arrives.
 - **No IDE, no compiler, no watchers**: the Kotlin compiler's own parser (syntax only) and SQLite; no CPU while idle.
 - **One daemon per machine** for every agent window, about 210 MB resident with two repositories indexed.
-- **MCP** over Streamable HTTP (stateless) plus the same tools on a CLI.
+- **MCP** over Streamable HTTP (stateless) plus the same tools on a CLI. The daemon is local-only and everything that acts for you (jobs, `run`, `edit`, releases) wants the token in its home's `daemon.token`, which only you can read; [Who may call the daemon](https://github.com/Terrio-cz/CodeLoupe/wiki/Configuration#who-may-call-the-daemon).
 
 ## Quick start
 

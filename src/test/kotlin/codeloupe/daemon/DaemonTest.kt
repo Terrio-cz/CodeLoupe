@@ -74,7 +74,7 @@ class DaemonTest {
         assertEquals(setOf("find", "outline"), status.latency.byTool.keys)
         // The test JVM holds the daemon and the whole suite, so its RSS says nothing; the other budgets must hold.
         assertTrue(status.budgets.warnings.none { !it.startsWith("rss ") }, status.budgets.warnings.toString())
-        val history = http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/status/history")).header(CodeLoupe.HEADER, "1").GET().build(), HttpResponse.BodyHandlers.ofString())
+        val history = http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/status/history")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).GET().build(), HttpResponse.BodyHandlers.ofString())
         assertEquals(200, history.statusCode())
         assertContains(history.body(), "\"rssMb\"")
     }
@@ -122,7 +122,7 @@ class DaemonTest {
     @Test
     @Order(4)
     fun `malformed API calls get a JSON error and a log line`() {
-        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1")
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token)
             .POST(HttpRequest.BodyPublishers.ofString("{bad")).build()
         val response = http.send(request, HttpResponse.BodyHandlers.ofString())
         assertEquals(500, response.statusCode())

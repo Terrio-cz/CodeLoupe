@@ -11,6 +11,7 @@ import codeloupe.write.WriteService
  */
 class EditTool(private val writes: WriteService) : Tool {
     override val name = "edit"
+    override val mutating = true
     override val description = "Change source by declaration instead of by text: op=replace (name, code, hash: the whole declaration, KDoc and annotations " +
         "included, becomes code), insert_after / insert_before (name = the anchor), insert_member (name = the type, position start|end|after_properties), " +
         "delete (declaration, its lines and a blank line), add_imports (file, imports), create_file (path, code: new files only, package = folder), " +

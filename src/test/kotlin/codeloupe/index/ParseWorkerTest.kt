@@ -90,7 +90,7 @@ class ParseWorkerTest {
         val http = HttpClient.newHttpClient()
         fun find(root: String, q: String): String {
             val body = buildJsonObject { put("root", root); put("q", q) }.toString()
-            val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1").POST(HttpRequest.BodyPublishers.ofString(body)).build()
+            val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).POST(HttpRequest.BodyPublishers.ofString(body)).build()
             return http.send(request, HttpResponse.BodyHandlers.ofString()).body()
         }
         fun workers() = SystemProcesses().read().filter { it.commandLine?.contains("codeloupe.index.ParseWorker") == true }

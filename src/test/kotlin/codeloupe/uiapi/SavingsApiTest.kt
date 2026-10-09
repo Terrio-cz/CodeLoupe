@@ -66,7 +66,7 @@ class SavingsApiTest {
     fun stop() = daemon.stop()
 
     private fun json(path: String): JsonObject {
-        val r: HttpResponse<String> = http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/ui-api/v1/$path")).header(CodeLoupe.HEADER, "1").GET().build(), HttpResponse.BodyHandlers.ofString())
+        val r: HttpResponse<String> = http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/ui-api/v1/$path")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).GET().build(), HttpResponse.BodyHandlers.ofString())
         assertEquals(200, r.statusCode(), r.body())
         return Json.parseToJsonElement(r.body()).jsonObject
     }

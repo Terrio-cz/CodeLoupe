@@ -6,29 +6,31 @@
 #   CODELOUPE_HOOKS=off   skip every CodeLoupe hook (also "hooks": {"enabled": false} in the daemon's config.json)
 #   CODELOUPE_PORT        the daemon's port; without it the port in daemon.json of the daemon's directory is used
 #   CODELOUPE_HOME        the daemon's directory; default is the same place the daemon uses
+#
+# With daemon.token in that directory the daemon first proves it holds the token (an answer to a nonce), then the token is sent.
+# Without the file (a daemon from before the token) the script talks to the port as it always did.
 
 [ "$CODELOUPE_HOOKS" = off ] && exit 0
 command -v curl >/dev/null 2>&1 || exit 0
 
+. "${BASH_SOURCE[0]%/*}/daemon-auth.sh"
+codeloupe_dir
+
 port="$CODELOUPE_PORT"
 if [ -z "$port" ]; then
-  dir="$CODELOUPE_HOME"
-  if [ -z "$dir" ]; then
-    # The daemon takes this home as its own (it follows the variable too); without one (cron, a minimal environment) both use the passwd entry, which ~ expands to.
-    if [ -n "$HOME" ]; then home=$HOME; else home=~; fi
-    case "$OSTYPE" in
-      msys*|cygwin*|win*) dir="${LOCALAPPDATA:-$USERPROFILE/AppData/Local}/codeloupe" ;;
-      darwin*) dir="$home/Library/Caches/codeloupe" ;;
-      *) dir="${XDG_CACHE_HOME:-$home/.cache}/codeloupe" ;;
-    esac
-  fi
   # No daemon.json: no daemon is running, and nothing is waited for.
-  [ -r "$dir/daemon.json" ] || exit 0
-  info=$(<"$dir/daemon.json")
+  [ -r "$CL_DIR/daemon.json" ] || exit 0
+  info=$(<"$CL_DIR/daemon.json")
   port=${info#*\"port\":}
   port=${port%%[!0-9]*}
 fi
 [ -n "$port" ] || exit 0
+
+# A daemon that made a token must prove it holds it before a prompt or a command is sent to it: a process that took the port after a
+# crash cannot, and gets nothing. The token goes to curl as a header file, never on a command line other users can read.
+auth=()
+codeloupe_prove "$CL_DIR" "$port"
+case $? in 0) auth=(-H "@$CL_TOKEN_FILE") ;; 2) ;; *) exit 0 ;; esac
 
 # A tool call is judged in milliseconds; a session start may wait for the repository map.
 IFS= read -r -d '' body
@@ -37,7 +39,7 @@ wait=2
 case "$body" in *'"hook_event_name":"SessionStart"'*|*'"hook_event_name": "SessionStart"'*) wait=10 ;; esac
 
 # No proxy: the body holds prompts and commands and goes to this machine only.
-reply=$(curl -sf --noproxy '*' --connect-timeout 0.3 -m "$wait" -H 'x-codeloupe: 1' -H 'content-type: application/json' --data-binary @- "http://127.0.0.1:$port/hook" <<<"$body" 2>/dev/null) || exit 0
+reply=$(curl -sf --noproxy '*' --connect-timeout 0.3 -m "$wait" -H 'x-codeloupe: 1' "${auth[@]}" -H 'content-type: application/json' --data-binary @- "http://127.0.0.1:$port/hook" <<<"$body" 2>/dev/null) || exit 0
 
 # True when $1 is the inside of a JSON string: every quote in it is escaped.
 plain() { local s=${1//\\?/}; [[ $s != *\"* ]]; }

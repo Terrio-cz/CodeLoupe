@@ -53,7 +53,7 @@ internal class AotTrainer(
             removeOtherBuilds()
             return true
         } finally {
-            delete(work)
+            deleteSettled(work)
         }
     }
 
@@ -72,8 +72,11 @@ internal class AotTrainer(
             val root = repo.toString().replace("\\", "\\\\")
             http.request("POST", "/api/outline", """{"root":"$root","target":"Greeter"}""", HEADERS, readTimeoutMs = 60_000)
         } finally {
+            // The workers the daemon started end with it; they are not waited for, as they would keep the work directory open.
+            val workers = daemon.descendants().toList()
             runCatching { http.request("POST", "/shutdown?force=1", headers = mapOf(CodeLoupe.HEADER to "1"), readTimeoutMs = 5_000) }
             if (!daemon.waitFor(stepSeconds, TimeUnit.SECONDS)) daemon.destroyForcibly().waitFor()
+            workers.forEach { it.destroyForcibly() }
         }
         check(Files.exists(daemonRecording) && Files.exists(cliRecording)) { "the JVM wrote no recording" }
     }
@@ -145,6 +148,15 @@ internal class AotTrainer(
         }
         val archives = caches.prefix.parent.resolveSibling("cds")
         if (Files.isDirectory(archives)) Files.newDirectoryStream(archives, "*.jsa").use { entries -> entries.filter { build.matches(it.name) }.forEach(::delete) }
+    }
+
+    // A directory the processes just ended had open can take a moment to let go (Windows).
+    private fun deleteSettled(path: Path) {
+        repeat(40) {
+            delete(path)
+            if (!Files.exists(path)) return
+            Thread.sleep(250)
+        }
     }
 
     private fun delete(path: Path) {

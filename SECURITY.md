@@ -48,7 +48,8 @@ issues in software that merely sits next to CodeLoupe (a tracker, Docker, Claude
 ## The security model in short
 
 The daemon is local-only: it listens on `127.0.0.1`, refuses requests with a foreign `Host`, any `Origin` or without the
-`x-codeloupe` header, so it serves no remote clients. The secret store is encrypted with a key that only the operating
+`x-codeloupe` header, so it serves no remote clients, and every route that acts for the user (running commands, jobs, releases, the app's
+views) wants the token in `<home>/daemon.token`, which only the owner can read, so another user of the machine cannot call them. The secret store is encrypted with a key that only the operating
 system (or a passphrase) can open; the tools an agent calls never return a value, and a value is not passed as an
 argument or written to a log. The
 desktop app's renderer is sandboxed and talks to the daemon only through validated IPC. Details are documented in the
