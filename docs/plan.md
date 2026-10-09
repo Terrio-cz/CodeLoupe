@@ -145,8 +145,11 @@ CLI `codeloupe …` ──HTTP (spustí daemon, když neběží)─────�
   Proto `<home>/daemon.token` (náhodných 32 B hex, vzniká s právy jen pro vlastníka, přežije restart, změna souboru platí bez restartu)
   a hlavička `x-codeloupe-token` na všem, co jedná za uživatele: `/jobs`, `/workspaces`, `/reconcile`, `/ports`, `/events`, `/webhooks`,
   `/ui-api`, `/shutdown`, mutující nástroje (`run`, `env`, `edit`, `update`, MCP `job`). Čtecí dotazy na kód (`/mcp`, `/api/<nástroj>`,
-  `/hook`) projdou i bez tokenu, dokud `config.json` `api.strict` není `true`; stávající záznam MCP (`--header x-codeloupe:1`) tak
-  funguje dál a `/status` počítá volání bez tokenu (`auth.withoutToken`), aby bylo vidět, kdy lze `strict` zapnout. Volba tokenu místo
+  `/hook`) token chtějí také, protože index prozradí jinému uživateli názvy souborů a symbolů. **Rozhodnutí (CL-158, doděláno):**
+  `api.strict` je ve výchozím stavu zapnuté, protože kritérium „druhý uživatel je odmítnut na každé cestě kromě GET /status“ jinak neplatí
+  a první vydání ještě nevyšlo, takže není co zpětně rozbít; cena je jeden krok po aktualizaci (`codeloupe mcp-config`). Kdo má stroj jen
+  pro sebe, může dát `api.strict: false`: starý záznam MCP (`--header x-codeloupe:1`) pak čte dál a `/status` počítá volání bez tokenu
+  (`auth.withoutToken`). Volba tokenu místo
   kontroly vlastníka spojení (Windows `GetExtendedTcpTable`, Linux `/proc/net/tcp`, macOS `lsof`): jeden mechanismus pro tři systémy,
   žádný nativní kód ani závod o PID/port, a MCP klient ho dostane přes `headersHelper` (`codeloupe mcp-headers`, v pluginu
   `hooks/mcp-headers.sh`), takže tajemství není v konfiguraci Claude Code.
@@ -440,7 +443,7 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
   Host/Origin/hlavička, single instance, MCP přes restart).
 - Home: `%LOCALAPPDATA%codeloupe` / `~/Library/Caches/codeloupe` / `$XDG_CACHE_HOME/codeloupe`
   (`CODELOUPE_HOME`), port 47391 (`CODELOUPE_PORT`), `config.json` v home.
-- Měření: `codeloupe metrics collect|compare|gaps|boilerplate` (CL-21, CL-22, CL-35); `run/codemetrics.mjs` v Terrio workspace dává na stejných transcriptech stejná čísla.
+- Měření: `codeloupe metrics collect|compare|gaps|boilerplate` (CL-21, CL-22, CL-35); `run/codemetrics.mjs` v Terrio workspace dává na stejných transcriptech stejná čísla, včetně bloku `start` (počáteční kontext, CL-168; test `StartContextTest` drží čísla ze skriptu na dvou fixturách). Výjimka záměrně: volání CodeLoupe mají kategorii `codeloupe`, skript je řadí do `other` / `shell_other`; velikost MCP schémat (`--mcp` ve skriptu) Kotlin neměří.
 
 ### Výsledek portu na Kotlin/JVM (CL-56, 2026-10-07)
 
@@ -1109,12 +1112,13 @@ rozhoduje launcher.
   Vypínač na jednom místě: `config.json` `hooks.enabled=false` (čte se při každém volání, bez restartu) nebo `CODELOUPE_HOOKS=off`. Formáty vstupu a výstupu hooků jsou podle
   dokumentace Claude Code; živé ověření nebylo možné (účet narazil na týdenní limit), `claude plugin validate --strict` prošel.
 - **Nezasahuje**: daemon neběží (skript končí bez čekání, když chybí `daemon.json`; zastaralý `daemon.json` stojí nejvýš `--connect-timeout 0.3`), repozitář nebyl indexován (hook nikdy nespouští build),
-  soubor není v bázi nebo je kratší než `minLines`, `Read` s `offset`/`limit`, příkaz není hledání/čtení zdrojáku (build, git, `.md`/`.json`, hledání ve výstupu roury, čtení useknuté `head`/`grep`),
+  soubor není v bázi nebo je kratší než `minLines`, `Read` s `offset`/`limit`, příkaz není hledání/čtení zdrojáku (build, git, `.md`/`.json`, hledání ve výstupu roury, hledání, jehož výstup krmí úpravu (`rg -l Foo | xargs sed -i …`, `| Set-Content`), čtení useknuté `head`/`grep`),
   stejný příkaz podruhé v relaci, relace po `maxPerSession` (40) radách a relace, která `giveUpAfter` (4) rad za sebou nepoužila žádné volání CodeLoupe na tom repozitáři
   (agent bez nástrojů, např. `terrio-coder`, tak dostane nejvýš čtyři rady). Rada má kolem 260 znaků (≈ 65 tokenů při 4 znacích na token).
 - **Tabulka rozhodnutí**: `SteeringTest` (tvary příkazů: hledání, čtení, roury, uvozovky, here-dokument, Windows `C:\`, `/c/`, PowerShell, a vše, čeho se nesmí dotknout), `ShellWordsTest`,
   `PatternShapeTest`, `HooksTest` (režimy, opakování, limity, výpadek indexu a konfigurace), `HooksDaemonTest` (skutečný daemon a repozitář, nezaindexovaný repozitář = 204, hlavička, skript
   `hook.sh` včetně mrtvého portu, chybějícího `daemon.json`, `CODELOUPE_HOOKS=off`, nesmyslného vstupu), `HookUsageTest`, `HookReplayTest`.
+- **Okrajové případy (CL-164)**: nástroj `PowerShell` se čte vlastním dialektem (`ShellDialect`): zpětné lomítko není escape, zpětný apostrof escapuje nebo pokračuje řádek, `''`/`""` je uvozovka, `&` volá příkaz, `( … )` je jedno slovo (`(Get-Content a.kt) -replace … | Set-Content a.kt` zůstane jeden řetězec příkazů s rourou), `@'…'@` je řetězec, `cat`/`type` jsou `Get-Content` i s parametry (`-TotalCount`); hledání, jehož výstup po rouře (`xargs`, `while read`) upravuje soubory (`sed -i`, `perl -pi`, `sd`, `Set-Content`), není dotaz na index; hodnota `-f/--file` (soubor vzorů) není vzor ani cíl, takže `grep -f patterns.txt -r src` nedostane `src` jako vzor. Rozbitá vstupní řádka (neuzavřená závorka, `@'`) skončí s řádkem a nikdy nevyhodí výjimku; hook dál selhává otevřeně.
 - **Měření nad skutečnými daty** (`codeloupe metrics hooks --replay --since 2026-10-01`, transkripty Terrio, 2 416 běhů, 61 861 volání Bash/PowerShell/Read; velikosti souborů podle výsledků v transkriptech,
   zmizelé worktree se berou jako indexované, je-li v jejich okolí git repozitář se zdrojáky = horní odhad toho, co by řekl daemon, který ty repozitáře zná):
   **11 003 volání (17,8 %) by dostalo radu**, kdyby se každá rada brala: `grep` 8 017, `usages` 1 142, celé čtení → `outline` 1 128 (ze 7 992 `Read`), `find` 563, výpis souborů → `outline`/`find` 112 + 41.
@@ -1389,6 +1393,20 @@ rozhoduje launcher.
 - **Testy**: `AotCachesTest`, `AotLockTest` (souběh, mrtvý a starý držitel, `cancel` jen trénink a ne cizí pid), `AotLauncherTest` (jeden trénink pro dvanáct souběžných startů, hotovo / selhání / více cest), `LauncherScriptsTest` (příznaky skriptů
   a `CliJvm` stejné, žádný `-Xshare` ani dump archivu), `AotTrainingTest` (skutečné JVM na instalovaných jarech: dvě první volání naráz, jeden trénink, jeden čistý pár cache, volání s cache z přesunuté kopie, s poškozenými soubory a daemon s cache
   i s poškozenou); `tools/bundle-smoke.mjs --aot` v CI na třech OS a v jobu `bundle`.
+
+### Výsledek CL-159 — řetězec dodávky, původ vydání a nastavení repozitáře (2026-10-09)
+
+- V souborech: `tools/check-workflows.mjs` (v jobu `tools` každého pushe) hlídá oprávnění workflow, připnutí akcí na SHA, `persist-credentials: false`,
+  zákaz `pull_request_target` a nedůvěryhodné výrazy v `run:`; `dependency-review.yml` zastaví PR s nálezem severity high; `dependabot.yml` má
+  cooldown 7 dní; job `publish` běží v prostředí `release` a podepisuje atestaci původu (`actions/attest`, Sigstore) ke každému souboru vydání;
+  poznámky k vydání říkají, jak soubor ověřit (`gh attestation verify`).
+- Nastavení repozitáře (rulesety `main` a tagů `v*`, politika Actions, neměnná vydání, prostředí `release`, soukromé hlášení zranitelností) se z PR
+  udělat nedá a pracovní okna se jich nesmějí dotknout: seznam se stavem z `gh api` a hotovými příkazy je v `docs/repository-hardening.md`.
+  Ruleset `main` má jako obchvat roli správce, protože okna přistávají přímým pushem a povinné kontroly by ho jinak odmítly.
+- Podpis aktualizací: certifikát (Authenticode, Developer ID) stojí peníze a vlastník se 2026-10-08 rozhodl nic neplatit. Zbývá odpojený podpis
+  `latest.yml` klíčem projektu (veřejný klíč v aplikaci, ověření před stažením); potřebuje, aby vlastník vytvořil pár klíčů a soukromý uložil
+  jako tajemství prostředí `release`, proto je to samostatná karta. Do té doby platí SHA-512 z feedu stejného vydání a ruční `gh attestation verify`.
+- Neověřeno: job `publish` s atestací se spustí poprvé na skutečném tagu; kontrola je v `docs/repository-hardening.md`, sekce „After the first release“.
 
 ## 10. Rizika
 

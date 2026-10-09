@@ -12,6 +12,7 @@ class TranscriptReader(private val categorizer: Categorizer) {
         return Run(
             file = source.path.fileName.toString(), kind = source.kind, role = parser.role, ter = source.ter ?: TER.find(parser.firstPrompt)?.value,
             model = parser.model, start = parser.start, end = parser.end, turns = parser.turns, usage = parser.usage, peakContext = parser.peak, tools = tools,
+            startCtx = parser.startContext(),
         )
     }
 
