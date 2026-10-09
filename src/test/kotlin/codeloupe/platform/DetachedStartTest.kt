@@ -29,8 +29,28 @@ class DetachedStartTest {
     }
 
     @Test
+    fun `the environment of a daemon started outside Windows is cut down to what is kept`() {
+        val environment = mutableMapOf("HOME" to "/home/u", "PATH" to "/usr/bin", "LC_CTYPE" to "C.UTF-8", "CODELOUPE_HOME" to "/h", "LD_PRELOAD" to "/x.so", "NODE_OPTIONS" to "--require x", "ANTHROPIC_API_KEY" to "k")
+        DetachedStart.cut(environment)
+        assertEquals(setOf("HOME", "PATH", "LC_CTYPE", "CODELOUPE_HOME"), environment.keys)
+    }
+
+    @Test
+    fun `outside Windows the process is started as a plain child with the cut environment and runs on`() {
+        assumeTrue(!NativeCalls.isWindows, "Windows starts it through WMI instead")
+        val dir = TestRepos.tmpDir("detached-posix")
+        val marker = dir.resolve("marker with space.txt")
+        DetachedStart.start(FakeJob.command("sleep=300", "touch=$marker"), dir)
+        repeat(100) {
+            if (Files.exists(marker)) return
+            Thread.sleep(100)
+        }
+        assertTrue(Files.exists(marker), "the detached process ran")
+    }
+
+    @Test
     fun `on Windows the process is started by WMI, not as a child of the caller`() {
-        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"))
+        assumeTrue(NativeCalls.isWindows, "WMI exists on Windows only")
         val dir = TestRepos.tmpDir("detached")
         val marker = dir.resolve("marker with space.txt")
         DetachedStart.start(FakeJob.command("sleep=1500", "touch=$marker"), dir)

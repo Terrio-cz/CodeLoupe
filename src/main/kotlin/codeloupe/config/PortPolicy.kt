@@ -1,7 +1,7 @@
 package codeloupe.config
 
 import codeloupe.CodeLoupe
-import java.io.File
+import codeloupe.platform.PathCase
 import java.nio.file.Path
 
 /**
@@ -18,5 +18,5 @@ object PortPolicy {
     }
 
     private fun sameDir(a: Path, b: Path): Boolean =
-        a.toAbsolutePath().normalize().toString().equals(b.toAbsolutePath().normalize().toString(), ignoreCase = File.separatorChar == '\\')
+        a.toAbsolutePath().normalize().toString().equals(b.toAbsolutePath().normalize().toString(), ignoreCase = PathCase.insensitive)
 }

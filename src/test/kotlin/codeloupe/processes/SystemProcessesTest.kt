@@ -23,6 +23,16 @@ class SystemProcessesTest {
     }
 
     @Test
+    fun `a working directory with spaces and non-ASCII letters is listed as it is`() {
+        val dir = TestRepos.tmpDir("proc-cwd").resolve("work space ünï").also { java.nio.file.Files.createDirectories(it) }
+        ChildProcesses().use { children ->
+            val child = children.start(dir, GRADLE_DAEMON_MARKER)
+            val listed = children.awaitListed(child)
+            assertEquals(OrphanDirs.key(dir), OrphanDirs.key(java.nio.file.Path.of(listed.cwd!!)))
+        }
+    }
+
+    @Test
     fun `this process is listed too, and a command line tells the build tools apart`() {
         val me = SystemProcesses().read().firstOrNull { it.pid == ProcessHandle.current().pid() }
         assertNotNull(me)

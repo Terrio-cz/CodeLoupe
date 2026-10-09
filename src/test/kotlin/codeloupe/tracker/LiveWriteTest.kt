@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  * and `CODELOUPE_LIVE_WRITE_ISSUE=<id of a card made for this>`. Sets State, adds a comment, sets State back, and after each
  * write compares the mirror with a fresh read of the issue. Writes `build/reports/codeloupe/live-write.md`.
  */
-@EnabledIfEnvironmentVariable(named = "CODELOUPE_LIVE_WRITE_ISSUE", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "CODELOUPE_LIVE_WRITE_ISSUE", matches = ".+", disabledReason = "writes to a live YouTrack issue: set CODELOUPE_LIVE_WRITE_ISSUE")
 class LiveWriteTest {
     @Test
     fun `writes reach the tracker, answer short and leave the mirror equal to the tracker`() {

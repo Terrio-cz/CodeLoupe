@@ -106,12 +106,26 @@ class JobPartsTest {
     @Test
     fun `program names resolve like Bash - bare names on PATH only - and read as programs`() {
         // Resolution uses the host's path syntax (backslashes), so the Windows rules can only be checked on Windows.
-        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"))
+        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"), "the Windows rules read host path syntax, so they run on Windows only")
         val dir = TestRepos.tmpDir("exe")
         Files.writeString(dir.resolve("tool.cmd"), "@echo off")
         val env = mapOf("PATH" to TestRepos.tmpDir("empty").toString(), "PATHEXT" to ".EXE;.CMD")
         assertEquals("tool", Executables.resolve("tool", dir, env, windows = true), "never from the job's directory")
         assertEquals(dir.resolve("tool.cmd").toString(), Executables.resolve("./tool", dir, env, windows = true))
+    }
+
+    @Test
+    fun `outside Windows a program name is left alone, and batch files are recognised by name on every OS`() {
+        val dir = TestRepos.tmpDir("exe-posix")
+        Files.writeString(dir.resolve("tool.cmd"), "echo")
+        assertEquals("tool", Executables.resolve("tool", dir, mapOf("PATH" to dir.toString(), "PATHEXT" to ".CMD"), windows = false))
+        assertEquals("./tool", Executables.resolve("./tool", dir, emptyMap(), windows = false))
+        assertTrue(Executables.isBatch("C:/x/Run.CMD") && Executables.isBatch("a.bat.") && Executables.isBatch("a.bat "))
+        assertTrue(!Executables.isBatch("tool.exe") && !Executables.isBatch("gradlew"))
+    }
+
+    @Test
+    fun `a command line is joined with quotes only where a word needs them`() {
         assertEquals("'X=1' status", CommandLine.join(listOf("X=1", "status")))
         assertEquals("git --x=1", CommandLine.join(listOf("git", "--x=1")))
     }

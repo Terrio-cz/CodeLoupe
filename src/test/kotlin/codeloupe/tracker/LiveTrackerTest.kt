@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  * `CODELOUPE_LIVE_PROJECT` (default the first project) and `CODELOUPE_LIVE_EPIC`. Writes a report to
  * `build/reports/codeloupe/live-tracker.md`.
  */
-@EnabledIfEnvironmentVariable(named = "CODELOUPE_LIVE_TRACKER", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "CODELOUPE_LIVE_TRACKER", matches = ".+", disabledReason = "needs a live YouTrack project: set CODELOUPE_LIVE_TRACKER")
 class LiveTrackerTest {
     @Test
     fun `a project mirrors, reads and answers queries from the index`() {

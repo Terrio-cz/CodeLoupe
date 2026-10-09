@@ -221,7 +221,7 @@ class JobsTest {
 
     @Test
     fun `a batch file never gets arguments cmd_exe would run as commands`() {
-        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"))
+        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"), "batch files run through cmd.exe, which exists on Windows only")
         Files.writeString(work.resolve("tool.cmd"), "@echo %*\r\n")
         val (status, body) = post("/jobs", request(listOf("./tool", "test&calc")))
         assertEquals(400, status)

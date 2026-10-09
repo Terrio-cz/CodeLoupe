@@ -1,6 +1,6 @@
 package codeloupe.uiapi
 
-import codeloupe.platform.NativeCalls
+import codeloupe.platform.PathCase
 import codeloupe.platform.Sha1
 import java.nio.file.Path
 
@@ -8,7 +8,7 @@ import java.nio.file.Path
 internal object WorktreeId {
     fun of(path: String): String {
         val normal = Path.of(path).toAbsolutePath().normalize().toString().replace('\\', '/').trimEnd('/')
-        return Sha1.hex(if (NativeCalls.isWindows) normal.lowercase() else normal).take(12)
+        return Sha1.hex(PathCase.fold(normal)).take(12)
     }
 
     /** [root] is the worktree [worktree] or a directory inside it. */
@@ -20,6 +20,6 @@ internal object WorktreeId {
 
     private fun key(path: String): String {
         val normal = path.replace('\\', '/').trimEnd('/')
-        return if (NativeCalls.isWindows) normal.lowercase() else normal
+        return PathCase.fold(normal)
     }
 }
