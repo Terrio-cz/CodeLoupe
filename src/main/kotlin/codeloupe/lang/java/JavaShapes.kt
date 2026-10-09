@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiClass
 import org.jetbrains.kotlin.com.intellij.psi.PsiClassInitializer
 import org.jetbrains.kotlin.com.intellij.psi.PsiEnumConstant
 import org.jetbrains.kotlin.com.intellij.psi.PsiField
+import org.jetbrains.kotlin.com.intellij.psi.PsiImplicitClass
 import org.jetbrains.kotlin.com.intellij.psi.PsiJavaToken
 import org.jetbrains.kotlin.com.intellij.psi.PsiMethod
 import org.jetbrains.kotlin.com.intellij.psi.PsiModifierList
@@ -28,7 +29,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement
  * Kotlin: a method is a `fun`, a field a `property`, a record component a constructor property, an enum constant an
  * `enum_entry`, an anonymous class a local `object`, an initializer block an `init`.
  */
-internal class JavaShapes(private val source: Source, private val types: JavaLocalTypes) {
+internal class JavaShapes(private val source: Source, private val types: JavaLocalTypes, private val fileStem: String) {
     fun classLike(element: PsiClass): DeclShape {
         val kind = when {
             element.isAnnotationType -> "annotation"
@@ -37,6 +38,7 @@ internal class JavaShapes(private val source: Source, private val types: JavaLoc
             else -> "class"
         }
         val modifiers = modifiers(element.modifierList)
+        if (element is PsiImplicitClass) return DeclShape(kind, fileStem, modifiers, sig = "class $fileStem")
         val sig = JavaSignature.of(element, JavaSpan.of(element), modifiers, source)
         return DeclShape(kind, element.nameIdentifier?.let(source::of) ?: "?", modifiers, supertypes = supertypes(element), sig = sig)
     }
@@ -86,15 +88,15 @@ internal class JavaShapes(private val source: Source, private val types: JavaLoc
         val first = declarator(element)
         val modifiers = modifiers(first.childList().filterIsInstance<PsiModifierList>().firstOrNull())
         val type = first.childList().filterIsInstance<PsiTypeElement>().firstOrNull()
-        val returns = type?.takeUnless(types::isVar)?.let(types::typeText) ?: types.of(type, element.initializer).ifEmpty { null }
+        val returns = types.of(type, element.initializer, element).ifEmpty { null }
         val nameText = name?.let(source::of) ?: "?"
         val sig = JavaSignature.prefixed(modifiers, "${type?.let { JsText.squash(source.of(it)) } ?: ""} $nameText")
         return DeclShape("property", nameText, modifiers, returns = returns, sig = sig)
     }
 
-    /** The parameter's type, name and varargs flag. */
+    /** The parameter's type (an array for varargs and `s[]`), name and varargs flag. */
     fun param(parameter: PsiParameter): ParamFact =
-        ParamFact(parameter.name, parameter.typeElement?.let(types::typeText).orEmpty(), vararg = parameter.isVarArgs)
+        ParamFact(parameter.name, types.of(parameter.typeElement, null, parameter), vararg = parameter.isVarArgs)
 
     // `int a, b;` holds the type and modifiers once, in the first declarator.
     private fun declarator(element: PsiVariable): PsiVariable {

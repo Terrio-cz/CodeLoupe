@@ -64,7 +64,7 @@ class JavaExtractorTest {
         assertEquals("T", one("Repository.find").returns)
         assertEquals("void", one("Repository.save").returns)
         val biggest = one("OrderService.biggest")
-        assertEquals(listOf(ParamFact("first", "T"), ParamFact("rest", "T", vararg = true)), biggest.params)
+        assertEquals(listOf(ParamFact("first", "T"), ParamFact("rest", "T[]", vararg = true)), biggest.params)
         assertEquals("static <T extends Comparable<T>> T biggest(T first, T... rest)", biggest.sig)
         assertEquals(listOf(ParamFact("args", "String[]")), one("Main.main").params)
         assertEquals("abstract Result handle(String id)", one("BaseService.handle").sig, "an abstract method ends before its semicolon")
