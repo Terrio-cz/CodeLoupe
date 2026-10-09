@@ -26,6 +26,10 @@ updates:
     ignore:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # typescript-eslint declares typescript <6.1.0 (8.71.1 and the 8.71.2 canary), so TypeScript 7 fails `npm ci` with
+      # ERESOLVE. Revisit when its peer range allows 7 (CL-153).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
