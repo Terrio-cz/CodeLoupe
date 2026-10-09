@@ -9,10 +9,13 @@
 codeloupe_dir() {
   CL_DIR="$CODELOUPE_HOME"
   [ -n "$CL_DIR" ] && return
+  # The daemon takes this home as its own (it follows the variable too); without one (cron, a minimal environment) both use the passwd entry, which ~ expands to.
+  local home
+  if [ -n "$HOME" ]; then home=$HOME; else home=~; fi
   case "$OSTYPE" in
     msys*|cygwin*|win*) CL_DIR="${LOCALAPPDATA:-$USERPROFILE/AppData/Local}/codeloupe" ;;
-    darwin*) CL_DIR="$HOME/Library/Caches/codeloupe" ;;
-    *) CL_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/codeloupe" ;;
+    darwin*) CL_DIR="$home/Library/Caches/codeloupe" ;;
+    *) CL_DIR="${XDG_CACHE_HOME:-$home/.cache}/codeloupe" ;;
   esac
 }
 

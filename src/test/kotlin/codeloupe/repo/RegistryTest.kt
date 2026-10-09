@@ -5,7 +5,6 @@ import codeloupe.config.Config
 import codeloupe.daemon.JobQueue
 import codeloupe.index.BaseBuilder
 import codeloupe.index.Store
-import codeloupe.platform.Sha1
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -67,7 +66,7 @@ class RegistryTest {
     @Test
     fun `a base of another index format is rebuilt, not served`() {
         val config = config()
-        val dir = config.home.resolve("repos").resolve(Sha1.hex(commonDir.lowercase()).take(12))
+        val dir = config.home.resolve("repos").resolve(RepoKey.id(commonDir))
         Files.createDirectories(dir)
         val old = dir.resolve("base-old.db")
         BaseBuilder.build(repo.toString(), TestRepos.git(repo, "rev-parse", "HEAD"), old)
