@@ -22,12 +22,12 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Who may call the daemon: the token on every route that acts for the user, the open `/status`, the read tier of a daemon that is not strict. */
+/** Who may call the daemon: the token on every route that acts for the user, the open `/status`, the read tier of a daemon that is not strict (the default is strict). */
 class DaemonAuthTest {
     private val http = HttpClient.newHttpClient()
     private val repo = TestRepos.fixtureRepo("kotlin/sample")
 
-    private fun config(home: java.nio.file.Path = TestRepos.tmpDir("home"), strict: Boolean = false) =
+    private fun config(home: java.nio.file.Path = TestRepos.tmpDir("home"), strict: Boolean = true) =
         Config(home, ServerSocket(0).use { it.localPort }, 60_000, 120_000, 512, null, api = ApiConfig(strict = strict))
 
     private fun send(port: Int, method: String, path: String, body: String? = null, vararg headers: Pair<String, String>): HttpResponse<String> {
@@ -86,8 +86,8 @@ class DaemonAuthTest {
     }
 
     @Test
-    fun `read-only code queries take a caller without the token and count it, a mutating tool does not`() {
-        val config = config()
+    fun `a daemon that is not strict takes read-only code queries without the token and counts them, a mutating tool is refused`() {
+        val config = config(strict = false)
         val daemon = Daemon.start(config)
         try {
             val port = config.port
@@ -111,8 +111,8 @@ class DaemonAuthTest {
     }
 
     @Test
-    fun `over MCP a mutating tool says how to get the token, a read-only one answers`() {
-        val config = config()
+    fun `over MCP a mutating tool says how to get the token, a read-only one answers on a daemon that is not strict`() {
+        val config = config(strict = false)
         val daemon = Daemon.start(config)
         try {
             fun call(name: String, arguments: String, vararg headers: Pair<String, String>) = send(
@@ -134,8 +134,8 @@ class DaemonAuthTest {
     }
 
     @Test
-    fun `a strict daemon wants the token for the code queries too`() {
-        val config = config(strict = true)
+    fun `by default the daemon wants the token for the code queries too`() {
+        val config = config()
         val daemon = Daemon.start(config)
         try {
             assertEquals(401, send(config.port, "POST", "/api/find", find(), local).statusCode())
@@ -204,7 +204,7 @@ class DaemonAuthTest {
         val daemon = Daemon.start(config)
         try {
             val auth = Json.parseToJsonElement(send(config.port, "GET", "/status", null, local).body()).jsonObject["auth"]!!.jsonObject
-            assertEquals("false", auth["strict"]!!.jsonPrimitive.content)
+            assertEquals("true", auth["strict"]!!.jsonPrimitive.content)
         } finally {
             daemon.stop()
         }

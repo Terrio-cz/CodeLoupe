@@ -44,6 +44,8 @@ data class InventoryReport(
         val duplicate: Boolean,
         val conflict: Boolean,
         val sources: List<Source>,
+        /** Wider scopes holding a secret of this name that this one would hide (a global key replaced inside one folder); `--all-sensitive` leaves it out. */
+        val shadows: List<String> = emptyList(),
     )
 
     @Serializable

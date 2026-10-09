@@ -53,7 +53,8 @@ views) wants the token in `<home>/daemon.token`, which only the owner can read, 
 system (or a passphrase) can open; the tools an agent calls never return a value, and a value is not passed as an
 argument or written to a log. The
 desktop app's renderer is sandboxed and talks to the daemon only through validated IPC. Details are documented in the
-wiki, in [Configuration](https://github.com/Terrio-cz/CodeLoupe/wiki/Configuration),
+wiki, in [Security](https://github.com/Terrio-cz/CodeLoupe/wiki/Security) (repository and release trust, verifying a
+release, the settings the owner applies), [Configuration](https://github.com/Terrio-cz/CodeLoupe/wiki/Configuration),
 [Environment and secrets](https://github.com/Terrio-cz/CodeLoupe/wiki/Environment-and-secrets) and
 [Installers and updates](https://github.com/Terrio-cz/CodeLoupe/wiki/Installers-and-updates), and in the Security
 section of [app/README.md](app/README.md).

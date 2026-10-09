@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong
  *   CORS preflight, which is refused);
  * - the token of `<home>/daemon.token` in `x-codeloupe-token` on every route that acts for the user or shows what the user did: a wrong
  *   token is refused wherever it is sent. The read-only code queries (`/mcp`, `/api/<tool>` of a tool that does not [Tool.mutating], `/hook`) take
- *   a caller without one unless [strict], so that an MCP entry written before the token existed keeps working; a mutating tool called that way is
+ *   a caller without one only when `api.strict` is turned off, so that an MCP entry written before the token existed keeps working; a mutating tool called that way is
  *   refused with the way to get the token. `/status` stays open, and `/env/values` has the token of its own.
  */
 internal class RequestGuard(

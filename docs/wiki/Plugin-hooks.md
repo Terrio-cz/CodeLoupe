@@ -9,8 +9,8 @@ its reason); anything else that answers on the port is dropped, so a stranger th
 When `<home>/daemon.token` exists the script first sends `GET /status` with a nonce and goes on only if the answer proves that the daemon
 holds the token (a process that took the port after a crash cannot, and then receives no prompt or command); the token goes to `curl` as a
 header file (`-H @daemon.token`), never on a command line. It needs `sha256sum`, `shasum` or `openssl` for that and does nothing without
-one. With no token file (a daemon from before the token) it behaves as it always did. The hook endpoint accepts a caller without the token
-unless `api.strict` is on ([Configuration](Configuration#who-may-call-the-daemon)).
+one. With no token file (a daemon from before the token) it behaves as it always did. The hook endpoint wants the token like the other
+routes, unless `api.strict` is set to `false` ([Configuration](Configuration#who-may-call-the-daemon)).
 
 Claude Code also has an `http` hook type, which would save starting `bash` (a call takes ~10 ms instead of ~80 ms on a busy
 Windows machine). The plugin does not use it: Claude Code takes the reply as it is, so whatever listens on the port when the daemon
@@ -29,7 +29,7 @@ and a hook cannot be switched off for the default port only, so both handlers wo
 
 It stays out of the way when the daemon is not running or has not indexed the repository, when the file is not in the index
 or has fewer lines than `minLines`, when the command is not about Kotlin or Java source (builds, git, `.md`/`.json` files, a
-search of a pipe's output, a read cut short by `head`/`grep`), when a read has `offset` or `limit`, and when the same command
+search of a pipe's output, a search whose output feeds an edit such as `rg -l Foo | xargs sed -i …`, a read cut short by `head`/`grep`), when a read has `offset` or `limit`, and when the same command
 comes again in the session (the agent insisted). A session gets at most `maxPerSession` pieces of advice, and none after `giveUpAfter` in
 a row without a CodeLoupe call on that repository in between: an agent that cannot or will not use the tools is not nagged, and one that does use them is advised again.
 

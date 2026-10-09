@@ -49,10 +49,16 @@ export class EnvManager {
     const checked = checkSet(input);
     if (!checked.ok) return { ok: false, message: `The value cannot be saved: ${checked.error}.` };
     const { name, scope, value } = checked.value;
+    // A page that was tampered with could write any value over any key: the user sees the name and scope in a dialog it cannot click.
+    if (!(await this.deps.confirm(`Save key ${name}?`, [`Scope: ${scope}`, 'A value stored under this name and scope is replaced. The value is written encrypted and not shown again.'].join('\n'), 'Save'))) {
+      return { ok: false, message: 'Save cancelled.' };
+    }
     try {
       const r = await this.deps.run(['env', 'set', name, '--scope', scope, '--source', 'app'], `${value}\n`, SHORT_MS);
       if (r.code !== 0) return { ok: false, message: `Save failed: ${lastLine(scrub(r.stderr || r.stdout, value))}` };
-      return { ok: true, message: `${name} saved (${scope}).` };
+      // The CLI adds a note on stderr when it creates the vault somewhere a cache cleaner may empty.
+      const note = r.stderr.trim() ? ` ${lastLine(scrub(r.stderr, value))}` : '';
+      return { ok: true, message: `${name} saved (${scope}).${note}` };
     } catch (e) {
       return { ok: false, message: `Save failed: ${lastLine(scrub((e as Error).message, value))}` };
     }
@@ -90,6 +96,14 @@ export class EnvManager {
     const checked = checkImport(input);
     if (!checked.ok) return { ok: false, message: `The import cannot start: ${checked.error}.` };
     const { select, replaceSources, overwrite, includeExcluded } = checked.value;
+    if (overwrite) {
+      const ok = await this.deps.confirm(
+        'Replace stored values with the ones in the files?',
+        'Where the store holds another value under the same name and scope, the value from the file replaces it. Replaced values cannot be restored.',
+        'Overwrite',
+      );
+      if (!ok) return { ok: false, message: 'Import cancelled.' };
+    }
     if (replaceSources) {
       const ok = await this.deps.confirm(
         'Replace the values in the source files with references?',

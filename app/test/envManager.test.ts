@@ -73,6 +73,25 @@ describe('EnvManager.set', () => {
     expect(JSON.stringify([t.calls[0].args, out])).not.toContain(SECRET);
   });
 
+  it('asks in a native dialog first, naming the key and scope, and writes nothing on a no', async () => {
+    const t = setup();
+    await t.manager.set(set({ scope: { kind: 'repo', ref: 'c:/work/app' } }));
+    expect(t.confirms).toHaveLength(1);
+    expect(t.confirms[0].message).toContain('YOUTRACK_TOKEN');
+    expect(t.confirms[0].detail).toContain('repo:c:/work/app');
+    expect(JSON.stringify(t.confirms)).not.toContain(SECRET);
+    const no = setup({ confirm: async () => false });
+    expect(await no.manager.set(set())).toEqual({ ok: false, message: 'Save cancelled.' });
+    expect(no.calls).toHaveLength(0);
+  });
+
+  it('passes on the note the CLI prints on stderr when it creates a vault in a cache folder', async () => {
+    const t = setup({}, () => ({ code: 0, stdout: 'stored', stderr: 'note: the vault is in /home/me/.cache/codeloupe/secrets/vault.env, inside the cache folder. Keep a copy.\n' }));
+    const out = await t.manager.set(set());
+    expect(out.ok).toBe(true);
+    expect(out.message).toContain('Keep a copy');
+  });
+
   it('scrubs the value out of a failure and never calls the CLI for bad input', async () => {
     const t = setup({}, () => ({ code: 1, stdout: '', stderr: `cannot store ${SECRET} here\n` }));
     const out = await t.manager.set(set());
@@ -125,11 +144,18 @@ describe('EnvManager import', () => {
     const t = setup({}, () => ({ code: 0, stdout: JSON.stringify(result), stderr: '' }));
     const out = await t.manager.importRun({ selections: [{ id: 'aabbccddeeff' }, { id: '001122334455', scope: 'global' }], replaceSources: true, overwrite: true, includeExcluded: false });
     expect(out).toEqual({ ok: true, result });
-    expect(t.confirms).toHaveLength(1);
+    expect(t.confirms.map(c => c.message)).toEqual(['Replace stored values with the ones in the files?', 'Replace the values in the source files with references?']);
     expect(t.calls[0].args).toEqual(['env', 'import', 'run', '--json', '--select', 'aabbccddeeff', '--select', '001122334455=global', '--replace', '--overwrite']);
     const plain = setup({}, () => ({ code: 0, stdout: JSON.stringify(result), stderr: '' }));
     await plain.manager.importRun({ selections: [{ id: 'aabbccddeeff' }], replaceSources: false, overwrite: false, includeExcluded: false });
     expect(plain.confirms).toHaveLength(0);
+  });
+
+  it('does nothing when the user declines to overwrite stored values', async () => {
+    const t = setup({ confirm: async message => !message.startsWith('Replace stored') });
+    const out = await t.manager.importRun({ selections: [{ id: 'aabbccddeeff' }], replaceSources: false, overwrite: true, includeExcluded: false });
+    expect(out).toEqual({ ok: false, message: 'Import cancelled.' });
+    expect(t.calls).toHaveLength(0);
   });
 
   it('does nothing when the user declines the replacement', async () => {

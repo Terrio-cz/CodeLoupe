@@ -165,6 +165,22 @@ describe('YouTrack accounts', () => {
     expect(readAccounts(home).youtrack).toEqual([]);
   });
 
+  it('asks before it overwrites the token of an account, and keeps it on a no', async () => {
+    const t = setup();
+    await t.manager.youtrackAdd(input);
+    t.calls.length = 0;
+    t.confirms.length = 0;
+    await t.manager.youtrackRotate('terrio', 'perm:new-fake-token');
+    expect(t.confirms).toHaveLength(1);
+    expect(t.confirms[0].detail).toContain('overwritten');
+    expect(JSON.stringify(t.confirms)).not.toContain('perm:new-fake-token');
+    const declined = setup({ confirm: async () => false });
+    await declined.manager.youtrackAdd(input);
+    declined.calls.length = 0;
+    expect(await declined.manager.youtrackRotate('terrio', 'perm:new-fake-token')).toMatchObject({ ok: false, message: 'Rotation cancelled.' });
+    expect(declined.calls).toHaveLength(0);
+  });
+
   it('turns an id into the name of its token in the store', () => {
     expect(tokenName('terrio')).toBe('YOUTRACK_TOKEN_TERRIO');
     expect(tokenName('my-firma.2')).toBe('YOUTRACK_TOKEN_MY_FIRMA_2');
