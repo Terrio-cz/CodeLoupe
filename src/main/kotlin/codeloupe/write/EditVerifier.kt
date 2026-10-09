@@ -22,7 +22,8 @@ internal object EditVerifier {
             val gained = outsideAfter - outsideBefore.toSet()
             return "the edit would change declarations outside its range (${(lost.map { "lost ${show(it)}" } + gained.map { "new ${show(it)}" }).take(3).joinToString("; ")})"
         }
-        val inside = after.decls.filter { it.startOffset >= range.start && it.endOffset <= newEnd }.map(DeclKeys::of)
+        // Locals are part of a body: the same name in two sibling scopes is no duplicate declaration.
+        val inside = after.decls.filter { !it.local && it.startOffset >= range.start && it.endOffset <= newEnd }.map(DeclKeys::of)
         if (range.mustDeclare && inside.isEmpty()) return "the code declares nothing"
         (inside.firstOrNull { it in outsideAfter } ?: inside.groupBy { it }.entries.firstOrNull { it.value.size > 1 }?.key)?.let { return "the file would declare ${show(it)} twice" }
         return null
