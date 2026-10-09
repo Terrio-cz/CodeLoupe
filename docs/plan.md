@@ -145,8 +145,11 @@ CLI `codeloupe …` ──HTTP (spustí daemon, když neběží)─────�
   Proto `<home>/daemon.token` (náhodných 32 B hex, vzniká s právy jen pro vlastníka, přežije restart, změna souboru platí bez restartu)
   a hlavička `x-codeloupe-token` na všem, co jedná za uživatele: `/jobs`, `/workspaces`, `/reconcile`, `/ports`, `/events`, `/webhooks`,
   `/ui-api`, `/shutdown`, mutující nástroje (`run`, `env`, `edit`, `update`, MCP `job`). Čtecí dotazy na kód (`/mcp`, `/api/<nástroj>`,
-  `/hook`) projdou i bez tokenu, dokud `config.json` `api.strict` není `true`; stávající záznam MCP (`--header x-codeloupe:1`) tak
-  funguje dál a `/status` počítá volání bez tokenu (`auth.withoutToken`), aby bylo vidět, kdy lze `strict` zapnout. Volba tokenu místo
+  `/hook`) token chtějí také, protože index prozradí jinému uživateli názvy souborů a symbolů. **Rozhodnutí (CL-158, doděláno):**
+  `api.strict` je ve výchozím stavu zapnuté, protože kritérium „druhý uživatel je odmítnut na každé cestě kromě GET /status“ jinak neplatí
+  a první vydání ještě nevyšlo, takže není co zpětně rozbít; cena je jeden krok po aktualizaci (`codeloupe mcp-config`). Kdo má stroj jen
+  pro sebe, může dát `api.strict: false`: starý záznam MCP (`--header x-codeloupe:1`) pak čte dál a `/status` počítá volání bez tokenu
+  (`auth.withoutToken`). Volba tokenu místo
   kontroly vlastníka spojení (Windows `GetExtendedTcpTable`, Linux `/proc/net/tcp`, macOS `lsof`): jeden mechanismus pro tři systémy,
   žádný nativní kód ani závod o PID/port, a MCP klient ho dostane přes `headersHelper` (`codeloupe mcp-headers`, v pluginu
   `hooks/mcp-headers.sh`), takže tajemství není v konfiguraci Claude Code.
