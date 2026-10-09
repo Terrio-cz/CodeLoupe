@@ -26,3 +26,8 @@ test('renders a table, escaping the bar, or says nothing was skipped', () => {
   assert.match(text, /\| JobObjectsTest \| outside Windows & there is no job \| Windows has job objects \\\| really \|/);
   assert.equal(render([], 'T'), '### T\n\nNothing was skipped.\n');
 });
+
+test('escapes a backslash before a bar so a cell cannot end early', () => {
+  const text = render([{ cls: 'X', name: 'a\\|b', reason: 'c\\d' }], 'T');
+  assert.ok(text.includes('| X | a\\\\\\|b | c\\\\d |'));
+});
