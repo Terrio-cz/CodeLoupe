@@ -17,7 +17,7 @@ class ProcessInventory(private val workspaces: Workspaces, private val source: P
         val processes = try {
             source.read()
         } catch (e: Exception) {
-            return@withContext ProcessReport(IsoTime.now(), problems = listOf("processes: ${e.message.orEmpty().lineSequence().first()}"))
+            return@withContext ProcessReport(IsoTime.now(), problems = listOf("$PROBLEM ${e.message.orEmpty().lineSequence().first()}"))
         }
         val entries = ProcessAttribution.attribute(processes, list)
         val ram = entries.groupBy { it.repo to it.workspace }.map { (_, same) ->
@@ -42,7 +42,9 @@ class ProcessInventory(private val workspaces: Workspaces, private val source: P
         )
     }
 
-    private companion object {
-        const val MB = 1024L * 1024
+    companion object {
+        /** Starts the problem that says the process table could not be read: a report without it is not proof that nothing runs. */
+        const val PROBLEM = "processes:"
+        private const val MB = 1024L * 1024
     }
 }

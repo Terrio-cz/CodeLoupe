@@ -2,6 +2,7 @@ package codeloupe.reconcile
 
 import codeloupe.config.ReconcileConfig
 import codeloupe.docker.ResourceReport
+import codeloupe.processes.ProcessInventory
 import codeloupe.processes.ProcessReport
 import codeloupe.platform.IsoTime
 import codeloupe.workspace.WorkspaceList
@@ -93,10 +94,10 @@ class Reconciler(
         ReleaseStatus(r.repo, r.workspace, r.at, left?.size, left?.count { it.attempts > 0 })
     }
 
-    // A release is done when Docker answered and no entry of it is left; a Docker that did not answer proves nothing.
+    // A release is done when Docker and the process table answered and no entry of it is left; a read that failed proves nothing.
     private fun completeReleases(snap: Snapshot) {
         val store = releases ?: return
-        if (!snap.dockerOk) return
+        if (!snap.complete) return
         for (r in store.all()) {
             if (snap.entries.none { it.released && it.repo.equals(r.repo, ignoreCase = true) && it.workspace.equals(r.workspace, ignoreCase = true) }) {
                 store.complete(r.repo, r.workspace)
@@ -109,7 +110,7 @@ class Reconciler(
         ActionResult(entry.key, entry.kind, entry.name, entry.workspace, ActionOutcome.SKIPPED, detail).also { record(it, trigger) }
 
     // The plan with the backoff state merged in; also forgets the state of what is no longer planned.
-    private class Snapshot(val entries: List<PlanEntry>, val plan: ReconcilePlan, val dockerOk: Boolean)
+    private class Snapshot(val entries: List<PlanEntry>, val plan: ReconcilePlan, val complete: Boolean)
 
     private suspend fun snapshot(read: suspend () -> WorkspaceList): Snapshot {
         val list = read()
@@ -118,10 +119,11 @@ class Reconciler(
         val entries = planner.plan(report.resources, list, running.processes).map { entry ->
             state.get(entry.key)?.let { entry.copy(attempts = it.attempts, nextAttempt = it.nextAttempt, lastError = it.lastError) } ?: entry
         }
-        // Only removable entries keep a backoff. Docker not answering leaves its entries out of the plan, which must not wipe it.
-        if (report.engine != null) state.retain(entries.filter { it.verdict == Verdict.AUTO || it.verdict == Verdict.CONFIRM }.mapTo(HashSet()) { it.key })
+        // A read that failed leaves its entries out of the plan, which must not wipe their backoff or tell a release that nothing is left.
+        val complete = report.engine != null && running.problems.none { it.startsWith(ProcessInventory.PROBLEM) }
+        if (complete) state.retain(entries.filter { it.verdict == Verdict.AUTO || it.verdict == Verdict.CONFIRM }.mapTo(HashSet()) { it.key })
         val counts = entries.groupingBy { it.verdict.name.lowercase() }.eachCount().toSortedMap()
         if (report.engine != null) latest = entries
-        return Snapshot(entries, ReconcilePlan(IsoTime.now(), config.auto, counts, entries, report.problems + running.problems.filter { it !in report.problems }), report.engine != null)
+        return Snapshot(entries, ReconcilePlan(IsoTime.now(), config.auto, counts, entries, report.problems + running.problems.filter { it !in report.problems }), complete)
     }
 }
