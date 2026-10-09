@@ -3,7 +3,7 @@
 // broken down by source and role, what each role actually calls, and the savings of removing a source.
 // Read-only. Run set and cost weights match the Terrio workspace collector run/codemetrics.mjs.
 //
-//   node tools/context-audit.mjs --since 2026-09-23 --until 2026-10-07 [--workspace <dir>] [--out audit.json]
+//   node tools/context-audit.mjs --since 2026-09-23 --until 2026-10-07 [--workspace <dir>] [--out audit.json] [--cpt <chars per token, only when the window has too few agent runs to calibrate>]
 //
 // Method: starting context S = input + cache read + cache write of the first assistant turn. Its cost =
 // what turn 1 paid for those tokens + one cache read (0.1) per later turn. Sources come from the transcript
@@ -16,30 +16,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import readline from 'node:readline';
-import { spawn } from 'node:child_process';
+import { mcpTools } from './context-audit-mcp.mjs';
 
 const args = {}; for (let i = 2; i < process.argv.length; i++) if (process.argv[i].startsWith('--')) args[process.argv[i].slice(2)] = process.argv[i + 1]?.startsWith('--') ? true : process.argv[++i] ?? true;
 const WS = args.workspace || 'C:/Users/tadea/Documents/Claude/terrio';
 const T = args.transcripts || path.join(os.homedir(), '.claude', 'projects', WS.replace(/[:\\/]/g, '-'));
 const W = { input: 1, cw5m: 1.25, cw1h: 2, cacheRead: 0.1, output: 5 };
 const since = Date.parse(args.since || '2026-09-23'), until = args.until ? Date.parse(args.until) : Infinity;
-
-async function mcpTools() {
-  const cfg = JSON.parse(fs.readFileSync(path.join(WS, '.mcp.json'), 'utf8')).mcpServers; const schema = {};
-  for (const [name, c] of Object.entries(cfg)) {
-    const tools = await new Promise(res => {
-      const p = spawn(c.command, c.args || [], { cwd: WS, env: { ...process.env, ...(c.env || {}) } }); let buf = '';
-      const t = setTimeout(() => { p.kill(); res([]); }, 30000); const send = m => p.stdin.write(JSON.stringify(m) + '\n');
-      p.stdout.on('data', d => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { let m; try { m = JSON.parse(buf.slice(0, i)); } catch { m = {}; } buf = buf.slice(i + 1);
-        if (m.id === 1) { send({ jsonrpc: '2.0', method: 'notifications/initialized' }); send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }); }
-        if (m.id === 2) { clearTimeout(t); p.kill(); res(m.result?.tools || []); } } });
-      send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'context-audit', version: '1' } } });
-    });
-    if (!tools.length) console.error(`! ${name}: no tools/list answer, its schemas count as 0`);
-    for (const t of tools) schema[`mcp__${name}__${t.name}`] = JSON.stringify(t).length;
-  }
-  return schema;
-}
 
 function agentDefs() {
   const dir = path.join(WS, '.claude', 'agents'); const out = {};
@@ -97,7 +80,7 @@ async function readRun(m) {
 const median = a => { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const MISC = ['environment', 'model', 'session_context', 'date', 'credential_org', 'total_tokens_reminder', 'auto_mode'];
 
-const schema = await mcpTools(); const agents = agentDefs();
+const schema = await mcpTools(WS); const agents = agentDefs();
 const runs = (await Promise.all(listRuns().map(readRun))).filter(Boolean);
 const mcpOf = r => (agents[r.role]?.tools || []).filter(t => t.startsWith('mcp__'));
 for (const r of runs) r.chars = { ...r.src, mcpSchemas: mcpOf(r).reduce((n, t) => n + (schema[t] || 0), 0) };
@@ -106,7 +89,9 @@ for (const r of runs) r.chars = { ...r.src, mcpSchemas: mcpOf(r).reduce((n, t) =
 const pts = runs.filter(r => r.kind === 'subagent' && agents[r.role]).map(r => [(r.src.body || 0) + (r.src.instructions || 0) + (r.src.prompt || 0) + r.chars.mcpSchemas, r.S]);
 const mx = pts.reduce((n, p) => n + p[0], 0) / pts.length, my = pts.reduce((n, p) => n + p[1], 0) / pts.length;
 const slope = pts.reduce((n, [x, y]) => n + (x - mx) * (y - my), 0) / pts.reduce((n, [x]) => n + (x - mx) ** 2, 0);
-const CPT = +(1 / slope).toFixed(2);
+const calibrated = pts.length >= 2 && slope > 0;
+if (!calibrated) console.error(`! only ${pts.length} workspace-agent subagent runs in the window, calibration skipped; using ${args.cpt || 1.45} chars/token (override with --cpt)`);
+const CPT = calibrated ? +(1 / slope).toFixed(2) : +(args.cpt || 1.45);
 
 const SOURCES = ['body', 'claudeMd', 'prompt', 'mcpSchemas', 'skills', 'agentList', 'deferred', 'mcpInstr', 'hook', 'misc'];
 for (const r of runs) {
