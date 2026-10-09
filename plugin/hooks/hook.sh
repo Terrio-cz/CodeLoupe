@@ -14,10 +14,12 @@ port="$CODELOUPE_PORT"
 if [ -z "$port" ]; then
   dir="$CODELOUPE_HOME"
   if [ -z "$dir" ]; then
+    # The daemon takes this home as its own (it follows the variable too); without one (cron, a minimal environment) both use the passwd entry, which ~ expands to.
+    if [ -n "$HOME" ]; then home=$HOME; else home=~; fi
     case "$OSTYPE" in
       msys*|cygwin*|win*) dir="${LOCALAPPDATA:-$USERPROFILE/AppData/Local}/codeloupe" ;;
-      darwin*) dir="$HOME/Library/Caches/codeloupe" ;;
-      *) dir="${XDG_CACHE_HOME:-$HOME/.cache}/codeloupe" ;;
+      darwin*) dir="$home/Library/Caches/codeloupe" ;;
+      *) dir="${XDG_CACHE_HOME:-$home/.cache}/codeloupe" ;;
     esac
   fi
   # No daemon.json: no daemon is running, and nothing is waited for.

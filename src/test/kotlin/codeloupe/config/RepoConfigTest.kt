@@ -1,6 +1,7 @@
 package codeloupe.config
 
 import codeloupe.TestRepos
+import codeloupe.platform.PathCase
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import java.nio.file.Files
@@ -30,14 +31,14 @@ class RepoConfigTest {
     }
 
     @Test
-    fun `other keys and object entries stay, a repository already listed is not added again in any spelling`() {
+    fun `other keys and object entries stay, a repository already listed is not added again in the same spelling`() {
         Files.writeString(
             file,
             """{ "port": 47999, "workspaces": { "abandonedDays": 30, "repos": [ { "path": "${slashed(app)}", "roots": ["D:/trees"] }, "${slashed(lib)}" ] }, "budgets": { "rssMb": 200 } }""",
         )
-        val result = RepoConfig.add(home, listOf(Path.of(app.toString().uppercase()), lib, fresh))
+        val result = RepoConfig.add(home, listOf(Path.of(app.toString()), lib, fresh))
         assertEquals(listOf(slashed(fresh)), result.added)
-        assertEquals(2, result.already.size)
+        assertEquals(listOf(slashed(app), slashed(lib)), result.already)
         val written = Json.parseToJsonElement(Files.readString(file)).jsonObject
         assertEquals("47999", written["port"].toString())
         assertEquals("""{"rssMb":200}""", written["budgets"].toString())
@@ -45,6 +46,14 @@ class RepoConfigTest {
         assertEquals(30, config.abandonedDays)
         assertEquals(listOf("D:/trees"), config.repos.first().roots, "an entry with roots is kept as it was")
         assertEquals(3, config.repos.size)
+    }
+
+    @Test
+    fun `a spelling that differs by case is the same repository where the file system ignores case and another one where it does not`() {
+        RepoConfig.add(home, listOf(app))
+        val result = RepoConfig.add(home, listOf(Path.of(app.toString().uppercase())))
+        assertEquals(PathCase.insensitive, result.added.isEmpty())
+        assertEquals(if (PathCase.insensitive) 1 else 2, RepoConfig.list(home).size)
     }
 
     @Test

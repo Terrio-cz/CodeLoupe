@@ -13,7 +13,7 @@ desktop app's first-run onboarding reads. The running daemon already knows a rep
 
 | | Default | Override |
 |---|---|---|
-| State and indexes | `%LOCALAPPDATA%\codeloupe`, `~/Library/Caches/codeloupe`, `$XDG_CACHE_HOME/codeloupe` | `CODELOUPE_HOME` |
+| State and indexes | `%LOCALAPPDATA%\codeloupe`, `~/Library/Caches/codeloupe`, `$XDG_CACHE_HOME/codeloupe` | `CODELOUPE_HOME`. On Linux and macOS `~` is `$HOME` when that names a directory (an isolated profile, `sudo -E`), as for the hook script, the launcher and git, not the passwd entry the JVM would take; the hook script and the daemon always agree on it. |
 | Port | 47391 | `CODELOUPE_PORT` or `<home>/config.json` `{ "port": … }`. A daemon with another `CODELOUPE_HOME` refuses 47391 and the port configured in the default home: it needs a port of its own (MCP clients find the daemon by port alone). |
 | Default root for tools without `root` | — | `CODELOUPE_ROOT` or `config.json` `defaultRoot` |
 | Base branch of a repository | `origin/HEAD`, else `origin/main`, `origin/master`, `main`, `master` | `.codeloupe.json` `{ "baseBranch": "origin/master" }` in the main worktree |

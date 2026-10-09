@@ -36,6 +36,17 @@ class ProcessAttributionTest {
     private fun attributed(vararg processes: ProcessInfo) = ProcessAttribution.attribute(processes.toList(), registry, self = -1).associate { it.pid to "${it.workspace}/${it.via}" }
 
     @Test
+    fun `a process in a workspace directory that is gone is still the workspace's, by the path it had`() {
+        val gone = root.resolve("terrio-worktrees").resolve("TER-9")
+        val goneRegistry = WorkspaceList(
+            "now",
+            listOf(RepoWorkspaces(main.toString().replace('\\', '/'), "Terrio", "x/.git", "master", emptyList(), emptyMap(), listOf(workspace(gone, "TER-9", state = WorkspaceState.LANDED)))),
+        )
+        val result = ProcessAttribution.attribute(listOf(process(1, gone.toString()), process(2, gone.resolve("build").toString())), goneRegistry, self = -1)
+        assertEquals(mapOf(1L to "TER-9/cwd", 2L to "TER-9/cwd"), result.associate { it.pid to "${it.workspace}/${it.via}" })
+    }
+
+    @Test
     fun `a process belongs to the workspace whose directory holds its working directory, the deepest one`() {
         val result = attributed(
             process(1, ter5.toString()),

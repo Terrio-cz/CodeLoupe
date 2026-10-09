@@ -8,6 +8,7 @@ import java.io.RandomAccessFile
 import java.net.UnixDomainSocketAddress
 import java.nio.channels.Channels
 import java.nio.channels.SocketChannel
+import java.nio.file.Files
 import java.nio.file.Path
 
 /** Where the Docker Engine listens: a Windows named pipe or a unix socket. TCP is not supported. */
@@ -59,31 +60,47 @@ sealed interface DockerEndpoint {
         private const val PIPE_RETRY_MS = 25L
         private val WINDOWS_PIPES = listOf("//./pipe/dockerDesktopLinuxEngine", "//./pipe/docker_engine")
 
-        /** `DOCKER_HOST` when set, otherwise the usual local sockets of the platform, in the order Docker Desktop prefers them. */
-        fun candidates(env: Map<String, String> = System.getenv(), os: String = System.getProperty("os.name")): List<DockerEndpoint> {
-            env["DOCKER_HOST"]?.takeIf { it.isNotBlank() }?.let { return listOf(parse(it)) }
-            if (os.lowercase().startsWith("windows")) return WINDOWS_PIPES.map { NamedPipe(it.replace('/', '\\')) }
-            val home = System.getProperty("user.home")
-            return listOf("/var/run/docker.sock", "$home/.docker/run/docker.sock", "$home/.docker/desktop/docker.sock").map(::UnixSocket)
+        /**
+         * `DOCKER_HOST` when set; otherwise the endpoint of the Docker context in use, then the usual local sockets of the platform
+         * ([DockerSockets]), in the order Docker Desktop prefers them.
+         */
+        fun candidates(
+            env: Map<String, String> = System.getenv(),
+            os: String = System.getProperty("os.name"),
+            home: String = System.getProperty("user.home"),
+            uid: Long? = currentUid(),
+        ): List<DockerEndpoint> {
+            env["DOCKER_HOST"]?.trim()?.takeIf { it.isNotEmpty() }?.let { return listOf(parse(it)) }
+            val context = DockerSockets.contextHost(env, home)?.let { runCatching { parse(it) }.getOrNull() }
+            val usual = if (os.lowercase().startsWith("windows")) WINDOWS_PIPES.map { NamedPipe(it.replace('/', '\\')) } else DockerSockets.unix(env, home, uid).map(::UnixSocket)
+            return (listOfNotNull(context) + usual).distinct()
         }
 
+        // The numeric id of this user, for /run/user/<id>; only Linux has such a directory.
+        private fun currentUid(): Long? = runCatching { (Files.getAttribute(Path.of("/proc/self"), "unix:uid") as Int).toLong() }.getOrNull()
+
         fun parse(host: String): DockerEndpoint = when {
-            host.startsWith("npipe://") -> NamedPipe(host.removePrefix("npipe://").replace('/', '\\'))
+            // `npipe:////./pipe/x` is the documented form; `npipe://./pipe/x` is written too.
+            host.startsWith("npipe://") -> NamedPipe(host.removePrefix("npipe://").replace('/', '\\').let { if (it.startsWith(".\\")) "\\\\$it" else it })
             host.startsWith("unix://") -> UnixSocket(host.removePrefix("unix://"))
-            else -> throw DockerUnavailable("DOCKER_HOST=$host: only npipe:// and unix:// endpoints are supported")
+            else -> throw DockerUnavailable("DOCKER_HOST=$host: only npipe:// and unix:// endpoints are supported (not tcp:// or ssh://)")
         }
 
         /** The first candidate that accepts a connection; requests open their own connections. */
         fun firstReachable(candidates: List<DockerEndpoint>): DockerEndpoint {
             val failures = ArrayList<String>()
+            var absent = 0
             for (endpoint in candidates) {
                 try {
                     endpoint.connect().close()
                     return endpoint
                 } catch (e: IOException) {
-                    failures += "${endpoint.address}: ${e.message.orEmpty().lineSequence().first()}"
+                    // A socket that is not there says nothing a list of a dozen usual places would help with.
+                    if (endpoint is UnixSocket && !Files.exists(Path.of(endpoint.address))) absent++
+                    else failures += "${endpoint.address}: ${e.message.orEmpty().lineSequence().first()}"
                 }
             }
+            if (absent > 0) failures += "none of $absent other usual sockets exists (set DOCKER_HOST to reach an Engine elsewhere)"
             throw DockerUnavailable("no Docker Engine endpoint answers (${failures.joinToString("; ")})")
         }
     }
