@@ -1390,6 +1390,20 @@ rozhoduje launcher.
   a `CliJvm` stejné, žádný `-Xshare` ani dump archivu), `AotTrainingTest` (skutečné JVM na instalovaných jarech: dvě první volání naráz, jeden trénink, jeden čistý pár cache, volání s cache z přesunuté kopie, s poškozenými soubory a daemon s cache
   i s poškozenou); `tools/bundle-smoke.mjs --aot` v CI na třech OS a v jobu `bundle`.
 
+### Výsledek CL-159 — řetězec dodávky, původ vydání a nastavení repozitáře (2026-10-09)
+
+- V souborech: `tools/check-workflows.mjs` (v jobu `tools` každého pushe) hlídá oprávnění workflow, připnutí akcí na SHA, `persist-credentials: false`,
+  zákaz `pull_request_target` a nedůvěryhodné výrazy v `run:`; `dependency-review.yml` zastaví PR s nálezem severity high; `dependabot.yml` má
+  cooldown 7 dní; job `publish` běží v prostředí `release` a podepisuje atestaci původu (`actions/attest`, Sigstore) ke každému souboru vydání;
+  poznámky k vydání říkají, jak soubor ověřit (`gh attestation verify`).
+- Nastavení repozitáře (rulesety `main` a tagů `v*`, politika Actions, neměnná vydání, prostředí `release`, soukromé hlášení zranitelností) se z PR
+  udělat nedá a pracovní okna se jich nesmějí dotknout: seznam se stavem z `gh api` a hotovými příkazy je v `docs/repository-hardening.md`.
+  Ruleset `main` má jako obchvat roli správce, protože okna přistávají přímým pushem a povinné kontroly by ho jinak odmítly.
+- Podpis aktualizací: certifikát (Authenticode, Developer ID) stojí peníze a vlastník se 2026-10-08 rozhodl nic neplatit. Zbývá odpojený podpis
+  `latest.yml` klíčem projektu (veřejný klíč v aplikaci, ověření před stažením); potřebuje, aby vlastník vytvořil pár klíčů a soukromý uložil
+  jako tajemství prostředí `release`, proto je to samostatná karta. Do té doby platí SHA-512 z feedu stejného vydání a ruční `gh attestation verify`.
+- Neověřeno: job `publish` s atestací se spustí poprvé na skutečném tagu; kontrola je v `docs/repository-hardening.md`, sekce „After the first release“.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

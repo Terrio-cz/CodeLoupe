@@ -1,4 +1,4 @@
-What protects what in the repository and in a release, how to verify a release, how far the updater is trusted, and the repository settings the owner still has to apply (they cannot be set from a pull request). The local API is covered in [Configuration](Configuration#who-may-call-the-daemon), the secret store in [Environment and secrets](Environment-and-secrets), reporting a problem in the [security policy](https://github.com/Terrio-cz/CodeLoupe/blob/main/SECURITY.md).
+What protects what in the repository and in a release, how to verify a release, how far the updater is trusted, and where the repository settings the owner still has to apply are listed (they cannot be set from a pull request). The local API is covered in [Configuration](Configuration#who-may-call-the-daemon), the secret store in [Environment and secrets](Environment-and-secrets), reporting a problem in the [security policy](https://github.com/Terrio-cz/CodeLoupe/blob/main/SECURITY.md).
 
 ## What the repository files enforce
 
@@ -42,42 +42,10 @@ checks against a key it already holds is what closes that, and the two ways to h
 - **A detached signature over `latest.yml`** (a key pair of the project, public key shipped in the app, signature verified before
   the download) costs nothing but needs the private key kept where the release job can use it without the build code reaching it;
   not done. Until then the provenance attestation above is the check a person can make by hand, and **immutable releases**
-  (checklist below) keep a published release from being changed afterwards.
+  (see Repository settings below) keep a published release from being changed afterwards.
 
-## Checklist for the owner
+## Repository settings
 
-State read with `gh api` on 2026-10-09 (read-only). Nothing here is changed by the repository files, because other windows land
-directly on `main` and a ruleset would change how.
-
-| Setting | Now | Wanted |
-|---|---|---|
-| Ruleset for `main` | none; legacy branch protection forbids force-push and deletion, requires nothing | add a ruleset: block force-push and deletion, require the status checks below. **Required checks stop a direct push of a commit that has not passed them**, which the current landing (merge `origin/main`, push straight to `main`) always does: add *Repository admin* as a bypass actor (mode *always*) to keep it, and drop the bypass once the flow pushes the branch first and waits for green. No pull request or review requirement. |
-| Required checks | none | `tools`, `test (ubuntu-latest)`, `test (windows-latest)`, `test (macos-latest)`, `app (ubuntu-latest)`, `bundle (ubuntu-latest)`, `analyze (java-kotlin)`, `analyze (javascript-typescript)` (the names GitHub shows today; a renamed job stops matching) |
-| Ruleset for tags `v*` | none | restrict creation to the maintainer, block update and deletion (a tag is what starts a release) |
-| Actions policy | all actions allowed; SHA pinning not required | *Allow GitHub-owned actions and those listed*: `gradle/actions/*` is the only other owner in use; turn on *Require actions to be pinned to a full-length commit SHA* (every workflow already is) |
-| Fork pull requests | approval for first-time contributors | approval for **all outside collaborators** |
-| Workflow token default | read-only; cannot approve pull requests | as is |
-| Immutable releases | off | on: a published release's files and tag can no longer change |
-| `release` environment | not created yet (the first tag creates it without rules) | *Settings → Environments → release*: required reviewer = the maintainer; limit to tags `v*`. The `publish` job then waits for an approval |
-| Private vulnerability reporting | off | on (SECURITY.md sends reporters there and has a fallback while it is off) |
-| Secret scanning, push protection | on | as is; optionally *validity checks* and *non-provider patterns* (off) |
-| Dependabot alerts and security updates | on | as is |
-| Code scanning | CodeQL by `codeql.yml` (default setup off) | as is |
-
-A ruleset can be created from the command line, for example (adjust the bypass actor to your role id; `5` is *Repository admin*):
-
-```bash
-gh api -X POST repos/Terrio-cz/CodeLoupe/rulesets --input - <<'JSON'
-{
-  "name": "main", "target": "branch", "enforcement": "active",
-  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
-  "bypass_actors": [{ "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" }],
-  "rules": [
-    { "type": "deletion" }, { "type": "non_fast_forward" },
-    { "type": "required_status_checks", "parameters": { "strict_required_status_checks_policy": false, "required_status_checks": [
-      { "context": "tools" }, { "context": "test (ubuntu-latest)" }, { "context": "app (ubuntu-latest)" }, { "context": "bundle (ubuntu-latest)" }
-    ] } }
-  ]
-}
-JSON
-```
+A few protections are repository settings, not files, and an owner with admin rights has to apply them (rulesets for `main` and for
+`v*` tags, the Actions policy, immutable releases, the `release` environment, private vulnerability reporting). They are listed with the
+current state and the commands in [repository-hardening.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/docs/repository-hardening.md).
