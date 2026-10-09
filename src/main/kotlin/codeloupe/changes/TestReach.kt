@@ -23,7 +23,7 @@ internal class TestReach(private val finder: UsageFinder) {
         if (isTest(decl.path)) testClass(decl.path, decl)?.let { return Reach(setOf(it), true) }
         // `hashCode` or `equals` is called from everywhere by name: what it means is the tests of the type that declares it.
         if (decl.name in OBJECT_MEMBERS || decl.kind == "constructor" || decl.kind == "init") {
-            return finder.cache.parent(decl)?.let { of(it, false) } ?: Reach(emptySet(), false)
+            return parentOf(decl, removed)?.let { of(it, false) } ?: Reach(emptySet(), false)
         }
         val tests = LinkedHashSet<TestClass>()
         var complete = true
@@ -53,7 +53,15 @@ internal class TestReach(private val finder: UsageFinder) {
         return Reach(tests, complete)
     }
 
-    fun parentOf(decl: DeclRow): DeclRow? = finder.cache.parent(decl)
+    /**
+     * The declaration [decl] belongs to, in the files as they are now. A removed declaration comes from the merge-base index, whose
+     * ids mean nothing in this one: its parent is found by the name of its container.
+     */
+    fun parentOf(decl: DeclRow, removed: Boolean): DeclRow? {
+        if (!removed) return finder.cache.parent(decl)
+        if (decl.container.isEmpty()) return null
+        return finder.cache.file(decl.path)?.all().orEmpty().firstOrNull { !it.local && it.kind in OutlineQuery.TYPE_KINDS && "${it.container}.${it.name}".removePrefix(".") == decl.container }
+    }
 
     /** The exact references; the unsure ones only when none is exact (a common name would otherwise drag in unrelated tests). */
     private fun sites(decl: DeclRow, removed: Boolean): List<Pair<RefRow, DeclRow?>> {

@@ -32,7 +32,7 @@ internal object TestSelection {
                 var found = reach.of(row, removed)
                 if (found.tests.isEmpty() && !TestReach.isTest(row.path)) {
                     // A new or private member is covered by the tests of the type it belongs to.
-                    val parent = reach.parentOf(row)
+                    val parent = reach.parentOf(row, removed)
                     if (parent != null) found = parentReach.getOrPut(parent.src to parent.id) { reach.of(parent, false) }
                 }
                 if (found.tests.isEmpty()) {
