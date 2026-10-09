@@ -7,4 +7,4 @@
  * environment: a build without a key installs what the release holds, checked against the SHA-512 of the feed as before,
  * and says so in the update log. Once a key is listed, a feed without a valid signature by one of them is refused.
  */
-export const UPDATE_PUBLIC_KEYS: readonly string[] = [];
+export const UPDATE_PUBLIC_KEYS: readonly string[] = ['MCowBQYDK2VwAyEAQTGxSZWKoNskGPTcXPEV9z1AST2NKQsxMx3aKHHjjmE='];

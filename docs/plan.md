@@ -1447,7 +1447,7 @@ rozhoduje launcher.
 - Co se ověřuje: updater před čtením `latest.yml` / `latest-linux.yml` stáhne vedle něj `<feed>.sig` (base64 surového podpisu Ed25519) a ověří ho nad
   přesně tím textem, který pak parsuje (`SignedFeedProvider`, podtřída `GenericProvider`, přepisuje `httpRequest`, takže není druhé stažení, které by se
   mohlo lišit). Chybějící podpis, podpis klíčem mimo seznam (i starým) a feed změněný po podpisu se odmítnou ještě před žádostí o instalátor.
-- Klíče: seznam `UPDATE_PUBLIC_KEYS` v `app/src/main/update/updateKeys.ts` (base64 DER SubjectPublicKeyInfo); je prázdný, dokud vlastník nevytvoří pár klíčů.
+- Klíče: seznam `UPDATE_PUBLIC_KEYS` v `app/src/main/update/updateKeys.ts` (base64 DER SubjectPublicKeyInfo); obsahuje veřejný klíč od 2026-10-09 (soukromý je tajemství `UPDATE_SIGNING_KEY` prostředí `release`).
   Bez klíče se build chová jako dřív (SHA-512 z feedu) a do `update.log` napíše, že podpis nekontroluje. S klíčem je podpis povinný: tag prvního vydání
   s klíčem proto nesmí vzniknout dřív než tajemství `UPDATE_SIGNING_KEY` (jinak by každá nainstalovaná aplikace feed odmítla).
 - Podepisování: job `publish` (jediný, kdo tajemství čte; spouští jen `openssl` a `gh`) podepíše oba feedy před atestací, podpis sám ověří veřejnou
