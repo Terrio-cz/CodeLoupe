@@ -1423,6 +1423,17 @@ rozhoduje launcher.
 - Odvozený klíč z passphrase se po použití vynuluje a `PBEKeySpec` smaže heslo; timeout `Exec.run` pokrývá i čtení výstupu (už platilo,
   `ExecTimeoutTest`). Rozlišení velkých a malých písmen v id rozsahu je CL-172.
 
+### Výsledek CL-171 — zkopírované tajemství se schová ve schránce (2026-10-09)
+
+- Electron 44 zapíše text a nativní formáty jedním `clipboard.write([new ClipboardItem({...})])`; nativní formát se předá jako klíč
+  `electron application/osclipboard;format="<název>"` s `Blob` (stejný zápis, jaký dokumentuje `has`). Zkoušeno na Windows: v reálném Electronu 44.6.0
+  jsou na schránce `ExcludeClipboardContentFromMonitorProcessing` = 1, `CanIncludeInClipboardHistory` = 0 a `CanUploadToCloudClipboard` = 0 vedle textu
+  (čteno přes `EnumClipboardFormats`). Starší `writeBuffer` by text smazal, proto se nepoužívá.
+- Kód: `app/src/main/env/concealedClipboard.ts` (formáty podle platformy, při chybě záloha na čistý text), `registerEnv.ts` ho předává jako
+  `clipboard.writeConcealed`, `EnvManager.reveal` ho používá a minutové mazání zůstává. Pozn.: kopírování je v aplikaci jen na macOS (Touch ID).
+- macOS (`org.nspasteboard.ConcealedType`) a Linux (`x-kde-passwordManagerHint`) ověřuje CI job `clipboard` (Electron + nástroje platformy:
+  `osascript`/NSPasteboard, `xclip -t TARGETS`), protože v tomto okně žádný Mac ani Linux není.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

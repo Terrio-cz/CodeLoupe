@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, systemPreferences } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, systemPreferences } from 'electron';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -6,6 +6,7 @@ import type { Environment } from '../../shared/contract';
 import { ENV_CH } from '../../shared/envActions';
 import type { AppSettings } from '../../shared/settings';
 import type { ApiSource } from '../api/ApiSource';
+import { writeConcealed } from './concealedClipboard';
 import { EnvManager } from './EnvManager';
 import { cliRunner } from './execCli';
 
@@ -32,7 +33,11 @@ export function registerEnv(ctx: EnvContext, handle: <A extends unknown[], R>(ch
     },
     reauth: touchId(),
     fetchValue: key => fetchValue(ctx, key, 'CodeLoupe app (clipboard copy)'),
-    clipboard: { write: text => clipboard.writeText(text), read: () => clipboard.readText() },
+    clipboard: {
+      write: text => clipboard.writeText(text),
+      read: () => clipboard.readText(),
+      writeConcealed: async text => { await writeConcealed(clipboard, ClipboardItem, text, process.platform); },
+    },
     schedule: (fn, ms) => { setTimeout(fn, ms).unref(); },
   });
   handle(ENV_CH.capabilities, () => manager.capabilities());

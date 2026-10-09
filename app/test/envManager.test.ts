@@ -204,6 +204,21 @@ describe('EnvManager.reveal', () => {
     expect(t.clipboard()).toBe('something else');
   });
 
+  it('copies through the concealed write when the platform has one, and still clears after a minute', async () => {
+    let plain = 0;
+    let concealed = '';
+    const t = setup({
+      reauth: async () => true,
+      clipboard: { write: () => { plain++; }, read: () => concealed, writeConcealed: async text => { concealed = text; } },
+    });
+    expect((await t.manager.reveal({ name: 'A', scope: { kind: 'global' } })).ok).toBe(true);
+    expect(concealed).toBe(SECRET);
+    expect(plain).toBe(0);
+    t.timers[0]();
+    await flush();
+    expect(plain).toBe(1);
+  });
+
   it('copies nothing when the authentication fails or the key is gone', async () => {
     const denied = setup({ reauth: async () => false });
     expect((await denied.manager.reveal({ name: 'A', scope: { kind: 'global' } })).ok).toBe(false);
