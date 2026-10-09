@@ -1,0 +1,60 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file://home/dev/.gradle/wrapper/dists/gradle-9.6.0-bin/42k10rwplmzkhuboz9kdazi7s/gradle-9.6.0/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :compileKotlin
+
+> Task :compileJava
+/work/proj/src/main/java/demo/Mailer.java:10: Warnung: [cast] redundanter Cast auf String
+        String subject = body.length() > 10 ? body.substring(0, 10) : body;
+                                               ^
+/work/proj/src/main/java/demo/Mailer.java:12: Fehler: Symbol nicht gefunden
+        return deliver(to, subject);
+               ^
+  Symbol:  Methode deliver(String,String)
+  Ort: Klasse Mailer
+/work/proj/src/main/java/demo/Mailer.java:17: Fehler: Inkompatible Typen: int kann nicht in String konvertiert werden
+        String text = n;
+                      ^
+/work/proj/src/main/java/demo/Mailer.java:18: Fehler: Symbol nicht gefunden
+        return text.length() + missing;
+                               ^
+  Symbol:  Variable missing
+  Ort: Klasse Mailer
+3 Fehler
+1 Warnung
+
+> Task :compileJava FAILED
+
+[Incubating] Problems report is available at: file:///work/proj/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava' (registered by plugin class 'org.gradle.api.plugins.JavaBasePlugin').
+> Compilation failed; see the compiler output below.
+  /work/proj/src/main/java/demo/Mailer.java:17: Fehler: Inkompatible Typen: int kann nicht in String konvertiert werden
+          String text = n;
+                        ^
+  /work/proj/src/main/java/demo/Mailer.java:18: Fehler: Symbol nicht gefunden
+          return text.length() + missing;
+                                 ^
+    Symbol:  Variable missing
+    Ort: Klasse Mailer
+  /work/proj/src/main/java/demo/Mailer.java:12: Fehler: Symbol nicht gefunden
+          return deliver(to, subject);
+                 ^
+    Symbol:  Methode deliver(String,String)
+    Ort: Klasse Mailer
+  3 Fehler
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 37s
+2 actionable tasks: 2 executed
