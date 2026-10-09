@@ -1248,6 +1248,15 @@ rozhoduje launcher.
   2. **`url` je pevný řetězec** (schéma `string().url()`), proměnné se rozbalují jen v `headers` a jen ty z `allowedEnvVars`: daemon na jiném portu (`CODELOUPE_PORT`) by dál potřeboval skript.
   3. **Jeden handler neumíme zaručit.** Záznam hooku nemá podmínku na prostředí (`if` je jen pravidlo nad vstupem nástroje), takže vedle sebe by na výchozím portu běžely oba a latenci dává pomalejší (skript).
 - **Rozhodnutí**: karta uzavřena jako Won't do. Znovu otevřít, pokud Claude Code umožní podepsanou odpověď, proměnné v `url` nebo podmínku na prostředí. Poznámka ve wiki (Plugin hooks).
+- **Živé ověření (CL-170, Claude Code 2.1.295, `claude -p` s `--plugin-dir` na scratch pluginu, jednorázový daemon na portu 47661, jeho vlastní `CODELOUPE_HOME`)**: plugin má jediný `PreToolUse` háček typu `http` na `http://127.0.0.1:47661/hook`
+  (hlavička `x-codeloupe: 1`, matcher `Bash|Read`), produkční plugin se nezměnil. Čtyři pozorování:
+  1. **`claude plugin validate` háček přijme** (varování jen o chybějícím `author`); stejný soubor s neznámým typem nebo `url` bez adresy validace odmítne s chybou na konkrétním záznamu. Typ `http` v pluginovém `hooks.json` tedy platí.
+  2. **Odpověď se zpracuje**: `grep -rn Hooks src` v zaindexovaném repozitáři, daemon `200` s `additionalContext`; přepis má `hook_success` a samostatný záznam `hook_additional_context` a model text dostal.
+     Platí to jen s tokenem: daemon dnes (CL-158) bez `x-codeloupe-token` odpovídá `401`, takže háček potřeboval `headers: {"x-codeloupe-token": "$CL_TOKEN"}` + `allowedEnvVars: ["CL_TOKEN"]` a proměnnou v prostředí Claude Code; žádné běžné prostředí ji nenese.
+  3. **Daemon neběží**: `connect ECONNREFUSED 127.0.0.1:47661` je záznam `hook_non_blocking_error` (`exitCode` 0) v přepisu a událost `hook_response` s `outcome: error` ve streamu; nástroj se provede, relace pokračuje. Totéž `401` (`stderr` `HTTP 401 from …/hook`, `exitCode` 401),
+     tedy chybějící nebo špatný token se ukáže stejně jako mrtvý daemon: jako neblokující chyba háčku, ne jako ticho.
+  4. **`204`**: ve streamu `hook_response` `outcome: success`, `exit_code` 204, prázdný výstup; v přepisu nevznikne po háčku žádný záznam a model nic nedostane.
+- **Závěr CL-146 se nemění** (zůstává skript): bod 2 jen přidává důvod, token pro `x-codeloupe-token` nelze do pluginu dostat bez proměnné prostředí. Nová karta nevznikla.
 
 ### Výsledek CL-145 — README jako úvodní stránka, detail ve wiki (2026-10-09)
 
