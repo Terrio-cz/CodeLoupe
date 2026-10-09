@@ -23,7 +23,8 @@ export interface EnvDeps {
   reauth?: () => Promise<boolean>;
   /** The stored value of one key, read from the daemon on behalf of the app (an audited read); null when it is not there. */
   fetchValue(key: { name: string; scope: string }): Promise<string | null>;
-  clipboard: { write(text: string): void; read(): string | Promise<string> };
+  /** `writeConcealed` marks the copy so that clipboard history and managers skip it; without it the value goes out as plain text. */
+  clipboard: { write(text: string): void | Promise<void>; read(): string | Promise<string>; writeConcealed?(text: string): Promise<void> };
   schedule(fn: () => void, ms: number): void;
 }
 
@@ -155,7 +156,8 @@ export class EnvManager {
     if (!(await this.deps.reauth())) return { ok: false, message: 'Authentication was not confirmed.' };
     const value = await this.deps.fetchValue(checked.value).catch(() => null);
     if (value === null) return { ok: false, message: 'Could not read the key.' };
-    this.deps.clipboard.write(value);
+    if (this.deps.clipboard.writeConcealed) await this.deps.clipboard.writeConcealed(value);
+    else await this.deps.clipboard.write(value);
     const digest = sha256(value);
     this.deps.schedule(() => { void Promise.resolve(this.deps.clipboard.read()).then(now => { if (sha256(now) === digest) this.deps.clipboard.write(''); }); }, CLIPBOARD_MS);
     return { ok: true, message: 'The value is on the clipboard and will be cleared in a minute.' };

@@ -14,6 +14,14 @@ vault, and on macOS and Linux the key in the keychain or secret service is left 
 more (the daemon, the CLI and the app must all use it). Moving the vault by default needs a migration across versions of the daemon, the CLI and the app that
 share it, and is not done.
 
+**Copying a value from the app.** The desktop app copies a stored value to the clipboard only after the OS asked you to authenticate (Touch ID on macOS;
+the other systems have no prompt Electron can raise, so the button is absent there) and clears it a minute later if it is still there. The copy carries
+the marker that password managers set, so clipboard history and managers skip it: on Windows `ExcludeClipboardContentFromMonitorProcessing`,
+`CanIncludeInClipboardHistory` = 0 and `CanUploadToCloudClipboard` = 0 (Win+V history, cloud clipboard); on macOS `org.nspasteboard.ConcealedType`
+(clipboard managers, Universal Clipboard); on Linux `x-kde-passwordManagerHint` = `secret` (KDE Klipper; other managers decide for themselves). If
+the platform refuses the marked item the value is copied as plain text, as before. A CI job copies through the app's own module in a real Electron and
+reads the formats back with the platform's tools on all three systems.
+
 **Scope ids and case.** A `workspace:<id>` or `repo:<id>` is a folder path with forward slashes and no trailing slash. On Windows and macOS (default volumes)
 paths compare without regard to case, so the id is lower-cased; on Linux `/x/Proj` and `/x/proj` are two folders and two scopes, and the id keeps its
 case (a macOS volume formatted case sensitive is treated like the default one). A vault written by an earlier version holds lower-cased ids: on Linux

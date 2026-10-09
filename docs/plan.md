@@ -1448,6 +1448,17 @@ rozhoduje launcher.
 - CLI: `ws reconcile --confirm|--workspace` vyžaduje `--plan <hash>` z výpisu suchého běhu (řádek `plan <hash>`); na 409 vypíše nový plán.
   Aplikace posílá hash plánu, který vypsal její nativní dialog, a odmítne požadavek, jehož hash stránky se liší od čerstvého plánu.
 
+### Výsledek CL-171 — zkopírované tajemství se schová ve schránce (2026-10-09)
+
+- Electron 44 zapíše text a nativní formáty jedním `clipboard.write([new ClipboardItem({...})])`; nativní formát se předá jako klíč
+  `electron application/osclipboard;format="<název>"` s `Blob` (stejný zápis, jaký dokumentuje `has`). Zkoušeno na Windows: v reálném Electronu 44.6.0
+  jsou na schránce `ExcludeClipboardContentFromMonitorProcessing` = 1, `CanIncludeInClipboardHistory` = 0 a `CanUploadToCloudClipboard` = 0 vedle textu
+  (čteno přes `EnumClipboardFormats`). Starší `writeBuffer` by text smazal, proto se nepoužívá.
+- Kód: `app/src/main/env/concealedClipboard.ts` (formáty podle platformy, při chybě záloha na čistý text), `registerEnv.ts` ho předává jako
+  `clipboard.writeConcealed`, `EnvManager.reveal` ho používá a minutové mazání zůstává. Pozn.: kopírování je v aplikaci jen na macOS (Touch ID).
+- macOS (`org.nspasteboard.ConcealedType`) a Linux (`x-kde-passwordManagerHint`) ověřuje CI job `clipboard` (Electron + nástroje platformy:
+  `osascript`/NSPasteboard, `xclip -t TARGETS`), protože v tomto okně žádný Mac ani Linux není.
+
 ### Výsledek CL-172 — velikost písmen v id rozsahu tajemství (2026-10-09)
 
 - `SecretScope.normalize` zmenšuje id jen tam, kde souborový systém velikost písmen nerozlišuje (Windows, macOS s výchozím svazkem); na Linuxu
