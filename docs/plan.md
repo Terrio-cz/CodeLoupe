@@ -428,17 +428,33 @@ TER-62 A 278 / B 320; rozptyl mezi opakováním téže varianty je 15–20 %, te
 
 **Nálezy reviewera.** Proti známým nálezům reálných kol: TER-62 (6 nálezů na špičce) A i B 6/6 v obou opakováních;
 TER-321 (4 nálezy) A 4/4 v obou opakováních, **B 3/4 v obou opakováních**: chybí návrh dvojice `Public-Change` / `Public-Change-Cs`
-pro `git land`. Příčina není CodeLoupe, ale tělo agenta: dnešní `terrio-reviewer-opus` (8,6 tis. znaků proti 13,9 tis.) tuto
-kontrolu jen odkazuje do referenčního souboru, který reviewer ve zkontrolovaných bězích (TER-321 a TER-62, první opakování) nečetl. Reviewer B je tedy na jednom známém nálezu horší
-a kritérium „nálezy nejsou horší“ se neplní. Na špičkách TER-324, TER-637 a TER-559 (v reálu `rev=ok`) vrátili A/B 1/1, 2/1
-a 1/2 nálezů (nejvyšší P3, B u TER-324 jeden P2); nebyly posouzeny, jen spočítány.
+pro `git land`. Příčina není CodeLoupe, ale tělo agenta: `terrio-reviewer-opus` po zkrácení (8,6 tis. znaků proti 13,9 tis.) tuto
+kontrolu jen odkazovalo do referenčního souboru, který reviewer ve zkontrolovaných bězích nečetl. Na špičkách TER-324, TER-637
+a TER-559 (v reálu `rev=ok`) vrátili A/B 1/1, 2/1 a 1/2 nálezů (nejvyšší P3, B u TER-324 jeden P2); nebyly posouzeny, jen spočítány.
+
+**Oprava těla reviewera (CL-179).** Kontrola dvojice `Public-Change` / `Public-Change-Cs` se vrátila přímo do těla agenta
+(lens Delivery; zároveň „přečti celou každou třídu, kterou diff mění“, které zkrácení také vyneslo do reference); tělo zůstává
+pod limitem 8 000 znaků (7 999) a obě těla jsou shodná. Opakování B na TER-321 a TER-62, 2× každý, stejný packet a klon:
+
+| Tělo | TER-321 nálezy | TER-62 nálezy | Cena USD (TER-321 / TER-62) | Jednotky tis. (TER-321 / TER-62) | Volání modelu |
+|---|---|---|---|---|---|
+| před CL-60 (A) | 4/4, 4/4 | 6/6, 6/6 | 1,20 / 1,18 | 330 / 337 | 11 / 13 |
+| po CL-60 (B), věta s odkazem | 3/4, 3/4 | 6/6, 6/6 | 0,86 / 1,34 | 231 / 385 | 7 / 15 |
+| CL-179 v1: věta „pár se kontroluje“ | 3/4, 3/4 | 6/6, 6/6 | 1,11–1,31 / 1,07–1,43 | — | 13–19 / 13–21 |
+| **CL-179 v2: chybějící pár = nález + návrh** | **4/4, 4/4** | **6/6, 6/6** | 1,39 a 0,98 / 1,59 a 1,27 | 391 a 271 / 488 a 371 | 26 a 12 / 25 a 17 |
+
+První verze (jen věta o kontrole) nestačila: reviewer pár sice zmínil, ale bez přístupu k brainu jej vedl jako „neznámé, ověřit
+před landem“, ne jako nález. Verze v2 říká, že potřebný a neviditelný pár je nález `!P3 text-only` a reviewer jej sám navrhne
+(`~ decide`), a tím se vrátil nález, který A měl. Kritérium „nálezy nejsou horší“ je splněno (TER-321 i TER-62 B = A).
+Opravená těla vycházejí dráž (průměr USD 1,31 proti 1,07 u zkráceného B a 1,10 u A, tedy asi o pětinu), rozptyl mezi opakováním téže
+varianty je přitom 15–40 %; část nákladu jde na to, že reviewer víc ověřuje (12–26 volání modelu).
 
 **Co z toho plyne.** (1) Agenti B CodeLoupe téměř nepoužili: 1 volání v 7 během reviewera, 10 volání v 5 během planneru
 (`find`, `outline`), jinak `rg`/`git`/Read. Rozdíly A proti B proto měří hlavně změnu těla agentů, ne nástroj; úsporu reviewera
 (−16 % ceny, −17 % jednotek) nelze přičíst CodeLoupe. (2) U planneru cena beze změny (−3 % USD, +1 % jednotek), víc volání modelu
 (+34 %), kratší wall (−20 %). (3) Omezení: jeden běh na buňku (reviewer TER-321/62 dva), 2 běhy souběžně na vytížené mašině
 (wall je orientační), YouTrack issue obsahuje kritéria „found: round 1“, takže TER-321 a TER-62 reviewer částečně ověřuje
-známá kritéria. Navazuje kontrola adopce nástroje v reviewerovi a doplnění `Public-Change` do těla (CL-179, CL-180).
+známá kritéria. Navazuje kontrola adopce nástroje v reviewerovi (CL-180); `Public-Change` v těle je opraveno (CL-179).
 
 ### 8.5 Živé porovnání
 
