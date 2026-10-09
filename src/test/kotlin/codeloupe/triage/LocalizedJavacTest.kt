@@ -43,7 +43,8 @@ class LocalizedJavacTest {
         val base = TestRepos.tmpDir("triage-localized").resolve("base.db")
         BaseBuilder.build(repo.toString(), TestRepos.git(repo, "rev-parse", "HEAD"), base)
         for ((code, _) in locales) {
-            val text = View(base).use { Triage.apply(summary("java-errors-$code-constructed"), ViewLocator(it)) }
+            // ErrorTriage itself: Triage keeps the plain summary when the pointers would make it more than 15 % longer, as short Japanese messages do.
+            val text = View(base).use { ErrorTriage.apply(summary("java-errors-$code-constructed").lines(), ViewLocator(it)).joinToString("\n") }
             assertContains(text, Regex("src/main/java/demo/Mailer\\.java:\\d+-\\d+ {2}\\[Mailer] .*send.* {2}· symbol Mailer\\.send hash=[0-9a-f]{10}\n {2}12 {2}"), code)
             assertContains(text, Regex("\\[Mailer] .*count.*· symbol Mailer\\.count hash=[0-9a-f]{10}\n {2}17 {2}"), code)
             assertFalse("[cast]" in text, "$code: the warning stays out:\n$text")
@@ -90,6 +91,7 @@ class LocalizedJavacTest {
     @Test
     fun `a file URI on Unix keeps its root slash so the working directory still matches`() {
         assertEquals("src/Foo.kt", ErrorLines.relative("file:///home/u/repo/src/Foo.kt", "/home/u/repo"))
+        assertEquals("src/Foo.kt", ErrorLines.relative("file:////home/u/repo/src/Foo.kt", "/home/u/repo"))
         assertEquals("e: src/Foo.kt:3:4 x", ErrorLines.relative("e: file:///home/u/repo/src/Foo.kt:3:4 x", "/home/u/repo/"))
         assertEquals("src/Foo.kt", ErrorLines.relative("file:///C:/work/repo/src/Foo.kt", "C:/work/repo"))
         assertEquals("/other/Foo.kt", ErrorLines.relative("file:///other/Foo.kt", "/home/u/repo"))

@@ -14,12 +14,14 @@ object ErrorLines {
 
     fun shorten(line: String, max: Int = 200): String = line.trim().let { if (it.length > max) it.take(max - 1) + "…" else it }
 
-    private val WINDOWS_URI = Regex("""file:///(?=[A-Za-z]:)""")
+    // `file:///C:/x` (a drive) and `file:///home/x`, also written `file:////home/x`; more slashes than three add nothing.
+    private val WINDOWS_URI = Regex("""file:/{3,}(?=[A-Za-z]:)""")
+    private val UNIX_URI = Regex("""file:/{3,}""")
 
     /** [text] with the working directory and `file:///` cut off, so an error line carries only what is specific to it. */
     fun relative(text: String, cwd: String): String {
         // `file:///C:/x` is the path `C:/x`, `file:///home/x` is `/home/x`: the root slash stays so the directory still matches.
-        var out = text.replace('\\', '/').replace(WINDOWS_URI, "").replace("file:///", "/")
+        var out = text.replace('\\', '/').replace(WINDOWS_URI, "").replace(UNIX_URI, "/")
         val base = cwd.trimEnd('/')
         if (base.isNotEmpty()) out = out.replace("$base/", "")
         return out
