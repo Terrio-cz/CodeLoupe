@@ -23,6 +23,18 @@ class ListenerParserTest {
     }
 
     @Test
+    fun `netstat of Windows lists IPv6 listeners and does not depend on the language of the state`() {
+        val text = """
+              TCP    [::]:3000              [::]:0                 ABHÖREN        6001
+              TCP    [::1]:5173             [::]:0                 ÉCOUTE         6002
+              TCP    0.0.0.0:8080           0.0.0.0:0              LISTENING       6003
+              TCP    [::1]:50000            [::1]:5173             ESTABLISHED     6004
+              UDP    0.0.0.0:5353           *:*                                    6005
+        """.trimIndent()
+        assertEquals(listOf(3000 to 6001L, 5173 to 6002L, 8080 to 6003L), ListenerParser.windows(text).map { it.port to it.pid })
+    }
+
+    @Test
     fun `ss of Linux gives ports and pids, with or without the owner`() {
         val text = """
             LISTEN 0      4096       127.0.0.1:19002      0.0.0.0:*    users:(("java",pid=4242,fd=60))

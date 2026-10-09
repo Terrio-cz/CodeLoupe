@@ -2,11 +2,12 @@ package codeloupe.ports
 
 /** Reads the listening TCP ports and their process ids out of what the OS tools print. */
 object ListenerParser {
-    private val WINDOWS = Regex("""^\s*TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)\s*$""", RegexOption.MULTILINE)
+    // A listening socket has no peer: its foreign address is 0.0.0.0:0 or [::]:0 whatever language the state is printed in.
+    private val WINDOWS = Regex("""^\s*TCP\s+\S+:(\d+)\s+(?:0\.0\.0\.0|\[::\]):0\s+\S+\s+(\d+)\s*$""", RegexOption.MULTILINE)
     private val SS_PORT = Regex("""^\s*LISTEN\s+\d+\s+\d+\s+\S*?:(\d+)\s+\S+""", RegexOption.MULTILINE)
     private val SS_PID = Regex("""pid=(\d+)""")
 
-    /** `netstat -ano -p tcp` on Windows: `  TCP    0.0.0.0:19002    0.0.0.0:0    LISTENING    4242`. */
+    /** `netstat -ano` on Windows (`-p tcp` would leave out the IPv6 listeners): `  TCP    0.0.0.0:19002    0.0.0.0:0    LISTENING    4242`. */
     fun windows(text: String): List<Listener> = WINDOWS.findAll(text).map { Listener(it.groupValues[1].toInt(), it.groupValues[2].toLong()) }.distinctBy { it.port to it.pid }.toList()
 
     /** `ss -ltnpH` on Linux: `LISTEN 0 4096 127.0.0.1:19002 0.0.0.0:* users:(("java",pid=4242,fd=60))`. */
