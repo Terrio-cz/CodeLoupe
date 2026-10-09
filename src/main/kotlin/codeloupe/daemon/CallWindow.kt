@@ -1,6 +1,6 @@
 package codeloupe.daemon
 
-import kotlin.math.ceil
+import codeloupe.platform.NearestRank
 
 /** The last [SIZE] calls, kept to answer percentiles for `/status`; older ones live in `calls.jsonl`. */
 class CallWindow {
@@ -36,8 +36,7 @@ class CallWindow {
 
     private fun rate(count: Int, of: Int) = Math.round(count * 1000.0 / of) / 1000.0
 
-    /** Nearest rank: the smallest value that at least [p] of the values do not exceed. */
-    private fun percentile(values: List<Long>, p: Double): Long = values.sorted()[ceil(p * values.size).toInt().coerceAtLeast(1) - 1]
+    private fun percentile(values: List<Long>, p: Double): Long = NearestRank.of(values, p)
 
     private companion object {
         const val SIZE = 1000
