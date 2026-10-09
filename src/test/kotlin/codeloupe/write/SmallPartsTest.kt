@@ -61,6 +61,16 @@ class SmallPartsTest {
     }
 
     @Test
+    fun `a glob that would take long to judge is answered at once and counts as a match`() {
+        val path = "a/b/c/d/e/f/g/" + "x".repeat(40) + ".kt"
+        val started = System.nanoTime()
+        assertTrue(!Glob.matches("**/".repeat(40) + "no.kt", path), "forty folder stars are one, and this file is not no.kt")
+        assertTrue(Glob.matches("*a".repeat(30) + "b", path), "too many wildcards: never weaker than a match")
+        assertTrue(Glob.matches("**/**/**/" + "x".repeat(40) + ".kt", path), "a run of folder stars is one")
+        assertTrue((System.nanoTime() - started) / 1_000_000 < 1_000)
+    }
+
+    @Test
     fun `the policy refuses secrets, conflicts, links out of the worktree and everything but source`() {
         val root = Files.createTempDirectory("policy")
         val policy = WritePolicy(WriteConfig(deny = listOf("gen/**")))

@@ -2,6 +2,7 @@ package codeloupe.secrets.imports
 
 import codeloupe.JsonFormat
 import codeloupe.platform.IsoTime
+import codeloupe.platform.OwnerOnly
 import codeloupe.secrets.SecretStore
 import kotlinx.serialization.Serializable
 import java.io.IOException
@@ -45,7 +46,7 @@ class ImportBackups(private val dir: Path, private val store: SecretStore, priva
 
         fun add(file: Path, original: ByteArray, replacedSha256: String) {
             val name = "${entries.size + 1}.bak"
-            Files.createDirectories(dir.resolve(id))
+            OwnerOnly.folder(dir.resolve(id))
             Files.writeString(dir.resolve(id).resolve(name), store.sealBlob("$id/$name", original))
             entries += Entry(file.toString(), name, ValueFingerprint.sha256(original), replacedSha256)
             writeManifest(Manifest(id, IsoTime.of(clock()), entries.toList()))

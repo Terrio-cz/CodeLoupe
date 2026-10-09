@@ -49,6 +49,8 @@ class WriteService(private val registry: Registry, private val policy: WritePoli
         val worktree = Path.of(location.worktree)
         val relative = file.replace('\\', '/').removePrefix("./")
         return withContext(Dispatchers.IO) {
+            // Where the file is comes first: nothing outside the worktree is opened, not even to say whether it exists.
+            policy.refusal(worktree, registry.mainWorktree(location.commonDir), relative, null)?.let { throw WriteRefused(it) }
             val source = SourceText.read(worktree.resolve(relative)) ?: throw WriteRefused("no file $relative in the worktree")
             policy.refusal(worktree, registry.mainWorktree(location.commonDir), relative, source.text)?.let { throw WriteRefused(it) }
             val before = Extraction.extract(relative, source.text)
@@ -69,6 +71,7 @@ class WriteService(private val registry: Registry, private val policy: WritePoli
         val relative = path.replace('\\', '/').removePrefix("./")
         return withContext(Dispatchers.IO) {
             if (Languages.languageOf(relative) == null) throw WriteRefused("$relative is not a Kotlin or Java file")
+            policy.refusal(worktree, registry.mainWorktree(location.commonDir), relative, null)?.let { throw WriteRefused(it) }
             val target = worktree.resolve(relative)
             if (Files.exists(target)) throw WriteRefused("$relative exists: use replace_symbol or insert_member on its declarations")
             val text = NewSource.text(relative, code, siblingEol(target.parent), Extraction.extract(relative, code))

@@ -100,6 +100,18 @@ class DaemonTest {
     }
 
     @Test
+    @Order(3)
+    fun `a body declared far too large is refused before it is read`() {
+        Socket("127.0.0.1", port).use { socket ->
+            socket.soTimeout = 10_000
+            socket.getOutputStream().write("POST /jobs HTTP/1.1\r\nHost: 127.0.0.1:$port\r\n${CodeLoupe.HEADER}: 1\r\nContent-Length: 9000000\r\nContent-Type: application/json\r\n\r\n".toByteArray())
+            socket.getOutputStream().flush()
+            val answer = socket.getInputStream().bufferedReader().readLine()
+            assertTrue(answer.startsWith("HTTP/1.1 403"), answer)
+        }
+    }
+
+    @Test
     @Order(4)
     fun `responses close the connection`() {
         val response = rawGet("/status", "127.0.0.1:$port")

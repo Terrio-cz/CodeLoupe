@@ -149,6 +149,31 @@ class EnvSurfacesTest {
     }
 
     @Test
+    fun `a damaged or empty token file is no token and gets replaced`() {
+        val file = home.resolve("secrets").resolve("api-token.env")
+        val url = URI("http://127.0.0.1:$port/env/values?names=PROBE_SECRET")
+        Files.writeString(file, "")
+        assertEquals(401, send(HttpRequest.newBuilder(url).GET()).first, "an empty file is not a token anyone can present")
+        assertEquals(401, send(HttpRequest.newBuilder(url).GET(), token = "x").first)
+        val fresh = token()
+        assertTrue(Regex("[0-9a-f]{64}").matches(fresh), "the file was made again")
+        assertEquals(200, send(HttpRequest.newBuilder(url).GET(), token = fresh).first)
+    }
+
+    @Test
+    fun `a stored value of several lines is masked line by line, as output is read`() {
+        val before = Scrubber.knownValues
+        try {
+            Scrubber.knownValues = { listOf("first-line-of-the-key\nsecond-line-of-the-key") }
+            assertEquals("a *** b", Scrubber.text("a second-line-of-the-key b"))
+            assertEquals("a *** b", Scrubber.text("a first-line-of-the-key b"))
+            assertEquals("CODELOUPE_PASSPHRASE=***", Scrubber.text("CODELOUPE_PASSPHRASE=correct-horse"))
+        } finally {
+            Scrubber.knownValues = before
+        }
+    }
+
+    @Test
     fun `the scrubber masks stored values by content and leaves short ones alone`() {
         val before = Scrubber.knownValues
         try {

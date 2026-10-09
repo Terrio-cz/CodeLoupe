@@ -31,6 +31,8 @@ class SystemProcessesTest {
         assertEquals(ProcessKind.KOTLIN_DAEMON, ProcessKind.of("java org.jetbrains.kotlin.daemon.KotlinCompileDaemon --daemon-runFilesPath x"))
         assertEquals(ProcessKind.GRADLE_CLIENT, ProcessKind.of("java -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain test"))
         assertEquals(ProcessKind.OTHER, ProcessKind.of("node server.js"))
+        assertEquals(ProcessKind.OTHER, ProcessKind.of("claude -p \"why does KotlinCompileDaemon idle? see GradleWorkerMain.kt\""), "a prompt that names a build tool is not one")
+        assertEquals(ProcessKind.OTHER, ProcessKind.of("node tick.js GradleWorkerMain.kt"))
         assertTrue(ProcessKind.GRADLE_DAEMON.buildTool && ProcessKind.GRADLE_WORKER.buildTool && ProcessKind.KOTLIN_DAEMON.buildTool)
         assertTrue(!ProcessKind.GRADLE_CLIENT.buildTool && !ProcessKind.OTHER.buildTool)
     }

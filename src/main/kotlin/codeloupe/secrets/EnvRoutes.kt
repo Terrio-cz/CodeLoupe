@@ -21,7 +21,7 @@ import java.security.MessageDigest
 fun Route.envRoutes(access: SecretAccess) {
     get("/env/values") {
         val presented = call.request.headers[TOKEN_HEADER].orEmpty()
-        if (!MessageDigest.isEqual(presented.toByteArray(), access.token().toByteArray())) return@get respond(call, HttpStatusCode.Unauthorized, "bad or missing $TOKEN_HEADER")
+        if (presented.isEmpty() || !MessageDigest.isEqual(presented.toByteArray(), access.token().toByteArray())) return@get respond(call, HttpStatusCode.Unauthorized, "bad or missing $TOKEN_HEADER")
         val store = access.store ?: return@get respond(call, HttpStatusCode.ServiceUnavailable, "no secret store: ${access.problem}")
         val names = call.request.queryParameters["names"]?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
         val chain = SecretStore.chain(call.request.queryParameters["workspace"], call.request.queryParameters["repository"])

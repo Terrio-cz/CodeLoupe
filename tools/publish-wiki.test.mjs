@@ -124,3 +124,16 @@ test('the token reaches git only as an environment header and is redacted from m
   assert.equal(redact(`fail ghs_secret123 and ${basic}`, { GITHUB_TOKEN: 'ghs_secret123' }), 'fail *** and ***');
   assert.equal(gitEnv({ GITHUB_TOKEN: 'x' }, '/some/local/path').GIT_CONFIG_COUNT, '2');
 });
+
+test('a link in the sources is not published', t => {
+  const src = source({ 'Home.md': 'Home\n' });
+  const outside = path.join(tmp('wiki-outside-'), 'secret.txt');
+  fs.writeFileSync(outside, 'not for the wiki');
+  try {
+    fs.symlinkSync(outside, path.join(src, 'Linked.md'));
+  } catch {
+    t.skip('this system does not allow links');
+    return;
+  }
+  assert.deepEqual(listFiles(src), ['Home.md']);
+});

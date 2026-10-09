@@ -2,6 +2,7 @@ package codeloupe.secrets
 
 import codeloupe.JsonFormat
 import codeloupe.platform.IsoTime
+import codeloupe.platform.OwnerOnly
 import kotlinx.serialization.Serializable
 import java.nio.file.Files
 import java.nio.file.Path
@@ -31,7 +32,7 @@ class SecretAudit(private val file: Path, private val clock: () -> Instant = Ins
     fun record(action: Action, name: String, scope: String, consumer: String) {
         val line = JsonFormat.json.encodeToString(Event.serializer(), Event(IsoTime.of(clock()), name, scope, action, clean(consumer))) + "\n"
         runCatching {
-            Files.createDirectories(file.parent)
+            OwnerOnly.folder(file.parent)
             if (Files.exists(file) && Files.size(file) > rollBytes) Files.move(file, older, StandardCopyOption.REPLACE_EXISTING)
             Files.write(file, line.toByteArray(), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
         }
