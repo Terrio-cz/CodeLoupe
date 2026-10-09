@@ -1213,6 +1213,24 @@ rozhoduje launcher.
   nečitelný `config.json` = výchozí hodnoty, skript `start-daemon.sh` bez `codeloupe` v PATH, mrtvý port, `CODELOUPE_HOOKS=off`), `OrientationScanTest`.
 - **Zbytek**: měření „s a bez“ na pěti úkolech potřebuje relace, které háček skutečně dostaly; kritérium je přepsáno na základní stav a hotový nástroj a srovnání přešlo do karty CL-148.
 
+### Výsledek CL-146 — háček `http` místo procesu: nepoužitelný, zůstává skript (2026-10-09)
+
+- **Co se zkoušelo**: pluginový `PreToolUse` typu `http` s `url` na `http://127.0.0.1:47391/hook` a hlavičkou `x-codeloupe: 1`. Živý test nebyl možný (účet `claude -p` je na týdenním limitu do 2026-10-11 20:00),
+  proto: (1) schéma a kód nainstalovaného Claude Code 2.1.288 (`claude.exe`, řetězce a funkce HTTP hooku) a dokumentace hooků, (2) nahrané volání: stejný `PreToolUse` payload jako HTTP POST na daemona (hlavička
+  `Host: 127.0.0.1:<port>` a `x-codeloupe`, jako by ho poslal klient) a přes `bash hook.sh`. **Neověřeno živě**: zda se při neběžícím daemonovi ukáže v přepisu oznámení „hook error“
+  (kód vrací neblokující chybu a loguje ji na úrovni `error`; zda ji UI zobrazí, jsem nezjistil) a zda plugin `hooks.json` typ `http` přijme (schéma záznamu hooku je sdílené, pluginový zdroj `pluginHook` ho nevylučuje).
+- **Tvar výměny** (potvrzeno proti schématu): tělo POST je JSON události, odpověď 2xx s prázdným tělem = úspěch bez výstupu (daemon odpovídá `204`), 2xx s JSON objektem se čte jako výstup příkazového hooku
+  (`hookSpecificOutput.additionalContext`, `permissionDecision`, `updatedInput`), jiné tělo než JSON, ne-2xx i selhání spojení jsou neblokující chyba; `SessionStart` a `Setup` typ `http` nepodporují (startovací háček
+  `start-daemon.sh` tedy zůstává skriptem). Loopback je výslovně povolen (blokují se soukromé a link-local adresy), `allowedHttpHookUrls` a `httpHookAllowedEnvVars` jsou politiky správce.
+  Daemon na nahraný payload odpověděl `200 application/json` s `additionalContext` (shodně se skriptem), na `git status` `204` bez těla, bez hlavičky `x-codeloupe` `403`.
+- **Měření** (jednorázový daemon, TerrioImporter klon, stroj zatížený ostatními okny, 90 POSTů a 36 spuštění skriptu): **HTTP medián 10,8 ms (p95 15,1)**, **skript medián 82 ms (p95 104)**; daemon neběží: `ECONNREFUSED` za 2 ms.
+  Latence tedy cíl < 50 ms splňuje s velkou rezervou. Přesto se nepoužije:
+  1. **Odpověď se nefiltruje.** `hook.sh` pustí dál jen tři tvary, které daemon píše; Claude Code u `http` bere JSON jak přijde, takže cokoli, co poslouchá na portu 47391 (daemon neběží, jiný uživatel stroje),
+     by mohlo schválit volání nástroje (`permissionDecision: allow`) nebo přepsat jeho vstup (`updatedInput`). Daemon se Claude Code prokázat nemůže (token v souborech pluginu je zakázán, CL-158 ověřuje volající, ne odpovídajícího).
+  2. **`url` je pevný řetězec** (schéma `string().url()`), proměnné se rozbalují jen v `headers` a jen ty z `allowedEnvVars`: daemon na jiném portu (`CODELOUPE_PORT`) by dál potřeboval skript.
+  3. **Jeden handler neumíme zaručit.** Záznam hooku nemá podmínku na prostředí (`if` je jen pravidlo nad vstupem nástroje), takže vedle sebe by na výchozím portu běžely oba a latenci dává pomalejší (skript).
+- **Rozhodnutí**: karta uzavřena jako Won't do. Znovu otevřít, pokud Claude Code umožní podepsanou odpověď, proměnné v `url` nebo podmínku na prostředí. Poznámka ve wiki (Plugin hooks).
+
 ### Výsledek CL-145 — README jako úvodní stránka, detail ve wiki (2026-10-09)
 
 - README (827 → ~130 řádků) je úvod: co a proč s grafem benchmarku, rychlý start (CLI, plugin), tabulka nástrojů, odkazy na
@@ -1332,6 +1350,31 @@ rozhoduje launcher.
 - **Zůstává nedokázáno** (seznam ve wiki, `Development`): case-sensitive svazek macOS, pid cizího uživatele, `lsof` v locale C proti skutečnému nástroji
   (dekodér je testován fixturou), zamčený Keychain / KWallet, pád démona mimo Windows (jen job objekty hlídají vnuky; jinak je při dalším startu ukončí pid),
   start démona mimo Windows jako obyčejné dítě ve skupině volajícího (bez `setsid`).
+
+### Výsledek CL-150 — AOT cache pro CLI a start daemona (2026-10-09)
+
+- **Zapnuto.** Launchery předají CLI `-Dcodeloupe.aot=<home>/aot/<instalace>-<build>` a použijí `<…>.cli.aot`, pokud existuje (`-XX:AOTCache`; JVM s ním odmítne `-Xshare`, proto skripty `-Xshare` už nedávají).
+  Cache vyrábí **daemon na pozadí 10 s po startu** (`AotLauncher` → samostatný JVM `AotTrainerMain` → `AotTrainer`): na zahozeném home s drobným git repozitářem nahraje (`-XX:AOTMode=record`) daemon se svými příznaky
+  a jedno volání `find` CLI se svými, obojí zastaví, nechá JVM obě cache vytvořit (`AOTMode=create`) pod dočasnými jmény, přejmenuje je atomicky a nakonec zapíše `<…>.ready` (běhové ID JVM a velikosti obou souborů).
+  Daemon, který obsluhuje, nikdy nic nedumpuje, takže `codeloupe stop` ani aktualizace nečekají. Další start daemona dostane `-XX:AOTCache=<…>.daemon.aot`, když je `.ready` v pořádku.
+- **Souběh prvních volání.** Trénink drží zámek vytvořený výlučně (`.lock`; pid a role, starý nebo mrtvý držitel se po 30 s / 20 min přebere) a druhý výlučný soubor `.trainer`, protože `DetachedStart` umí proces na Windows
+  spustit dvakrát (záloha, když nepřečte odpověď): dvě souběžná spuštění by jinak dělala dva tréninky (zjištěno testem). `codeloupe stop` ukončí běžící trénink podle zámků v home (JDK na Windows nečte příkazový řádek cizího procesu,
+  trénink se pozná podle toho, co o sobě zapsal: pid, role a čas startu). Neúspěch se pamatuje v `.failed` 6 h.
+- **Nález, který změnil návrh: dynamický archiv se dvěma souběžnými prvními voláními rozbije další JVM.** Dva `java -XX:+AutoCreateSharedArchive` na jeden soubor (to, co launchery dělaly) nechaly roztržený archiv a následující
+  volání skončilo pádem JVM (`EXCEPTION_ACCESS_VIOLATION`, `bundle-smoke` s dvěma prvními voláními naráz). Skripty proto dynamický archiv už nevytvářejí: dokud AOT cache není (≈ 20 s po prvním startu daemona), volání jedou na archivu JDK
+  (≈ 0,3 s místo 0,19 s), první volání je o ~1,3 s rychlejší než dřív, protože na konci nic nedumpuje. Trénink po úspěchu smaže staré `cds/<instalace>-<build>.jsa`.
+- **Platnost.** JVM cache, kterou nemůže použít, mlčky ignoruje a běží bez ní (výstup beze slova, exit 0): useknutý, prázdný a zaplněný soubor, chybějící soubor, cache jiného JDK. Přesunutá kopie instalace (jiná cesta i časy souborů) a jar
+  s jiným časem změny **cache dál používají** (172 ms proti 298 bez ní; JBR 25.0.3 i OpenJDK 25.0.1), takže přesun ani rozbalení instalátorem nic nerozbije; nová instalace v jiném adresáři má vlastní klíč a vlastní trénink.
+  Ruční přepsání bajtů uprostřed souboru JVM shodí (JVM cache bez `-XX:+VerifySharedSpaces` neověřuje): u souborů, které vznikají atomickým přejmenováním dokončeného souboru, to nenastává. `.ready` s jiným běhovým ID JVM (výměna runtime
+  pod stejným jarem) cache pro daemona vyřadí a trénink ji vyrobí znovu.
+- **Měření** (Windows 11, runtime z bundlu JBR 25.0.3, drobný repozitář, stroj zatížený ostatními okny; medián z 10–12 volání, střídavě): CLI `find` **bez archivu 302–322 ms, dynamický archiv 182–213 ms, AOT 135–142 ms**
+  (`bundle-smoke --aot`: 318 / 187 / 148, tj. **−21 %** proti dynamickému; další běhy −23 % a −25 %); cache 22,2 MB (CLI) a 51,1 MB (daemon). Vytvoření: nahrání daemona ~4 s a zastavení 0,9 s, vytvoření CLI cache 1,1 s a daemona 1,3 s;
+  `aotReadySeconds` 20–23 (z toho 10 s čekání). Start daemona do naslouchání **1 031 → 559 ms (−46 %)** (medián ze 6), RSS po čtyřech dotazech 118 → 115 MB; `tools/rss-mix.mjs` (50 dotazů, 3 série střídavě) 147 / 144 / 142 MB bez cache
+  proti 144 / 145 / 147 s cache, tedy v šumu. `codeloupe stop` 264–291 ms (beze změny). Vestavěné jednorázové vytvoření uvnitř prvního volání bylo horší: +2,7 s a JVM píše hlášky na stdout i s `-Xlog:disable`, proto se trénuje zvlášť.
+- **Mimo rozsah**: desktopová aplikace spouští přibalený jar přímo, ne launcherem, takže její daemon cache nepoužije (její `stop` trénink ukončí); parse worker a build worker jsou další JVM a cache nemají.
+- **Testy**: `AotCachesTest`, `AotLockTest` (souběh, mrtvý a starý držitel, `cancel` jen trénink a ne cizí pid), `AotLauncherTest` (jeden trénink pro dvanáct souběžných startů, hotovo / selhání / více cest), `LauncherScriptsTest` (příznaky skriptů
+  a `CliJvm` stejné, žádný `-Xshare` ani dump archivu), `AotTrainingTest` (skutečné JVM na instalovaných jarech: dvě první volání naráz, jeden trénink, jeden čistý pár cache, volání s cache z přesunuté kopie, s poškozenými soubory a daemon s cache
+  i s poškozenou); `tools/bundle-smoke.mjs --aot` v CI na třech OS a v jobu `bundle`.
 
 ## 10. Rizika
 

@@ -228,7 +228,7 @@ jobs:
         run: |
           dir=$(ls -d build/bundle/codeloupe-*/ | head -n 1)
           zip=$(ls build/distributions/codeloupe-*.zip | head -n 1)
-          node tools/bundle-smoke.mjs "$dir" --zip "$zip" --out bundle-report.json
+          node tools/bundle-smoke.mjs "$dir" --zip "$zip" --out bundle-report.json --aot
           {
             echo "### Bundle ${{ matrix.os }}"
             echo '```json'

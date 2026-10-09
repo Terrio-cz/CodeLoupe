@@ -1,6 +1,7 @@
 package codeloupe.cli
 
 import codeloupe.CodeLoupe
+import codeloupe.aot.AotCaches
 import codeloupe.JsonFormat
 import codeloupe.config.Config
 import codeloupe.config.PortPolicy
@@ -33,7 +34,8 @@ class DaemonClient(private val config: Config) {
         // Its own home as working directory: the daemon outlives the CLI and must not hold the user's directory.
         val args = listOf("daemon", "--detached", "--home", config.home.toString(), "--port", config.port.toString()) +
             config.defaultRoot?.let { listOf("--root", it) }.orEmpty()
-        DetachedStart.start(JavaProcess.command(MAIN_CLASS, DaemonJvm.args(parsesHere = config.parseWorkerIdleSeconds <= 0), args), config.home)
+        val jvm = DaemonJvm.args(parsesHere = config.parseWorkerIdleSeconds <= 0) + AotCaches.fromProperty()?.daemonFlags().orEmpty()
+        DetachedStart.start(JavaProcess.command(MAIN_CLASS, jvm, args), config.home)
         repeat(80) {
             Thread.sleep(100)
             status(300)?.let { return checkedHome(it) }
