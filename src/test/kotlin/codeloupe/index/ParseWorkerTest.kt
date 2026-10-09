@@ -49,8 +49,8 @@ class ParseWorkerTest {
         ParseWorkerClient(idleSeconds = 2).use { client ->
             assertNotNull(client.extract("src/Billing.kt", kotlinSource))
             val first = client.pid!!
-            assertTrue(waitUntil { ProcessHandle.of(first).isEmpty }, "it ended after 2 idle seconds")
-            assertNull(client.pid)
+            // Wait on the client's own view: on Windows a lookup by pid reports a terminating process as gone before its Process handle reports the exit.
+            assertTrue(waitUntil { client.pid == null }, "it ended after 2 idle seconds")
             assertNotNull(client.extract("src/Billing.kt", kotlinSource))
             assertNotEquals(first, client.pid)
         }
