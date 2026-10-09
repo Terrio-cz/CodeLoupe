@@ -22,18 +22,18 @@ divided by 3.16; method and every row in [docs/benchmarks.md](https://github.com
 | Outline of a file | `outline` | 206 | 615 | 197 |
 | Who uses a type | `usages` | 560 | 2,997 | 626 |
 | Who calls a member | `calls` | 169 | 1,352 | 286 |
-| Subtypes of a type | `hierarchy` | 127 | 464 | 102 |
+| Subtypes of a type | `hierarchy` | 59 | 464 | 102 |
 | Text search, 30 hits | `grep` | 1,298 | n/a | 1,497 |
-| What a branch changed | `changes` | 2,938 | 79,728 | 2,247 |
+| What a branch changed | `changes` | 2,423 | 79,728 | 2,247 |
 
 *grep + read* is what an agent without an index typically does: `rg` with context lines, a whole-file read, the full
 `git diff`. *grep, minimal* is a best case that assumes the agent never reads a line it does not need (for source
 lookups it is given the exact line range, for the branch `git diff --stat`). Against grep + read, CodeLoupe's answers
-are 4–41 % of the size (8 % summed over all questions) and take one call where grep needs two for source lookups.
-Against the best case they are about the same for source lookups and outlines, smaller for usages and callers, and
-larger for subtypes and branch changes: CodeLoupe returns more per line (the type itself and its direct supertypes, the
-enclosing declaration of every hit, exact against candidate marks, callers and tests of every changed declaration
-that was not added), and `git diff --stat` says less.
+are 3–41 % of the size (8 % summed over all questions) and take one call where grep needs two for source lookups.
+Against the best case they are about the same for source lookups, outlines and branch changes (8 % more), and smaller
+for usages, callers and subtypes. The default answers are compact: `hierarchy` lists the direct subtypes and `changes` the
+changed declarations; supertypes (`supers=true`, `deep=true` for transitive links) and the callers and tests of each
+changed declaration (`callers=true`) are one more parameter away.
 
 Beyond navigation, and not part of the benchmark: worktrees of one repository share one index and each adds only its own
 edits; long commands run in the daemon so an agent's turn can end ([Jobs and events](Jobs-and-events)); a tracker mirror
@@ -46,7 +46,7 @@ answers issue reads locally; `codeloupe metrics` shows from Claude Code transcri
 [GitNexus](https://github.com/abhigyanpatwari/GitNexus) over public repositories at pinned commits
 (`JetBrains/Exposed` `023a6a3`, 319 Kotlin files without tests; CodeLoupe `f370022`, 457 files), and writes
 [docs/benchmarks.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/docs/benchmarks.md), [docs/benchmarks.json](https://github.com/Terrio-cz/CodeLoupe/blob/main/docs/benchmarks.json) and the chart below. Run of
-2026-10-08 on Windows 11, i7-13700F, 64 GB, CodeLoupe 0.1.0 (commit `b2a695e`), `gitnexus@1.6.12` from npm.
+2026-10-09 on Windows 11, i7-13700F, 64 GB, CodeLoupe 0.1.0 (commit `38eab82`), `gitnexus@1.6.12` from npm.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Terrio-cz/CodeLoupe/main/docs/benchmarks-dark.svg">
@@ -57,14 +57,14 @@ Tokens read per question, median over 15–16 questions of each kind (2 for the 
 
 | Task | CodeLoupe | GitNexus | grep + read | grep, minimal |
 |---|---:|---:|---:|---:|
-| Read a type | 326 | 2,021 | 789 | 322 |
-| Read a member | 117 | 938 | 1,746 | 118 |
+| Read a type | 326 | 1,962 | 789 | 322 |
+| Read a member | 117 | 848 | 1,746 | 118 |
 | Outline of a file | 206 | n/a | 615 | 197 |
-| Who uses a type | 560 | 1,601 | 2,997 | 626 |
-| Who calls a member | 169 | 726 | 1,352 | 286 |
-| Subtypes of a type | 127 | 1,412 | 464 | 102 |
+| Who uses a type | 560 | 1,542 | 2,997 | 626 |
+| Who calls a member | 169 | 666 | 1,352 | 286 |
+| Subtypes of a type | 59 | 1,352 | 464 | 102 |
 | Text search, 30 hits | 1,298 | n/a | n/a | 1,497 |
-| What a branch changed | 2,938 | 21,769 | 79,728 | 2,247 |
+| What a branch changed | 2,423 | 21,740 | 79,728 | 2,247 |
 
 GitNexus 1.6.12 has no outline or text-search tool, so those rows are `n/a`. Its `context` answers are JSON cards (callers,
 callees, process membership), not the same content as CodeLoupe's, so the comparison is of what is read, not of what is
@@ -77,7 +77,7 @@ Same run:
 
 | | CodeLoupe | GitNexus |
 |---|---:|---:|
-| Tool definitions in the agent's context (`tools/list`) | 13 tools, 3,749 tokens | 17 tools, 22,140 tokens |
+| Tool definitions in the agent's context (`tools/list`) | 14 tools, 4,223 tokens | 17 tools, 22,140 tokens |
 | First index, Exposed / CodeLoupe | 7.3 s / 2.7 s | 128 s / 68 s |
 | Peak memory while indexing, Exposed | 517 MB | 2,583 MB |
 | Memory after the queries | 206 MB daemon, both repositories | 3,325 MB MCP server after 82 queries (114 MB at start) |

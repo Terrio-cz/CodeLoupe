@@ -13,7 +13,7 @@ With a tracker configured it also mirrors your issues (YouTrack first) and answe
 
 An agent working on a Kotlin repository keeps asking where something is declared, what a file contains, who uses or calls
 it and what its branch changed. Without an index it answers with `rg` and whole-file reads; CodeLoupe answers each question
-with one call. Over two public repositories its answers are 4-41 % of the size of grep plus reading (8 % summed over all
+with one call. Over two public repositories its answers are 3-41 % of the size of grep plus reading (8 % summed over all
 questions), measured, not estimated ([Benchmarks](https://github.com/Terrio-cz/CodeLoupe/wiki/Benchmarks)):
 
 <picture>

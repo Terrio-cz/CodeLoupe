@@ -1,6 +1,6 @@
 {
  "meta": {
-  "date": "2026-10-08",
+  "date": "2026-10-09",
   "machine": {
    "os": "Windows_NT 10.0.26200",
    "cpu": "13th Gen Intel(R) Core(TM) i7-13700F",
@@ -13,11 +13,11 @@
    "git": "git version 2.51.0.windows.1"
   },
   "codeloupe": {
-   "sha": "815671eae397b32f4e52ef775a83447eaf78bee7",
+   "sha": "38eab828b96777fa344e48f8e5461076e24c5150",
    "dirty": false,
    "version": "0.1.0",
    "home": "throwaway (--work)",
-   "port": 47665
+   "port": 47650
   },
   "baselines": {
    "minimal": "rg lines only (rg -n -w, rg -n for source: plus the exact declaration lines, as if the agent knew the range); git diff --stat for the branch",
@@ -72,7 +72,7 @@
     "tokens": 499,
     "lines": 46,
     "calls": 2,
-    "ms": 595.7,
+    "ms": 629.5,
     "hits": 1
    },
    "typical": {
@@ -80,24 +80,24 @@
     "tokens": 662,
     "lines": 66,
     "calls": 2,
-    "ms": 596.1
+    "ms": 629.9
    },
    "codeloupe": {
     "chars": 1563,
     "tokens": 495,
     "lines": 46,
     "calls": 1,
-    "ms": 16.9,
+    "ms": 11.9,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4781,
-    "tokens": 1513,
+    "chars": 4593,
+    "tokens": 1454,
     "lines": 68,
     "calls": 1,
-    "ms": 213.5,
+    "ms": 197.8,
     "answered": true
    }
   },
@@ -110,7 +110,7 @@
     "tokens": 1403,
     "lines": 101,
     "calls": 2,
-    "ms": 590,
+    "ms": 629,
     "hits": 1
    },
    "typical": {
@@ -118,24 +118,24 @@
     "tokens": 4450,
     "lines": 331,
     "calls": 2,
-    "ms": 590.4
+    "ms": 629.5
    },
    "codeloupe": {
     "chars": 4314,
     "tokens": 1366,
     "lines": 101,
     "calls": 1,
-    "ms": 16.3,
+    "ms": 11.7,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 21913,
-    "tokens": 6935,
+    "chars": 21725,
+    "tokens": 6875,
     "lines": 348,
     "calls": 1,
-    "ms": 217.7,
+    "ms": 242.7,
     "answered": true
    }
   },
@@ -148,7 +148,7 @@
     "tokens": 142,
     "lines": 11,
     "calls": 2,
-    "ms": 590.3,
+    "ms": 607.9,
     "hits": 1
    },
    "typical": {
@@ -156,24 +156,24 @@
     "tokens": 23394,
     "lines": 1903,
     "calls": 2,
-    "ms": 590.8
+    "ms": 608.5
    },
    "codeloupe": {
     "chars": 477,
     "tokens": 151,
     "lines": 11,
     "calls": 1,
-    "ms": 11.3,
+    "ms": 12.2,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 11863,
-    "tokens": 3755,
+    "chars": 11675,
+    "tokens": 3695,
     "lines": 210,
     "calls": 1,
-    "ms": 269.5,
+    "ms": 299.1,
     "answered": true
    }
   },
@@ -186,7 +186,7 @@
     "tokens": 279,
     "lines": 22,
     "calls": 2,
-    "ms": 580.8,
+    "ms": 613.4,
     "hits": 1
    },
    "typical": {
@@ -194,24 +194,24 @@
     "tokens": 1123,
     "lines": 101,
     "calls": 2,
-    "ms": 581.2
+    "ms": 613.8
    },
    "codeloupe": {
     "chars": 912,
     "tokens": 289,
     "lines": 22,
     "calls": 1,
-    "ms": 14.8,
+    "ms": 9.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 5249,
-    "tokens": 1662,
+    "chars": 5061,
+    "tokens": 1602,
     "lines": 88,
     "calls": 1,
-    "ms": 227.6,
+    "ms": 215,
     "answered": true
    }
   },
@@ -224,7 +224,7 @@
     "tokens": 193,
     "lines": 17,
     "calls": 2,
-    "ms": 592.2,
+    "ms": 560,
     "hits": 1
    },
    "typical": {
@@ -232,24 +232,24 @@
     "tokens": 9248,
     "lines": 748,
     "calls": 2,
-    "ms": 592.5
+    "ms": 560.3
    },
    "codeloupe": {
     "chars": 626,
     "tokens": 199,
     "lines": 17,
     "calls": 1,
-    "ms": 16.5,
+    "ms": 8.9,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 18109,
-    "tokens": 5731,
+    "chars": 17921,
+    "tokens": 5672,
     "lines": 325,
     "calls": 1,
-    "ms": 302.9,
+    "ms": 195.7,
     "answered": true
    }
   },
@@ -262,7 +262,7 @@
     "tokens": 608,
     "lines": 43,
     "calls": 2,
-    "ms": 568.9,
+    "ms": 605,
     "hits": 1
    },
    "typical": {
@@ -270,24 +270,24 @@
     "tokens": 645,
     "lines": 48,
     "calls": 2,
-    "ms": 569.3
+    "ms": 605.5
    },
    "codeloupe": {
     "chars": 1920,
     "tokens": 608,
     "lines": 43,
     "calls": 1,
-    "ms": 15.7,
+    "ms": 9.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 5956,
-    "tokens": 1885,
+    "chars": 5768,
+    "tokens": 1826,
     "lines": 102,
     "calls": 1,
-    "ms": 268,
+    "ms": 225.1,
     "answered": true
    }
   },
@@ -300,7 +300,7 @@
     "tokens": 168,
     "lines": 15,
     "calls": 2,
-    "ms": 587.4,
+    "ms": 652.5,
     "hits": 1
    },
    "typical": {
@@ -308,24 +308,24 @@
     "tokens": 1971,
     "lines": 197,
     "calls": 2,
-    "ms": 588
+    "ms": 652.9
    },
    "codeloupe": {
     "chars": 527,
     "tokens": 167,
     "lines": 15,
     "calls": 1,
-    "ms": 15.8,
+    "ms": 9.9,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 13551,
-    "tokens": 4289,
+    "chars": 13363,
+    "tokens": 4229,
     "lines": 233,
     "calls": 1,
-    "ms": 293.3,
+    "ms": 242.5,
     "answered": true
    }
   },
@@ -338,7 +338,7 @@
     "tokens": 504,
     "lines": 41,
     "calls": 2,
-    "ms": 575.4,
+    "ms": 618.7,
     "hits": 1
    },
    "typical": {
@@ -346,24 +346,24 @@
     "tokens": 23394,
     "lines": 1903,
     "calls": 2,
-    "ms": 575.9
+    "ms": 619.2
    },
    "codeloupe": {
     "chars": 1596,
     "tokens": 506,
     "lines": 41,
     "calls": 1,
-    "ms": 15.8,
+    "ms": 10,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 15586,
-    "tokens": 4933,
+    "chars": 15398,
+    "tokens": 4873,
     "lines": 261,
     "calls": 1,
-    "ms": 207.5,
+    "ms": 212.5,
     "answered": true
    }
   },
@@ -376,7 +376,7 @@
     "tokens": 172,
     "lines": 8,
     "calls": 2,
-    "ms": 572.2,
+    "ms": 560,
     "hits": 1
    },
    "typical": {
@@ -384,24 +384,24 @@
     "tokens": 3351,
     "lines": 238,
     "calls": 2,
-    "ms": 572.7
+    "ms": 560.4
    },
    "codeloupe": {
     "chars": 511,
     "tokens": 162,
     "lines": 8,
     "calls": 1,
-    "ms": 14.7,
+    "ms": 9.8,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1397,
-    "tokens": 443,
+    "chars": 1209,
+    "tokens": 383,
     "lines": 33,
     "calls": 1,
-    "ms": 156.8,
+    "ms": 148.3,
     "answered": true
    }
   },
@@ -414,7 +414,7 @@
     "tokens": 762,
     "lines": 45,
     "calls": 2,
-    "ms": 615.9,
+    "ms": 647.7,
     "hits": 1
    },
    "typical": {
@@ -422,24 +422,24 @@
     "tokens": 10718,
     "lines": 667,
     "calls": 2,
-    "ms": 616.5
+    "ms": 648.2
    },
    "codeloupe": {
     "chars": 2373,
     "tokens": 751,
     "lines": 45,
     "calls": 1,
-    "ms": 16.1,
+    "ms": 9.1,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4085,
-    "tokens": 1293,
+    "chars": 3897,
+    "tokens": 1234,
     "lines": 48,
     "calls": 1,
-    "ms": 138.4,
+    "ms": 214.9,
     "answered": true
    }
   },
@@ -452,7 +452,7 @@
     "tokens": 238,
     "lines": 16,
     "calls": 2,
-    "ms": 609.7,
+    "ms": 687.5,
     "hits": 1
    },
    "typical": {
@@ -460,24 +460,24 @@
     "tokens": 10722,
     "lines": 667,
     "calls": 2,
-    "ms": 610.5
+    "ms": 688
    },
    "codeloupe": {
     "chars": 716,
     "tokens": 227,
     "lines": 16,
     "calls": 1,
-    "ms": 14.8,
+    "ms": 8.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1776,
-    "tokens": 563,
+    "chars": 1588,
+    "tokens": 503,
     "lines": 33,
     "calls": 1,
-    "ms": 156.8,
+    "ms": 206.7,
     "answered": true
    }
   },
@@ -490,7 +490,7 @@
     "tokens": 75,
     "lines": 3,
     "calls": 2,
-    "ms": 656.5,
+    "ms": 593.1,
     "hits": 1
    },
    "typical": {
@@ -498,24 +498,24 @@
     "tokens": 3335,
     "lines": 238,
     "calls": 2,
-    "ms": 657.2
+    "ms": 593.5
    },
    "codeloupe": {
     "chars": 265,
     "tokens": 84,
     "lines": 3,
     "calls": 1,
-    "ms": 12.2,
+    "ms": 9.7,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1844,
-    "tokens": 584,
+    "chars": 1656,
+    "tokens": 525,
     "lines": 44,
     "calls": 1,
-    "ms": 148.1,
+    "ms": 208.6,
     "answered": true
    }
   },
@@ -528,7 +528,7 @@
     "tokens": 91,
     "lines": 3,
     "calls": 2,
-    "ms": 664.8,
+    "ms": 592.5,
     "hits": 1
    },
    "typical": {
@@ -536,24 +536,24 @@
     "tokens": 1656,
     "lines": 119,
     "calls": 2,
-    "ms": 665.4
+    "ms": 593
    },
    "codeloupe": {
     "chars": 294,
     "tokens": 94,
     "lines": 3,
     "calls": 1,
-    "ms": 14.8,
+    "ms": 9.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1419,
-    "tokens": 450,
+    "chars": 1231,
+    "tokens": 390,
     "lines": 33,
     "calls": 1,
-    "ms": 143.5,
+    "ms": 202.7,
     "answered": true
    }
   },
@@ -566,7 +566,7 @@
     "tokens": 102,
     "lines": 5,
     "calls": 2,
-    "ms": 632.7,
+    "ms": 691.7,
     "hits": 1
    },
    "typical": {
@@ -574,24 +574,24 @@
     "tokens": 33397,
     "lines": 2310,
     "calls": 2,
-    "ms": 633.1
+    "ms": 692.3
    },
    "codeloupe": {
     "chars": 327,
     "tokens": 104,
     "lines": 5,
     "calls": 1,
-    "ms": 13.7,
+    "ms": 8.8,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2172,
-    "tokens": 688,
+    "chars": 1984,
+    "tokens": 628,
     "lines": 52,
     "calls": 1,
-    "ms": 144.6,
+    "ms": 206.6,
     "answered": true
    }
   },
@@ -604,7 +604,7 @@
     "tokens": 114,
     "lines": 4,
     "calls": 2,
-    "ms": 574.7,
+    "ms": 619.7,
     "hits": 1
    },
    "typical": {
@@ -612,24 +612,24 @@
     "tokens": 3207,
     "lines": 200,
     "calls": 2,
-    "ms": 575
+    "ms": 620.2
    },
    "codeloupe": {
     "chars": 358,
     "tokens": 114,
     "lines": 4,
     "calls": 1,
-    "ms": 14,
+    "ms": 7.8,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 5312,
-    "tokens": 1682,
+    "chars": 5124,
+    "tokens": 1622,
     "lines": 138,
     "calls": 1,
-    "ms": 134.9,
+    "ms": 195.4,
     "answered": true
    }
   },
@@ -642,7 +642,7 @@
     "tokens": 132,
     "lines": 8,
     "calls": 2,
-    "ms": 804.2,
+    "ms": 596.2,
     "hits": 1
    },
    "typical": {
@@ -650,24 +650,24 @@
     "tokens": 1835,
     "lines": 138,
     "calls": 2,
-    "ms": 804.6
+    "ms": 596.8
    },
    "codeloupe": {
     "chars": 574,
     "tokens": 182,
     "lines": 10,
     "calls": 1,
-    "ms": 14,
+    "ms": 8.9,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2668,
-    "tokens": 845,
+    "chars": 2480,
+    "tokens": 785,
     "lines": 58,
     "calls": 1,
-    "ms": 185.9,
+    "ms": 180.8,
     "answered": true
    }
   },
@@ -680,7 +680,7 @@
     "tokens": 197,
     "lines": 12,
     "calls": 1,
-    "ms": 23.1,
+    "ms": 25.6,
     "hits": 0
    },
    "typical": {
@@ -695,7 +695,7 @@
     "tokens": 200,
     "lines": 12,
     "calls": 1,
-    "ms": 14.1,
+    "ms": 8.7,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -711,7 +711,7 @@
     "tokens": 1304,
     "lines": 60,
     "calls": 1,
-    "ms": 27.6,
+    "ms": 24.7,
     "hits": 0
    },
    "typical": {
@@ -726,7 +726,7 @@
     "tokens": 1211,
     "lines": 59,
     "calls": 1,
-    "ms": 11.4,
+    "ms": 9,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -742,7 +742,7 @@
     "tokens": 6622,
     "lines": 343,
     "calls": 1,
-    "ms": 22.3,
+    "ms": 24.7,
     "hits": 0
    },
    "typical": {
@@ -757,7 +757,7 @@
     "tokens": 5677,
     "lines": 303,
     "calls": 1,
-    "ms": 15.9,
+    "ms": 15.7,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -773,7 +773,7 @@
     "tokens": 174,
     "lines": 13,
     "calls": 1,
-    "ms": 22.1,
+    "ms": 24.6,
     "hits": 0
    },
    "typical": {
@@ -788,7 +788,7 @@
     "tokens": 206,
     "lines": 13,
     "calls": 1,
-    "ms": 11.2,
+    "ms": 7.8,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -804,7 +804,7 @@
     "tokens": 2611,
     "lines": 141,
     "calls": 1,
-    "ms": 21,
+    "ms": 24.3,
     "hits": 0
    },
    "typical": {
@@ -819,7 +819,7 @@
     "tokens": 3352,
     "lines": 140,
     "calls": 1,
-    "ms": 12,
+    "ms": 10.9,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -835,7 +835,7 @@
     "tokens": 148,
     "lines": 10,
     "calls": 1,
-    "ms": 17.8,
+    "ms": 25.1,
     "hits": 0
    },
    "typical": {
@@ -843,14 +843,14 @@
     "tokens": 613,
     "lines": 47,
     "calls": 1,
-    "ms": 0.4
+    "ms": 0.5
    },
    "codeloupe": {
     "chars": 850,
     "tokens": 269,
     "lines": 10,
     "calls": 1,
-    "ms": 11.2,
+    "ms": 8.4,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -866,7 +866,7 @@
     "tokens": 950,
     "lines": 45,
     "calls": 1,
-    "ms": 20.3,
+    "ms": 23.3,
     "hits": 0
    },
    "typical": {
@@ -874,14 +874,14 @@
     "tokens": 1917,
     "lines": 196,
     "calls": 1,
-    "ms": 0.4
+    "ms": 0.5
    },
    "codeloupe": {
     "chars": 2367,
     "tokens": 750,
     "lines": 45,
     "calls": 1,
-    "ms": 12.1,
+    "ms": 8.5,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -897,7 +897,7 @@
     "tokens": 552,
     "lines": 10,
     "calls": 1,
-    "ms": 593.5,
+    "ms": 592.2,
     "hits": 9
    },
    "typical": {
@@ -905,24 +905,24 @@
     "tokens": 3019,
     "lines": 71,
     "calls": 1,
-    "ms": 593.8
+    "ms": 598.9
    },
    "codeloupe": {
     "chars": 1214,
     "tokens": 385,
     "lines": 15,
     "calls": 1,
-    "ms": 18.9,
+    "ms": 9.9,
     "answered": true,
     "exact": 5,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 3377,
-    "tokens": 1069,
+    "chars": 3189,
+    "tokens": 1010,
     "lines": 61,
     "calls": 1,
-    "ms": 217.9,
+    "ms": 224.9,
     "answered": true
    }
   },
@@ -935,7 +935,7 @@
     "tokens": 1379,
     "lines": 29,
     "calls": 1,
-    "ms": 647.7,
+    "ms": 674,
     "hits": 28
    },
    "typical": {
@@ -943,24 +943,24 @@
     "tokens": 6962,
     "lines": 189,
     "calls": 1,
-    "ms": 644.1
+    "ms": 580.8
    },
    "codeloupe": {
     "chars": 2816,
     "tokens": 892,
     "lines": 44,
     "calls": 1,
-    "ms": 14.6,
+    "ms": 18.3,
     "answered": true,
     "exact": 21,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 17658,
-    "tokens": 5588,
+    "chars": 17470,
+    "tokens": 5529,
     "lines": 341,
     "calls": 1,
-    "ms": 205.8,
+    "ms": 257,
     "answered": true
    }
   },
@@ -973,7 +973,7 @@
     "tokens": 682,
     "lines": 15,
     "calls": 1,
-    "ms": 745.2,
+    "ms": 611.3,
     "hits": 14
    },
    "typical": {
@@ -981,24 +981,24 @@
     "tokens": 3913,
     "lines": 105,
     "calls": 1,
-    "ms": 589.1
+    "ms": 595
    },
    "codeloupe": {
     "chars": 2115,
     "tokens": 670,
     "lines": 30,
     "calls": 1,
-    "ms": 11.7,
+    "ms": 13.1,
     "answered": true,
     "exact": 10,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 11459,
-    "tokens": 3627,
+    "chars": 11271,
+    "tokens": 3567,
     "lines": 203,
     "calls": 1,
-    "ms": 266.1,
+    "ms": 225.5,
     "answered": true
    }
   },
@@ -1011,7 +1011,7 @@
     "tokens": 2029,
     "lines": 36,
     "calls": 1,
-    "ms": 661,
+    "ms": 566.2,
     "hits": 35
    },
    "typical": {
@@ -1019,24 +1019,24 @@
     "tokens": 11304,
     "lines": 265,
     "calls": 1,
-    "ms": 567.2
+    "ms": 598.8
    },
    "codeloupe": {
     "chars": 4544,
     "tokens": 1438,
     "lines": 59,
     "calls": 1,
-    "ms": 12,
+    "ms": 12.1,
     "answered": true,
     "exact": 25,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 4541,
-    "tokens": 1438,
+    "chars": 4353,
+    "tokens": 1378,
     "lines": 81,
     "calls": 1,
-    "ms": 218.7,
+    "ms": 246,
     "answered": true
    }
   },
@@ -1049,7 +1049,7 @@
     "tokens": 4946,
     "lines": 84,
     "calls": 1,
-    "ms": 590.3,
+    "ms": 570.8,
     "hits": 83
    },
    "typical": {
@@ -1057,24 +1057,24 @@
     "tokens": 19704,
     "lines": 480,
     "calls": 1,
-    "ms": 590.1
+    "ms": 587.9
    },
    "codeloupe": {
     "chars": 5526,
     "tokens": 1749,
     "lines": 64,
     "calls": 1,
-    "ms": 12.6,
+    "ms": 12.7,
     "answered": true,
     "exact": 77,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 17527,
-    "tokens": 5547,
+    "chars": 17339,
+    "tokens": 5488,
     "lines": 318,
     "calls": 1,
-    "ms": 205.2,
+    "ms": 267.6,
     "answered": true
    }
   },
@@ -1087,7 +1087,7 @@
     "tokens": 251,
     "lines": 6,
     "calls": 1,
-    "ms": 561.4,
+    "ms": 584.5,
     "hits": 5
    },
    "typical": {
@@ -1095,24 +1095,24 @@
     "tokens": 1506,
     "lines": 40,
     "calls": 1,
-    "ms": 610.3
+    "ms": 567.9
    },
    "codeloupe": {
     "chars": 639,
     "tokens": 203,
     "lines": 5,
     "calls": 1,
-    "ms": 10.1,
+    "ms": 7.3,
     "answered": true,
     "exact": 1,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 4655,
-    "tokens": 1474,
+    "chars": 4467,
+    "tokens": 1414,
     "lines": 95,
     "calls": 1,
-    "ms": 242.2,
+    "ms": 262.1,
     "answered": true
    }
   },
@@ -1125,7 +1125,7 @@
     "tokens": 1138,
     "lines": 20,
     "calls": 1,
-    "ms": 546.8,
+    "ms": 620.2,
     "hits": 19
    },
    "typical": {
@@ -1133,24 +1133,24 @@
     "tokens": 5909,
     "lines": 136,
     "calls": 1,
-    "ms": 577.6
+    "ms": 611.9
    },
    "codeloupe": {
     "chars": 2544,
     "tokens": 806,
     "lines": 32,
     "calls": 1,
-    "ms": 13.1,
+    "ms": 9.8,
     "answered": true,
     "exact": 16,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 13139,
-    "tokens": 4158,
+    "chars": 12951,
+    "tokens": 4099,
     "lines": 226,
     "calls": 1,
-    "ms": 262.3,
+    "ms": 241.3,
     "answered": true
    }
   },
@@ -1163,7 +1163,7 @@
     "tokens": 272,
     "lines": 7,
     "calls": 1,
-    "ms": 560.4,
+    "ms": 644.4,
     "hits": 6
    },
    "typical": {
@@ -1171,24 +1171,24 @@
     "tokens": 1641,
     "lines": 48,
     "calls": 1,
-    "ms": 559.1
+    "ms": 586.2
    },
    "codeloupe": {
     "chars": 957,
     "tokens": 303,
     "lines": 14,
     "calls": 1,
-    "ms": 13.1,
+    "ms": 9,
     "answered": true,
     "exact": 4,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 14057,
-    "tokens": 4449,
+    "chars": 13869,
+    "tokens": 4389,
     "lines": 254,
     "calls": 1,
-    "ms": 214.9,
+    "ms": 237.6,
     "answered": true
    }
   },
@@ -1201,7 +1201,7 @@
     "tokens": 231,
     "lines": 5,
     "calls": 1,
-    "ms": 520.3,
+    "ms": 664.8,
     "hits": 4
    },
    "typical": {
@@ -1209,24 +1209,24 @@
     "tokens": 1334,
     "lines": 32,
     "calls": 1,
-    "ms": 620.3
+    "ms": 611.7
    },
    "codeloupe": {
     "chars": 705,
     "tokens": 224,
     "lines": 4,
     "calls": 1,
-    "ms": 11.2,
+    "ms": 8.6,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1160,
-    "tokens": 368,
+    "chars": 972,
+    "tokens": 308,
     "lines": 26,
     "calls": 1,
-    "ms": 182,
+    "ms": 171.8,
     "answered": true
    }
   },
@@ -1239,7 +1239,7 @@
     "tokens": 231,
     "lines": 6,
     "calls": 1,
-    "ms": 604.5,
+    "ms": 604.3,
     "hits": 5
    },
    "typical": {
@@ -1247,24 +1247,24 @@
     "tokens": 1370,
     "lines": 40,
     "calls": 1,
-    "ms": 508.7
+    "ms": 586.1
    },
    "codeloupe": {
     "chars": 1065,
     "tokens": 338,
     "lines": 5,
     "calls": 1,
-    "ms": 13.2,
+    "ms": 9.1,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1894,
-    "tokens": 600,
+    "chars": 1706,
+    "tokens": 540,
     "lines": 41,
     "calls": 1,
-    "ms": 193.5,
+    "ms": 184.6,
     "answered": true
    }
   },
@@ -1277,7 +1277,7 @@
     "tokens": 2150,
     "lines": 40,
     "calls": 1,
-    "ms": 615.2,
+    "ms": 694.1,
     "hits": 39
    },
    "typical": {
@@ -1285,24 +1285,24 @@
     "tokens": 9883,
     "lines": 252,
     "calls": 1,
-    "ms": 546.7
+    "ms": 592.3
    },
    "codeloupe": {
     "chars": 2242,
     "tokens": 710,
     "lines": 13,
     "calls": 1,
-    "ms": 12.3,
+    "ms": 9.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1232,
-    "tokens": 390,
+    "chars": 1044,
+    "tokens": 331,
     "lines": 26,
     "calls": 1,
-    "ms": 188.9,
+    "ms": 153.1,
     "answered": true
    }
   },
@@ -1315,7 +1315,7 @@
     "tokens": 273,
     "lines": 6,
     "calls": 1,
-    "ms": 620.5,
+    "ms": 593,
     "hits": 5
    },
    "typical": {
@@ -1323,24 +1323,24 @@
     "tokens": 909,
     "lines": 26,
     "calls": 1,
-    "ms": 558.3
+    "ms": 570.2
    },
    "codeloupe": {
     "chars": 452,
     "tokens": 144,
     "lines": 3,
     "calls": 1,
-    "ms": 10.4,
+    "ms": 9.1,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1660,
-    "tokens": 526,
+    "chars": 1472,
+    "tokens": 466,
     "lines": 37,
     "calls": 1,
-    "ms": 180.9,
+    "ms": 175.4,
     "answered": true
    }
   },
@@ -1353,7 +1353,7 @@
     "tokens": 130,
     "lines": 4,
     "calls": 1,
-    "ms": 570.9,
+    "ms": 567.7,
     "hits": 3
    },
    "typical": {
@@ -1361,24 +1361,24 @@
     "tokens": 832,
     "lines": 24,
     "calls": 1,
-    "ms": 531.2
+    "ms": 836.9
    },
    "codeloupe": {
     "chars": 448,
     "tokens": 142,
     "lines": 3,
     "calls": 1,
-    "ms": 10.1,
+    "ms": 8.8,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1210,
-    "tokens": 383,
+    "chars": 1022,
+    "tokens": 324,
     "lines": 26,
     "calls": 1,
-    "ms": 168.5,
+    "ms": 199.9,
     "answered": true
    }
   },
@@ -1391,7 +1391,7 @@
     "tokens": 186,
     "lines": 5,
     "calls": 1,
-    "ms": 521.2,
+    "ms": 644,
     "hits": 4
    },
    "typical": {
@@ -1399,24 +1399,24 @@
     "tokens": 1131,
     "lines": 32,
     "calls": 1,
-    "ms": 557.7
+    "ms": 598.9
    },
    "codeloupe": {
     "chars": 550,
     "tokens": 175,
     "lines": 4,
     "calls": 1,
-    "ms": 25.9,
+    "ms": 36.1,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1854,
-    "tokens": 587,
+    "chars": 1666,
+    "tokens": 528,
     "lines": 45,
     "calls": 1,
-    "ms": 172.9,
+    "ms": 142,
     "answered": true
    }
   },
@@ -1429,7 +1429,7 @@
     "tokens": 2180,
     "lines": 40,
     "calls": 1,
-    "ms": 557.8,
+    "ms": 596.5,
     "hits": 39
    },
    "typical": {
@@ -1437,24 +1437,24 @@
     "tokens": 11505,
     "lines": 294,
     "calls": 1,
-    "ms": 538.3
+    "ms": 649.7
    },
    "codeloupe": {
     "chars": 2140,
     "tokens": 678,
     "lines": 14,
     "calls": 1,
-    "ms": 10.4,
+    "ms": 10.1,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 5008,
-    "tokens": 1585,
+    "chars": 4820,
+    "tokens": 1526,
     "lines": 131,
     "calls": 1,
-    "ms": 173.6,
+    "ms": 122.4,
     "answered": true
    }
   },
@@ -1467,7 +1467,7 @@
     "tokens": 194,
     "lines": 4,
     "calls": 1,
-    "ms": 589.9,
+    "ms": 603.5,
     "hits": 3
    },
    "typical": {
@@ -1475,24 +1475,24 @@
     "tokens": 1025,
     "lines": 24,
     "calls": 1,
-    "ms": 579.6
+    "ms": 586.9
    },
    "codeloupe": {
     "chars": 510,
     "tokens": 162,
     "lines": 3,
     "calls": 1,
-    "ms": 10,
+    "ms": 8.8,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2355,
-    "tokens": 746,
+    "chars": 2167,
+    "tokens": 686,
     "lines": 51,
     "calls": 1,
-    "ms": 168.3,
+    "ms": 126.3,
     "answered": true
    }
   },
@@ -1505,7 +1505,7 @@
     "tokens": 95,
     "lines": 3,
     "calls": 1,
-    "ms": 571,
+    "ms": 589.9,
     "hits": 2
    },
    "typical": {
@@ -1513,24 +1513,24 @@
     "tokens": 714,
     "lines": 16,
     "calls": 1,
-    "ms": 575.9
+    "ms": 626.2
    },
    "codeloupe": {
-    "chars": 581,
-    "tokens": 184,
-    "lines": 6,
+    "chars": 309,
+    "tokens": 98,
+    "lines": 3,
     "calls": 1,
-    "ms": 8.6,
+    "ms": 8.5,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 3346,
-    "tokens": 1059,
+    "chars": 3158,
+    "tokens": 1000,
     "lines": 61,
     "calls": 1,
-    "ms": 228.5,
+    "ms": 182.9,
     "answered": true
    }
   },
@@ -1543,7 +1543,7 @@
     "tokens": 1084,
     "lines": 18,
     "calls": 1,
-    "ms": 565.7,
+    "ms": 602.6,
     "hits": 17
    },
    "typical": {
@@ -1551,24 +1551,24 @@
     "tokens": 5246,
     "lines": 136,
     "calls": 1,
-    "ms": 589.5
+    "ms": 587.2
    },
    "codeloupe": {
-    "chars": 6586,
-    "tokens": 2085,
-    "lines": 35,
+    "chars": 6346,
+    "tokens": 2009,
+    "lines": 32,
     "calls": 1,
-    "ms": 8.9,
+    "ms": 8.7,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 17527,
-    "tokens": 5547,
+    "chars": 17339,
+    "tokens": 5488,
     "lines": 318,
     "calls": 1,
-    "ms": 202.2,
+    "ms": 174.7,
     "answered": true
    }
   },
@@ -1581,7 +1581,7 @@
     "tokens": 49,
     "lines": 2,
     "calls": 1,
-    "ms": 621.4,
+    "ms": 599.3,
     "hits": 1
    },
    "typical": {
@@ -1589,24 +1589,24 @@
     "tokens": 294,
     "lines": 8,
     "calls": 1,
-    "ms": 550.9
+    "ms": 573.8
    },
    "codeloupe": {
-    "chars": 305,
-    "tokens": 97,
-    "lines": 5,
+    "chars": 161,
+    "tokens": 51,
+    "lines": 2,
     "calls": 1,
-    "ms": 11.3,
+    "ms": 8.2,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 8143,
-    "tokens": 2577,
+    "chars": 7955,
+    "tokens": 2518,
     "lines": 144,
     "calls": 1,
-    "ms": 183.9,
+    "ms": 196.1,
     "answered": true
    }
   },
@@ -1619,7 +1619,7 @@
     "tokens": 17730,
     "lines": 333,
     "calls": 1,
-    "ms": 530.7,
+    "ms": 628.2,
     "hits": 332
    },
    "typical": {
@@ -1627,24 +1627,24 @@
     "tokens": 102657,
     "lines": 2575,
     "calls": 1,
-    "ms": 578.9
+    "ms": 599.9
    },
    "codeloupe": {
-    "chars": 448,
-    "tokens": 142,
-    "lines": 4,
+    "chars": 335,
+    "tokens": 107,
+    "lines": 3,
     "calls": 1,
-    "ms": 9.5,
+    "ms": 8.1,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 13979,
-    "tokens": 4424,
+    "chars": 13791,
+    "tokens": 4365,
     "lines": 255,
     "calls": 1,
-    "ms": 169.2,
+    "ms": 164.4,
     "answered": true
    }
   },
@@ -1657,7 +1657,7 @@
     "tokens": 537,
     "lines": 11,
     "calls": 1,
-    "ms": 621.1,
+    "ms": 578.8,
     "hits": 10
    },
    "typical": {
@@ -1665,24 +1665,24 @@
     "tokens": 2090,
     "lines": 59,
     "calls": 1,
-    "ms": 564.9
+    "ms": 650.9
    },
    "codeloupe": {
-    "chars": 2499,
-    "tokens": 791,
-    "lines": 21,
+    "chars": 423,
+    "tokens": 134,
+    "lines": 5,
     "calls": 1,
-    "ms": 9.4,
+    "ms": 9,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 19686,
-    "tokens": 6230,
+    "chars": 19498,
+    "tokens": 6171,
     "lines": 373,
     "calls": 1,
-    "ms": 237.2,
+    "ms": 184.7,
     "answered": true
    }
   },
@@ -1695,7 +1695,7 @@
     "tokens": 97,
     "lines": 3,
     "calls": 1,
-    "ms": 621.9,
+    "ms": 564.7,
     "hits": 2
    },
    "typical": {
@@ -1703,24 +1703,24 @@
     "tokens": 274,
     "lines": 9,
     "calls": 1,
-    "ms": 629.1
+    "ms": 610.2
    },
    "codeloupe": {
-    "chars": 349,
-    "tokens": 111,
-    "lines": 6,
+    "chars": 176,
+    "tokens": 56,
+    "lines": 3,
     "calls": 1,
-    "ms": 9,
+    "ms": 7.6,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 12631,
-    "tokens": 3998,
+    "chars": 12443,
+    "tokens": 3938,
     "lines": 241,
     "calls": 1,
-    "ms": 189.4,
+    "ms": 172.3,
     "answered": true
    }
   },
@@ -1733,7 +1733,7 @@
     "tokens": 73,
     "lines": 2,
     "calls": 1,
-    "ms": 574.3,
+    "ms": 606.5,
     "hits": 1
    },
    "typical": {
@@ -1741,24 +1741,24 @@
     "tokens": 377,
     "lines": 8,
     "calls": 1,
-    "ms": 575.8
+    "ms": 567.2
    },
    "codeloupe": {
-    "chars": 469,
-    "tokens": 149,
-    "lines": 5,
+    "chars": 152,
+    "tokens": 49,
+    "lines": 2,
     "calls": 1,
-    "ms": 11.6,
+    "ms": 7.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 13620,
-    "tokens": 4311,
+    "chars": 13432,
+    "tokens": 4251,
     "lines": 211,
     "calls": 1,
-    "ms": 177.1,
+    "ms": 196,
     "answered": true
    }
   },
@@ -1771,7 +1771,7 @@
     "tokens": 54,
     "lines": 2,
     "calls": 1,
-    "ms": 612.5,
+    "ms": 646.4,
     "hits": 1
    },
    "typical": {
@@ -1779,24 +1779,24 @@
     "tokens": 287,
     "lines": 8,
     "calls": 1,
-    "ms": 593.2
+    "ms": 735.8
    },
    "codeloupe": {
-    "chars": 324,
-    "tokens": 103,
-    "lines": 5,
+    "chars": 177,
+    "tokens": 57,
+    "lines": 2,
     "calls": 1,
-    "ms": 9.3,
+    "ms": 7.3,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 8367,
-    "tokens": 2648,
+    "chars": 8179,
+    "tokens": 2589,
     "lines": 132,
     "calls": 1,
-    "ms": 209.5,
+    "ms": 188.9,
     "answered": true
    }
   },
@@ -1809,7 +1809,7 @@
     "tokens": 1500,
     "lines": 30,
     "calls": 1,
-    "ms": 626.5,
+    "ms": 609.7,
     "hits": 30
    },
    "typical": null,
@@ -1818,7 +1818,7 @@
     "tokens": 1655,
     "lines": 78,
     "calls": 1,
-    "ms": 22.6,
+    "ms": 33.2,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -1834,7 +1834,7 @@
     "tokens": 1540,
     "lines": 30,
     "calls": 1,
-    "ms": 581.5,
+    "ms": 609.5,
     "hits": 30
    },
    "typical": null,
@@ -1843,7 +1843,7 @@
     "tokens": 1461,
     "lines": 68,
     "calls": 1,
-    "ms": 26.9,
+    "ms": 42.1,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -1859,7 +1859,7 @@
     "tokens": 1637,
     "lines": 30,
     "calls": 1,
-    "ms": 572.6,
+    "ms": 605.8,
     "hits": 30
    },
    "typical": null,
@@ -1868,7 +1868,7 @@
     "tokens": 1341,
     "lines": 60,
     "calls": 1,
-    "ms": 31.9,
+    "ms": 43.1,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -1884,7 +1884,7 @@
     "tokens": 986,
     "lines": 30,
     "calls": 1,
-    "ms": 554,
+    "ms": 569.4,
     "hits": 30
    },
    "typical": null,
@@ -1893,7 +1893,7 @@
     "tokens": 1147,
     "lines": 65,
     "calls": 1,
-    "ms": 23.3,
+    "ms": 29.6,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -1909,7 +1909,7 @@
     "tokens": 2730,
     "lines": 139,
     "calls": 1,
-    "ms": 53.9,
+    "ms": 57.3,
     "hits": 0
    },
    "typical": {
@@ -1917,24 +1917,24 @@
     "tokens": 81467,
     "lines": 5656,
     "calls": 1,
-    "ms": 57.8
+    "ms": 62.7
    },
    "codeloupe": {
-    "chars": 10677,
-    "tokens": 3379,
-    "lines": 131,
+    "chars": 8562,
+    "tokens": 2710,
+    "lines": 106,
     "calls": 1,
-    "ms": 737.3,
+    "ms": 716.9,
     "answered": true,
     "exact": null,
-    "candidate": 11
+    "candidate": null
    },
    "gitnexus": {
-    "chars": 69046,
-    "tokens": 21850,
+    "chars": 68952,
+    "tokens": 21821,
     "lines": 1400,
     "calls": 1,
-    "ms": 272.8,
+    "ms": 248.4,
     "answered": true
    }
   },
@@ -1947,7 +1947,7 @@
     "tokens": 488,
     "lines": 20,
     "calls": 2,
-    "ms": 196.9,
+    "ms": 178,
     "hits": 1
    },
    "typical": {
@@ -1955,24 +1955,24 @@
     "tokens": 514,
     "lines": 26,
     "calls": 2,
-    "ms": 197.2
+    "ms": 178.4
    },
    "codeloupe": {
     "chars": 1465,
     "tokens": 464,
     "lines": 20,
     "calls": 1,
-    "ms": 9.8,
+    "ms": 7.3,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4604,
-    "tokens": 1457,
+    "chars": 4416,
+    "tokens": 1398,
     "lines": 83,
     "calls": 1,
-    "ms": 146.1,
+    "ms": 126.1,
     "answered": true
    }
   },
@@ -1985,7 +1985,7 @@
     "tokens": 1044,
     "lines": 75,
     "calls": 2,
-    "ms": 194.8,
+    "ms": 177.5,
     "hits": 1
    },
    "typical": {
@@ -1993,24 +1993,24 @@
     "tokens": 1120,
     "lines": 86,
     "calls": 2,
-    "ms": 195.2
+    "ms": 178
    },
    "codeloupe": {
     "chars": 3252,
     "tokens": 1030,
     "lines": 75,
     "calls": 1,
-    "ms": 12.9,
+    "ms": 6.3,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4668,
-    "tokens": 1478,
+    "chars": 4480,
+    "tokens": 1418,
     "lines": 46,
     "calls": 1,
-    "ms": 156.9,
+    "ms": 144.3,
     "answered": true
    }
   },
@@ -2023,7 +2023,7 @@
     "tokens": 218,
     "lines": 22,
     "calls": 2,
-    "ms": 189.3,
+    "ms": 189.1,
     "hits": 1
    },
    "typical": {
@@ -2031,24 +2031,24 @@
     "tokens": 242,
     "lines": 27,
     "calls": 2,
-    "ms": 189.7
+    "ms": 189.5
    },
    "codeloupe": {
     "chars": 692,
     "tokens": 219,
     "lines": 22,
     "calls": 1,
-    "ms": 11.2,
+    "ms": 6.3,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 6816,
-    "tokens": 2157,
+    "chars": 6628,
+    "tokens": 2098,
     "lines": 163,
     "calls": 1,
-    "ms": 158.4,
+    "ms": 154.6,
     "answered": true
    }
   },
@@ -2061,7 +2061,7 @@
     "tokens": 88,
     "lines": 3,
     "calls": 2,
-    "ms": 207.6,
+    "ms": 197.4,
     "hits": 1
    },
    "typical": {
@@ -2069,24 +2069,24 @@
     "tokens": 96,
     "lines": 6,
     "calls": 2,
-    "ms": 207.9
+    "ms": 197.8
    },
    "codeloupe": {
     "chars": 256,
     "tokens": 82,
     "lines": 3,
     "calls": 1,
-    "ms": 8.9,
+    "ms": 7.2,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1644,
-    "tokens": 521,
+    "chars": 1456,
+    "tokens": 461,
     "lines": 43,
     "calls": 1,
-    "ms": 149.5,
+    "ms": 135.2,
     "answered": true
    }
   },
@@ -2099,7 +2099,7 @@
     "tokens": 243,
     "lines": 14,
     "calls": 2,
-    "ms": 177.6,
+    "ms": 213.4,
     "hits": 1
    },
    "typical": {
@@ -2107,24 +2107,24 @@
     "tokens": 251,
     "lines": 17,
     "calls": 2,
-    "ms": 177.9
+    "ms": 213.9
    },
    "codeloupe": {
     "chars": 770,
     "tokens": 244,
     "lines": 14,
     "calls": 1,
-    "ms": 9.2,
+    "ms": 6.2,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2834,
-    "tokens": 897,
+    "chars": 2646,
+    "tokens": 838,
     "lines": 61,
     "calls": 1,
-    "ms": 162.3,
+    "ms": 143.1,
     "answered": true
    }
   },
@@ -2137,7 +2137,7 @@
     "tokens": 98,
     "lines": 4,
     "calls": 2,
-    "ms": 176.8,
+    "ms": 218.2,
     "hits": 1
    },
    "typical": {
@@ -2145,24 +2145,24 @@
     "tokens": 122,
     "lines": 9,
     "calls": 2,
-    "ms": 177.1
+    "ms": 218.8
    },
    "codeloupe": {
     "chars": 274,
     "tokens": 87,
     "lines": 4,
     "calls": 1,
-    "ms": 10.7,
+    "ms": 7.9,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2784,
-    "tokens": 882,
+    "chars": 2596,
+    "tokens": 822,
     "lines": 73,
     "calls": 1,
-    "ms": 168.4,
+    "ms": 147.3,
     "answered": true
    }
   },
@@ -2175,7 +2175,7 @@
     "tokens": 364,
     "lines": 26,
     "calls": 2,
-    "ms": 178.5,
+    "ms": 221.8,
     "hits": 1
    },
    "typical": {
@@ -2183,24 +2183,24 @@
     "tokens": 382,
     "lines": 31,
     "calls": 2,
-    "ms": 178.9
+    "ms": 222.4
    },
    "codeloupe": {
     "chars": 1147,
     "tokens": 363,
     "lines": 26,
     "calls": 1,
-    "ms": 10.6,
+    "ms": 6.3,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 8517,
-    "tokens": 2696,
+    "chars": 8329,
+    "tokens": 2636,
     "lines": 203,
     "calls": 1,
-    "ms": 140.2,
+    "ms": 130.7,
     "answered": true
    }
   },
@@ -2213,7 +2213,7 @@
     "tokens": 805,
     "lines": 57,
     "calls": 2,
-    "ms": 186.4,
+    "ms": 198.4,
     "hits": 1
    },
    "typical": {
@@ -2221,24 +2221,24 @@
     "tokens": 915,
     "lines": 70,
     "calls": 2,
-    "ms": 186.7
+    "ms": 198.8
    },
    "codeloupe": {
     "chars": 2446,
     "tokens": 775,
     "lines": 57,
     "calls": 1,
-    "ms": 9.9,
+    "ms": 6.9,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 7460,
-    "tokens": 2361,
+    "chars": 7272,
+    "tokens": 2302,
     "lines": 142,
     "calls": 1,
-    "ms": 134.2,
+    "ms": 160,
     "answered": true
    }
   },
@@ -2251,7 +2251,7 @@
     "tokens": 121,
     "lines": 2,
     "calls": 2,
-    "ms": 183,
+    "ms": 196.8,
     "hits": 1
    },
    "typical": {
@@ -2259,24 +2259,24 @@
     "tokens": 1053,
     "lines": 65,
     "calls": 2,
-    "ms": 183.4
+    "ms": 197.3
    },
    "codeloupe": {
     "chars": 278,
     "tokens": 88,
     "lines": 2,
     "calls": 1,
-    "ms": 8.9,
+    "ms": 6.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4611,
-    "tokens": 1460,
+    "chars": 4235,
+    "tokens": 1341,
     "lines": 126,
     "calls": 2,
-    "ms": 132.3,
+    "ms": 132.6,
     "answered": true
    }
   },
@@ -2289,7 +2289,7 @@
     "tokens": 96,
     "lines": 3,
     "calls": 2,
-    "ms": 227.8,
+    "ms": 191.4,
     "hits": 1
    },
    "typical": {
@@ -2297,24 +2297,24 @@
     "tokens": 341,
     "lines": 23,
     "calls": 2,
-    "ms": 228.1
+    "ms": 191.9
    },
    "codeloupe": {
     "chars": 281,
     "tokens": 89,
     "lines": 3,
     "calls": 1,
-    "ms": 8.3,
+    "ms": 5.6,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 5171,
-    "tokens": 1637,
+    "chars": 4983,
+    "tokens": 1577,
     "lines": 131,
     "calls": 1,
-    "ms": 144.8,
+    "ms": 125.7,
     "answered": true
    }
   },
@@ -2327,7 +2327,7 @@
     "tokens": 114,
     "lines": 4,
     "calls": 2,
-    "ms": 216.9,
+    "ms": 205.1,
     "hits": 1
    },
    "typical": {
@@ -2335,24 +2335,24 @@
     "tokens": 522,
     "lines": 28,
     "calls": 2,
-    "ms": 217.3
+    "ms": 205.5
    },
    "codeloupe": {
     "chars": 375,
     "tokens": 119,
     "lines": 4,
     "calls": 1,
-    "ms": 9.3,
+    "ms": 7.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2537,
-    "tokens": 803,
+    "chars": 2349,
+    "tokens": 744,
     "lines": 67,
     "calls": 1,
-    "ms": 139.9,
+    "ms": 123.6,
     "answered": true
    }
   },
@@ -2365,7 +2365,7 @@
     "tokens": 88,
     "lines": 6,
     "calls": 2,
-    "ms": 205.8,
+    "ms": 186.3,
     "hits": 1
    },
    "typical": {
@@ -2373,24 +2373,24 @@
     "tokens": 288,
     "lines": 24,
     "calls": 2,
-    "ms": 206.3
+    "ms": 186.7
    },
    "codeloupe": {
     "chars": 305,
     "tokens": 97,
     "lines": 6,
     "calls": 1,
-    "ms": 10.7,
+    "ms": 7.7,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4209,
-    "tokens": 1332,
+    "chars": 3833,
+    "tokens": 1213,
     "lines": 114,
     "calls": 2,
-    "ms": 155.7,
+    "ms": 119.1,
     "answered": true
    }
   },
@@ -2403,7 +2403,7 @@
     "tokens": 95,
     "lines": 4,
     "calls": 2,
-    "ms": 219.7,
+    "ms": 194.4,
     "hits": 1
    },
    "typical": {
@@ -2411,24 +2411,24 @@
     "tokens": 529,
     "lines": 42,
     "calls": 2,
-    "ms": 220.1
+    "ms": 194.7
    },
    "codeloupe": {
     "chars": 288,
     "tokens": 92,
     "lines": 4,
     "calls": 1,
-    "ms": 8.7,
+    "ms": 6.5,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 3254,
-    "tokens": 1030,
+    "chars": 2878,
+    "tokens": 911,
     "lines": 81,
     "calls": 2,
-    "ms": 162.1,
+    "ms": 129.7,
     "answered": true
    }
   },
@@ -2441,7 +2441,7 @@
     "tokens": 148,
     "lines": 6,
     "calls": 2,
-    "ms": 197.6,
+    "ms": 196.1,
     "hits": 1
    },
    "typical": {
@@ -2449,24 +2449,24 @@
     "tokens": 951,
     "lines": 46,
     "calls": 2,
-    "ms": 198
+    "ms": 196.5
    },
    "codeloupe": {
     "chars": 461,
     "tokens": 146,
     "lines": 6,
     "calls": 1,
-    "ms": 8.9,
+    "ms": 6.7,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 5355,
-    "tokens": 1695,
+    "chars": 5167,
+    "tokens": 1636,
     "lines": 103,
     "calls": 1,
-    "ms": 151.1,
+    "ms": 135.2,
     "answered": true
    }
   },
@@ -2479,7 +2479,7 @@
     "tokens": 149,
     "lines": 6,
     "calls": 2,
-    "ms": 215.2,
+    "ms": 192,
     "hits": 1
    },
    "typical": {
@@ -2487,24 +2487,24 @@
     "tokens": 4634,
     "lines": 243,
     "calls": 2,
-    "ms": 215.5
+    "ms": 192.5
    },
    "codeloupe": {
     "chars": 463,
     "tokens": 147,
     "lines": 6,
     "calls": 1,
-    "ms": 10.6,
+    "ms": 7.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4343,
-    "tokens": 1375,
+    "chars": 3967,
+    "tokens": 1256,
     "lines": 98,
     "calls": 2,
-    "ms": 174,
+    "ms": 161,
     "answered": true
    }
   },
@@ -2517,7 +2517,7 @@
     "tokens": 150,
     "lines": 6,
     "calls": 2,
-    "ms": 199.9,
+    "ms": 179.3,
     "hits": 1
    },
    "typical": {
@@ -2525,24 +2525,24 @@
     "tokens": 1102,
     "lines": 72,
     "calls": 2,
-    "ms": 200.3
+    "ms": 179.8
    },
    "codeloupe": {
     "chars": 475,
     "tokens": 151,
     "lines": 6,
     "calls": 1,
-    "ms": 13.1,
+    "ms": 7.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2573,
-    "tokens": 815,
+    "chars": 2385,
+    "tokens": 755,
     "lines": 63,
     "calls": 1,
-    "ms": 150.9,
+    "ms": 136.3,
     "answered": true
    }
   },
@@ -2555,7 +2555,7 @@
     "tokens": 203,
     "lines": 8,
     "calls": 1,
-    "ms": 22.8,
+    "ms": 26.2,
     "hits": 0
    },
    "typical": {
@@ -2563,14 +2563,14 @@
     "tokens": 462,
     "lines": 25,
     "calls": 1,
-    "ms": 0.5
+    "ms": 0.4
    },
    "codeloupe": {
     "chars": 562,
     "tokens": 178,
     "lines": 7,
     "calls": 1,
-    "ms": 12.2,
+    "ms": 6.1,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -2586,7 +2586,7 @@
     "tokens": 267,
     "lines": 17,
     "calls": 1,
-    "ms": 21.5,
+    "ms": 25.8,
     "hits": 0
    },
    "typical": {
@@ -2601,7 +2601,7 @@
     "tokens": 195,
     "lines": 13,
     "calls": 1,
-    "ms": 9.8,
+    "ms": 7.3,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -2617,7 +2617,7 @@
     "tokens": 167,
     "lines": 17,
     "calls": 1,
-    "ms": 21.5,
+    "ms": 24.5,
     "hits": 0
    },
    "typical": {
@@ -2625,14 +2625,14 @@
     "tokens": 220,
     "lines": 26,
     "calls": 1,
-    "ms": 0.6
+    "ms": 0.4
    },
    "codeloupe": {
     "chars": 763,
     "tokens": 242,
     "lines": 17,
     "calls": 1,
-    "ms": 8.8,
+    "ms": 7.4,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -2648,7 +2648,7 @@
     "tokens": 22,
     "lines": 2,
     "calls": 1,
-    "ms": 22.7,
+    "ms": 24,
     "hits": 0
    },
    "typical": {
@@ -2656,14 +2656,14 @@
     "tokens": 59,
     "lines": 5,
     "calls": 1,
-    "ms": 0.5
+    "ms": 0.4
    },
    "codeloupe": {
     "chars": 128,
     "tokens": 41,
     "lines": 2,
     "calls": 1,
-    "ms": 8.1,
+    "ms": 7.4,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -2679,7 +2679,7 @@
     "tokens": 156,
     "lines": 6,
     "calls": 1,
-    "ms": 20.5,
+    "ms": 25.3,
     "hits": 0
    },
    "typical": {
@@ -2687,14 +2687,14 @@
     "tokens": 229,
     "lines": 16,
     "calls": 1,
-    "ms": 0.5
+    "ms": 0.4
    },
    "codeloupe": {
     "chars": 279,
     "tokens": 89,
     "lines": 6,
     "calls": 1,
-    "ms": 8.8,
+    "ms": 7.4,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -2710,7 +2710,7 @@
     "tokens": 26,
     "lines": 2,
     "calls": 1,
-    "ms": 22.6,
+    "ms": 27.5,
     "hits": 0
    },
    "typical": {
@@ -2725,7 +2725,7 @@
     "tokens": 67,
     "lines": 5,
     "calls": 1,
-    "ms": 9,
+    "ms": 6.4,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -2741,7 +2741,7 @@
     "tokens": 157,
     "lines": 16,
     "calls": 1,
-    "ms": 22.2,
+    "ms": 25.4,
     "hits": 0
    },
    "typical": {
@@ -2756,7 +2756,7 @@
     "tokens": 193,
     "lines": 16,
     "calls": 1,
-    "ms": 9.8,
+    "ms": 7.8,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -2772,7 +2772,7 @@
     "tokens": 325,
     "lines": 16,
     "calls": 1,
-    "ms": 24.3,
+    "ms": 29.8,
     "hits": 0
    },
    "typical": {
@@ -2780,14 +2780,14 @@
     "tokens": 869,
     "lines": 69,
     "calls": 1,
-    "ms": 0.7
+    "ms": 0.5
    },
    "codeloupe": {
     "chars": 846,
     "tokens": 268,
     "lines": 20,
     "calls": 1,
-    "ms": 10.3,
+    "ms": 8.9,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -2803,7 +2803,7 @@
     "tokens": 484,
     "lines": 11,
     "calls": 1,
-    "ms": 213.2,
+    "ms": 206.9,
     "hits": 10
    },
    "typical": {
@@ -2811,24 +2811,24 @@
     "tokens": 2665,
     "lines": 80,
     "calls": 1,
-    "ms": 207.2
+    "ms": 210.7
    },
    "codeloupe": {
     "chars": 1381,
     "tokens": 438,
     "lines": 18,
     "calls": 1,
-    "ms": 10.2,
+    "ms": 8.4,
     "answered": true,
     "exact": 6,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 3194,
-    "tokens": 1011,
+    "chars": 3006,
+    "tokens": 952,
     "lines": 76,
     "calls": 1,
-    "ms": 178.2,
+    "ms": 147.7,
     "answered": true
    }
   },
@@ -2841,7 +2841,7 @@
     "tokens": 371,
     "lines": 9,
     "calls": 1,
-    "ms": 189.2,
+    "ms": 183.5,
     "hits": 8
    },
    "typical": {
@@ -2849,24 +2849,24 @@
     "tokens": 1833,
     "lines": 64,
     "calls": 1,
-    "ms": 189.6
+    "ms": 193.2
    },
    "codeloupe": {
     "chars": 873,
     "tokens": 277,
     "lines": 14,
     "calls": 1,
-    "ms": 10.6,
+    "ms": 7,
     "answered": true,
     "exact": 4,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 1478,
-    "tokens": 468,
+    "chars": 1290,
+    "tokens": 409,
     "lines": 39,
     "calls": 1,
-    "ms": 180.4,
+    "ms": 155,
     "answered": true
    }
   },
@@ -2879,7 +2879,7 @@
     "tokens": 1435,
     "lines": 32,
     "calls": 1,
-    "ms": 193.1,
+    "ms": 185.9,
     "hits": 31
    },
    "typical": {
@@ -2887,24 +2887,24 @@
     "tokens": 5124,
     "lines": 167,
     "calls": 1,
-    "ms": 187.2
+    "ms": 174.7
    },
    "codeloupe": {
     "chars": 3542,
     "tokens": 1121,
     "lines": 47,
     "calls": 1,
-    "ms": 10.6,
+    "ms": 9.4,
     "answered": true,
     "exact": 29,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 6180,
-    "tokens": 1956,
+    "chars": 5992,
+    "tokens": 1897,
     "lines": 156,
     "calls": 1,
-    "ms": 200.4,
+    "ms": 144.7,
     "answered": true
    }
   },
@@ -2917,7 +2917,7 @@
     "tokens": 424,
     "lines": 11,
     "calls": 1,
-    "ms": 180.6,
+    "ms": 181.7,
     "hits": 10
    },
    "typical": {
@@ -2932,17 +2932,17 @@
     "tokens": 379,
     "lines": 19,
     "calls": 1,
-    "ms": 9.2,
+    "ms": 8.1,
     "answered": true,
     "exact": 6,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 1439,
-    "tokens": 456,
+    "chars": 1251,
+    "tokens": 396,
     "lines": 36,
     "calls": 1,
-    "ms": 173.2,
+    "ms": 131.6,
     "answered": true
    }
   },
@@ -2955,7 +2955,7 @@
     "tokens": 807,
     "lines": 19,
     "calls": 1,
-    "ms": 189.9,
+    "ms": 207.5,
     "hits": 18
    },
    "typical": {
@@ -2963,24 +2963,24 @@
     "tokens": 2974,
     "lines": 96,
     "calls": 1,
-    "ms": 222.8
+    "ms": 172.2
    },
    "codeloupe": {
     "chars": 1954,
     "tokens": 619,
     "lines": 32,
     "calls": 1,
-    "ms": 9.3,
+    "ms": 9,
     "answered": true,
     "exact": 15,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 2050,
-    "tokens": 649,
+    "chars": 1862,
+    "tokens": 590,
     "lines": 54,
     "calls": 1,
-    "ms": 170,
+    "ms": 148.5,
     "answered": true
    }
   },
@@ -2993,7 +2993,7 @@
     "tokens": 297,
     "lines": 8,
     "calls": 1,
-    "ms": 234.5,
+    "ms": 178.2,
     "hits": 7
    },
    "typical": {
@@ -3001,24 +3001,24 @@
     "tokens": 1527,
     "lines": 51,
     "calls": 1,
-    "ms": 267.4
+    "ms": 186.4
    },
    "codeloupe": {
     "chars": 689,
     "tokens": 219,
     "lines": 11,
     "calls": 1,
-    "ms": 9.8,
+    "ms": 7.9,
     "answered": true,
     "exact": 4,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 2552,
-    "tokens": 808,
+    "chars": 2364,
+    "tokens": 749,
     "lines": 66,
     "calls": 1,
-    "ms": 168.7,
+    "ms": 152,
     "answered": true
    }
   },
@@ -3031,7 +3031,7 @@
     "tokens": 1530,
     "lines": 40,
     "calls": 1,
-    "ms": 275.8,
+    "ms": 180.7,
     "hits": 39
    },
    "typical": {
@@ -3039,24 +3039,24 @@
     "tokens": 7278,
     "lines": 260,
     "calls": 1,
-    "ms": 398.5
+    "ms": 184.7
    },
    "codeloupe": {
     "chars": 3541,
     "tokens": 1121,
     "lines": 49,
     "calls": 1,
-    "ms": 10.2,
+    "ms": 7.7,
     "answered": true,
     "exact": 28,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 7405,
-    "tokens": 2344,
+    "chars": 7217,
+    "tokens": 2284,
     "lines": 196,
     "calls": 1,
-    "ms": 231.3,
+    "ms": 159.7,
     "answered": true
    }
   },
@@ -3069,7 +3069,7 @@
     "tokens": 570,
     "lines": 14,
     "calls": 1,
-    "ms": 321.3,
+    "ms": 251,
     "hits": 13
    },
    "typical": {
@@ -3077,24 +3077,24 @@
     "tokens": 2870,
     "lines": 88,
     "calls": 1,
-    "ms": 289.5
+    "ms": 236.4
    },
    "codeloupe": {
     "chars": 1579,
     "tokens": 500,
     "lines": 22,
     "calls": 1,
-    "ms": 10.1,
+    "ms": 7.9,
     "answered": true,
     "exact": 10,
     "candidate": 0
    },
    "gitnexus": {
-    "chars": 5460,
-    "tokens": 1728,
+    "chars": 5272,
+    "tokens": 1669,
     "lines": 135,
     "calls": 1,
-    "ms": 221.7,
+    "ms": 175.5,
     "answered": true
    }
   },
@@ -3107,7 +3107,7 @@
     "tokens": 298,
     "lines": 7,
     "calls": 1,
-    "ms": 312.2,
+    "ms": 254.1,
     "hits": 6
    },
    "typical": {
@@ -3115,24 +3115,24 @@
     "tokens": 1200,
     "lines": 45,
     "calls": 1,
-    "ms": 243.9
+    "ms": 183.3
    },
    "codeloupe": {
     "chars": 296,
     "tokens": 94,
     "lines": 3,
     "calls": 1,
-    "ms": 9.3,
+    "ms": 6.2,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4185,
-    "tokens": 1325,
+    "chars": 3809,
+    "tokens": 1206,
     "lines": 113,
     "calls": 2,
-    "ms": 224.5,
+    "ms": 142.3,
     "answered": true
    }
   },
@@ -3145,7 +3145,7 @@
     "tokens": 859,
     "lines": 18,
     "calls": 1,
-    "ms": 227.6,
+    "ms": 193.7,
     "hits": 17
    },
    "typical": {
@@ -3153,24 +3153,24 @@
     "tokens": 2271,
     "lines": 71,
     "calls": 1,
-    "ms": 221.5
+    "ms": 177.5
    },
    "codeloupe": {
     "chars": 1183,
     "tokens": 375,
     "lines": 11,
     "calls": 1,
-    "ms": 12,
+    "ms": 7.5,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4861,
-    "tokens": 1539,
+    "chars": 4673,
+    "tokens": 1479,
     "lines": 124,
     "calls": 1,
-    "ms": 163.9,
+    "ms": 228.7,
     "answered": true
    }
   },
@@ -3183,7 +3183,7 @@
     "tokens": 554,
     "lines": 13,
     "calls": 1,
-    "ms": 228.3,
+    "ms": 187.8,
     "hits": 12
    },
    "typical": {
@@ -3191,24 +3191,24 @@
     "tokens": 2800,
     "lines": 95,
     "calls": 1,
-    "ms": 215.3
+    "ms": 212.3
    },
    "codeloupe": {
     "chars": 334,
     "tokens": 106,
     "lines": 3,
     "calls": 1,
-    "ms": 9.8,
+    "ms": 5.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2228,
-    "tokens": 706,
+    "chars": 2040,
+    "tokens": 646,
     "lines": 60,
     "calls": 1,
-    "ms": 145.2,
+    "ms": 146.3,
     "answered": true
    }
   },
@@ -3221,7 +3221,7 @@
     "tokens": 198,
     "lines": 7,
     "calls": 1,
-    "ms": 258.1,
+    "ms": 207.4,
     "hits": 6
    },
    "typical": {
@@ -3229,24 +3229,24 @@
     "tokens": 1151,
     "lines": 47,
     "calls": 1,
-    "ms": 202
+    "ms": 266.4
    },
    "codeloupe": {
     "chars": 503,
     "tokens": 160,
     "lines": 5,
     "calls": 1,
-    "ms": 9.4,
+    "ms": 6.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 3743,
-    "tokens": 1185,
+    "chars": 3367,
+    "tokens": 1066,
     "lines": 101,
     "calls": 2,
-    "ms": 147.2,
+    "ms": 146,
     "answered": true
    }
   },
@@ -3259,7 +3259,7 @@
     "tokens": 2432,
     "lines": 54,
     "calls": 1,
-    "ms": 191.9,
+    "ms": 229.5,
     "hits": 53
    },
    "typical": {
@@ -3267,24 +3267,24 @@
     "tokens": 8523,
     "lines": 271,
     "calls": 1,
-    "ms": 212.4
+    "ms": 195.4
    },
    "codeloupe": {
     "chars": 200,
     "tokens": 64,
     "lines": 2,
     "calls": 1,
-    "ms": 9.1,
+    "ms": 7.9,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2807,
-    "tokens": 889,
+    "chars": 2431,
+    "tokens": 770,
     "lines": 68,
     "calls": 2,
-    "ms": 189.4,
+    "ms": 138.8,
     "answered": true
    }
   },
@@ -3297,7 +3297,7 @@
     "tokens": 581,
     "lines": 13,
     "calls": 1,
-    "ms": 225.1,
+    "ms": 200.7,
     "hits": 12
    },
    "typical": {
@@ -3305,24 +3305,24 @@
     "tokens": 1370,
     "lines": 37,
     "calls": 1,
-    "ms": 229.1
+    "ms": 188.8
    },
    "codeloupe": {
     "chars": 576,
     "tokens": 183,
     "lines": 4,
     "calls": 1,
-    "ms": 9.6,
+    "ms": 7.3,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4858,
-    "tokens": 1538,
+    "chars": 4670,
+    "tokens": 1478,
     "lines": 96,
     "calls": 1,
-    "ms": 143.8,
+    "ms": 128.8,
     "answered": true
    }
   },
@@ -3335,7 +3335,7 @@
     "tokens": 1343,
     "lines": 27,
     "calls": 1,
-    "ms": 214,
+    "ms": 201.4,
     "hits": 26
    },
    "typical": {
@@ -3343,24 +3343,24 @@
     "tokens": 6403,
     "lines": 181,
     "calls": 1,
-    "ms": 237.7
+    "ms": 200.6
    },
    "codeloupe": {
     "chars": 684,
     "tokens": 217,
     "lines": 5,
     "calls": 1,
-    "ms": 10,
+    "ms": 6.5,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 3747,
-    "tokens": 1186,
+    "chars": 3371,
+    "tokens": 1067,
     "lines": 85,
     "calls": 2,
-    "ms": 151.4,
+    "ms": 150.8,
     "answered": true
    }
   },
@@ -3373,7 +3373,7 @@
     "tokens": 91,
     "lines": 4,
     "calls": 1,
-    "ms": 205.8,
+    "ms": 193.5,
     "hits": 3
    },
    "typical": {
@@ -3381,24 +3381,24 @@
     "tokens": 654,
     "lines": 24,
     "calls": 1,
-    "ms": 205.8
+    "ms": 272.4
    },
    "codeloupe": {
     "chars": 331,
     "tokens": 105,
     "lines": 3,
     "calls": 1,
-    "ms": 8.5,
+    "ms": 7.7,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2186,
-    "tokens": 692,
+    "chars": 1998,
+    "tokens": 633,
     "lines": 56,
     "calls": 1,
-    "ms": 160.1,
+    "ms": 146.7,
     "answered": true
    }
   },
@@ -3411,7 +3411,7 @@
     "tokens": 107,
     "lines": 3,
     "calls": 1,
-    "ms": 218.3,
+    "ms": 190.7,
     "hits": 2
    },
    "typical": {
@@ -3419,24 +3419,24 @@
     "tokens": 550,
     "lines": 16,
     "calls": 1,
-    "ms": 228.3
+    "ms": 182.5
    },
    "codeloupe": {
-    "chars": 196,
-    "tokens": 63,
-    "lines": 4,
+    "chars": 151,
+    "tokens": 48,
+    "lines": 3,
     "calls": 1,
-    "ms": 10,
+    "ms": 7.2,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2571,
-    "tokens": 814,
+    "chars": 2383,
+    "tokens": 755,
     "lines": 67,
     "calls": 1,
-    "ms": 191.4,
+    "ms": 201.2,
     "answered": true
    }
   },
@@ -3449,7 +3449,7 @@
     "tokens": 70,
     "lines": 3,
     "calls": 1,
-    "ms": 206.9,
+    "ms": 187.8,
     "hits": 2
    },
    "typical": {
@@ -3457,24 +3457,24 @@
     "tokens": 191,
     "lines": 8,
     "calls": 1,
-    "ms": 233.3
+    "ms": 186.4
    },
    "codeloupe": {
-    "chars": 200,
-    "tokens": 64,
-    "lines": 4,
+    "chars": 158,
+    "tokens": 50,
+    "lines": 3,
     "calls": 1,
-    "ms": 8.5,
+    "ms": 5.4,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 1884,
-    "tokens": 597,
+    "chars": 1696,
+    "tokens": 537,
     "lines": 49,
     "calls": 1,
-    "ms": 187.8,
+    "ms": 167.7,
     "answered": true
    }
   },
@@ -3487,7 +3487,7 @@
     "tokens": 203,
     "lines": 9,
     "calls": 1,
-    "ms": 188.7,
+    "ms": 214.8,
     "hits": 8
    },
    "typical": {
@@ -3495,24 +3495,24 @@
     "tokens": 1825,
     "lines": 64,
     "calls": 1,
-    "ms": 208.2
+    "ms": 195.5
    },
    "codeloupe": {
-    "chars": 520,
-    "tokens": 165,
-    "lines": 12,
+    "chars": 434,
+    "tokens": 138,
+    "lines": 9,
     "calls": 1,
-    "ms": 8.8,
+    "ms": 5.8,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2081,
-    "tokens": 659,
+    "chars": 1893,
+    "tokens": 600,
     "lines": 57,
     "calls": 1,
-    "ms": 205.5,
+    "ms": 187.2,
     "answered": true
    }
   },
@@ -3525,7 +3525,7 @@
     "tokens": 54,
     "lines": 2,
     "calls": 1,
-    "ms": 207.8,
+    "ms": 211.3,
     "hits": 1
    },
    "typical": {
@@ -3533,24 +3533,24 @@
     "tokens": 306,
     "lines": 8,
     "calls": 1,
-    "ms": 217.3
+    "ms": 206.4
    },
    "codeloupe": {
-    "chars": 193,
-    "tokens": 62,
-    "lines": 3,
+    "chars": 113,
+    "tokens": 36,
+    "lines": 2,
     "calls": 1,
-    "ms": 8.7,
+    "ms": 7.6,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 3444,
-    "tokens": 1090,
+    "chars": 3256,
+    "tokens": 1031,
     "lines": 88,
     "calls": 1,
-    "ms": 177.3,
+    "ms": 141.8,
     "answered": true
    }
   },
@@ -3563,7 +3563,7 @@
     "tokens": 200,
     "lines": 7,
     "calls": 1,
-    "ms": 235.4,
+    "ms": 175.8,
     "hits": 6
    },
    "typical": {
@@ -3571,24 +3571,24 @@
     "tokens": 1410,
     "lines": 48,
     "calls": 1,
-    "ms": 222.6
+    "ms": 187.2
    },
    "codeloupe": {
-    "chars": 597,
-    "tokens": 189,
-    "lines": 10,
+    "chars": 497,
+    "tokens": 158,
+    "lines": 7,
     "calls": 1,
-    "ms": 8.5,
+    "ms": 6.9,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4128,
-    "tokens": 1307,
+    "chars": 3940,
+    "tokens": 1247,
     "lines": 101,
     "calls": 1,
-    "ms": 180.8,
+    "ms": 163.9,
     "answered": true
    }
   },
@@ -3601,7 +3601,7 @@
     "tokens": 45,
     "lines": 2,
     "calls": 1,
-    "ms": 203.4,
+    "ms": 207.8,
     "hits": 1
    },
    "typical": {
@@ -3609,24 +3609,24 @@
     "tokens": 291,
     "lines": 8,
     "calls": 1,
-    "ms": 199.4
+    "ms": 181.3
    },
    "codeloupe": {
-    "chars": 185,
-    "tokens": 59,
-    "lines": 3,
+    "chars": 102,
+    "tokens": 33,
+    "lines": 2,
     "calls": 1,
-    "ms": 8.3,
+    "ms": 8.1,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 3832,
-    "tokens": 1213,
+    "chars": 3644,
+    "tokens": 1154,
     "lines": 91,
     "calls": 1,
-    "ms": 288.5,
+    "ms": 165.5,
     "answered": true
    }
   },
@@ -3639,7 +3639,7 @@
     "tokens": 159,
     "lines": 4,
     "calls": 1,
-    "ms": 211.9,
+    "ms": 192.3,
     "hits": 3
    },
    "typical": {
@@ -3647,24 +3647,24 @@
     "tokens": 375,
     "lines": 12,
     "calls": 1,
-    "ms": 219.8
+    "ms": 207.6
    },
    "codeloupe": {
-    "chars": 225,
-    "tokens": 72,
-    "lines": 5,
+    "chars": 188,
+    "tokens": 60,
+    "lines": 4,
     "calls": 1,
-    "ms": 7.7,
+    "ms": 6.5,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 2631,
-    "tokens": 833,
+    "chars": 2443,
+    "tokens": 774,
     "lines": 72,
     "calls": 1,
-    "ms": 266.3,
+    "ms": 166.1,
     "answered": true
    }
   },
@@ -3677,7 +3677,7 @@
     "tokens": 116,
     "lines": 5,
     "calls": 1,
-    "ms": 233.2,
+    "ms": 194.2,
     "hits": 4
    },
    "typical": {
@@ -3685,24 +3685,24 @@
     "tokens": 1006,
     "lines": 32,
     "calls": 1,
-    "ms": 262.8
+    "ms": 209.1
    },
    "codeloupe": {
-    "chars": 745,
-    "tokens": 236,
-    "lines": 16,
+    "chars": 297,
+    "tokens": 94,
+    "lines": 7,
     "calls": 1,
-    "ms": 8.4,
+    "ms": 7,
     "answered": true,
     "exact": null,
     "candidate": null
    },
    "gitnexus": {
-    "chars": 4790,
-    "tokens": 1516,
+    "chars": 4602,
+    "tokens": 1457,
     "lines": 129,
     "calls": 1,
-    "ms": 316.3,
+    "ms": 171,
     "answered": true
    }
   },
@@ -3715,7 +3715,7 @@
     "tokens": 1494,
     "lines": 30,
     "calls": 1,
-    "ms": 202.6,
+    "ms": 196.4,
     "hits": 30
    },
    "typical": null,
@@ -3724,7 +3724,7 @@
     "tokens": 1255,
     "lines": 58,
     "calls": 1,
-    "ms": 13.2,
+    "ms": 47.7,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -3740,7 +3740,7 @@
     "tokens": 1135,
     "lines": 30,
     "calls": 1,
-    "ms": 188.4,
+    "ms": 215.5,
     "hits": 30
    },
    "typical": null,
@@ -3749,7 +3749,7 @@
     "tokens": 979,
     "lines": 60,
     "calls": 1,
-    "ms": 14,
+    "ms": 17.9,
     "answered": true,
     "exact": null,
     "candidate": null
@@ -3765,7 +3765,7 @@
     "tokens": 1764,
     "lines": 88,
     "calls": 1,
-    "ms": 37.6,
+    "ms": 44.9,
     "hits": 0
    },
    "typical": {
@@ -3773,24 +3773,24 @@
     "tokens": 77989,
     "lines": 4539,
     "calls": 1,
-    "ms": 40.4
+    "ms": 49.5
    },
    "codeloupe": {
-    "chars": 7890,
-    "tokens": 2497,
-    "lines": 117,
+    "chars": 6744,
+    "tokens": 2135,
+    "lines": 106,
     "calls": 1,
-    "ms": 341.8,
+    "ms": 306.2,
     "answered": true,
     "exact": null,
-    "candidate": 3
+    "candidate": null
    },
    "gitnexus": {
-    "chars": 68534,
-    "tokens": 21688,
+    "chars": 68440,
+    "tokens": 21659,
     "lines": 2566,
     "calls": 1,
-    "ms": 232.7,
+    "ms": 211.3,
     "answered": true
    }
   }
@@ -3800,43 +3800,43 @@
    "perRepo": [
     {
      "repo": "exposed",
-     "firstIndexMs": 5747,
-     "peakRssMb": 503,
-     "homeBytes": 43397403,
+     "firstIndexMs": 7050,
+     "peakRssMb": 537,
+     "homeBytes": 35930106,
      "repoWrites": {
       "files": 0,
       "top": []
      },
-     "firstChangesMs": 4611
+     "firstChangesMs": 4186
     },
     {
      "repo": "codeloupe",
-     "firstIndexMs": 2612,
-     "peakRssMb": 436,
-     "homeBytes": 51217239,
+     "firstIndexMs": 3067,
+     "peakRssMb": 475,
+     "homeBytes": 43979968,
      "repoWrites": {
       "files": 0,
       "top": []
      },
-     "firstChangesMs": 1449
+     "firstChangesMs": 1246
     }
    ],
-   "startMs": 2832,
-   "rssAfterStartMb": 105,
-   "cliCallMs": 220,
-   "idleRssMb": 196,
-   "idleTreeRssMb": 204,
+   "startMs": 1785,
+   "rssAfterStartMb": 109,
+   "cliCallMs": 199,
+   "idleRssMb": 162,
+   "idleTreeRssMb": 298,
    "idleCpuMsPer30s": 0,
    "idleCpuTreeMsPer30s": 0,
-   "homeBytes": 65323754,
-   "heapMb": 47
+   "homeBytes": 145980352,
+   "heapMb": 34
   },
   "gitnexus": {
    "perRepo": [
     {
      "repo": "exposed",
-     "firstIndexMs": 251630,
-     "peakRssMb": 2219,
+     "firstIndexMs": 16098,
+     "peakRssMb": 465,
      "repoWrites": {
       "files": 8,
       "top": [
@@ -3845,14 +3845,14 @@
        "AGENTS.md"
       ]
      },
-     "toolReportedMs": 104600,
-     "homeBytes": 1119027203,
-     "graph": "41409 nodes, 79980 edges"
+     "toolReportedMs": null,
+     "homeBytes": 1119234643,
+     "graph": null
     },
     {
      "repo": "codeloupe",
-     "firstIndexMs": 60877,
-     "peakRssMb": 1245,
+     "firstIndexMs": 15157,
+     "peakRssMb": 467,
      "repoWrites": {
       "files": 8,
       "top": [
@@ -3861,33 +3861,33 @@
        "CLAUDE.md"
       ]
      },
-     "toolReportedMs": 47300,
-     "homeBytes": 147887344,
-     "graph": "12641 nodes, 26251 edges"
+     "toolReportedMs": null,
+     "homeBytes": 147885754,
+     "graph": null
     }
    ],
-   "rssAfterStartMb": 112,
-   "rssAfterQueriesMb": 3371,
-   "idleTreeRssMb": 3334,
-   "idleCpuMsPer30s": 125,
-   "cliCallMs": 749,
-   "homeBytes": 14666853
+   "rssAfterStartMb": 104,
+   "rssAfterQueriesMb": 3348,
+   "idleTreeRssMb": 3315,
+   "idleCpuMsPer30s": 78,
+   "cliCallMs": 748,
+   "homeBytes": 14666071
   }
  },
  "notMeasured": [],
  "tools": {
   "codeloupe": {
    "count": 14,
-   "chars": 12986,
-   "tokens": 4110,
+   "chars": 13344,
+   "tokens": 4223,
    "perTool": [
     {
      "name": "find",
-     "chars": 919
+     "chars": 1078
     },
     {
      "name": "grep",
-     "chars": 1023
+     "chars": 1032
     },
     {
      "name": "outline",
@@ -3911,11 +3911,11 @@
     },
     {
      "name": "hierarchy",
-     "chars": 625
+     "chars": 680
     },
     {
      "name": "changes",
-     "chars": 974
+     "chars": 1057
     },
     {
      "name": "task_code",
@@ -3931,7 +3931,7 @@
     },
     {
      "name": "env",
-     "chars": 826
+     "chars": 878
     },
     {
      "name": "job",

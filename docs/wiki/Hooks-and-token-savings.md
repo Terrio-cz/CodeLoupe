@@ -25,7 +25,7 @@ switch to turn every hook off: [Plugin hooks](Plugin-hooks).
 | Layer | What it saves | Details |
 |---|---|---|
 | Steering hook | a shell search or a whole-file read of indexed source is answered by a pointer to `find`, `usages`, `grep` or `outline` | [Plugin hooks](Plugin-hooks) |
-| Declaration-level answers | `symbol`, `outline`, `usages`, `calls`, `hierarchy` and `changes` return the piece asked for instead of files: 4-41 % of the size of grep and whole-file reads, 8 % summed | [Benchmarks](Benchmarks) |
+| Declaration-level answers | `symbol`, `outline`, `usages`, `calls`, `hierarchy` and `changes` return the piece asked for instead of files: 3-41 % of the size of grep and whole-file reads, 8 % summed | [Benchmarks](Benchmarks) |
 | `run` | a short command answered with a summary (every error line kept) and a handle to the full output: about 88 % less over the recorded set | [Tools reference](Tools-reference) |
 | `job` | a long command runs in the daemon, so no turn is held open on a build | [Jobs and events](Jobs-and-events) |
 | `doc`, `issue`, `task_context` | a repeated read from the same `root` answers in one line, or only what changed | below |

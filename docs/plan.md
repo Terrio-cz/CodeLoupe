@@ -1527,6 +1527,22 @@ rozhoduje launcher.
   umí spustit cokoli jako uživatel; „podepsaný testovací háček“ by byl obřad bez hranice.
 - Ingest: `seen` (5 000) a `pending` (1 000) ve snímku parseru jsou omezené, `.meta.json` se čte nejvýš 64 kB (`BoundedRead`).
 
+### Výsledek CL-126 — kompaktní odpovědi: podtypy a změny větve (2026-10-09)
+
+Měřeno `tools/benchmark.mjs` (medián tokenů, oba repozitáře, proti „grep, minimal“): podtypy 175 → **57 %** (127 → 59 tokenů proti 102),
+změny větve 185 → **108 %** (2 938 → 2 423 proti 2 247, n = 2), outline 113 → 105 %; zdroj typu/členu, usages, callers a hledání textu beze změny.
+První kolo (CL-126, 08.10.) zkrátilo formát (společný adresář, `./`, rozsah `14` místo `14-14`, hlavička typu bez konstruktoru, KDoc pryč z podpisů)
+a dostalo podtypy na 124 % a změny na 131 %; zbytek byl strukturální, ne formátový, proto výchozí odpověď řeže obsah:
+
+- `hierarchy`: výchozí jsou přímé podtypy (jak je hledá i rg v baseline); `supers=true` přidá hlavičku typu a přímé supertypy, `deep=true`
+  tranzitivní nadtypy i podtypy. Bez hlavičky se podtypy píšou s celou cestou (společný adresář v nadpisu). Členy (override) beze změny.
+- `changes`: výchozí je seznam změněných deklarací; `callers=true` přidá volající a testy u každé (dřív výchozí; u přidaných jen na žádost).
+  Členy téhož typu v řadě (≥ 2) jsou pod řádkem `  [Typ]` a bez předpony. Callers se bez žádosti nepočítají vůbec, takže je odpověď i rychlejší
+  (medián 591 → 512 ms) a start session už nemusí filtrovat odsazené řádky.
+- Definice nástrojů: `hierarchy` 625 → 680, `changes` 974 → 1 057 znaků (+44 tokenů z 4 223); popisy zkrácené, aby `tools/list` nerostl znatelně.
+- Odpověď `changes` je u velkých větví řezaná limitem 60 deklarací (poslední řádek říká kolik chybí); srovnání s `git diff --stat` je tedy
+  „co agent přečte na první pohled“, ne úplný výpis. Úplnost: `limit`.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
