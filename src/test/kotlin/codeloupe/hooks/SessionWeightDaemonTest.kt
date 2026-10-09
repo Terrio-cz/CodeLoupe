@@ -37,7 +37,7 @@ class SessionWeightDaemonTest {
 
     private fun get(path: String, header: Boolean = true): HttpResponse<String> {
         val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/session-weight?path=" + URLEncoder.encode(path, Charsets.UTF_8)))
-        if (header) request.header(CodeLoupe.HEADER, "1")
+        if (header) request.header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token)
         return http.send(request.GET().build(), HttpResponse.BodyHandlers.ofString())
     }
 
@@ -73,7 +73,7 @@ class SessionWeightDaemonTest {
         own.turn(210_000)
         fun run(event: String): String {
             val input = """{"hook_event_name":"$event","session_id":"script-session","transcript_path":"${own.path.toString().replace("\\", "/")}"}"""
-            val process = ProcessBuilder(bash!!, script).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment()["CODELOUPE_PORT"] = port.toString() }.start()
+            val process = ProcessBuilder(bash!!, script).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment()["CODELOUPE_PORT"] = port.toString(); environment()["CODELOUPE_HOME"] = config.home.toString() }.start()
             process.outputStream.use { it.write(input.toByteArray()) }
             val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
             process.waitFor(30, TimeUnit.SECONDS)

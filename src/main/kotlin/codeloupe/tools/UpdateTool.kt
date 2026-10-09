@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 /** `update`: sets fields and/or adds a comment on a tracker issue; answers with what changed, not the issue. */
 class UpdateTool(private val trackers: Trackers) : Tool {
     override val name = "update"
+    override val mutating = true
     override val description = "Write to a tracker issue: set={Field: value} (State, Assignee, Priority, Type, summary, description or any custom field; " +
         "several values comma-separated; empty clears) and/or comment=<text>. Answers one short line: the fields that changed (old→new), " +
         "the comment id, the new state. The local mirror holds the new version at once."

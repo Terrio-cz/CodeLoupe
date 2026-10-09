@@ -13,10 +13,10 @@ object GlobalExcludes {
     private val EXCLUDES = Regex("""^excludesfile\s*=\s*(.*)$""", RegexOption.IGNORE_CASE)
 
     /** The file git reads global ignore rules from for the repository at [commonDir]; the last config that sets it wins. */
-    fun file(commonDir: Path): Path {
-        val home = home()
-        val xdg = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.isNotBlank() }?.let(Path::of) ?: home?.resolve(".config")
-        val global = System.getenv("GIT_CONFIG_GLOBAL")?.takeIf { it.isNotBlank() }?.let { listOf(Path.of(it)) }
+    fun file(commonDir: Path, env: Map<String, String> = System.getenv(), userHome: String? = System.getProperty("user.home")): Path {
+        val home = (env["HOME"] ?: userHome)?.takeIf { it.isNotBlank() }?.let(Path::of)
+        val xdg = env["XDG_CONFIG_HOME"]?.takeIf { it.isNotBlank() }?.let(Path::of) ?: home?.resolve(".config")
+        val global = env["GIT_CONFIG_GLOBAL"]?.takeIf { it.isNotBlank() }?.let { listOf(Path.of(it)) }
             ?: listOfNotNull(xdg?.resolve("git/config"), home?.resolve(".gitconfig"))
         var configured: String? = null
         for (config in global + listOf(commonDir.resolve("config"))) configured = excludesFile(config) ?: configured
@@ -50,6 +50,4 @@ object GlobalExcludes {
 
     private fun expand(path: String, home: Path?): Path =
         if (home != null && (path == "~" || path.startsWith("~/"))) home.resolve(path.removePrefix("~").removePrefix("/")) else Path.of(path)
-
-    private fun home(): Path? = (System.getenv("HOME") ?: System.getProperty("user.home"))?.takeIf { it.isNotBlank() }?.let(Path::of)
 }

@@ -6,7 +6,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 
 class McpConfigCommand : CliktCommand(name = "mcp-config") {
-    override fun help(context: Context) = "Print the .mcp.json entry for Claude Code."
+    override fun help(context: Context) = "Print the .mcp.json entry for Claude Code; its headers helper gives the client the daemon token."
 
     override fun run() {
         val port = ConfigLoader.load().port
@@ -18,7 +18,8 @@ class McpConfigCommand : CliktCommand(name = "mcp-config") {
                 "url": "http://127.0.0.1:$port/mcp",
                 "headers": {
                   "${CodeLoupe.HEADER}": "1"
-                }
+                },
+                "headersHelper": "${CodeLoupe.NAME} mcp-headers"
               }
             }
             """.trimIndent(),

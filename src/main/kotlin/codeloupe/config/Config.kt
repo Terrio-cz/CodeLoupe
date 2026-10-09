@@ -23,4 +23,5 @@ data class Config(
     val parseWorkerIdleSeconds: Int = 0,
     val secrets: SecretsConfig = SecretsConfig(),
     val write: WriteConfig = WriteConfig(),
+    val api: ApiConfig = ApiConfig(),
 )

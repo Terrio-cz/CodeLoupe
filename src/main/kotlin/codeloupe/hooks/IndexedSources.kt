@@ -1,11 +1,12 @@
 package codeloupe.hooks
 
+import codeloupe.platform.PathCase
 import codeloupe.repo.Registry
 import java.nio.file.Files
 import java.nio.file.Path
 
 /** [SourceFiles] over the daemon's indexes: only repositories it has already indexed, and only what that base holds. Failures answer "no". */
-class IndexedSources(private val registry: Registry, private val windows: Boolean = System.getProperty("os.name").lowercase().startsWith("windows")) : SourceFiles {
+class IndexedSources(private val registry: Registry, private val ignoreCase: Boolean = PathCase.insensitive) : SourceFiles {
     private class Place(val worktree: String, val relative: String, val base: Path)
 
     override fun file(path: String): SourceFile? = runCatching {
@@ -27,7 +28,7 @@ class IndexedSources(private val registry: Registry, private val windows: Boolea
         val base = synchronized(state) { state.baseFile } ?: return null
         val text = full.replace('\\', '/')
         val root = location.worktree.trimEnd('/')
-        if (!text.startsWith("$root/", ignoreCase = windows) && !text.equals(root, ignoreCase = windows)) return null
+        if (!text.startsWith("$root/", ignoreCase = ignoreCase) && !text.equals(root, ignoreCase = ignoreCase)) return null
         return Place(root, text.substring(minOf(text.length, root.length + 1)), base)
     }
 

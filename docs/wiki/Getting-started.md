@@ -45,9 +45,11 @@ daemon starts on the first CLI call; `codeloupe start` / `stop` manage it explic
 daemon's state as JSON (exit code 3 when it is not running); `codeloupe repos add <folder>...` makes it know a repository
 before the first question ([Configuration](Configuration#repositories)).
 
-A CLI call against a running daemon takes ~0.2 s. The start script keeps a JVM class-data archive in
-`<home>/cds/` (about 8 MB per install and build); the first call after an install creates it (~1.5 s), and it is
-simply not used when that directory is not writable. `JAVA_OPTS` / `CODELOUPE_OPTS` add JVM flags.
+A CLI call against a running daemon takes ~0.15 s. The start script maps a JVM AOT cache from `<home>/aot/` (about 22 MB for
+the CLI and 51 MB for the daemon, per install and build). The daemon makes both in the background, a few seconds after it
+started and in a JVM of its own, so no call waits for it; until they exist (about 20 s) a call takes ~0.3 s, and a cache
+the JVM cannot use (another JDK, a damaged file) is ignored without a message. `codeloupe stop` ends a training that is
+running. `JAVA_OPTS` / `CODELOUPE_OPTS` add JVM flags.
 
 ## Where things live
 

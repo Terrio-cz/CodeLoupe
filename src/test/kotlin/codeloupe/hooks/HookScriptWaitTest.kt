@@ -1,5 +1,6 @@
 package codeloupe.hooks
 
+import codeloupe.TestRepos
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.net.InetSocketAddress
@@ -36,7 +37,7 @@ class HookScriptWaitTest {
     private fun run(bash: String, port: Int, body: String): Pair<String, Duration> {
         val file = Path.of(System.getProperty("codeloupe.projectDir"), "plugin", "hooks", "hook.sh").toString().replace("\\", "/")
         val started = System.nanoTime()
-        val process = ProcessBuilder(bash, file).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment()["CODELOUPE_PORT"] = port.toString() }.start()
+        val process = ProcessBuilder(bash, file).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment()["CODELOUPE_PORT"] = port.toString(); environment()["CODELOUPE_HOME"] = TestRepos.tmpDir("hook-home").toString() }.start()
         process.outputStream.use { it.write(body.toByteArray()) }
         val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
         assertTrue(process.waitFor(30, TimeUnit.SECONDS))

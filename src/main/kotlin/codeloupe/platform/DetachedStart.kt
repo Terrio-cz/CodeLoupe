@@ -15,7 +15,7 @@ object DetachedStart {
     fun start(command: List<String>, workDir: Path) {
         if (NativeCalls.isWindows && runCatching { windows(command, workDir) }.getOrDefault(false)) return
         ProcessBuilder(command)
-            .apply { if (!NativeCalls.isWindows) environment().keys.retainAll(::kept) }
+            .apply { if (!NativeCalls.isWindows) cut(environment()) }
             .directory(workDir.toFile())
             .redirectOutput(ProcessBuilder.Redirect.DISCARD)
             .redirectError(ProcessBuilder.Redirect.DISCARD)
@@ -59,6 +59,11 @@ object DetachedStart {
             }
         }
         return out.append("\\".repeat(slashes * 2)).append('"').toString()
+    }
+
+    /** The environment of a daemon started outside Windows: only what [kept] names. */
+    internal fun cut(environment: MutableMap<String, String>) {
+        environment.keys.retainAll(::kept)
     }
 
     /**

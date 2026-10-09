@@ -13,14 +13,20 @@ class OwnerOnlyTest {
     private fun mode(path: java.nio.file.Path) = PosixFilePermissions.toString(Files.getPosixFilePermissions(path))
 
     @Test
-    fun `a file is written whole, for the owner only, over an older one`() {
+    fun `a file is written whole over an older one, and no temporary file stays`() {
         val dir = TestRepos.tmpDir("owner-only")
         val file = dir.resolve("a").resolve("token")
         OwnerOnly.write(file, "one")
         OwnerOnly.write(file, "two")
         assertEquals("two", Files.readString(file))
         assertEquals(listOf("token"), Files.list(file.parent).use { s -> s.map { it.fileName.toString() }.toList() }, "no temporary file stays")
+    }
+
+    @Test
+    fun `a file written for the owner only has the owner-only mode from the start`() {
         assumeTrue(posix, "no POSIX permissions here")
+        val file = TestRepos.tmpDir("owner-only-mode").resolve("a").resolve("token")
+        OwnerOnly.write(file, "one")
         assertEquals("rw-------", mode(file))
         assertEquals("rwx------", mode(file.parent))
     }
