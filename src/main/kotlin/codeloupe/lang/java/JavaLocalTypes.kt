@@ -4,6 +4,7 @@ import codeloupe.lang.JsText
 import codeloupe.lang.TypeSpec
 import codeloupe.lang.kotlin.LocalScopes
 import codeloupe.lang.kotlin.Source
+import codeloupe.lang.kotlin.childList
 import org.jetbrains.kotlin.com.intellij.psi.JavaTokenType
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiExpression
@@ -22,17 +23,27 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiTypeElement
  * which only the query side can resolve.
  */
 internal class JavaLocalTypes(private val source: Source, private val scopes: LocalScopes) {
-    /** The declared type, or for `var` the type of the initializer; "" for an implicitly typed lambda parameter. */
-    fun of(declared: PsiTypeElement?, initializer: PsiExpression?): String = when {
+    /**
+     * The declared type, or for `var` the type of the initializer; "" for an implicitly typed lambda parameter. The
+     * dimensions written after the name of [owner] (`String s[]`) belong to the type.
+     */
+    fun of(declared: PsiTypeElement?, initializer: PsiExpression?, owner: PsiElement? = null): String = when {
         declared == null -> ""
         isVar(declared) -> initializer?.let(::ofExpression) ?: ""
-        else -> typeText(declared)
+        else -> typeText(declared) + dimensions(owner)
     }
+
+    /** `[]` for each pair of brackets after the name: `int d[]`. */
+    fun dimensions(owner: PsiElement?): String =
+        "[]".repeat(owner?.childList()?.count { it is PsiJavaToken && it.tokenType == JavaTokenType.LBRACKET } ?: 0)
 
     fun isVar(type: PsiTypeElement) = type.textLength == VAR.length && source.of(type) == VAR
 
-    /** Type text as written, without a varargs `...`. */
-    fun typeText(type: PsiTypeElement): String = JsText.squash(source.of(type)).removeSuffix("...").trimEnd()
+    /** Type text as written; a varargs `T...` is the array `T[]` it stands for. */
+    fun typeText(type: PsiTypeElement): String {
+        val text = JsText.squash(source.of(type))
+        return if (text.endsWith(VARARGS)) text.removeSuffix(VARARGS).trimEnd() + "[]" else text
+    }
 
     /** `for (var x : items)`: the element type of `items`. */
     fun elementOf(range: PsiExpression?): String = range?.let(::ofExpression)?.let(TypeSpec::element) ?: ""
@@ -91,6 +102,7 @@ internal class JavaLocalTypes(private val source: Source, private val scopes: Lo
 
     private companion object {
         const val VAR = "var"
+        const val VARARGS = "..."
         val STRINGS = setOf(JavaTokenType.STRING_LITERAL, JavaTokenType.TEXT_BLOCK_LITERAL)
 
         // Calls handing back the receiver, a like collection or one of its elements - unless the index knows a
