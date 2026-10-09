@@ -63,9 +63,10 @@ export class AccountsManager {
     const label = this.label(input?.label);
     if (typeof label !== 'string') return label;
     const dir = input?.configDir;
-    if (typeof dir !== 'string' || !dir.trim() || dir.length > 400 || hasControl(dir) || !path.isAbsolute(dir.trim())) return fail('Enter the account folder as a full path.');
+    if (typeof dir !== 'string' || !dir.trim() || dir.length > 400 || hasControl(dir)) return fail('Enter the account folder as a full path.');
     // A network path (UNC) is absolute too, and looking at it makes Windows sign in to that server: the account folder is on this computer.
     if (/^[\\/]{2}/.test(dir.trim())) return fail('Enter a folder on this computer, not a network path.');
+    if (!path.isAbsolute(dir.trim())) return fail('Enter the account folder as a full path.');
     const configDir = path.normalize(dir.trim());
     if (!fs.existsSync(configDir)) {
       if (input.create !== true) return fail('The folder does not exist; tick “create it” or enter an existing one.');

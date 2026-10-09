@@ -23,15 +23,8 @@ extraResources:
 electronLanguages:
   - en-US
 artifactName: CodeLoupe-${version}-${os}-${arch}.${ext}
-# Ad hoc macOS signature (a no-op on the other platforms).
-afterPack: ./scripts/ad-hoc-sign.mjs
-# Electron fuses (CL-161): the packaged app is not a general Node.js. ELECTRON_RUN_AS_NODE, NODE_OPTIONS and --inspect would let anything
-# that can set the environment of a launch run its own script as the app. The app uses none of them (child processes are spawned with
-# `execFile` of the daemon's own runtime or the claude CLI). CI reads the fuses back from the built app.
-electronFuses:
-  runAsNode: false
-  enableNodeOptionsEnvironmentVariable: false
-  enableNodeCliInspectArguments: false
+# Flips the Electron fuses, then signs the macOS app ad hoc (scripts/after-pack.mjs; the signature is a no-op on the other platforms).
+afterPack: ./scripts/after-pack.mjs
 # Auto-update (CL-107). `--publish never` publishes nothing; this makes electron-builder write the feed files
 # (latest.yml, latest-linux.yml: SHA-512 and size of each installer) and resources/app-update.yml. The release job attaches
 # the feed files to the draft release; the app finds a newer release itself and reads the files from that release's

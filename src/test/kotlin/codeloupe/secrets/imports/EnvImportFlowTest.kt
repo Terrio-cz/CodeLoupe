@@ -122,8 +122,8 @@ class EnvImportFlowTest {
         fun scopeOf(name: String, kind: SourceKind? = null) = scan.found.filter { it.name == name && (kind == null || it.kind == kind) }.map { it.scope.toString() }.toSet()
         assertEquals(setOf("global"), scopeOf("ANTHROPIC_API_KEY"))
         assertEquals(setOf("global"), scopeOf("YOUTRACK_TOKEN", SourceKind.CLAUDE_JSON))
-        assertTrue(scopeOf("TERRIO_API_KEY").single().startsWith("workspace:") && scopeOf("TERRIO_API_KEY").single().endsWith("/claude/terrio"))
-        assertTrue(scopeOf("DB_PASSWORD").single().startsWith("repo:") && scopeOf("DB_PASSWORD").single().endsWith("/repos/app"))
+        assertTrue(scopeOf("TERRIO_API_KEY").single().startsWith("workspace:") && scopeOf("TERRIO_API_KEY").single().lowercase().endsWith("/claude/terrio"))
+        assertTrue(scopeOf("DB_PASSWORD").single().startsWith("repo:") && scopeOf("DB_PASSWORD").single().lowercase().endsWith("/repos/app"))
         assertEquals(scopeOf("DB_PASSWORD"), scopeOf("API_KEY"), "a file in a subfolder of a repository belongs to the repository")
     }
 

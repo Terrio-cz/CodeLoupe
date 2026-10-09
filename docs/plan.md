@@ -1504,7 +1504,7 @@ rozhoduje launcher.
 - Git na cizím adresáři: `--no-ext-diff --no-textconv` u všech `git diff`. Filtry `clean` z `.git/config` cizího adresáře se tím nezastaví
   (vypnout je znamená rozbít LFS); `safe.directory` v gitu odmítne adresáře jiného vlastníka a adresář, který si uživatel stáhl sám, je stejné
   riziko jako každý jeho vlastní `git status`.
-- Electron: pojistky `runAsNode`, `NODE_OPTIONS` a `--inspect` vypnuté (`electronFuses`, CI je čte z postaveného instalátoru na všech třech
+- Electron: pojistky `runAsNode`, `NODE_OPTIONS` a `--inspect` vypnuté v `afterPack` (`app/scripts/after-pack.mjs`, před ad hoc podpisem: `electronFuses` z konfigurace se překlápí až po podpisu a na macOS rozbil podpis; CI je čte z postaveného instalátoru na všech třech
   systémech); `claudeAdd` odmítne síťové cesty. `in-process-gpu` a `NetworkServiceInProcess` zůstávají (rozpočet RAM ≤ 300 MB, `docs/ui-spec.md`
   § 11, vykreslování je v sandboxu). `CODELOUPE_UPDATE_*` a `CODELOUPE_APP_CLI` zůstávají: prostředí aplikace řídí ten, kdo ji spouští, a ten už
   umí spustit cokoli jako uživatel; „podepsaný testovací háček“ by byl obřad bez hranice.
