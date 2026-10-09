@@ -131,21 +131,21 @@ export function Workspaces({ route }: { route: Route }) {
         </div>
       </section>
 
-      {toConfirm.length > 0 && <ConfirmCard entries={toConfirm} onDone={reloadAll} />}
+      {toConfirm.length > 0 && <ConfirmCard entries={toConfirm} planHash={plan.data?.planHash} onDone={reloadAll} />}
 
       <Card bodyClass="">
         <DataTable label="Workspaces" rows={shown} columns={columns(sizes, !repo && repos.length > 1)} rowKey={r => r.id} selected={route.id}
           onOpen={r => go('workspaces', r.id)} shortcuts={settings?.shortcuts} empty="No workspace matches the filter." />
       </Card>
       {route.id && (selected
-        ? <WorkspaceDrawer row={selected} onClose={() => go('workspaces')} onChanged={reloadAll} />
+        ? <WorkspaceDrawer row={selected} planHash={plan.data?.planHash} onClose={() => go('workspaces')} onChanged={reloadAll} />
         : <Drawer title={route.id} onClose={() => go('workspaces')}><ErrorState title="Workspace not found" message="This workspace is not in the registry." /></Drawer>)}
     </>
   );
 }
 
 /** Everything waiting for a yes, across workspaces; the yes itself is given in a native dialog that lists what goes. */
-function ConfirmCard({ entries, onDone }: { entries: PlanEntry[]; onDone(): void }) {
+function ConfirmCard({ entries, planHash, onDone }: { entries: PlanEntry[]; planHash: string | undefined; onDone(): void }) {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const action = useAction<ReconcileOutcome>();
   const keys = entries.map(e => e.key).join('|');
@@ -153,7 +153,7 @@ function ConfirmCard({ entries, onDone }: { entries: PlanEntry[]; onDone(): void
 
   const toggle = (k: string) => setPicked(prev => { const n = new Set(prev); if (!n.delete(k)) n.add(k); return n; });
   const remove = async () => {
-    const result = await action.run(() => bridge().actions.reconcileRun({ keys: [...picked] }));
+    const result = await action.run(() => bridge().actions.reconcileRun({ keys: [...picked], planHash }));
     if (result?.results.length) { setPicked(new Set()); onDone(); }
   };
 
@@ -193,7 +193,7 @@ function Outcome({ outcome }: { outcome: ReconcileOutcome | { ok: boolean; messa
   );
 }
 
-function WorkspaceDrawer({ row, onClose, onChanged }: { row: WorkspaceRow; onClose(): void; onChanged(): void }) {
+function WorkspaceDrawer({ row, planHash, onClose, onChanged }: { row: WorkspaceRow; planHash: string | undefined; onClose(): void; onChanged(): void }) {
   const release = useAction();
   const cleanup = useAction<ReconcileOutcome>();
   const ws = row.ws;
@@ -205,7 +205,7 @@ function WorkspaceDrawer({ row, onClose, onChanged }: { row: WorkspaceRow; onClo
     if (r?.ok) onChanged();
   };
   const doCleanup = async () => {
-    const r = await cleanup.run(() => bridge().actions.reconcileRun({ keys: waiting.map(e => e.key) }));
+    const r = await cleanup.run(() => bridge().actions.reconcileRun({ keys: waiting.map(e => e.key), planHash }));
     if (r?.results.length) onChanged();
   };
 

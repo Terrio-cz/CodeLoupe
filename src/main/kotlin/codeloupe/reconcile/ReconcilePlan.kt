@@ -11,4 +11,6 @@ data class ReconcilePlan(
     val counts: Map<String, Int> = emptyMap(),
     val entries: List<PlanEntry> = emptyList(),
     val problems: List<String> = emptyList(),
+    /** [PlanHash] of [entries]: what a `POST /reconcile/run` that confirms entries must send back. */
+    val planHash: String = "",
 )

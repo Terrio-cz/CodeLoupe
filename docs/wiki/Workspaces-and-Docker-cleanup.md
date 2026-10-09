@@ -94,9 +94,18 @@ directory it says what the policy does and why. Unowned resources are not in it 
 | `keep` | the workspace is active; its repository is not in the registry; younger than the grace period | stays |
 | `protected` | a `protect` rule of the config matches | never touched, whatever else holds |
 
-`--run` (or `POST /reconcile/run` with `{"confirm": [keys], "workspaces": [names]}`) does it now: the `auto` entries plus
+**A confirm is bound to the plan the person saw.** The dry run carries a `planHash`, a fingerprint of the entries (target, kind, workspace,
+ownership and verdict; not the clock, the retry counters or the wording of a reason), and the CLI prints it (`plan <hash>`). A confirm (`--confirm`,
+`--workspace`, or `confirm` / `workspaces` in `POST /reconcile/run`) must send the hash of the plan that was shown: `--plan <hash>` on the
+command line, `planHash` in the body (the desktop app sends the hash of the plan its dialog listed). Without it the daemon answers 428; if the plan it
+holds when the call arrives hashes differently (a resource appeared, a workspace changed state) it answers 409 with the current plan and removes nothing, so
+a click on a stale list, or a script told to confirm blind, cannot delete what the person never saw. Runs by the scheduler and `--run` without a
+confirm are not affected. `POST /workspaces/release` has no plan to bind: it only marks a workspace released, and the cleanup that follows is
+the reconcile plan above, which an `auto` entry of a released workspace already shows.
+
+`--run` (or `POST /reconcile/run` with `{"confirm": [keys], "workspaces": [names], "planHash": "…"}`) does it now: the `auto` entries plus
 what is named (`"auto": false` leaves the `auto` entries out; the app sends it, so it removes only what the person confirmed). A named `keep` or `protected` entry is refused. The plan is re-read from the registry and Docker for every
-run, so a stale key removes nothing it should not. Removal goes through the Engine API, containers first (stopped, removed
+run, so a stale key removes nothing it should not (and a stale plan hash is refused before anything is touched). Removal goes through the Engine API, containers first (stopped, removed
 with their anonymous volumes), then networks, volumes, images, never forced: a resource that is in use is *blocked*, not
 killed. A container is read again just before it is stopped: one that was stopped when planned and has been started since, or whose labels no longer name the workspace, is left (blocked) until the next plan.
 An orphan directory is deleted without following links; a file that is still locked (Windows) leaves it blocked.

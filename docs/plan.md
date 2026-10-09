@@ -1456,6 +1456,28 @@ rozhoduje launcher.
 - Odvozený klíč z passphrase se po použití vynuluje a `PBEKeySpec` smaže heslo; timeout `Exec.run` pokrývá i čtení výstupu (už platilo,
   `ExecTimeoutTest`). Rozlišení velkých a malých písmen v id rozsahu je CL-172.
 
+### Výsledek CL-169 — potvrzení vázané na plán, který člověk viděl (2026-10-09)
+
+- `GET /reconcile` vrací `planHash` (SHA-256 z položek: klíč, druh, jméno, repo, workspace, vlastnictví, stav workspace, verdikt, released, cesta;
+  bez času, počítadel pokusů a textu důvodu). `POST /reconcile/run` s `confirm` nebo `workspaces` musí poslat `planHash`: chybí → 428, plán
+  daemonu se mezitím změnil → 409 s aktuálním plánem a nic se nesmaže. Kontrola běží uvnitř zámku `Reconciler.run` nad snímkem, podle kterého se
+  pak maže, takže mezi kontrolou a mazáním se plán nezmění. Běhy plánovače a `--run` bez potvrzení se hashe netýkají.
+- `POST /workspaces/release` plán nemá: jen označí workspace jako uvolněný a úklid, který následuje, je právě reconcile plán, který tytéž
+  položky už ukazuje jako `auto`; vázat na hash tedy nelze a není co.
+- CLI: `ws reconcile --confirm|--workspace` vyžaduje `--plan <hash>` z výpisu suchého běhu (řádek `plan <hash>`); na 409 vypíše nový plán.
+  Aplikace posílá hash plánu, který vypsal její nativní dialog, a odmítne požadavek, jehož hash stránky se liší od čerstvého plánu.
+
+### Výsledek CL-171 — zkopírované tajemství se schová ve schránce (2026-10-09)
+
+- Electron 44 zapíše text a nativní formáty jedním `clipboard.write([new ClipboardItem({...})])`; nativní formát se předá jako klíč
+  `electron application/osclipboard;format="<název>"` s `Blob` (stejný zápis, jaký dokumentuje `has`). Zkoušeno na Windows: v reálném Electronu 44.6.0
+  jsou na schránce `ExcludeClipboardContentFromMonitorProcessing` = 1, `CanIncludeInClipboardHistory` = 0 a `CanUploadToCloudClipboard` = 0 vedle textu
+  (čteno přes `EnumClipboardFormats`). Starší `writeBuffer` by text smazal, proto se nepoužívá.
+- Kód: `app/src/main/env/concealedClipboard.ts` (formáty podle platformy, při chybě záloha na čistý text), `registerEnv.ts` ho předává jako
+  `clipboard.writeConcealed`, `EnvManager.reveal` ho používá a minutové mazání zůstává. Pozn.: kopírování je v aplikaci jen na macOS (Touch ID).
+- macOS (`org.nspasteboard.ConcealedType`) a Linux (`x-kde-passwordManagerHint`) ověřuje CI job `clipboard` (Electron + nástroje platformy:
+  `osascript`/NSPasteboard, `xclip -t TARGETS`), protože v tomto okně žádný Mac ani Linux není.
+
 ### Výsledek CL-172 — velikost písmen v id rozsahu tajemství (2026-10-09)
 
 - `SecretScope.normalize` zmenšuje id jen tam, kde souborový systém velikost písmen nerozlišuje (Windows, macOS s výchozím svazkem); na Linuxu

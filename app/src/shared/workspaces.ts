@@ -100,6 +100,8 @@ export interface ReconcilePlan {
   counts: Record<string, number>;
   entries: PlanEntry[];
   problems: string[];
+  /** Fingerprint of the entries; a confirm sends the one of the plan the person saw (`POST /reconcile/run`). */
+  planHash: string;
 }
 
 export interface ReleaseStatus {

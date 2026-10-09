@@ -52,9 +52,18 @@ class Reconciler(
     /**
      * Attempts what is allowed: the `auto` entries when [auto], the `confirm` entries named by [confirm] (keys) or
      * [workspaces] (names, any repo). Entries whose backoff has not run out wait, unless [confirm] names them.
+     * With [shownPlan] (the [ReconcilePlan.planHash] the person saw) a confirm is checked against the plan this run executes: a different
+     * plan throws [StalePlan] before anything is touched.
      */
-    suspend fun run(trigger: String, auto: Boolean, confirm: Set<String> = emptySet(), workspaces: Set<String> = emptySet()): ReconcileRun = lock.withLock {
+    suspend fun run(
+        trigger: String,
+        auto: Boolean,
+        confirm: Set<String> = emptySet(),
+        workspaces: Set<String> = emptySet(),
+        shownPlan: String? = null,
+    ): ReconcileRun = lock.withLock {
         val first = snapshot(registry, overlap = false)
+        if (shownPlan != null && shownPlan != first.plan.planHash) throw StalePlan(first.plan)
         // A protect rule that could not be read protects nothing: removing anything on the strength of the others would fail open.
         if (config.invalidProtect > 0) return@withLock ReconcileRun(IsoTime.now(), trigger, emptyList(), first.plan)
         val entries = first.entries
@@ -144,6 +153,6 @@ class Reconciler(
         if (complete) state.retain(entries.filter { it.verdict == Verdict.AUTO || it.verdict == Verdict.CONFIRM }.mapTo(HashSet()) { it.key })
         val counts = entries.groupingBy { it.verdict.name.lowercase() }.eachCount().toSortedMap()
         if (report.engine != null) latest = entries
-        return Snapshot(entries, ReconcilePlan(IsoTime.now(), config.auto, counts, entries, report.problems + running.problems.filter { it !in report.problems } + protectProblem()), complete)
+        return Snapshot(entries, ReconcilePlan(IsoTime.now(), config.auto, counts, entries, report.problems + running.problems.filter { it !in report.problems } + protectProblem(), PlanHash.of(entries)), complete)
     }
 }

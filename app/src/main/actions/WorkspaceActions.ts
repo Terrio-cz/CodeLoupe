@@ -12,6 +12,7 @@ export type Confirm = (question: { message: string; detail: string; accept: stri
 
 const KEY = /^(container|network|volume|image|directory):.{1,500}$/;
 const MAX_KEYS = 200;
+const PLAN_HASH = /^[A-Za-z0-9]{8,64}$/;
 const SHOWN = 12;
 
 /** `3 resources`: the noun agrees with the number. */
@@ -62,6 +63,9 @@ export class WorkspaceActions {
     if (!keys || keys.length === 0 || keys.length > MAX_KEYS || !keys.every(k => typeof k === 'string' && KEY.test(k))) return { ...refused('Invalid selection.'), results: [] };
 
     const plan = await this.daemon.get<ReconcilePlan>('/reconcile');
+    // The hash of the plan the screen showed must still be the daemon's: the person clicked on a list that is no longer the plan otherwise.
+    if (req?.planHash !== undefined && (typeof req.planHash !== 'string' || !PLAN_HASH.test(req.planHash))) return { ...refused('Invalid selection.'), results: [] };
+    if (req?.planHash !== undefined && req.planHash !== plan.planHash) return { ...refused('The cleanup plan has changed in the meantime; refresh the screen.'), results: [] };
     const wanted = [...new Set(keys)].map(k => plan.entries.find(e => e.key === k));
     if (wanted.some(e => !e)) return { ...refused('The cleanup plan has changed in the meantime; refresh the screen.'), results: [] };
     const entries = wanted as PlanEntry[];
@@ -75,7 +79,14 @@ export class WorkspaceActions {
     });
     if (!ok) return { ok: false, message: 'Cancelled.', results: [] };
 
-    const run = await this.daemon.post<{ actions: ReconcileAction[] }>('/reconcile/run', { confirm: entries.map(e => e.key), auto: false });
+    // The dialog listed this plan: the daemon removes nothing if its plan is another one by the time the call arrives.
+    let run: { actions: ReconcileAction[] };
+    try {
+      run = await this.daemon.post<{ actions: ReconcileAction[] }>('/reconcile/run', { confirm: entries.map(e => e.key), auto: false, planHash: plan.planHash });
+    } catch (e) {
+      if ((e as { status?: number }).status === 409) return { ...refused('The cleanup plan changed while the dialog was open; nothing was removed. Refresh the screen.'), results: [] };
+      throw e;
+    }
     const named = new Set(entries.map(e => e.key));
     const results = run.actions.filter(a => named.has(a.key));
     const count = (o: ReconcileAction['outcome']) => results.filter(a => a.outcome === o).length;

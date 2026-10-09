@@ -102,9 +102,10 @@ class ReconcileIntegrationTest {
                 assertEquals(setOf("$name-keep", "$name-active", "$name-adopted", "$name-unowned"), names(docker, name))
 
                 // A protected or kept resource cannot be forced by naming it; the adopted one goes when named.
+                val shown = JsonFormat.json.decodeFromString(ReconcilePlan.serializer(), http(config, "GET", "/reconcile").body()).planHash
                 val forced = JsonFormat.json.decodeFromString(
                     ReconcileRun.serializer(),
-                    http(config, "POST", "/reconcile/run", """{"confirm":["volume:$name-keep","volume:$name-active","volume:$name-adopted","volume:$name-unowned"]}""").body(),
+                    http(config, "POST", "/reconcile/run", """{"planHash":"$shown","confirm":["volume:$name-keep","volume:$name-active","volume:$name-adopted","volume:$name-unowned"]}""").body(),
                 )
                 assertEquals(setOf("volume:$name-adopted"), forced.actions.filter { it.outcome == ActionOutcome.REMOVED }.map { it.key }.toSet())
                 assertEquals(setOf("$name-keep", "$name-active", "$name-unowned"), names(docker, name))
