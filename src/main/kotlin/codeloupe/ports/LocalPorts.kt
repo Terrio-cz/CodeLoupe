@@ -1,9 +1,9 @@
 package codeloupe.ports
 
+import codeloupe.platform.ToolOutput
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.util.concurrent.TimeUnit
 
 /** The ports of this machine: bound and connected to for [inUse], `netstat` / `ss` / `lsof` for [listeners]. */
 class LocalPorts(private val os: String = System.getProperty("os.name")) : PortProbe {
@@ -36,12 +36,7 @@ class LocalPorts(private val os: String = System.getProperty("os.name")) : PortP
     // The command line of a process, or its executable when the OS keeps the arguments from us.
     private fun describe(pid: Long): String? = ProcessHandle.of(pid).map { h -> h.info().commandLine().orElseGet { h.info().command().orElse(null) } }.orElse(null)
 
-    private fun output(vararg command: String): String {
-        val process = ProcessBuilder(*command).redirectErrorStream(true).start()
-        val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
-        if (!process.waitFor(TOOL_SECONDS, TimeUnit.SECONDS)) process.destroyForcibly()
-        return out
-    }
+    private fun output(vararg command: String): String = ToolOutput.read(TOOL_SECONDS, *command, mergeErrors = true)
 
     private companion object {
         const val CONNECT_MS = 200
