@@ -3,12 +3,14 @@ package codeloupe.cli
 import codeloupe.config.ConfigLoader
 import codeloupe.secrets.SecretScope
 import codeloupe.secrets.SecretStore
+import codeloupe.secrets.VaultLocation
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
+import java.nio.file.Files
 
 class EnvSetCommand : CliktCommand(name = "set") {
     private val name by argument(help = "Variable name, e.g. YOUTRACK_TOKEN")
@@ -20,11 +22,15 @@ class EnvSetCommand : CliktCommand(name = "set") {
     override fun run() {
         val value = System.console()?.readPassword("value for $name (hidden): ")?.let { String(it) } ?: generateSequence(::readLine).joinToString("\n")
         if (value.isEmpty()) throw UsageError("no value on stdin")
+        val home = ConfigLoader.load().home
+        val vault = home.resolve("secrets").resolve("vault.env")
+        val creating = !Files.exists(vault)
         val meta = try {
-            SecretStore.open(ConfigLoader.load().home).set(name, SecretScope.parse(scope), value.trimEnd('\r', '\n'), source)
+            SecretStore.open(home).set(name, SecretScope.parse(scope), value.trimEnd('\r', '\n'), source)
         } catch (e: IllegalArgumentException) {
             throw UsageError(e.message.orEmpty())
         }
         echo("${if (meta.rotated != null) "replaced" else "stored"} ${meta.name} in ${meta.scope}")
+        if (creating) VaultLocation.cacheWarning(vault)?.let { echo(it, err = true) }
     }
 }

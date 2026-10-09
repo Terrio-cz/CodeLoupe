@@ -12,7 +12,12 @@ class PassphraseProtector(private val passphrase: CharArray, private val iterati
 
     override fun wrap(key: ByteArray): String {
         val salt = ByteArray(16).also(random::nextBytes)
-        val sealed = SecretCrypto.seal(derive(salt, iterations), Base64.getEncoder().encodeToString(key), AAD)
+        val derived = derive(salt, iterations)
+        val sealed = try {
+            SecretCrypto.seal(derived, Base64.getEncoder().encodeToString(key), AAD)
+        } finally {
+            derived.fill(0)
+        }
         return listOf("pbkdf2", iterations, Base64.getEncoder().encodeToString(salt), sealed.nonce, sealed.value).joinToString(":")
     }
 
@@ -21,17 +26,26 @@ class PassphraseProtector(private val passphrase: CharArray, private val iterati
         require(parts.size == 5 && parts[0] == "pbkdf2") { "not a passphrase-wrapped key" }
         val rounds = parts[1].toIntOrNull()
         require(rounds != null && rounds in 1..MAX_ITERATIONS) { "not a passphrase-wrapped key" }
-        val key = derive(Base64.getDecoder().decode(parts[2]), rounds)
+        val derived = derive(Base64.getDecoder().decode(parts[2]), rounds)
         val plain = try {
-            SecretCrypto.open(key, SecretCrypto.Sealed(parts[3], parts[4]), AAD)
+            SecretCrypto.open(derived, SecretCrypto.Sealed(parts[3], parts[4]), AAD)
         } catch (e: java.security.GeneralSecurityException) {
             throw IllegalStateException("wrong passphrase for this vault")
+        } finally {
+            derived.fill(0)
         }
         return Base64.getDecoder().decode(plain)
     }
 
-    private fun derive(salt: ByteArray, rounds: Int): ByteArray =
-        SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(PBEKeySpec(passphrase, salt, rounds, SecretCrypto.KEY_BYTES * 8)).encoded
+    /** The key stretched from the passphrase; the caller clears it after use, and the spec's own copy of the passphrase is cleared here. */
+    private fun derive(salt: ByteArray, rounds: Int): ByteArray {
+        val spec = PBEKeySpec(passphrase, salt, rounds, SecretCrypto.KEY_BYTES * 8)
+        try {
+            return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
+        }
+    }
 
     companion object {
         /** The cost of a new vault; the count is stored with the key, so a vault made with fewer keeps opening. */

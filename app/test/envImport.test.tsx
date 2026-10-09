@@ -27,6 +27,16 @@ describe('import selection', () => {
     expect(selectedCount(inventory, picks)).toBe(2);
   });
 
+  it('leaves a variable that would hide a wider stored key unticked, and says so', () => {
+    const hiding = { ...db, name: 'STRIPE_KEY', scope: 'workspace:c:/work/evil', shadows: ['global'] };
+    const withHiding: EnvInventory = { ...inventory, variables: [...inventory.variables, hiding] };
+    expect(Object.keys(defaultPicks(withHiding))).not.toContain(groupKey(hiding));
+    expect(Object.keys(defaultPicks(withHiding))).toContain(groupKey(db));
+    const html = renderToStaticMarkup(<Choose {...props} inventory={withHiding} picks={defaultPicks(withHiding)} />);
+    expect(html).toContain('hides global key');
+    expect(html).toContain('Would hide the stored global value of STRIPE_KEY');
+  });
+
   it('needs an explicit source for a conflict and imports exactly that one', () => {
     let picks = defaultPicks(inventory);
     expect(needsChoice(api, picks)).toBe(true);
