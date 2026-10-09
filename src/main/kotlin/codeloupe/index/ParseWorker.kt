@@ -24,10 +24,11 @@ object ParseWorker {
         System.setOut(System.err)
         val lastActive = AtomicLong(System.currentTimeMillis())
         val working = java.util.concurrent.atomic.AtomicBoolean(false)
+        val parent = ProcessHandle.current().parent().orElse(null)
         Thread {
             while (true) {
                 Thread.sleep(WATCH_MS)
-                if (!working.get() && System.currentTimeMillis() - lastActive.get() > idleMs) exitProcess(0)
+                if (shouldEnd(parent?.isAlive != false, working.get(), System.currentTimeMillis() - lastActive.get(), idleMs)) exitProcess(0)
             }
         }.apply { isDaemon = true }.start()
         val requests = BufferedReader(InputStreamReader(System.`in`, Charsets.UTF_8), BUFFER)
@@ -42,6 +43,12 @@ object ParseWorker {
             working.set(false)
         }
     }
+
+    /**
+     * Whether the worker ends: its parent is gone (a daemon that crashed while the worker was inside a parse, which never reads the
+     * closed pipe), or nothing was asked for [idleMs] and no parse is under way.
+     */
+    internal fun shouldEnd(parentAlive: Boolean, working: Boolean, idleForMs: Long, idleMs: Long): Boolean = !parentAlive || (!working && idleForMs > idleMs)
 
     /** The JVM flags the daemon starts a worker with: a small heap, the compiler's parser needs no more for a file of 512 KB. */
     val JVM_ARGS = listOf(
