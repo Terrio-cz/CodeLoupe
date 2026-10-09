@@ -1,0 +1,25 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.{kt,kts,java}]
+indent_size = 4
+
+# Hard line breaks in Markdown are two trailing spaces.
+[*.md]
+trim_trailing_whitespace = false
+
+# Windows batch files are committed with CRLF (.gitattributes).
+[*.{bat,cmd}]
+end_of_line = crlf
+
+# Golden outputs and fixtures are compared byte for byte.
+[src/test/resources/**]
+insert_final_newline = unset
+trim_trailing_whitespace = unset

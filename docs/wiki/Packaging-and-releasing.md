@@ -71,6 +71,14 @@ A release is a tag. `git tag v1.2.3 && git push origin v1.2.3` runs [release.yml
 The release notes list one line per card (`CL-<n>` and its commit subjects since the previous `v*` tag), merges
 skipped, commits without a card under *Other*. Card titles are not in them: the workflow has no tracker access.
 
+### Changelog
+
+There is no `CHANGELOG.md` to keep by hand: the release notes above are the changelog, generated from the commit subjects
+by `tools/release-notes.mjs` (`node tools/release-notes.mjs <tag> [--from <previous tag>]` prints them) and attached to
+each [GitHub release](https://github.com/Terrio-cz/CodeLoupe/releases). A change is therefore described by its commit
+subject: one imperative, lowercase line that starts with the card (`CL-<n> …`) when there is one. Contributors outside the
+project need no card; their commits are listed under *Other*. See [CONTRIBUTING.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/CONTRIBUTING.md).
+
 ### One version everywhere
 
 The tag's version goes into Gradle (`-PreleaseVersion`: jar name, `build.properties`, `codeloupe --version`, `/status`,

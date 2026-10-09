@@ -115,8 +115,10 @@ In the repository: [docs/plan.md](docs/plan.md) (plan, decisions, measurements; 
 
 ## Contributing and status
 
-Issues and pull requests are welcome; build, test and conventions are in
-[Development](https://github.com/Terrio-cz/CodeLoupe/wiki/Development). The wiki is edited as files in [`docs/wiki`](docs/wiki).
+Issues and pull requests are welcome; read [CONTRIBUTING.md](CONTRIBUTING.md) (build, test, checks, licence of
+contributions) and the [Code of Conduct](CODE_OF_CONDUCT.md), and see
+[Development](https://github.com/Terrio-cz/CodeLoupe/wiki/Development) for the layout. Report a vulnerability privately,
+as [SECURITY.md](SECURITY.md) describes. The wiki is edited as files in [`docs/wiki`](docs/wiki).
 Early: version 0.1.0, no public release yet. Roadmap and results per step: [docs/plan.md](docs/plan.md). Limits that matter
 (Kotlin and Java only, syntax-level resolution, no semantic search) are in
 [FAQ and troubleshooting](https://github.com/Terrio-cz/CodeLoupe/wiki/FAQ-and-troubleshooting).

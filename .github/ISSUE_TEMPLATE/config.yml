@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or how-to
+    url: https://github.com/Terrio-cz/CodeLoupe/wiki/FAQ-and-troubleshooting
+    about: The wiki answers most questions; start with the FAQ and troubleshooting page.
+  - name: Security vulnerability
+    url: https://github.com/Terrio-cz/CodeLoupe/security/policy
+    about: Report it privately, not in a public issue. The policy says how.

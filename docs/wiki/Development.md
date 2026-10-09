@@ -93,7 +93,11 @@ there).
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/Terrio-cz/CodeLoupe). Keep changes small and
-tested: run the suites above, add a test next to the code (`src/test/kotlin`, fixtures through `TestRepos`), and update the
-wiki page that describes what you change. The project is source-available under the
-[PolyForm Noncommercial License 1.0.0](https://github.com/Terrio-cz/CodeLoupe/blob/main/LICENSE).
+Issues and pull requests are welcome on [GitHub](https://github.com/Terrio-cz/CodeLoupe). Read
+[CONTRIBUTING.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/CONTRIBUTING.md) first: build and test commands, the checks CI runs (including the
+private-names and wiki-link checks), commit style and how contributions are licensed. Keep changes small and tested: add
+a test next to the code (`src/test/kotlin`, fixtures through `TestRepos`), and update the wiki page that describes what you
+change. The project follows a [Code of Conduct](https://github.com/Terrio-cz/CodeLoupe/blob/main/CODE_OF_CONDUCT.md); report a vulnerability privately as
+[SECURITY.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/SECURITY.md) describes, never in a public issue. Issues and pull requests start from templates in
+[.github](https://github.com/Terrio-cz/CodeLoupe/tree/main/.github); `.editorconfig` and `.gitattributes` keep whitespace and line endings (LF in the repository) from
+drifting. The project is source-available under the [PolyForm Noncommercial License 1.0.0](https://github.com/Terrio-cz/CodeLoupe/blob/main/LICENSE).
