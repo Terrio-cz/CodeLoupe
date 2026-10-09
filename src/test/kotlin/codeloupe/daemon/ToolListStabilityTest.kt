@@ -42,7 +42,7 @@ class ToolListStabilityTest {
 
     private fun listing(config: Config): String = runBlocking {
         val client = Client(Implementation(name = "test", version = "0"))
-        client.connect(StreamableHttpClientTransport(HttpClient(ClientCIO) { install(SSE) }, "http://127.0.0.1:${config.port}/mcp") { headers.append(CodeLoupe.HEADER, "1") })
+        client.connect(StreamableHttpClientTransport(HttpClient(ClientCIO) { install(SSE) }, "http://127.0.0.1:${config.port}/mcp") { headers.append(CodeLoupe.HEADER, "1"); headers.append(CodeLoupe.TOKEN_HEADER, TestToken.of(config.port)) })
         try {
             Json.encodeToString(ListToolsResult.serializer(), client.listTools())
         } finally {
