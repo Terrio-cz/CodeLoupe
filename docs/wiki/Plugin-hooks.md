@@ -29,7 +29,7 @@ and a hook cannot be switched off for the default port only, so both handlers wo
 
 It stays out of the way when the daemon is not running or has not indexed the repository, when the file is not in the index
 or has fewer lines than `minLines`, when the command is not about Kotlin or Java source (builds, git, `.md`/`.json` files, a
-search of a pipe's output, a read cut short by `head`/`grep`), when a read has `offset` or `limit`, and when the same command
+search of a pipe's output, a search whose output feeds an edit such as `rg -l Foo | xargs sed -i …`, a read cut short by `head`/`grep`), when a read has `offset` or `limit`, and when the same command
 comes again in the session (the agent insisted). A session gets at most `maxPerSession` pieces of advice, and none after `giveUpAfter` in
 a row without a CodeLoupe call on that repository in between: an agent that cannot or will not use the tools is not nagged, and one that does use them is advised again.
 

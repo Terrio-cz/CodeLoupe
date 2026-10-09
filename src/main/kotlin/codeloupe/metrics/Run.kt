@@ -13,6 +13,7 @@ data class Run(
     val usage: Usage,
     val peakContext: Long,
     val tools: List<ToolCall>,
+    val startCtx: StartCtx? = null,
 ) {
     val wallSec: Long
         get() = if (start != null && end != null) Math.round((java.time.Instant.parse(end).toEpochMilli() - java.time.Instant.parse(start).toEpochMilli()) / 1000.0) else 0

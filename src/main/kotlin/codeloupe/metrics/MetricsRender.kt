@@ -14,6 +14,7 @@ object MetricsRender {
             lines += "$role  runs ${a.runs}  cost med ${fmt(a.cost.median)} p75 ${fmt(a.cost.p75)} Σ ${fmt(a.cost.sum)}  peakCtx med ${fmt(a.peakContext.median)}  " +
                 "turns med ${a.turns.median}  wall med ${a.wallSec.median}s  codeRead med ${a.codeReadCalls.median} calls / ${fmt(a.codeReadChars.median)} ch, " +
                 "rereads med ${a.codeRereads.median}, editErr Σ ${a.codeEditErrors.sum}/${a.codeEditCalls.sum}"
+            a.start?.let { lines += StartRender.line(it) }
             lines += "   tool results = ${percent(a.toolResultCostPct)}% of cost: " +
                 a.categories.entries.take(CATEGORIES_SHOWN).joinToString("  ") { (c, v) -> "$c ${percent(v.costPct)}%" }
             if (roles != null) a.topCommands.take(COMMANDS_SHOWN).forEach { lines += "     ${percent(it.costPct)}%  ${it.calls}×  ${it.cmd}" }
@@ -33,6 +34,7 @@ object MetricsRender {
                 "codeReadChars" to (x.codeReadChars to y.codeReadChars), "codeRereads" to (x.codeRereads to y.codeRereads),
                 "codeEditErrors" to (x.codeEditErrors to y.codeEditErrors), "toolErrors" to (x.toolErrors to y.toolErrors),
             )
+            lines += StartRender.compare(x.start, y.start)
             lines += "   " + figures.joinToString("  ") { (name, pair) -> change(name, pair.first.median, pair.second.median) }
         }
         return lines.joinToString("\n")
@@ -49,5 +51,5 @@ object MetricsRender {
         else -> n.toString()
     }
 
-    private fun percent(x: Double) = if (x == Math.floor(x)) x.toLong().toString() else x.toString()
+    internal fun percent(x: Double) = if (x == Math.floor(x)) x.toLong().toString() else x.toString()
 }

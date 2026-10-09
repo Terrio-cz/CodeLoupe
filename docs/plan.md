@@ -443,7 +443,7 @@ Odhad: fáze 1–2 jedno okno, 3–5 druhé, 6 třetí, 7 běží s reálnými t
   Host/Origin/hlavička, single instance, MCP přes restart).
 - Home: `%LOCALAPPDATA%codeloupe` / `~/Library/Caches/codeloupe` / `$XDG_CACHE_HOME/codeloupe`
   (`CODELOUPE_HOME`), port 47391 (`CODELOUPE_PORT`), `config.json` v home.
-- Měření: `codeloupe metrics collect|compare|gaps|boilerplate` (CL-21, CL-22, CL-35); `run/codemetrics.mjs` v Terrio workspace dává na stejných transcriptech stejná čísla.
+- Měření: `codeloupe metrics collect|compare|gaps|boilerplate` (CL-21, CL-22, CL-35); `run/codemetrics.mjs` v Terrio workspace dává na stejných transcriptech stejná čísla, včetně bloku `start` (počáteční kontext, CL-168; test `StartContextTest` drží čísla ze skriptu na dvou fixturách). Výjimka záměrně: volání CodeLoupe mají kategorii `codeloupe`, skript je řadí do `other` / `shell_other`; velikost MCP schémat (`--mcp` ve skriptu) Kotlin neměří.
 
 ### Výsledek portu na Kotlin/JVM (CL-56, 2026-10-07)
 
@@ -1112,12 +1112,13 @@ rozhoduje launcher.
   Vypínač na jednom místě: `config.json` `hooks.enabled=false` (čte se při každém volání, bez restartu) nebo `CODELOUPE_HOOKS=off`. Formáty vstupu a výstupu hooků jsou podle
   dokumentace Claude Code; živé ověření nebylo možné (účet narazil na týdenní limit), `claude plugin validate --strict` prošel.
 - **Nezasahuje**: daemon neběží (skript končí bez čekání, když chybí `daemon.json`; zastaralý `daemon.json` stojí nejvýš `--connect-timeout 0.3`), repozitář nebyl indexován (hook nikdy nespouští build),
-  soubor není v bázi nebo je kratší než `minLines`, `Read` s `offset`/`limit`, příkaz není hledání/čtení zdrojáku (build, git, `.md`/`.json`, hledání ve výstupu roury, čtení useknuté `head`/`grep`),
+  soubor není v bázi nebo je kratší než `minLines`, `Read` s `offset`/`limit`, příkaz není hledání/čtení zdrojáku (build, git, `.md`/`.json`, hledání ve výstupu roury, hledání, jehož výstup krmí úpravu (`rg -l Foo | xargs sed -i …`, `| Set-Content`), čtení useknuté `head`/`grep`),
   stejný příkaz podruhé v relaci, relace po `maxPerSession` (40) radách a relace, která `giveUpAfter` (4) rad za sebou nepoužila žádné volání CodeLoupe na tom repozitáři
   (agent bez nástrojů, např. `terrio-coder`, tak dostane nejvýš čtyři rady). Rada má kolem 260 znaků (≈ 65 tokenů při 4 znacích na token).
 - **Tabulka rozhodnutí**: `SteeringTest` (tvary příkazů: hledání, čtení, roury, uvozovky, here-dokument, Windows `C:\`, `/c/`, PowerShell, a vše, čeho se nesmí dotknout), `ShellWordsTest`,
   `PatternShapeTest`, `HooksTest` (režimy, opakování, limity, výpadek indexu a konfigurace), `HooksDaemonTest` (skutečný daemon a repozitář, nezaindexovaný repozitář = 204, hlavička, skript
   `hook.sh` včetně mrtvého portu, chybějícího `daemon.json`, `CODELOUPE_HOOKS=off`, nesmyslného vstupu), `HookUsageTest`, `HookReplayTest`.
+- **Okrajové případy (CL-164)**: nástroj `PowerShell` se čte vlastním dialektem (`ShellDialect`): zpětné lomítko není escape, zpětný apostrof escapuje nebo pokračuje řádek, `''`/`""` je uvozovka, `&` volá příkaz, `( … )` je jedno slovo (`(Get-Content a.kt) -replace … | Set-Content a.kt` zůstane jeden řetězec příkazů s rourou), `@'…'@` je řetězec, `cat`/`type` jsou `Get-Content` i s parametry (`-TotalCount`); hledání, jehož výstup po rouře (`xargs`, `while read`) upravuje soubory (`sed -i`, `perl -pi`, `sd`, `Set-Content`), není dotaz na index; hodnota `-f/--file` (soubor vzorů) není vzor ani cíl, takže `grep -f patterns.txt -r src` nedostane `src` jako vzor. Rozbitá vstupní řádka (neuzavřená závorka, `@'`) skončí s řádkem a nikdy nevyhodí výjimku; hook dál selhává otevřeně.
 - **Měření nad skutečnými daty** (`codeloupe metrics hooks --replay --since 2026-10-01`, transkripty Terrio, 2 416 běhů, 61 861 volání Bash/PowerShell/Read; velikosti souborů podle výsledků v transkriptech,
   zmizelé worktree se berou jako indexované, je-li v jejich okolí git repozitář se zdrojáky = horní odhad toho, co by řekl daemon, který ty repozitáře zná):
   **11 003 volání (17,8 %) by dostalo radu**, kdyby se každá rada brala: `grep` 8 017, `usages` 1 142, celé čtení → `outline` 1 128 (ze 7 992 `Read`), `find` 563, výpis souborů → `outline`/`find` 112 + 41.
