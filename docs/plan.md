@@ -1161,6 +1161,23 @@ rozhoduje launcher.
   (~0,45 s), které na skenu nezávisí. Čtyři čtení tedy stojí jeden sken místo čtyř (součet −70 %), stěna při souběhu klesla o 15–40 %, ale pod 1,2 s se na 65 workspacech nedostala.
   Dál se nezrychlovalo (paralelní sken worktrees, souběh čtení procesů se skenem) bez dalšího měření; první čtení po startu zůstává o vteřiny delší (zahřívá JGit a historii úkolů).
 
+### Výsledek CL-144 — sken worktrees paralelně a čtení procesů souběžně se skenem (2026-10-09)
+
+- `WorkspaceScanner` čte worktrees jednoho repozitáře na čtyřech vláknech (`ScanPool`, vlákna po vteřině nečinnosti zanikají; pořadí i výsledek stejné, test porovnává paralelní a sekvenční sken
+  na deseti worktrees včetně smazaného adresáře a uvolněného úkolu). Suchý běh `GET /reconcile` spouští sken registru, snapshot Dockeru a tabulku procesů **najednou** (`Reconciler.snapshot(overlap = true)`,
+  `ResourceInventory.report(Deferred)`, `ProcessInventory.report(Deferred)` připojí seznam až při spojování); `POST /reconcile/run`, plánovač a uvolnění čtou dál jedno po druhém a vždy znovu
+  (registr, pak Docker, pak procesy), test hlídá pořadí. Sdílený sken a jeho zneplatnění (`invalidate`) se nezměnily.
+- **Měření** (jednorázový daemon, nový home, TerrioImporter 13 + CodeLoupe 63 = 76 workspaců, Docker Engine běží, stroj zatížený ostatními okny; bez trackeru, takže `tasks` nic nehledá; tři dvojice starý / nový
+  build střídavě, v každé medián z 6 kol, čtení se 3 s pauzou, aby každé kolo začalo čerstvým skenem; výstup `/workspaces` je v obou buildech stejný, kontrolováno otiskem cest, stavů, větví, commitů a aktivity):
+
+  | | starý (3 série) | nový (3 série) |
+  |---|---|---|
+  | čtyři routy naráz (stěna) | 2,52 / 1,30 / 1,23 s | 0,68 / 1,09 / 0,64 s |
+  | čtyři routy po sobě (součet) | 2,65 / 1,73 / 1,65 s | 1,01 / 1,57 / 1,06 s |
+  | první čtení po startu (čtyři naráz) | 4,4 / 3,4 / 3,3 s | 2,6 / 3,0 / 2,8 s |
+
+  Kritérium „pod 1,2 s naráz“ platí ve všech třech sériích (střední série měla celý stroj zatížený, starý build v ní měřil 1,30 s). První čtení po startu zůstává 2–3 s (zahřívá JGit a historii úkolů).
+
 ### Výsledek CL-136 — kontext na začátku relace (2026-10-09)
 
 - **Mechanismus**: `start-daemon.sh` (SessionStart `startup|resume|clear|compact`) po `codeloupe start` předá stdin skriptu `hook.sh` a ten zeptá daemona (`POST /hook`, čekání až 10 s).

@@ -3,6 +3,9 @@ package codeloupe.processes
 import codeloupe.platform.IsoTime
 import codeloupe.workspace.WorkspaceList
 import codeloupe.workspace.Workspaces
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -12,13 +15,19 @@ import kotlinx.coroutines.withContext
  */
 class ProcessInventory(private val workspaces: Workspaces, private val source: ProcessSource = SystemProcesses()) {
     /** [registry]: the workspace list to join with, when the caller has read it already. */
-    suspend fun report(registry: WorkspaceList? = null): ProcessReport = withContext(Dispatchers.IO) {
-        val list = registry ?: workspaces.recent()
+    suspend fun report(registry: WorkspaceList? = null): ProcessReport =
+        if (registry != null) read { registry } else coroutineScope { report(async { workspaces.recent() }) }
+
+    /** As [report], with the workspace list still being read: the process table is read meanwhile and the list awaited only to join. */
+    suspend fun report(registry: Deferred<WorkspaceList>): ProcessReport = read { registry.await() }
+
+    private suspend fun read(registry: suspend () -> WorkspaceList): ProcessReport = withContext(Dispatchers.IO) {
         val processes = try {
             source.read()
         } catch (e: Exception) {
             return@withContext ProcessReport(IsoTime.now(), problems = listOf("$PROBLEM ${e.message.orEmpty().lineSequence().first()}"))
         }
+        val list = registry()
         val entries = ProcessAttribution.attribute(processes, list)
         val ram = entries.groupBy { it.repo to it.workspace }.map { (_, same) ->
             val first = same.first()

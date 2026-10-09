@@ -1,0 +1,77 @@
+name: Bug report
+description: Something does not work as documented.
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please check the [FAQ and troubleshooting](https://github.com/Terrio-cz/CodeLoupe/wiki/FAQ-and-troubleshooting) page first.
+
+        **Do not paste secrets, tokens, `.env` contents or private code.** Replace them with placeholders before you submit. A
+        security problem belongs in a [private report](https://github.com/Terrio-cz/CodeLoupe/security/policy), not here.
+  - type: input
+    id: version
+    attributes:
+      label: CodeLoupe version
+      description: The output of `codeloupe --version`, or Settings → Version in the desktop app, or the commit if you built from source.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - CLI
+        - MCP tool (from an agent)
+        - Daemon
+        - Desktop app
+        - Claude Code plugin or hook
+        - Installer or updater
+        - Documentation
+        - Other
+  - type: textarea
+    id: command
+    attributes:
+      label: What did you run?
+      description: The command, tool call or the steps in the app. Redact paths, names and anything private.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The relevant lines of the output, `codeloupe status`, or `daemon.log`, redacted. Keep it short.
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Anything unusual about the setup
+      description: Java version if you run from source, a repository that is very large or not on a local disk, a proxy, a second daemon on another port.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed secrets, tokens and private code from everything above.
+          required: true

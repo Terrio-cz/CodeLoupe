@@ -8,3 +8,9 @@ src/test/resources/fixtures/** text eol=lf
 plugin/hooks/*.sh text eol=lf
 # SKILL.md frontmatter is matched with a LF-only pattern (app/test/pluginFiles.test.ts); CRLF broke it on Windows.
 plugin/skills/**/*.md text eol=lf
+# Any shell script runs under bash on every OS (CRLF breaks the shebang); binary assets are never touched.
+*.sh text eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.woff2 binary

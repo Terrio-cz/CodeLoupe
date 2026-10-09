@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an improvement or a new capability.
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [wiki](https://github.com/Terrio-cz/CodeLoupe/wiki) and the existing issues first. Do not paste secrets or private code.
+        CodeLoupe is source-available under the [PolyForm Noncommercial License 1.0.0](https://github.com/Terrio-cz/CodeLoupe/blob/main/LICENSE).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem do you want solved?
+      description: Describe the situation and what is hard today, not only the solution you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What did you try or consider instead?
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to work on it?
+      options:
+        - "No, I only suggest it"
+        - "Yes, I would open a pull request"

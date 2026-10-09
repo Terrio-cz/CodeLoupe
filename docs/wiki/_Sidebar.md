@@ -27,3 +27,5 @@
 * [Installers and updates](Installers-and-updates)
 * [Packaging and releasing](Packaging-and-releasing)
 * [Development](Development)
+* [Contributing](https://github.com/Terrio-cz/CodeLoupe/blob/main/CONTRIBUTING.md)
+* [Security policy](https://github.com/Terrio-cz/CodeLoupe/blob/main/SECURITY.md)

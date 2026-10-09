@@ -5,6 +5,7 @@ import codeloupe.platform.IsoTime
 import codeloupe.workspace.WorkspaceList
 import codeloupe.workspace.WorkspaceState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -24,7 +25,12 @@ class ResourceInventory(
      * [registry]: the workspace list to join with, when the caller has read it already. [memory]: also read the memory of
      * the running containers that belong to a workspace (one Engine reading each, so it is asked for, not always done).
      */
-    suspend fun report(registry: WorkspaceList? = null, memory: Boolean = false): ResourceReport = withContext(Dispatchers.IO) {
+    suspend fun report(registry: WorkspaceList? = null, memory: Boolean = false): ResourceReport = read(memory) { registry ?: recent() }
+
+    /** As [report], with the workspace list still being read: Docker is asked meanwhile and the list awaited only to join. */
+    suspend fun report(registry: Deferred<WorkspaceList>, memory: Boolean = false): ResourceReport = read(memory) { registry.await() }
+
+    private suspend fun read(memory: Boolean, registry: suspend () -> WorkspaceList): ResourceReport = withContext(Dispatchers.IO) {
         val problems = ArrayList<String>()
         val api = try {
             connect()
@@ -39,7 +45,7 @@ class ResourceInventory(
             // No engine: the Engine did not give a complete picture, and callers read "engine set" as "these resources are all there are".
             return@withContext ResourceReport(IsoTime.now(), problems = listOf("${api.address}: ${e.message.orEmpty().lineSequence().first()}"))
         }
-        val list = registry ?: recent()
+        val list = registry()
         problems += list.problems
         val states = HashMap<Pair<String, String>, WorkspaceState>()
         for (repo in list.repos) for (workspace in repo.workspaces) states[repo.name.lowercase() to workspace.name.lowercase()] = workspace.state

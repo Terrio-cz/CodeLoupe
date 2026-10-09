@@ -171,4 +171,22 @@ class WorkspaceScannerTest {
         scan()
         assertEquals(before, Timings.gitSpawns())
     }
+
+    @Test
+    fun `reading the worktrees on several threads gives the same workspaces as one after another`() {
+        for (i in 20..29) worktree("TER-$i", if (i % 3 == 0) "TER-$i work" else null)
+        TestRepos.git(repo, "merge", "-q", "--ff-only", "TER-21")
+        worktree("TER-40").toFile().deleteRecursively()
+        val now = Instant.now()
+        val tasks = { id: String -> if (id == "TER-22") row(id, "Done", true) else null }
+        val landed = { id: String -> id == "TER-21" }
+        fun scan(parallel: Boolean) =
+            WorkspaceScanner(14, tasks, landed, { now }, parallel).scan(commonDir, repo, pattern, listOf(roots.toString().replace('\\', '/')), withSize = false)
+
+        val sequential = scan(parallel = false)
+        val parallel = scan(parallel = true)
+        assertTrue(sequential.workspaces.size >= 12)
+        assertEquals(sequential, parallel)
+        assertEquals(sequential.workspaces.map { it.path }, parallel.workspaces.map { it.path })
+    }
 }

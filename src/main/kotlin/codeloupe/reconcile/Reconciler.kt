@@ -6,6 +6,10 @@ import codeloupe.processes.ProcessInventory
 import codeloupe.processes.ProcessReport
 import codeloupe.platform.IsoTime
 import codeloupe.workspace.WorkspaceList
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -21,7 +25,7 @@ import kotlinx.coroutines.sync.withLock
 class Reconciler(
     private val config: ReconcileConfig,
     private val registry: suspend () -> WorkspaceList,
-    private val inventory: suspend (WorkspaceList) -> ResourceReport,
+    private val inventory: suspend (Deferred<WorkspaceList>) -> ResourceReport,
     private val planner: ReconcilePlanner,
     private val executor: (PlanEntry) -> ActionResult,
     private val state: ReconcileState,
@@ -29,7 +33,7 @@ class Reconciler(
     private val releases: ReleaseStore? = null,
     private val log: (String) -> Unit = {},
     /** The build tools working in workspace directories; the reconciler stops the ones the plan allows. */
-    private val processes: suspend (WorkspaceList) -> ProcessReport = { ProcessReport(IsoTime.now()) },
+    private val processes: suspend (Deferred<WorkspaceList>) -> ProcessReport = { ProcessReport(IsoTime.now()) },
     /** The registry for the dry run, which may be a scan shared with other reads; a run never uses it. */
     private val planRegistry: suspend () -> WorkspaceList = registry,
     /** Called when a run changed something, so that scans kept for the read-only routes are dropped. */
@@ -43,14 +47,14 @@ class Reconciler(
     @Volatile private var latest: List<PlanEntry>? = null
 
     /** What would be done now. Reads, removes nothing. */
-    suspend fun plan(): ReconcilePlan = lock.withLock { snapshot(planRegistry).plan }
+    suspend fun plan(): ReconcilePlan = lock.withLock { snapshot(planRegistry, overlap = true).plan }
 
     /**
      * Attempts what is allowed: the `auto` entries when [auto], the `confirm` entries named by [confirm] (keys) or
      * [workspaces] (names, any repo). Entries whose backoff has not run out wait, unless [confirm] names them.
      */
     suspend fun run(trigger: String, auto: Boolean, confirm: Set<String> = emptySet(), workspaces: Set<String> = emptySet()): ReconcileRun = lock.withLock {
-        val first = snapshot(registry)
+        val first = snapshot(registry, overlap = false)
         // A protect rule that could not be read protects nothing: removing anything on the strength of the others would fail open.
         if (config.invalidProtect > 0) return@withLock ReconcileRun(IsoTime.now(), trigger, emptyList(), first.plan)
         val entries = first.entries
@@ -79,7 +83,7 @@ class Reconciler(
         }
         val attempted = results.any { it.outcome != ActionOutcome.SKIPPED }
         if (attempted) changed()
-        val after = if (attempted) snapshot(registry) else first
+        val after = if (attempted) snapshot(registry, overlap = false) else first
         completeReleases(after)
         ReconcileRun(IsoTime.now(), trigger, results, after.plan)
     }
@@ -117,10 +121,21 @@ class Reconciler(
     private fun protectProblem(): List<String> =
         if (config.invalidProtect > 0) listOf("config workspaces.reconcile.protect has ${config.invalidProtect} rule(s) that cannot be read (an invalid regex?): nothing is removed until it is fixed") else emptyList()
 
-    private suspend fun snapshot(read: suspend () -> WorkspaceList): Snapshot {
-        val list = read()
-        val report = inventory(list)
-        val running = processes(list)
+    // [overlap]: Docker and the process table do not depend on the registry scan, so the dry run reads all three at once.
+    // A run reads them one after another, in the order its decisions rely on.
+    private suspend fun snapshot(read: suspend () -> WorkspaceList, overlap: Boolean): Snapshot = coroutineScope {
+        if (!overlap) {
+            val list = CompletableDeferred(read())
+            val report = inventory(list)
+            return@coroutineScope assemble(list.await(), report, processes(list))
+        }
+        val list = async { read() }
+        val report = async { inventory(list) }
+        val running = async { processes(list) }
+        assemble(list.await(), report.await(), running.await())
+    }
+
+    private fun assemble(list: WorkspaceList, report: ResourceReport, running: ProcessReport): Snapshot {
         val entries = planner.plan(report.resources, list, running.processes).map { entry ->
             state.get(entry.key)?.let { entry.copy(attempts = it.attempts, nextAttempt = it.nextAttempt, lastError = it.lastError) } ?: entry
         }
