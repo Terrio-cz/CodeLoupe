@@ -9,11 +9,15 @@ import codeloupe.platform.JavaProcess
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.PersonIdent
 import java.io.File
+import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.FileVisitResult
+import java.nio.file.SimpleFileVisitor
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.name
 
@@ -173,8 +177,21 @@ internal class AotTrainer(
         }
     }
 
+    // Git writes its objects read-only, which Windows will not delete until the attribute is cleared.
     private fun delete(path: Path) {
-        runCatching { if (Files.isDirectory(path)) path.toFile().deleteRecursively() else Files.deleteIfExists(path) }
+        runCatching {
+            Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
+                override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = remove(file)
+                override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult = remove(dir)
+                override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+            })
+        }
+    }
+
+    private fun remove(entry: Path): FileVisitResult {
+        entry.toFile().setWritable(true)
+        runCatching { Files.deleteIfExists(entry) }
+        return FileVisitResult.CONTINUE
     }
 
     companion object {

@@ -100,6 +100,13 @@ git(repo, 'add', '-A');
 git(repo, 'commit', '-q', '-m', 'init');
 
 // The AOT caches (CL-150): the daemon makes them in the background some seconds after it started.
+// What a training left behind, to show why a directory could not be removed.
+function leftovers(dir) {
+  const out = [];
+  const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else out.push(path.relative(dir, f)); } };
+  try { for (const e of fs.readdirSync(dir, { withFileTypes: true })) if (e.isDirectory()) walk(path.join(dir, e.name)); } catch { /* gone meanwhile */ }
+  return out.length ? ` (inside: ${out.slice(0, 12).join(', ')})` : '';
+}
 async function checkAotCaches(report) {
   const aotDir = path.join(tmp, 'home', 'aot');
   const list = () => (fs.existsSync(aotDir) ? fs.readdirSync(aotDir) : []);
@@ -114,7 +121,7 @@ async function checkAotCaches(report) {
   report.aotReadySeconds = Math.round((performance.now() - began) / 1000);
   while (list().some(f => f.endsWith('.lock') || f.endsWith('.trainer')) && performance.now() - began < 300_000) await sleep(500);
   const files = list().map(f => f.replace(/^.*-[0-9a-f]{12}/, '*')).sort();
-  if (files.join() !== '*.cli.aot,*.daemon.aot,*.ready') throw new Error(`the AOT caches are not one clean pair: ${files.join(', ')}`);
+  if (files.join() !== '*.cli.aot,*.daemon.aot,*.ready') throw new Error(`the AOT caches are not one clean pair: ${files.join(', ')}${leftovers(aotDir)}`);
   const archives = path.join(tmp, 'home', 'cds');
   if (fs.existsSync(archives) && fs.readdirSync(archives).some(f => f.endsWith('.jsa'))) throw new Error('the dynamic archive was left behind');
   const cache = path.join(aotDir, list().find(f => f.endsWith('.cli.aot')));
