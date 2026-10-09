@@ -15,7 +15,7 @@ object DetachedStart {
     fun start(command: List<String>, workDir: Path) {
         if (NativeCalls.isWindows && runCatching { windows(command, workDir) }.getOrDefault(false)) return
         ProcessBuilder(command)
-            .apply { if (!NativeCalls.isWindows) environment().keys.retainAll { it in KEPT || it.startsWith("LC_") } }
+            .apply { if (!NativeCalls.isWindows) environment().keys.retainAll(::kept) }
             .directory(workDir.toFile())
             .redirectOutput(ProcessBuilder.Redirect.DISCARD)
             .redirectError(ProcessBuilder.Redirect.DISCARD)
@@ -61,7 +61,18 @@ object DetachedStart {
         return out.append("\\".repeat(slashes * 2)).append('"').toString()
     }
 
-    private val KEPT = setOf("HOME", "USER", "LOGNAME", "SHELL", "PATH", "LANG", "TMPDIR", "TZ")
+    /**
+     * Whether the daemon started from a shell outside Windows keeps [name]: who and where it is, and the places it is told to look
+     * for things (the Docker Engine, Gradle's home, the session bus a keyring answers on, git's global config, the user's own
+     * `CODELOUPE_*` such as the vault passphrase). Nothing that changes what a program does; PATH is kept as before.
+     */
+    internal fun kept(name: String): Boolean = name in KEPT || name.startsWith("LC_") || name.startsWith("CODELOUPE_")
+
+    private val KEPT = setOf(
+        "HOME", "USER", "LOGNAME", "SHELL", "PATH", "LANG", "TMPDIR", "TZ",
+        "DOCKER_HOST", "GRADLE_USER_HOME", "JAVA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_RUNTIME_DIR",
+        "DBUS_SESSION_BUS_ADDRESS", "DISPLAY", "GIT_CONFIG_GLOBAL", "SSH_AUTH_SOCK",
+    )
     private const val CMDLINE = "CODELOUPE_SPAWN_CMDLINE"
     private const val CWD = "CODELOUPE_SPAWN_CWD"
 

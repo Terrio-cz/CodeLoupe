@@ -1213,6 +1213,24 @@ rozhoduje launcher.
   nečitelný `config.json` = výchozí hodnoty, skript `start-daemon.sh` bez `codeloupe` v PATH, mrtvý port, `CODELOUPE_HOOKS=off`), `OrientationScanTest`.
 - **Zbytek**: měření „s a bez“ na pěti úkolech potřebuje relace, které háček skutečně dostaly; kritérium je přepsáno na základní stav a hotový nástroj a srovnání přešlo do karty CL-148.
 
+### Výsledek CL-146 — háček `http` místo procesu: nepoužitelný, zůstává skript (2026-10-09)
+
+- **Co se zkoušelo**: pluginový `PreToolUse` typu `http` s `url` na `http://127.0.0.1:47391/hook` a hlavičkou `x-codeloupe: 1`. Živý test nebyl možný (účet `claude -p` je na týdenním limitu do 2026-10-11 20:00),
+  proto: (1) schéma a kód nainstalovaného Claude Code 2.1.288 (`claude.exe`, řetězce a funkce HTTP hooku) a dokumentace hooků, (2) nahrané volání: stejný `PreToolUse` payload jako HTTP POST na daemona (hlavička
+  `Host: 127.0.0.1:<port>` a `x-codeloupe`, jako by ho poslal klient) a přes `bash hook.sh`. **Neověřeno živě**: zda se při neběžícím daemonovi ukáže v přepisu oznámení „hook error“
+  (kód vrací neblokující chybu a loguje ji na úrovni `error`; zda ji UI zobrazí, jsem nezjistil) a zda plugin `hooks.json` typ `http` přijme (schéma záznamu hooku je sdílené, pluginový zdroj `pluginHook` ho nevylučuje).
+- **Tvar výměny** (potvrzeno proti schématu): tělo POST je JSON události, odpověď 2xx s prázdným tělem = úspěch bez výstupu (daemon odpovídá `204`), 2xx s JSON objektem se čte jako výstup příkazového hooku
+  (`hookSpecificOutput.additionalContext`, `permissionDecision`, `updatedInput`), jiné tělo než JSON, ne-2xx i selhání spojení jsou neblokující chyba; `SessionStart` a `Setup` typ `http` nepodporují (startovací háček
+  `start-daemon.sh` tedy zůstává skriptem). Loopback je výslovně povolen (blokují se soukromé a link-local adresy), `allowedHttpHookUrls` a `httpHookAllowedEnvVars` jsou politiky správce.
+  Daemon na nahraný payload odpověděl `200 application/json` s `additionalContext` (shodně se skriptem), na `git status` `204` bez těla, bez hlavičky `x-codeloupe` `403`.
+- **Měření** (jednorázový daemon, TerrioImporter klon, stroj zatížený ostatními okny, 90 POSTů a 36 spuštění skriptu): **HTTP medián 10,8 ms (p95 15,1)**, **skript medián 82 ms (p95 104)**; daemon neběží: `ECONNREFUSED` za 2 ms.
+  Latence tedy cíl < 50 ms splňuje s velkou rezervou. Přesto se nepoužije:
+  1. **Odpověď se nefiltruje.** `hook.sh` pustí dál jen tři tvary, které daemon píše; Claude Code u `http` bere JSON jak přijde, takže cokoli, co poslouchá na portu 47391 (daemon neběží, jiný uživatel stroje),
+     by mohlo schválit volání nástroje (`permissionDecision: allow`) nebo přepsat jeho vstup (`updatedInput`). Daemon se Claude Code prokázat nemůže (token v souborech pluginu je zakázán, CL-158 ověřuje volající, ne odpovídajícího).
+  2. **`url` je pevný řetězec** (schéma `string().url()`), proměnné se rozbalují jen v `headers` a jen ty z `allowedEnvVars`: daemon na jiném portu (`CODELOUPE_PORT`) by dál potřeboval skript.
+  3. **Jeden handler neumíme zaručit.** Záznam hooku nemá podmínku na prostředí (`if` je jen pravidlo nad vstupem nástroje), takže vedle sebe by na výchozím portu běžely oba a latenci dává pomalejší (skript).
+- **Rozhodnutí**: karta uzavřena jako Won't do. Znovu otevřít, pokud Claude Code umožní podepsanou odpověď, proměnné v `url` nebo podmínku na prostředí. Poznámka ve wiki (Plugin hooks).
+
 ### Výsledek CL-145 — README jako úvodní stránka, detail ve wiki (2026-10-09)
 
 - README (827 → ~130 řádků) je úvod: co a proč s grafem benchmarku, rychlý start (CLI, plugin), tabulka nástrojů, odkazy na

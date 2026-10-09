@@ -1,5 +1,7 @@
 package codeloupe.metrics
 
+import codeloupe.platform.Tenths
+
 /** Sums run summaries up per role. */
 object Aggregator {
     private const val TOP_COMMANDS = 15
@@ -35,5 +37,5 @@ object Aggregator {
         )
     }
 
-    private fun tenth(x: Double) = Math.round(x * 10) / 10.0
+    private fun tenth(x: Double) = Tenths.of(x)
 }

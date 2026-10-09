@@ -4,6 +4,7 @@ import codeloupe.daemon.CallRecord
 import codeloupe.ingest.RunWriter
 import codeloupe.ingest.Transcripts
 import codeloupe.metrics.BaselineStore
+import codeloupe.platform.NearestRank
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -62,12 +63,7 @@ internal class OverviewViews(
 
     private fun instant(r: CallRecord) = runCatching { Instant.parse(r.t) }.getOrNull()
 
-    /** Nearest-rank percentile; 0 for no values. */
-    private fun percentile(values: List<Long>, p: Int): Long {
-        if (values.isEmpty()) return 0
-        val sorted = values.sorted()
-        return sorted[((p / 100.0) * sorted.size).toInt().coerceIn(1, sorted.size) - 1]
-    }
+    private fun percentile(values: List<Long>, p: Int): Long = NearestRank.of(values, p / 100.0)
 
     private companion object {
         const val ACTIVE_WINDOW_S = 15 * 60L

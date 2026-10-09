@@ -31,7 +31,8 @@ fi
 # A tool call is judged in milliseconds; a session start may wait for the repository map.
 IFS= read -r -d '' body
 wait=2
-case "$body" in *SessionStart*) wait=10 ;; esac
+# Only the event name counts: a Bash command that mentions SessionStart is still a tool call.
+case "$body" in *'"hook_event_name":"SessionStart"'*|*'"hook_event_name": "SessionStart"'*) wait=10 ;; esac
 
 # No proxy: the body holds prompts and commands and goes to this machine only.
 reply=$(curl -sf --noproxy '*' --connect-timeout 0.3 -m "$wait" -H 'x-codeloupe: 1' -H 'content-type: application/json' --data-binary @- "http://127.0.0.1:$port/hook" <<<"$body" 2>/dev/null) || exit 0

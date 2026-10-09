@@ -31,17 +31,25 @@ data class WorkspacesConfig(
             val section = file["workspaces"] as? JsonObject ?: return WorkspacesConfig()
             val repos = (section["repos"] as? JsonArray).orEmpty().mapNotNull { entry ->
                 when (entry) {
-                    is JsonPrimitive -> text(entry)?.let { Repo(it) }
-                    is JsonObject -> text(entry["path"])?.let { Repo(it, strings(entry["roots"])) }
+                    is JsonPrimitive -> path(entry)?.let { Repo(it) }
+                    is JsonObject -> path(entry["path"])?.let { Repo(it, paths(entry["roots"])) }
                     else -> null
                 }
             }
             val adoption = (section["adoption"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(AdoptionRule::parse) }
-            return WorkspacesConfig(repos, (section["abandonedDays"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it > 0 } ?: 14, adoption, ReconcileConfig.parse(section["reconcile"] as? JsonObject), PortsConfig.parse(section["ports"] as? JsonObject), text(section["gradleUserHome"]), (section["recentScanMs"] as? JsonPrimitive)?.content?.toLongOrNull()?.takeIf { it >= 0 } ?: 2_000)
+            return WorkspacesConfig(repos, (section["abandonedDays"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it > 0 } ?: 14, adoption, ReconcileConfig.parse(section["reconcile"] as? JsonObject), PortsConfig.parse(section["ports"] as? JsonObject), path(section["gradleUserHome"]), (section["recentScanMs"] as? JsonPrimitive)?.content?.toLongOrNull()?.takeIf { it >= 0 } ?: 2_000)
         }
 
         private fun text(element: Any?): String? = (element as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
 
         private fun strings(element: Any?): List<String> = (element as? JsonArray).orEmpty().mapNotNull(::text)
+
+        // `~/code/app` is the user's home, not a directory under the daemon's working directory (which is its own home).
+        private fun path(element: Any?): String? = text(element)?.let { text ->
+            val home = System.getProperty("user.home")
+            if (home != null && (text == "~" || text.startsWith("~/") || text.startsWith("~\\"))) home.trimEnd('/', '\\') + text.drop(1).replace('\\', '/') else text
+        }
+
+        private fun paths(element: Any?): List<String> = (element as? JsonArray).orEmpty().mapNotNull(::path)
     }
 }

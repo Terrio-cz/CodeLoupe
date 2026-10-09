@@ -32,7 +32,7 @@ internal object TestSelection {
                 var found = reach.of(row, removed)
                 if (found.tests.isEmpty() && !TestReach.isTest(row.path)) {
                     // A new or private member is covered by the tests of the type it belongs to.
-                    val parent = reach.parentOf(row)
+                    val parent = reach.parentOf(row, removed)
                     if (parent != null) found = parentReach.getOrPut(parent.src to parent.id) { reach.of(parent, false) }
                 }
                 if (found.tests.isEmpty()) {
@@ -92,7 +92,8 @@ internal object TestSelection {
 
     private fun label(row: DeclRow) = if (row.container.isEmpty()) row.name else "${row.container}.${row.name}"
 
-    private fun moduleTask(path: String): String = ModulePath.of(path).let { TestClass(it.module, "test", "", false).task }
+    // A declaration of a test source set widens to that source set's own task (integrationTest), the others to the module's `test`.
+    private fun moduleTask(path: String): String = ModulePath.of(path).let { TestClass(it.module, if (TestReach.isTest(path)) it.sourceSet else "test", "", false).task }
 
     /** The task that runs a module's tests after a non-code file under `src` changed; null for files that no test reads. */
     private fun resourceTask(path: String): String? {

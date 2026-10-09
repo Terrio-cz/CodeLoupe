@@ -25,7 +25,7 @@ data class ReplayReport(
     fun render(): String {
         val total = calls.values.sum()
         val spoken = advised + denied
-        fun share(n: Int) = if (total == 0) "0" else "%.1f".format(n * 100.0 / total)
+        fun share(n: Int) = if (total == 0) "0" else "%.1f".format(java.util.Locale.ROOT, n * 100.0 / total)
         return buildString {
             appendLine("replay of $transcripts transcripts through the steering hook (mode $mode, large from $minLines lines; files as they are on disk today)")
             appendLine("$total shell and read calls: " + calls.entries.sortedByDescending { it.value }.joinToString(", ") { "${it.key} ${it.value}" })

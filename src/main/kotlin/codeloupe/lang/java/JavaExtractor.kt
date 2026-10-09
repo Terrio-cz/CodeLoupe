@@ -26,6 +26,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiField
 import org.jetbrains.kotlin.com.intellij.psi.PsiForStatement
 import org.jetbrains.kotlin.com.intellij.psi.PsiForeachStatement
 import org.jetbrains.kotlin.com.intellij.psi.PsiIfStatement
+import org.jetbrains.kotlin.com.intellij.psi.PsiImplicitClass
 import org.jetbrains.kotlin.com.intellij.psi.PsiImportStatementBase
 import org.jetbrains.kotlin.com.intellij.psi.PsiJavaCodeReferenceElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiJavaFile
@@ -48,11 +49,11 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiTypeParameter
 import org.jetbrains.kotlin.com.intellij.psi.PsiWhileStatement
 
 /** Java PSI -> facts of one file: package, imports, declarations, references; the same facts the Kotlin extractor makes. */
-internal class JavaExtractor(private val source: Source) {
+internal class JavaExtractor(private val source: Source, fileStem: String = "") {
     private val scopes = LocalScopes()
     private val localTypes = JavaLocalTypes(source, scopes)
     private val lambdaTypes = JavaLambdaTypes(localTypes)
-    private val shapes = JavaShapes(source, localTypes)
+    private val shapes = JavaShapes(source, localTypes, fileStem)
     private val references = JavaReferences(source, scopes, localTypes)
     private var packageName = ""
     private val imports = ArrayList<ImportFact>()
@@ -113,6 +114,8 @@ internal class JavaExtractor(private val source: Source) {
     }
 
     private fun classLike(element: PsiClass) {
+        // Half-typed `class {}`: no name to declare, but what is inside it still refers to things.
+        if (element !is PsiImplicitClass && element.nameIdentifier == null) return walkChildren(element)
         stack += declare(element, shapes.classLike(element))
         decls[innermost()].bodyOpen = element.lBrace?.textRange?.startOffset ?: -1
         decls[innermost()].bodyClose = element.rBrace?.textRange?.startOffset ?: -1
@@ -131,6 +134,8 @@ internal class JavaExtractor(private val source: Source) {
     }
 
     private fun method(element: PsiMethod) {
+        // Half-typed `void (int x) {}`: no name to declare, but what is inside it still refers to things.
+        if (element.nameIdentifier == null) return walkChildren(element)
         val components = if (element.isConstructor) componentParams(element.containingClass) else emptyList()
         val listed = element.parameterList.parameters.map(shapes::param)
         val bindings = bindings((listed.ifEmpty { components }).map { it.name to it.type })
@@ -156,7 +161,7 @@ internal class JavaExtractor(private val source: Source) {
         val range = element.iteratedValue
         val variable = element.iterationParameter
         val declared = variable.typeElement
-        val bound = if (declared != null && localTypes.isVar(declared)) localTypes.elementOf(range) else localTypes.of(declared, null)
+        val bound = if (declared != null && localTypes.isVar(declared)) localTypes.elementOf(range) else localTypes.of(declared, null, variable)
         val bindings = mapOf(variable.name to bound)
         for (child in element.childList()) {
             if (child == range) walk(child) else scopes.within(bindings) { walk(child) }
@@ -164,14 +169,14 @@ internal class JavaExtractor(private val source: Source) {
     }
 
     private fun parameters(list: List<PsiParameter>): Map<String, String> =
-        bindings(list.map { it.name to localTypes.of(it.typeElement, null) })
+        bindings(list.map { it.name to localTypes.of(it.typeElement, null, it) })
 
     private fun bindings(pairs: List<Pair<String, String>>): Map<String, String> = pairs.toMap(HashMap())
 
     private fun lambdaParameters(lambda: PsiLambdaExpression): Map<String, String> {
         val list = lambda.parameterList.parameters.toList()
         val implied = if (list.size == 1 && list[0].typeElement == null) lambdaTypes.parameter(lambda) else ""
-        return bindings(list.map { it.name to (if (it.typeElement == null) implied else localTypes.of(it.typeElement, null)) })
+        return bindings(list.map { it.name to (if (it.typeElement == null) implied else localTypes.of(it.typeElement, null, it)) })
     }
 
     private fun bindName(identifier: PsiElement?, type: String) {

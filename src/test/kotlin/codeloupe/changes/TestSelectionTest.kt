@@ -100,6 +100,20 @@ class TestSelectionTest {
     }
 
     @Test
+    fun `a removed member that nothing uses means the tests of the type it belonged to`() {
+        // The default branch still has the member; the worktree removes it.
+        write(repo, "core/src/main/kotlin/demo/Billing.kt", BILLING.replace("class Billing {", "class Billing {\n    fun unused(): Int = 1\n"))
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "a member nothing uses")
+        val removing = TestRepos.tmpDir("wt").resolve("removing").also { git(repo, "worktree", "add", "-q", "-b", "removing", it.toString(), "main") }
+        write(removing, "core/src/main/kotlin/demo/Billing.kt", BILLING)
+        val text = tests(removing)
+        assertContains(text, "./gradlew :core:test --tests 'demo.BillingTest'")
+        assertContains(text, "BillingTest <- Billing.unused")
+        assertFalse("whole module" in text, text)
+    }
+
+    @Test
     fun `Java declarations and tests work too`() {
         write("mail/src/main/java/mail/Mailer.java", "package mail;\n\npublic class Mailer {\n    public String send(String to) { return to + \"!\"; }\n}\n")
         assertContains(tests(), "./gradlew :mail:test --tests 'mail.MailerTest'")

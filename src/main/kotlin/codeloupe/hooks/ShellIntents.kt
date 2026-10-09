@@ -185,10 +185,14 @@ class ShellIntents(private val paths: ShellPaths) {
         while (k < rest.size && !rest[k].startsWith("-") && rest[k] != "(" && rest[k] != "!") roots += paths.resolve(cwd, rest[k++]) ?: return emptyList()
         val names = ArrayList<String>()
         var inner: List<String>? = null
+        // `-delete` or an `-exec` of something that is no search acts on the files; it does not list them for a reader.
+        var acts = false
         while (k < rest.size) {
             when (rest[k]) {
                 "-name", "-iname" -> { rest.getOrNull(k + 1)?.let { names += it }; k += 2 }
+                "-delete" -> { acts = true; k++ }
                 "-exec", "-execdir", "-ok" -> {
+                    acts = true
                     val end = rest.drop(k + 1).indexOfFirst { it == ";" || it == "+" || it == "\\;" }
                     inner = rest.drop(k + 1).let { if (end >= 0) it.take(end) else it }
                     k += 1 + (if (end >= 0) end + 1 else 0)
@@ -203,6 +207,7 @@ class ShellIntents(private val paths: ShellPaths) {
             innerIntents.filterIsInstance<ShellIntent.Search>().map { it.copy(targets = it.targets.ifEmpty { where }, filter = if (names.any(SourceNames::mentionsSource)) Filter.SOURCE else Filter.OTHER) }
         }.orEmpty()
         if (search.isNotEmpty()) return search
+        if (acts) return emptyList()
         return if (names.isEmpty()) emptyList() else listOf(ShellIntent.FileList(names, where, cwd))
     }
 

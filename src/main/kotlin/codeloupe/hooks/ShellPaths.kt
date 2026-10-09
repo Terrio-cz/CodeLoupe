@@ -14,7 +14,8 @@ class ShellPaths(private val home: String, private val windows: Boolean) {
             text.startsWith("~/") -> "$home/${text.substring(2)}"
             else -> drive(text) ?: text
         }
-        val base = if (isAbsolute(absolute)) absolute else "${cwd.trimEnd('/')}/$absolute"
+        // Claude Code sends the working directory of a Windows session with backslashes: `..` must not take the whole of it for one name.
+        val base = if (isAbsolute(absolute)) absolute else "${cwd.replace('\\', '/').trimEnd('/')}/$absolute"
         return normalize(base)
     }
 

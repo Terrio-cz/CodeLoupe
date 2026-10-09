@@ -37,11 +37,11 @@ class ReconcileState(private val file: Path, private val config: ReconcileConfig
 
     /** Whether an attempt at [key] may be made now. */
     @Synchronized
-    fun due(key: String): Boolean = items[key]?.let { Instant.parse(it.nextAttempt) <= now() } ?: true
+    fun due(key: String): Boolean = items[key]?.let { dueNow(it) } ?: true
 
     /** Whether any target is waiting for a retry that is due. */
     @Synchronized
-    fun anyDue(): Boolean = items.values.any { Instant.parse(it.nextAttempt) <= now() }
+    fun anyDue(): Boolean = items.values.any(::dueNow)
 
     /** Records a failed or blocked attempt; the wait doubles from `retryBaseMinutes` up to `retryMaxMinutes`. */
     @Synchronized
@@ -62,6 +62,9 @@ class ReconcileState(private val file: Path, private val config: ReconcileConfig
     fun retain(keys: Set<String>) {
         if (items.keys.retainAll(keys)) save()
     }
+
+    // A wait that cannot be read is over: the attempt is made, and the entry gets a fresh one.
+    private fun dueNow(item: Item): Boolean = runCatching { Instant.parse(item.nextAttempt) <= now() }.getOrDefault(true)
 
     private fun save() {
         runCatching {
