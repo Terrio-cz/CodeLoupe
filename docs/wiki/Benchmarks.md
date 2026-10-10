@@ -339,7 +339,7 @@ the index, a diff with 3 lines of context, tests with 1; 40 kB) and B2 (2 lines 
 
 Per task the medians of B2 are 56 to 88 % of the control, and one cell spans 150-340 thousand, so three points are inside the noise of 12 runs. The ceiling is structural: half of a
 reviewer's cost is cache writes of a context of about 80 thousand tokens, 28 % is output (thinking and the report), and the packet is 12-13 thousand of those tokens; what the
-packet leaves out the reviewer reads on demand (code reads 4.6 → 7.4 % of cost). Nothing was changed in the live Terrio workspace. Details and limits: docs/plan.md § 8.4.
+packet leaves out the reviewer reads on demand (code reads 4.6 → 7.4 % of cost). The compact packet was nevertheless adopted in the live Terrio workspace (low regret, reversible; a real pack of a large closed task shrank from 116 to 45 kB). Details and limits: docs/plan.md § 8.4.
 
 ### What did not work, and what the numbers do not show
 
