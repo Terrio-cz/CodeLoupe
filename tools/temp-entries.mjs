@@ -10,9 +10,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-// What the toolchain keeps in the temp folder on its own (the Kotlin compiler daemon and its logs, the SQLite driver's library, hsperfdata,
-// PowerShell's probe files): not the tests' doing, and it does not grow with the suite.
-const TOOLCHAIN = /^(.*[\\/])?(kotlin-|sqlite-.*sqlitejdbc|hsperfdata_|__PSScriptPolicyTest|\.org\.chromium|gradle-)/;
+// What the toolchain and the operating system keep in the temp folder on their own (the Kotlin compiler daemon and its logs, the SQLite driver's library, hsperfdata,
+// PowerShell's probe files, the per-user folders of macOS daemons): not the tests' doing, and it does not grow with the suite.
+const TOOLCHAIN = /^(.*[\\/])?(kotlin-|sqlite-.*sqlitejdbc|hsperfdata_|__PSScriptPolicyTest|\.org\.chromium|gradle-|com\.apple\.|betaenrollmentagent$|proactived$)/;
 
 /** Names in [after] that were not in [before] and are not the toolchain's. */
 export function newEntries(before, after) {
