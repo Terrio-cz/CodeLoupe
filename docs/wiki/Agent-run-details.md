@@ -158,7 +158,7 @@ The lesson for anyone trimming an agent prompt: re-run a fixed-findings check, b
 
 ### A task pack that lets the planner stop
 
-*What was tried:* the planner is the largest single cost of the flow (123 of about 420 million weighted units in the period). In these runs 36 % of a run was output (thinking and the plan), 35 % cache writes and 29 % cache reads, with tool results only 20-30 %. So a bigger first answer pays only if it removes turns.
+*What was tried:* the planner is the largest single cost of the flow (about a fifth of the flow's weighted cost in the period). In these runs 36 % of a run was output (thinking and the plan), 35 % cache writes and 29 % cache reads, with tool results only 20-30 %. So a bigger first answer pays only if it removes turns.
 
 CodeLoupe's `task_context` tool now also carries the description sections of the task, the comment thread within a size budget (long comments cut in the middle, so a 29-comment thread keeps every decision), the files that reference the touched code, and the lines of the repository rules and documents that name the touched files. This bundle is the *task pack*.
 

@@ -13,7 +13,7 @@ What does a coding-agent run cost, and which changes make it cheaper without mak
 
 1. **Give the planner a prepared task pack and a turn budget.** A pack (task, comments, related files) plus an instruction to start from it and stop at 8 turns cut a planner run to 54 % of its cost (235 against 433 thousand units); the pack alone saved only 8 %.
 2. **Keep the start of every prompt byte-identical, and keep project docs out of small helper agents.** A changing block in front of the stable part cost about 2.3 thousand units per start; leaving the project instructions file out of helper agents took the first prompt from 19-21 to 10-12 thousand tokens, no rule lost (54 of 54).
-3. **Trim tools and prompt size at the start.** Each role keeps only the tool servers it uses: first prompt 17-26 down to 10-12 thousand tokens, and two unused servers made a run 7-10 % dearer.
+3. **Trim tools and prompt size at the start.** Each role keeps only the tool servers it uses: first prompt 17-26 down to 10-12 thousand tokens, and keeping two unused servers made a run 7-10 % dearer.
 4. **Choose cache settings that match the pause between runs.** For the reviewer the 1-hour premium was 25.4 million units and 2.9 came back, so 5 minutes saves about 3 % of the flow; for the coder and tester, with pauses of 180-300 seconds, 1 hour stays.
 5. **Do not expect search tools alone to cut cost.** The reviewer called the code index 6.0 times per run instead of 0.2 and cost stayed the same (333 against 323 thousand units).
 6. **Always measure with replicates and a quality gate.** Replicates of one variant differ by 15-40 %, so a smaller difference is noise. A cheaper variant that loses findings is not cheaper: the smaller model cost a third as much and missed 2 of 3 known findings on one task.
@@ -22,7 +22,7 @@ What does a coding-agent run cost, and which changes make it cheaper without mak
 
 **This is an estimate from small controlled runs, not a measured total.** The adopted changes of the last days (task pack and turn budget, file-list sentence, compact review packet, dispatcher instructions, shorter cache for some helper agents) come to about **16-22 % of the cost of the agent flow**. With the earlier prompt trimming (fewer tools, no project instructions in helper agents, unused servers dropped) it is about **22-30 %**. The coder and tester did not improve: what was tried on them was rejected or too small to see.
 
-*How we arrived at it:* each role's measured saving was weighted by that role's share of the flow's cost (the planner alone is 123 of about 420 million units in the period), then the cache setting (about 3 %) and the project-instructions file (up to 4.2 %) were added. No run measured the whole flow before and after, so the range is wide.
+*How we arrived at it:* each role's measured saving was weighted by that role's share of the flow's cost (the planner alone is about a fifth of the flow's cost), then the cache setting (about 3 %) and the project-instructions file (up to 4.2 %) were added. No run measured the whole flow before and after, so the range is wide.
 
 ## Small glossary
 
