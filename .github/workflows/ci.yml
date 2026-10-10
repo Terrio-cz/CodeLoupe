@@ -46,6 +46,8 @@ jobs:
   # a runner: the generator's own tests above, `brew style` for the cask here. winget has no hosted runner image.
   manifests:
     name: manifests (macos)
+    needs: changes
+    if: needs.changes.outputs.code != 'false'
     runs-on: macos-latest
     timeout-minutes: 10
     steps:
@@ -72,6 +74,8 @@ jobs:
 
   test:
     name: test (${{ matrix.os }})
+    needs: changes
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -87,24 +91,27 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
+        if: needs.changes.outputs.code != 'false'
 
       # Caches ~/.gradle (dependencies, wrapper distribution) keyed on the build files.
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-read-only: false
+        if: needs.changes.outputs.code != 'false'
 
       - name: Test
         run: ./gradlew test --console=plain --no-daemon
         shell: bash
+        if: needs.changes.outputs.code != 'false'
 
       # A test that cannot run on this OS says so with a reason (assumeTrue); the job summary lists them (CL-166).
       - name: Skipped tests
-        if: always()
+        if: (always()) && needs.changes.outputs.code != 'false'
         shell: bash
         run: node tools/skipped-tests.mjs build/test-results/test --title "Skipped tests (${{ matrix.os }})" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test reports
-        if: always()
+        if: (always()) && needs.changes.outputs.code != 'false'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports-${{ matrix.os }}
@@ -118,6 +125,8 @@ jobs:
   # are skipped. A throwaway GNOME Keyring on a private session bus runs them here; the probe fails the job when it is not up.
   libsecret:
     name: libsecret (ubuntu)
+    needs: changes
+    if: needs.changes.outputs.code != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -152,6 +161,8 @@ jobs:
 
   app:
     name: app (${{ matrix.os }})
+    needs: changes
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -171,14 +182,20 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: app/package-lock.json
+        if: needs.changes.outputs.code != 'false'
 
       # npm ci fails when the lockfile and package.json disagree. Install scripts stay off: nothing here needs
       # the Electron binary, and esbuild ships its binary as an optional package.
       - run: npm ci --ignore-scripts
+        if: needs.changes.outputs.code != 'false'
       - run: npm run lint
+        if: needs.changes.outputs.code != 'false'
       - run: npm run typecheck
+        if: needs.changes.outputs.code != 'false'
       - run: npm test
+        if: needs.changes.outputs.code != 'false'
       - run: npm run build
+        if: needs.changes.outputs.code != 'false'
 
       - name: Upload build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -187,11 +204,14 @@ jobs:
           path: app/out/
           if-no-files-found: error
           retention-days: 14
+        if: needs.changes.outputs.code != 'false'
 
   # A revealed secret is copied with the platform's concealment markers (CL-171). The probe starts the real Electron, copies a value
   # that is not a secret through the app's own module and reads the clipboard back with the platform's tools.
   clipboard:
     name: clipboard (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code != 'false'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -227,6 +247,8 @@ jobs:
 
   bundle:
     name: bundle (${{ matrix.os }})
+    needs: changes
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -244,10 +266,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
+        if: needs.changes.outputs.code != 'false'
 
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-read-only: false
+        if: needs.changes.outputs.code != 'false'
 
       # jlink output only runs on the OS it was built on, hence one bundle per OS.
       - name: Build the bundle
@@ -255,6 +279,7 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: ./gradlew bundle --console=plain --no-daemon ${RELEASE_VERSION:+-PreleaseVersion=$RELEASE_VERSION}
         shell: bash
+        if: needs.changes.outputs.code != 'false'
 
       # Runs a query with the bundle's launcher on a PATH without any Java and records size and daemon RSS.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -262,6 +287,7 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: app/package-lock.json
+        if: needs.changes.outputs.code != 'false'
 
       - name: Smoke test and measure
         shell: bash
@@ -275,6 +301,7 @@ jobs:
             cat bundle-report.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+        if: needs.changes.outputs.code != 'false'
 
       - name: Upload report
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -282,10 +309,11 @@ jobs:
           name: bundle-report-${{ matrix.os }}
           path: bundle-report.json
           retention-days: 90
+        if: needs.changes.outputs.code != 'false'
 
       # Zips are ~150 MB each: kept for main and for a release build (the release attaches them), briefly.
       - name: Upload bundle
-        if: github.ref == 'refs/heads/main' || inputs.version != ''
+        if: (github.ref == 'refs/heads/main' || inputs.version != '') && needs.changes.outputs.code != 'false'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bundle-${{ matrix.os }}
@@ -308,6 +336,7 @@ jobs:
             echo "installer build failed, trying again ($attempt)"
             sleep 15
           done
+        if: needs.changes.outputs.code != 'false'
 
       # Unpacks the installer without installing it and runs the bundle inside on a PATH without Java: proves the
       # installer carries a working daemon with its runtime. Installing and starting the app is CL-108.
@@ -350,6 +379,7 @@ jobs:
           esac
           test -f "$(find unpacked -path '*claude-plugin/.claude-plugin/marketplace.json' | head -n 1)"
           ls -l app/dist | grep -E '.(exe|dmg|AppImage|deb)$' | tee -a "$GITHUB_STEP_SUMMARY"
+        if: needs.changes.outputs.code != 'false'
 
       # The fuses are flipped in the built app (app/electron-builder.yml electronFuses, CL-161): read them back from the unpacked installer.
       - name: Check the Electron fuses
@@ -365,6 +395,7 @@ jobs:
           grep -q 'RunAsNode is Disabled' ../fuses.txt
           grep -q 'EnableNodeOptionsEnvironmentVariable is Disabled' ../fuses.txt
           grep -q 'EnableNodeCliInspectArguments is Disabled' ../fuses.txt
+        if: needs.changes.outputs.code != 'false'
 
       - name: Upload installers
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -383,13 +414,15 @@ jobs:
             app/dist/latest-linux.yml
           if-no-files-found: error
           retention-days: 7
+        if: needs.changes.outputs.code != 'false'
 
   # Installs each installer for real (CL-108) and runs what a user would: the app starts, it starts the bundled daemon,
   # queries work through the CLI and the MCP endpoint on a PATH without Java, then everything is uninstalled.
   # The release pipeline (CL-106) publishes only when this is green.
   installer-smoke:
     name: installer smoke (${{ matrix.os }})
-    needs: bundle
+    needs: [bundle, changes]
+    if: ${{ !cancelled() && needs.bundle.result == 'success' && needs.changes.outputs.code != 'false' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -439,12 +472,42 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # What the push changed (CL-195, tools/changed-paths.mjs). A push that only touches documentation skips the steps of
+  # the required jobs (test, app and bundle still report, a job skipped whole would leave the check pending) and the jobs
+  # that are not required; a push that only touches tests or the plugin also skips the update test. When the range of the
+  # push is unknown (a new branch, a tag, a force push) everything runs, and so it does when this job fails.
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.paths.outputs.code }}
+      update: ${{ steps.paths.outputs.update }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - id: paths
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          node tools/changed-paths.mjs "$BASE" HEAD | tee -a "$GITHUB_OUTPUT"
+
   # The app updates itself from one build to the next (CL-107), on a real installation and against a local feed: three
   # builds (N, N+1 and one whose daemon cannot start), install N, let it download, verify and install N+1, check that
   # settings, a secret and the daemon's data survive and the daemon runs the new bundle, that a tampered installer is
   # refused and that the failing build falls back to the previous daemon (tools/update-test.mjs). No release, no tag.
   update-test:
     name: update test (${{ matrix.os }})
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.update != 'false' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:

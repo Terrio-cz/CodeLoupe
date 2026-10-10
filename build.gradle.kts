@@ -89,6 +89,9 @@ tasks.test {
     // AotTrainingTest runs the installed jars.
     dependsOn(tasks.installDist)
     useJUnitPlatform()
+    // Test classes run in parallel JVMs (CL-195): two on a 4 vCPU runner, never more, so a machine with many agent windows
+    // is not flooded. Every test works in its own temporary directory and on a free port. -PtestForks=N overrides.
+    maxParallelForks = (findProperty("testForks") as String?)?.toInt() ?: (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     systemProperty("codeloupe.projectDir", projectDir.absolutePath)
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
