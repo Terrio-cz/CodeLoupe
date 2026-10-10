@@ -56,7 +56,7 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
 
     /** Drops everything read so far, for transcripts that must be read again (other categories). */
     fun clear() = transaction { db ->
-        db.createStatement().use { s -> listOf("steps", "usage_hours", "gaps", "runs", "files").forEach { s.executeUpdate("DELETE FROM $it") } }
+        db.createStatement().use { s -> listOf("steps", "usage_hours", "gaps", "limits", "runs", "files").forEach { s.executeUpdate("DELETE FROM $it") } }
     }
 
     override fun close() {
@@ -106,6 +106,8 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
                 "at_ms INTEGER NOT NULL, week TEXT NOT NULL, tool TEXT NOT NULL, shape TEXT NOT NULL, kind TEXT NOT NULL, token TEXT, fallback TEXT)",
             "CREATE INDEX IF NOT EXISTS gaps_at ON gaps(at_ms)",
             "CREATE INDEX IF NOT EXISTS gaps_run ON gaps(run_id)",
+            // The usage-limit answers a run wrote (CL-210): when, when the limit lifts if the line says, and which limit it was.
+            "CREATE TABLE IF NOT EXISTS limits (run_id INTEGER NOT NULL, at_ms INTEGER NOT NULL, resets_ms INTEGER, kind TEXT NOT NULL, text TEXT NOT NULL, PRIMARY KEY (run_id, at_ms)) WITHOUT ROWID",
             // One row per day or run that went over a budget: the event for it is sent once.
             "CREATE TABLE IF NOT EXISTS breaches (key TEXT PRIMARY KEY, at TEXT NOT NULL)",
         )

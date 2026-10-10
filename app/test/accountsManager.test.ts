@@ -56,6 +56,24 @@ describe('Claude accounts', () => {
     ]);
   });
 
+  it('keeps the token secret name of an account through a rename and a change of default (CL-210)', async () => {
+    const t = setup();
+    fs.writeFileSync(path.join(home, 'accounts.json'), JSON.stringify({
+      version: 1,
+      claude: [
+        { id: 'a', label: 'A', configDir: dir('claude-a'), default: true, tokenSecret: 'CLAUDE_TOKEN_A' },
+        { id: 'b', label: 'B', configDir: dir('claude-b'), default: false },
+      ],
+      youtrack: [],
+    }));
+    expect((await t.manager.claudeRename('a', 'Renamed')).ok).toBe(true);
+    expect((await t.manager.claudeSetDefault('b')).ok).toBe(true);
+    expect(readAccounts(home).claude).toEqual([
+      { id: 'a', label: 'Renamed', configDir: dir('claude-a'), default: false, tokenSecret: 'CLAUDE_TOKEN_A' },
+      { id: 'b', label: 'B', configDir: dir('claude-b'), default: true },
+    ]);
+  });
+
   it('refuses a relative path, a missing directory without create, a file, a duplicate and the implicit default again', async () => {
     const t = setup();
     expect((await t.manager.claudeAdd({ label: 'x', configDir: 'relative/dir', create: true })).ok).toBe(false);

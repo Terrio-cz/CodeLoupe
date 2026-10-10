@@ -13,6 +13,19 @@ import { ago, pct, tokens } from '../format';
 type ClaudeRow = AccountsData['claude'][number];
 type YoutrackRow = AccountsData['youtrack'][number];
 
+const LIMIT_TONE: Record<ClaudeRow['limit']['state'], Tone> = { limited: 'critical', ok: 'ok', unknown: 'neutral' };
+
+function LimitCell({ limit }: { limit: ClaudeRow['limit'] }) {
+  if (limit.state === 'unknown') return <span className="muted" title="No usage-limit answer in this account's transcripts">none seen</span>;
+  const kind = limit.kind ? ` ${limit.kind}` : '';
+  return (
+    <span>
+      <StatusBadge tone={LIMIT_TONE[limit.state]}>{limit.state === 'limited' ? `limited${kind}` : `lifted${kind}`}</StatusBadge>
+      {limit.resetsAt && <span className="muted" style={{ display: 'block' }}>{limit.state === 'limited' ? 'resets ' : 'reset '}<time dateTime={limit.resetsAt}>{new Date(limit.resetsAt).toLocaleString()}</time></span>}
+    </span>
+  );
+}
+
 const MIRROR: Record<YoutrackRow['mirror']['state'], [Tone, string]> = {
   synced: ['ok', 'synced'],
   syncing: ['running', 'syncing'],
@@ -56,6 +69,9 @@ export function Accounts() {
     { key: 'windows', header: 'Windows', render: a => a.windows, numeric: true },
     { key: 'cost', header: 'Cost 7d', render: a => tokens(a.weighted7d), numeric: true },
     { key: 'saved', header: 'Saved', render: a => (a.savedPct7d === null ? '—' : pct(a.savedPct7d, 1)), numeric: true },
+    { key: 'session', header: 'Cost 5h', render: a => tokens(a.weighted5h), numeric: true },
+    { key: 'limit', header: 'Limit', render: a => <LimitCell limit={a.limit} /> },
+    { key: 'token', header: 'Token secret', render: a => (a.tokenSecret ? <span><span className="mono">{a.tokenSecret}</span>{!a.tokenConfigured && <> <StatusBadge tone="warning">not in store</StatusBadge></>}</span> : <span className="muted">—</span>) },
     { key: 'used', header: 'Last used', render: a => ago(a.lastUsedAt) },
     {
       key: 'actions', header: 'Actions',
