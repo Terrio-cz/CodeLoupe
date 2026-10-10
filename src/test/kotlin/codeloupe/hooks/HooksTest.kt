@@ -3,6 +3,7 @@ package codeloupe.hooks
 import codeloupe.TestRepos
 import codeloupe.config.HooksConfig
 import codeloupe.daemon.AppendLog
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -137,6 +138,17 @@ class HooksTest {
         assertNotNull(broken.handle(call("cat /repo/$big")), "an unreadable configuration means the defaults")
         val throwing = Hooks(Steering(sources, ShellPaths("/home/me", false)), { HooksConfig() }, AppendLog(home.resolve("hooks.jsonl"))::append, { error("no root") })
         assertNotNull(throwing.handle(call("cat /repo/$big")), "a root that cannot be found is not needed for the answer")
+    }
+
+    @Test
+    fun `a session or a subagent starting in a worktree makes the daemon forget what was read there`() {
+        val forgotten = mutableListOf<String>()
+        fun hooks(forget: (String) -> Unit) =
+            Hooks(Steering(sources, ShellPaths("/home/me", windows = false)), { HooksConfig() }, AppendLog(home.resolve("hooks.jsonl"))::append, { "/repo" }, forgetReads = forget)
+        val recording = hooks { forgotten += it }
+        for (event in listOf("SubagentStart", "SessionStart", "PreToolUse", "Stop")) runBlocking { recording.reply(call("ls", event = event)) }
+        assertEquals(listOf("/repo", "/repo"), forgotten, "the two events that put a new agent in front of the worktree, nothing else")
+        assertNull(runBlocking { hooks { error("broken") }.reply(call("ls", event = "SubagentStart")) }, "a memory that fails never fails the hook")
     }
 
     @Test

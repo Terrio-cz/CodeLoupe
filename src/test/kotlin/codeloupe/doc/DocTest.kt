@@ -5,6 +5,7 @@ import codeloupe.config.Config
 import codeloupe.daemon.JobQueue
 import codeloupe.repo.Registry
 import codeloupe.tools.DocTool
+import codeloupe.tools.Sessions
 import codeloupe.tools.ToolArgs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,6 +84,19 @@ class DocTest {
         assertTrue(again.length < 100, again)
         assertContains(read(d, names = listOf("steps"), forget = true), "Build the layer")
         assertContains(read(d, names = listOf("nope")), "no section 'nope'; have: plan-cl-93, goal, steps")
+    }
+
+    @Test
+    fun `a new agent in a worktree whose reads were forgotten gets the content, the one before it still a short line`() {
+        val d = doc(plan())
+        read(d, DocReader.View.FULL, session = "c:/repo")
+        read(d, session = "c:/repo/sub")
+        read(d, DocReader.View.FULL, session = "c:/other")
+        memory.forget { Sessions.near(it, "C:\\Repo") }
+        assertContains(read(d, DocReader.View.FULL, session = "c:/repo"), "Build the layer")
+        assertContains(read(d, session = "c:/repo/sub"), "sections: ")
+        assertTrue(read(d, DocReader.View.FULL, session = "c:/repo").startsWith("plan.md unchanged since"), "the same agent asking again is told so")
+        assertTrue(read(d, DocReader.View.FULL, session = "c:/other").startsWith("plan.md unchanged since"), "another worktree keeps its memory")
     }
 
     @Test

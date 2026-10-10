@@ -26,6 +26,7 @@ class Hooks(
     private val session: SessionContext? = null,
     private val weights: SessionWeights? = null,
     private val warned: WarnedLevels? = null,
+    private val forgetReads: (String) -> Unit = {},
 ) {
     private class Session {
         var given = 0
@@ -51,9 +52,10 @@ class Hooks(
 
     /** [handle] for every event, the ones that wait for the index included. */
     suspend fun reply(json: JsonObject): JsonObject? {
-        if (HookInput(json).event != "SessionStart") return handle(json)
-        val started = System.nanoTime()
         val input = HookInput(json)
+        if (input.event == "SessionStart" || input.event == "SubagentStart") input.cwd?.let { cwd -> runCatching { forgetReads(cwd) } }
+        if (input.event != "SessionStart") return handle(json)
+        val started = System.nanoTime()
         val settings = runCatching(config).getOrDefault(HooksConfig())
         val context = session?.takeIf { settings.enabled && settings.sessionStart.enabled } ?: return pass("off", started)
         val cwd = input.cwd ?: return pass("ignored", started)
@@ -80,6 +82,7 @@ class Hooks(
         return runCatching {
             when (input.event) {
                 "PreToolUse" -> steer(input, settings.steer, started)
+                "SubagentStart" -> pass("subagent", started)
                 "UserPromptSubmit", "Stop" -> weigh(input, json, settings.weight, started)
                 else -> pass("ignored", started)
             }
@@ -167,13 +170,13 @@ class Hooks(
         private fun directoryOf(path: String): String = java.nio.file.Path.of(path).let { if (java.nio.file.Files.isDirectory(it)) it else it.parent ?: it }.toString()
 
         /** The hooks of a daemon: the index of [registry], the settings of the home's `config.json` read per call, and `hooks.jsonl`. */
-        fun create(config: Config, registry: Registry, scope: kotlinx.coroutines.CoroutineScope, callsOn: (String) -> Int, projects: () -> Collection<String> = { emptyList() }): Hooks {
+        fun create(config: Config, registry: Registry, scope: kotlinx.coroutines.CoroutineScope, callsOn: (String) -> Int, forgetReads: (String) -> Unit = {}, projects: () -> Collection<String> = { emptyList() }): Hooks {
             val windows = System.getProperty("os.name").lowercase().startsWith("windows")
             val paths = ShellPaths(System.getProperty("user.home").replace('\\', '/'), windows)
             return Hooks(
                 Steering(IndexedSources(registry, windows), paths), { ConfigLoader.hooks(config.home) },
                 AppendLog(config.home.resolve("hooks.jsonl"))::append, { path -> runCatching { registry.locate(directoryOf(path)).worktree }.getOrNull() }, callsOn,
-                SessionContext(registry, projects), SessionWeights(scope), WarnedLevels(config.home.resolve("weight-warned.txt")),
+                SessionContext(registry, projects), SessionWeights(scope), WarnedLevels(config.home.resolve("weight-warned.txt")), forgetReads,
             )
         }
     }

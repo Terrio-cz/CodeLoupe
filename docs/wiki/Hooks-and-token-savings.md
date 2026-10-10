@@ -52,4 +52,4 @@ per caller (`root`), what that caller was shown.
 
 `doc` reads only files under the caller's `root` or under the agent harness's folders (`~/.claude`, `<tmp>/claude`), with links
 resolved first, and never a secret store (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `credentials*`, `.ssh`, `.aws`, …), a binary file or one over 8 MB.
-The memory is per daemon and per `root`; it is not saved over a daemon restart (the next read is a full one).
+The memory is per daemon and per `root`; it is not saved over a daemon restart (the next read is a full one), and a session or subagent starting in the worktree (the plugin's `SessionStart` and `SubagentStart` hooks) clears it for that worktree, so a new agent is never told `unchanged` of text it has not read.

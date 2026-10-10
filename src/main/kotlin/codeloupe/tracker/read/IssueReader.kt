@@ -11,6 +11,9 @@ import codeloupe.tracker.TrackerMirror
  * Without a session key nothing is remembered.
  */
 class IssueReader(private val memory: ReadMemory, private val clock: () -> Long = System::currentTimeMillis) {
+    /** Drops what the readers [matching] were told, so their next read is whole again. */
+    fun forget(matching: (String) -> Boolean) = memory.forget(matching)
+
     suspend fun read(mirror: TrackerMirror, id: String, parts: Parts, since: String?, session: String): String {
         val note = mirror.refresh(id)
         val issue = mirror.store.issue(id) ?: return note ?: "no issue $id"

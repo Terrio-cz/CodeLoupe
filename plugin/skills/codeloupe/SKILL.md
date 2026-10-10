@@ -51,7 +51,7 @@ Code tools take `root`: the absolute path of the repository or worktree you work
   qualified (`Type.member`) or the answer is a superset.
 - The index follows the working tree: edits in a worktree show up on the next query, no refresh step.
 - A repeated `issue`, `task_context` or `doc` read from the same `root` answers `unchanged since …` or only the difference;
-  `since=none` sends it again (do that after the context was cleared). Read a large file with `doc` digest first, then only the sections you need.
+  `since=none` sends it again (do that after the context was cleared, or when the answer says unchanged for something you have not read; the plugin's hooks reset the memory of a worktree when a session or subagent starts in it). Read a large file with `doc` digest first, then only the sections you need.
 - Long commands go to `job`: start it, end the turn when there is nothing else to do, and read `status` when you
   continue. Do not hold a turn open on a slow build.
 

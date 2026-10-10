@@ -1,4 +1,4 @@
-The plugin registers two hooks: `SessionStart` starts the daemon ([Hooks and token savings](Hooks-and-token-savings#the-sessionstart-hook)), and `PreToolUse` steers searches and whole-file reads, described here.
+The plugin registers three hooks: `SessionStart` starts the daemon ([Hooks and token savings](Hooks-and-token-savings#the-sessionstart-hook)), `PreToolUse` steers searches and whole-file reads, described here, and `SubagentStart` makes the daemon forget what the worktree was read as (below).
 
 Agents still reach for `rg`, `grep`, `cat` and whole-file reads. A hook runs outside the model and costs no tokens, so the
 plugin points those calls at the CodeLoupe call that answers them. All hooks go through one script (`plugin/hooks/hook.sh`:
@@ -55,6 +55,15 @@ command text) and how many were followed by a CodeLoupe code call on the same wo
 `/status` has `hooks` (calls, advised, denied, why the rest was left alone, median and p95 ms of the decision).
 `codeloupe metrics hooks --replay --since 2026-10-01` runs the shell and read calls of old transcripts through the same
 decision and prints how many it would advise and with which call (counts only; sizes from the transcript's own results).
+
+## Subagents and what was already read
+
+`issue`, `task_context`, `doc` and `dispatch_plan` answer a repeated read from the same `root` with `unchanged since your read`. A subagent shares the
+root (and the MCP connection) with the window that started it, so without help its first read could be told that. The `SessionStart` and `SubagentStart`
+hooks send the working directory of the new session or subagent to the daemon, which drops the reads it remembers for that worktree (the root itself, a
+folder inside it or one around it): the new agent's first read is a whole one (the agent that read before also gets one whole answer, then
+one-line answers again). The hook needs no setting and costs no model tokens; without the plugin hooks (or with `CODELOUPE_HOOKS=off`) the old behaviour
+stays and `since=none` is the way to get the content.
 
 ## Session start
 
