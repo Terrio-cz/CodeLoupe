@@ -1365,6 +1365,16 @@ rozhoduje launcher.
   ho ohlásil `lost` se zachovaným logem (daemon je sám v job objectu s KILL_ON_JOB_CLOSE, každý job má navíc vlastní
   vnořený pro cancel); po pádu bez job objectu (ne-Windows) přeživší ukončí podle pid + času startu.
   `codeloupe stop` s běžícími joby odmítne (`--force`).
+- **Historie jobů (CL-209)**: dokončený job zůstává v `jobs.db` (i s logem) aspoň **7 dní** a dokud je mezi 500 nejnovějšími; strop 20 000.
+  Úklid běží při otevření databáze a každých 100 zápisů; běžící a čekající job se nemaže nikdy. Záznam, který tato verze nepřečte (novější
+  verze), se ve výpisu přeskočí, ne selže celý. Test: JVM, která zapíše joby a skončí `halt` bez zavření databáze (jako `taskkill /F`),
+  a čtení z druhého procesu; restart démona nad stejným domovem; záznam ve formátu 0.1.0. *Proč zmizely joby z 9. 10. po výměně 0.1.0 → 0.1.1
+  (nález 10. 10.)*: kód démona `jobs.db` nikdy nemaže (`JobStore` jen vkládá a čistí podle stáří) a formát záznamu se od CL-84 nezměnil. `jobs.db`
+  v domovu aplikace má hlavní soubor 4096 B (jen hlavička) a WAL o 7 rámcích: schéma a jediný job z 10. 10. 21:15; hlavní soubor psán v 21:07:35,
+  tedy databáze byla **založena znovu** při startu 0.1.1 (tehdy `PRAGMA journal_mode=WAL` zapíše prázdnou stránku do nového souboru), přitom
+  `jobs/` drží šest logů z 9. 10. (18:16–21:16) a `daemon.log` jejich „started/done“. Soubory `jobs.db*` tedy někdo odstranil mezi posledním jobem
+  0.1.0 (21:16 9. 10.) a startem 0.1.1, `events.db` ve stejném domově zůstal. Kdo, z dat nejde zjistit (`daemon.log` o tom mlčí); démon teď při startu
+  napíše `jobs: N records kept` a varování, když je v `jobs/` víc logů než záznamů.
 - **Sloty**: `slots` v `config.json` (Terrio `gradle-test` ×2, `vps-test`), nekonfigurovaný slot = 1. Ověřeno: dva
   `gradle-test` obsazené, třetí job čekal v daemonu (`/status` `jobs.slots.waiting`) a spustil se po uvolnění; čekání
   je suspendovaná korutina (semafor FIFO), ne smyčka.

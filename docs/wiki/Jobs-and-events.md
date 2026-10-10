@@ -17,6 +17,10 @@ codeloupe job status [id]  ·  codeloupe job cancel <id>
   and jobs run in the daemon's own kill-on-close job object: if the daemon dies they end too, never as orphans.
 - Output and errors go straight to `<home>/jobs/<id>.log`; the record (`<home>/jobs.db`) keeps exit code, duration and a
   **compact summary**: test counts (Gradle, Maven, node:test, Jest, pytest), the first failure lines, the last 15 lines.
+- **History**: a finished job's record and log stay for at least 7 days (and while it is among the newest 500 jobs; 20,000 is the
+  hard cap), then go together. A daemon restart, a forced stop (the write-ahead log is replayed) and an update keep the list; a record
+  this version cannot read is skipped, not fatal. At start the daemon logs `jobs: N records kept`, and says so when `jobs/` holds
+  more logs than there are records (the records were removed from outside).
 - **Slots**: `--slot <name>` holds a named resource while running; a busy slot queues the job in the daemon (first come,
   first served). `config.json` `slots` sets capacities (`{ "gradle-test": 2 }`); a slot not listed holds one job.
 - **Policy**: commands run by the daemon never pass the agent host's guard hooks, so every job — follow-ups included,
