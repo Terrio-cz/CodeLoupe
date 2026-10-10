@@ -604,6 +604,50 @@ Kritérium „podíl čtení trackeru ≤ 5 %“ **zůstává nesplněné** (5,9
 `dispatch_plan` 0,3 %. Nejde o chybějící údaj, ale o to,
 že suggester chce vlastní výběr nad celým backlogem (typ, priorita, oblast), který `dispatch_plan` neumí. Cena (medián 67 % proti A, 1. kritérium) zůstává splněna. Dál se neiterovalo.
 
+**Skutečná úspora u codera a reviewera: hledání v shellu a kompaktní packet (CL-189, 2026-10-10).** Coder a reviewer jsou spolu 262 z asi 420 mil.
+vážených jednotek. Dvě páky, měřené zvlášť, v odlehlých kopiích workspace (živý workspace se nesahal), na throwaway daemonech z větve (porty 47640–47644,
+vlastní `CODELOUPE_HOME`), `claude -p --agent`, kopie Terrio klonované z lokálního bare repozitáře bez vzdáleného `origin` (první pokus s `origin` skončil
+tím, že `git fetch` v klonu přitáhl master s řešením; tyto běhy se zahodily). Nic do YouTrack. Celkem 76 běhů a asi 41 USD včetně zahozených.
+
+*L1, coder (Sonnet, medium, `terrio-coder`).* Tři uzavřené tasky se známým řešením, základ = první rodič merge: TER-670 (`CliOptions`, 5 souborů), TER-545
+(`WeeklyDatabaseImportCli`, 3 soubory), TER-536 (nullabilita DTO, 7 souborů, 3 moduly). Plán dostal coder ze skutečného plánu (TER-670 jsem napsal ve stejném
+stylu), packet jako ve fázovém běhu, vlastní klon a `TERRIO_RUN_SANDBOX` na běh. Správnost: tři ověření po běhu: (a) coder sám provedl `gradle precheck`, (b) na jeho strom se
+přepsaly testy známého řešení (TER-670 kolo 1, TER-545 a TER-536 z merge) a znovu proběhl `gradle precheck` v odlehlém sandboxu, (c) počet commitů a čistota stromu.
+B = tělo s tabulkou „co čím“ (`symbol`/`usages`/`outline`/`grep`/`find`, „`rg -n` jen pro nekotlinové soubory“, nástroj `grep` v `tools:`, tělo přesně 8 000 znaků) +
+steering hook pluginu v režimu `redirect`.
+
+| Iterace | Var. | n | Jednotky tis. medián / průměr | USD průměr | Tahy | Volání CL na běh | Shellové hledání (volání / podíl ceny) | Správnost |
+|---|---|---:|---|---:|---:|---:|---|---|
+| 1, plán s řádky | A dnešní | 15 | 80 / 84 | 0,17 | 11,3 | 0,0 | 1,5 / 4,2 % | 15/15 |
+| 1 | **B tabulka + hook** | 15 | **103 / 105 (129 %)** | 0,21 | 13,7 | 1,7 | 2,5 / 1,3 % | 15/15 |
+| 2, jen issue (`light`) | A dnešní | 9 | 70 / 73 | 0,15 | 9,6 | 0,0 | 2,9 / 7,3 % | 9/9 |
+| 2 | **B tabulka + hook** | 9 | **81 / 82 (115 %)** | 0,16 | 11,2 | 0,9 | 3,4 / 5,1 % | 6/9 |
+
+*Výsledek: pára nesplněna, B je dražší (129 % a 115 % proti A, kritérium bylo ≤ 85 %).* Příčina: shellové hledání je u codera na těchto úlohách jen 4,2 % ceny
+(7,3 % bez plánu s řádky), i úplné odstranění by tedy dalo nejvýš 4–7 %; tabulka podíl sníží (1,3 %), ale agent přidá `outline`/`grep` volání a 2 tahy navíc (cache read
++40 %), takže součet je dražší. Hook v `redirect` promluvil jen ve 4 z 15 běhů iterace 1 (10 zásahů) a v iteraci 2 ve 0 z 9; nic neušetřil. V iteraci 2 B selhal u TER-545 ve 3 ze 3 běhů na jedné
+implementačně specifické kontrole známého testu (omezení se odmítá i v builderu `osmArgs`; A ji splnil 3/3), jinak byly všechny testy zelené; je to rozdíl implementace,
+ne chyba chování. Jiné měření (reálný coder, medián 150 tis., `code_search_shell` 12,4 %) vychází z větších úloh, než byly tyto tři; páku to neotevře (strop 12 %).
+Omezení: 3 úlohy s malým diffem, 15 a 9 běhů na variantu, plán popisuje soubory, takže se nehledá; Sonnet medium; `terrio-coder-high` čte tělo codera ze souboru, nezkoušelo se.
+
+*L2, reviewer (Opus, high, `terrio-reviewer-opus`, živé tělo po CL-180).* Čtyři uzavřená kola se známými nálezy (TER-321 4, TER-62 6, TER-637 3, TER-559 3). A = packet
+z CL-180 (diff −U12 / −U3, rejstřík AGENTS.md, ≈ 78 kB; v živém generátoru je navíc blok `changes` do 14 kB, takže A je mírně levnější než skutečnost) = 12 běhů (10 z CL-180 + 2 nové;
+jeden nový běh s přesunutým `origin/master` se vyřadil). B1 = kompaktní packet: `changes` (deklarace s volajícími a testy) + rejstřík + diff produkce −U3, testů −U1, strop 36 kB (≈ 40 kB).
+B2 = totéž s produkcí −U2, diffem testů a dokumentace jen na požádání (`git diff` s hotovým příkazem v packetu) a stropem 22 kB (≈ 25 kB). Prompt a tělo reviewera stejné.
+
+| Var. | n | Packet kB | Jednotky tis. medián / průměr | USD medián | Volání CL | Tool results kB | Nálezy |
+|---|---:|---:|---|---:|---:|---:|---|
+| A (CL-180) | 12 | 78 | 323 / 324 | 1,13 | 5,5 | 147 | 48/48 |
+| B1 | 12 | 40 | 288 / 280 (89 % / 86 %) | 1,01 | 6,3 | 127 | 48/48 |
+| **B2** | 12 | 25 | **267 / 263 (83 % / 81 %)** | 0,96 (85 %) | 5,3 | 114 | 48/48 |
+
+Po úlohách (medián B2 / A): TER-321 81 %, TER-559 88 %, TER-62 81 %, TER-637 56 %; průměr poměrů po úlohách 77 %. *Výsledek: kritérium ≤ 80 % mediánu nesplněno o 3 body
+(83 %), průměr 81 %; nálezy beze ztráty (48/48 v A i B2).* Rozpětí jedné buňky je 150–340 tis., takže u 12 běhů nejde 3 body odlišit od šumu. Proč strop leží kolem 80–85 %: u reviewera je 50 % ceny zápis
+do cache (kontext ≈ 80 tis. tokenů na běh), 22 % čtení a 28 % výstup (myšlení a zpráva), a packet je jen 12–13 tis. tokenů z těch 80; zmenšení o 53 kB ušetří
+≈ 12 % (B1), další zúžení ≈ 6 bodů, protože reviewer dotahuje, co v packetu chybí (code_read 4,6 → 7,4 %). Živá úprava se **neprovedla** (kritérium nesplněno); podklad pro rozhodnutí:
+generátor `gen-packet.mjs` (v `%TEMP%\terrio-bench-cl190`) je malá změna `writeReviewBundleImpl` v `run/context.mjs` (`CAP.perFile`/`total`, kontext −U2, testy a dokumentace jen jako seznam).
+Žádná změna kódu CodeLoupe nebyla potřeba. Omezení: 3 běhy na buňku, A převzato z CL-180 (stejný den, stejný CLI), čtyři úlohy, hodnocení nálezů vzorem.
+
 **Planner s balíčkem `task_context` a krátkým tělem (CL-190, 2026-10-10).** Planner je největší položka toku (123 z asi 420 mil. vážených jednotek od 2026-10-01,
 medián 46 tahů, peak kontext 167 tis. tokenů, 921 tis. jednotek na běh). Hypotéza: tahy planneru jdou na zjišťování toho, co může předat připravený balíček, a méně tahů
 znamená méně čtení cache. Řízený pokus (Opus, effort high, 3 uzavřené úkoly TER-321, TER-62, TER-324 z CL-23 / CL-180 ve stejných odlehlých klonech těsně před landem,

@@ -309,6 +309,38 @@ packet (the live planner has one, so part of the saving may already be taken), a
 the way: a fresh subagent that reads a root another agent already read is told "unchanged since your read" (CL-192). Method and
 table: docs/plan.md § 8.4.
 
+### Shell search steering and a compact review packet (CL-189)
+
+Two levers aimed at the coder and the reviewer, the two largest roles of the Terrio flow (262 of about 420 million weighted units). 76 headless runs
+(Sonnet medium for the coder, Opus high for the reviewer), scratch clones without a remote, throwaway daemons, about 41 USD.
+
+**Coder: a routing table plus the steering hook in `redirect` mode does not pay.** Three closed tasks with a known solution (a small CLI option change, a refusal in a
+weekly import, a DTO nullability change across three modules); after each run the known solution's tests were laid over the coder's tree and the targeted precheck ran again.
+
+| Coder variant | n | Weighted units, thousand: median / mean | Model calls | Shell search: calls, share of cost | Known-solution checks |
+|---|---:|---|---:|---|---|
+| today, plan with line hints | 15 | 80 / 84 | 11.3 | 1.5, 4.2 % | 15 of 15 pass |
+| **table + `grep` + hook** | 15 | **103 / 105 (129 %)** | 13.7 | 2.5, 1.3 % | 15 of 15 |
+| today, issue only (`light`) | 9 | 70 / 73 | 9.6 | 2.9, 7.3 % | 9 of 9 |
+| **table + `grep` + hook** | 9 | **81 / 82 (115 %)** | 11.2 | 3.4, 5.1 % | 6 of 9 (one implementation-specific assertion in one task) |
+
+The target was 85 % of today's cost; the variant costs more. Shell search is only 4-7 % of a coder run here, so there is little to save, and the table moves part of it to
+`outline` and `grep` calls that add two turns. The hook spoke in 4 of 15 runs (10 times) and in none of the 9 light runs.
+
+**Reviewer: a compact packet saves 17 %, three points short of the 20 % target, with no finding lost.** Four closed rounds with 16 known findings. The
+packet of CL-180 (about 78 kB: the diff with 12 lines of context, the `AGENTS.md` index) against two compact ones: B1 (declarations with callers and tests from `changes`,
+the index, a diff with 3 lines of context, tests with 1; 40 kB) and B2 (2 lines of context, test and documentation diffs on demand with the command in the packet; 25 kB).
+
+| Packet | n | Weighted units, thousand: median / mean | Median USD | Tool results kB | Known findings |
+|---|---:|---|---:|---:|---|
+| CL-180 (78 kB) | 12 | 323 / 324 | 1.13 | 147 | 48 of 48 |
+| B1 (40 kB) | 12 | 288 / 280 (89 % / 86 %) | 1.01 | 127 | 48 of 48 |
+| **B2 (25 kB)** | 12 | **267 / 263 (83 % / 81 %)** | 0.96 | 114 | 48 of 48 |
+
+Per task the medians of B2 are 56 to 88 % of the control, and one cell spans 150-340 thousand, so three points are inside the noise of 12 runs. The ceiling is structural: half of a
+reviewer's cost is cache writes of a context of about 80 thousand tokens, 28 % is output (thinking and the report), and the packet is 12-13 thousand of those tokens; what the
+packet leaves out the reviewer reads on demand (code reads 4.6 → 7.4 % of cost). Nothing was changed in the live Terrio workspace. Details and limits: docs/plan.md § 8.4.
+
 ### What did not work, and what the numbers do not show
 
 - **Agents barely called CodeLoupe (CL-180, fixed in the agent instructions).** 1 call in 7 reviewer runs, 10 in 5 planner runs, 0 in 40
