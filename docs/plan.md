@@ -908,6 +908,49 @@ celková cena +9,4 %, výstup 27,8 → 62,1 M tokenů (zbytek do 65,5 M jsou bě
 Důsledek: výstup je u reviewera třetina ceny role a u testeru, planneru a retro přes pětinu, takže pokus se stručným výstupem
 (terse output) má větší strop, než se čekalo; startovní kontext a čtení z cache zůstávají největší složkou, ale o ~10 % menší.
 
+### 8.7 Levnější model nebo nižší effort u planneru a reviewera (CL-202, 2026-10-10)
+
+Planner (`terrio-planner`, Opus high) a reviewer (`terrio-reviewer-opus`, Opus high) jsou spolu přes polovinu útraty Terria. Otázka: drží kvalitu na Sonnetu 5.5 nebo na nižším effortu?
+Řízený pokus stejnými skripty, prompty, packety, klony a body jako CL-189 / CL-190 (scratch kopie workspace, živý workspace se nesahal; jediný rozdíl je `model` / `effort` v hlavičce agenta
+a v `--model` / `--effort`), throwaway daemony 47700 (planner, build CL-189 s novým balíčkem `task_context`) a 47701 (reviewer, build CL-190), `claude -p --agent`, dva běhy souběžně. **Baseline se nepouštěla znovu**:
+planner Opus high = běhy B a D z CL-190 (živé tělo, 12 běhů na 3 úlohách TER-321, TER-62, TER-324), reviewer Opus high = varianta RC z CL-189 (živé kompaktní packet, 12 platných běhů po vyřazení běhu s přesunutým
+`origin/master`, 4 úlohy, 16 známých nálezů na sadu). Nové: V1 planner Sonnet high (3 běhy na úlohu = 9), V3 reviewer Sonnet high (2 na úlohu = 8), V4 reviewer Opus medium (2 na úlohu = 8). Celkem 25 běhů,
+10,9 USD z rozpočtu 30. **V2 (planner Sonnet medium) se nepouštěl**: V1 už kvalitu nedrží (pravidlo karty).
+
+Cena. Vážené jednotky počítají tokeny stejnou váhou u všech modelů (`codemetrics.mjs`: „stejný poměr pro současné modely“), takže při změně modelu neříkají nic o penězích; kritérium ≤ 60 % se proto posuzuje
+na **USD z CLI** (nese cenu modelu), jednotky jsou uvedeny vedle. Kvalita reviewera: všechny známé nálezy v každém běhu. Vzorec z `gt.mjs` se ukázal příliš volný: hledá slova v celé zprávě, tedy i v části
+„co jsem ověřil“, kde reviewer popisuje kód, ale nález nevznáší. Proto je přidána **přísná varianta** (`findings.mjs`: vzorce jen nad sekcí `Findings`); u baseline RC dává přísná i volná varianta 100 %, takže baseline se
+tím nemění. Nálezy, které přísná varianta nenašla, jsem ověřil ručně.
+
+| Role | Var. | n | Jednotky tis. (medián) | USD medián / průměr | Poměr proti Opus high (USD / jednotky) | Známé nálezy volně / přísně | Volání CL na běh |
+|---|---|---:|---:|---|---|---|---:|
+| reviewer | Opus high (RC, baseline) | 12 | 267 | 0,97 / 0,94 | 100 % | 48 z 48 / 48 z 48 | 5,1 |
+| reviewer | **V3 Sonnet high** | 8 | 156 | 0,31 / 0,31 | **32 % / 58 %** | 100 % / **88 %** (28 z 32) | 0,4 |
+| reviewer | **V4 Opus medium** | 8 | 168 | 0,62 / 0,64 | **64 % / 63 %** (průměr 68 %) | 100 % / 97 % (32 z 32 po ruční kontrole) | 2,0 |
+| planner | Opus high (B+D, baseline) | 12 | 240 | 0,87 | 100 % | viz níže | – |
+| planner | **V1 Sonnet high** | 9 | 184 | 0,36 | **41 % / 77 %** | viz níže | – |
+
+*V3, reviewer Sonnet high: cena splněna (32 % USD), kvalita ne.* U TER-637 (3 známé nálezy) V3 ve **2 ze 2 běhů** nahlásil jen jeden nález (dokumentace tvrdí jedno čtení `pg_index`, kód čte dvakrát) a vynechal
+dva: osud přejmenovaného držáku indexu (`_old`) bez návodu k úklidu a chybějící test varování pro ledger. Volný vzorec je ale i u těchto běhů označil za nalezené (slova stála v části „ověřeno“); ruční čtení sekcí
+`Findings` obou běhů potvrdilo, že tam nejsou. Pravidlo karty (reviewer, který vynechá známý nález ve dvou bězích, končí) tak V3 vyřazuje; TER-321 (4/4), TER-62 (6/6) a TER-559 (3/3) V3 splnil v obou bězích.
+Zbytek chování: 7 tahů místo 12, CodeLoupe 0,4 volání na běh (shell a `Read`), zpráva podobně dlouhá (5-10 tis. znaků).
+
+*V4, reviewer Opus medium: kvalita drží, cena ne o několik bodů.* 32 z 32 známých nálezů (jeden běh TER-559 hlásil zdvojenou kontrolu parsování jako „stejné kontroly na dvou místech“, vzorec chtěl „two copies“; ruční kontrola ho uznala).
+Cena ale vychází na 64 % mediánu (USD i jednotky), 68 % průměru a po úlohách 61 % (TER-321), 68 % (TER-62), 70 % (TER-559) a 76 % (TER-637): kritérium ≤ 60 % nesplněno. Rozpětí buňky je u baseline 150-340 tis., takže
+rozdíl od 60 % je v šumu, ale na špatné straně ve všech čtyřech úlohách.
+
+*V1, planner Sonnet high: cena splněna (41 % USD, jednotky 77 %), kvalita ne.* Kontrolní seznam CL-23 (stejný `judge.mjs`; Opus B+D / V1): známé nálezy reálných kol 0,93 / 0,90 (37 z 40 a 27 z 30; chybí stejný
+třetí nález TER-321), rozhodnutí reálného plánu 0,99 / 0,97, soubory reálného řešení **0,74 / 0,67** (−7 bodů, u B samotného 0,72, rozdíl −5), řádky premortem **16,4 / 12,1 (−26 %)**, různé čočky premortem **7,4 / 4,7**.
+Po úlohách (Opus / V1): soubory 0,75 / 0,67, 0,65 / 0,60, 0,86 / 0,79; řádky premortem 18,8 / 13,3, 17,0 / 11,7, 13,5 / 11,3; čočky 6,0 / 5,0, 7,5 / 4,3, 8,8 / 4,7, tedy všude stejným směrem. Rozhodnutí
+a nálezy jsou v rozptylu (±3 body), soubory a hloubka premortem ne: Sonnet plánuje přímočařeji (8 tahů proti 16,5, 21 tis. znaků), vynechá více jednořádkových úprav a méně čoček rizik, což je přesně to, co planner
+před kódem dodává. Kritérium „do 3 bodů v každé položce“ nesplněno, V2 (medium) by bylo horší a nepustilo se.
+
+*Nasazení: žádné.* Žádná varianta nesplnila obě podmínky, živý workspace zůstává beze změny (žádné `.bak-cl202`); CL-197 a CL-188, které upravují stejná těla, se nečekalo. Nejbližší je V4 (reviewer Opus medium, −36 % USD bez
+ztráty nálezu): stojí za opakování, až se změní packet nebo tělo reviewera, ale hlavička `terrio-reviewer` (xhigh, kolo 1) a `terrio-reviewer-opus` (high) se tímto pokusem neměnila.
+Zjištění k harnessu: Sonnet v jednom z 9 plánovacích běhů spustil `find / -iname ...` v Git Bashi; claude -p na něj čekal přes 10 minut po hotovém plánu (JSON pak nese jen poslední krátkou zprávu a spotřebu posledního tahu,
+proto `tr.mjs` bere text a jednotky z transcriptu); další běhy hlídá watchdog, který shellové potomky starší 4 minut ukončí. Omezení: 2-3 běhy na buňku, kontrolní seznam planneru je vzorcový, reviewer se hodnotí jen
+na známé nálezy (ne na falešné nálezy ani jejich závažnost), jeden kontrolní den a jedna sada úloh, baseline z předchozích dnů (stejný CLI 2.1.295). Skripty: `%TEMP%\terrio-bench-cl3` (`setup.mjs`, `bench-run.mjs`, `lane.sh`, `judge.mjs`, `analyze.mjs`, `findings.mjs`, `tr.mjs`).
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
