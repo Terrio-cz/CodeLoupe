@@ -727,7 +727,7 @@ TER-321 8/16 a TER-62 5/15 beze změny; balíček je o 1–7 % delší (18,3 →
 (rozsah 7–10 z 11), Q 47/55 = 0,85 (8–11), u TER-62 (n = 2) P 18/30, Q 21/30; řádky premortem TER-324 11,8 proti 13,0; jednotky 212 proti 222 tis. (+4 %), tahy 12–39 proti 18–30. Rozdíl v pokrytí souborů není měřitelný: **balíček plán nezlepšil**.
 Chybějící soubory u TER-324 jsou stále tytéž, `User.kt` a `Organization.kt` (chybí ve 2 z 5 běhů P a ve 3 z 5 běhů Q); oba balíček jmenuje už předtím jako tip (`? avatarMediaId`, `? rejectionReason` v `touch`) a historie je nepředpoví
 (se službami účtů je dřívější úkoly měnily jen 3 z asi 15), takže je planner vynechává vlastním rozhodnutím. Ztráta oproti starému tělu (0,97 → 0,82 v CL-190) se tedy balíčkem nezavře; zbývá věta v těle planneru
-(„vypiš každý soubor, který změna zasáhne, i jednořádkové úpravy a dokumentaci“), ta ale mění agenta `terrio-planner.md` v pracovním prostoru Terrio, což vyžaduje souhlas uživatele; ostatní rozhodnutí, nálezy a premortem v rozptylu stejné.
+(„vypiš každý soubor, který změna zasáhne, i jednořádkové úpravy a dokumentaci“), ta ale mění agenta `terrio-planner.md` v pracovním prostoru Terrio, což vyžaduje souhlas uživatele (karta CL-197, tam i opakování proti starému tělu na třech úkolech); ostatní rozhodnutí, nálezy a premortem v rozptylu stejné.
 
 *Mezery CL-191 (2026-10-10).* Zpráva `metrics gaps --since 2026-10-01` měla 365 mezer ve 2 105 voláních (17 %; karta psala 236 z 1 540, 15 %, o dny dřív). Příčiny největších tvarů (počty ze stejných transcriptů):
 (1) `outline:path` fallback 60× – 54 z nich nebyl omyl nástroje: agent po `outline` přečetl rozsah řádků, který outline ukázal (`Read` s `offset`/`limit`, `sed -n 10,40p`), tedy zamýšlený postup; detektor to počítal jako druhé čtení, teď ne (zbývá 6 celosouborových čtení).
@@ -738,7 +738,7 @@ nově `module` bere i cestu adresáře nebo začátek názvu souboru a prázdná
 (5) `issue:name` 27× a `task_code:name` 20× fallback – artefakt detektoru: token z `TER-324` je `TER` a trefí každé pozdější čtení, které zmiňuje nějaký úkol (`cat brain/tasks/TER-324.md`); nástroje trackeru už fallback nemají.
 Dále `symbol path:1` (5×): řádek před první deklarací (balíček, importy) nenašel nic, nově vrátí nejbližší následující deklaraci, a chybějící soubor to řekne (`no indexed file … (to be created, or not in this worktree)`).
 Stejné transcripty, nový detektor: 365 → 196 mezer (9,3 %). Řízené běhy planneru (7 běhů na variantu): starý daemon 15 mezer v 78 voláních (19,2 %; nový detektor 11, 14,1 %), daemon s opravami 8 v 91 (8,8 %); zbylých 8 je 5 záporných odpovědí na jména, která úkol teprve zavádí
-(`location_search`, `LocationSearch*`, `AccountInput`) a 3 náhodné shody tokenu (`website`, `description`, `json`). Cíl 7 % se nesplnil (8,8 %), a protože zbytek nepochází z daemona, kritérium se přepisuje; metrika sama je nová karta.
+(`location_search`, `LocationSearch*`, `AccountInput`) a 3 náhodné shody tokenu (`website`, `description`, `json`). Cíl 7 % se nesplnil (8,8 %), a protože zbytek nepochází z daemona, kritérium se přepisuje; metrika sama je karta CL-198.
 
 Skripty a data: `%TEMP%\terrio-bench2\cl189` (`bench-ws`, `bench-run`, `lane`, `analyze`, `judge`, `trace`, `summ`; přiložené ke kartě CL-190).
 

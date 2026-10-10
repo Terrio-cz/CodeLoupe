@@ -225,7 +225,7 @@
    "args": {
     "name": "Constructs.kt:1"
    },
-   "text": "no declaration \"Constructs.kt:1\""
+   "text": "src/main/kotlin/com/example/shop/Constructs.kt:10  com.example.shop.OrderId  hash=e68e6eb3c0\ntypealias OrderId = String"
   },
   {
    "tool": "symbol",
