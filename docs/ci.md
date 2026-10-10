@@ -85,3 +85,8 @@ Trial run 1 (branch CL-195, run 38070132858; a new branch, so every step ran): 1
 The Windows test is 46 % shorter. The run is now bounded by `bundle (macos-15-intel)` and the installer smoke test after it
 (650 s + 84 s), not by the tests; the Intel runner varies by minutes between runs. Further gains would come from the macOS
 Intel bundle and from the update test, which is unchanged for a push that touches code.
+
+Trial run 2 (same branch, a push that only changed `docs/ci.md`, CI run 38071077346 and CodeQL run 38071077352): CI 30 s,
+CodeQL 10 s, both green. Every required job reported (`tools`, `test` on three systems, `app`, `bundle`, both analyses) with
+its steps skipped, 7 to 14 s each; `update test`, `clipboard`, `libsecret`, `manifests` and `installer smoke` were skipped
+whole. Against 14 minutes for the same push before.
