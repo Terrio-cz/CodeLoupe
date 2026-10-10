@@ -356,8 +356,8 @@ export class MockData {
     return {
       baseline: { state: 'ok', label: 'baseline', since: '2026-09-23', until: '2026-10-06', runs: 2_373, coveredShare: null, message: null },
       claude: [
-        { id: 'default', label: 'Account A', email: 'a@example.test', configDir: 'C:/Users/dev/.claude', isDefault: true, implicit: false, exists: true, windows: 4, weighted7d: 12_100_000, savedPct7d: 14, lastUsedAt: iso(this.now - 2 * 60_000) },
-        { id: 'b', label: 'Account B', email: 'b@example.test', configDir: 'C:/Users/dev/.claude-b', isDefault: false, implicit: false, exists: true, windows: 2, weighted7d: 6_800_000, savedPct7d: 11, lastUsedAt: iso(this.now - HOUR) },
+        { id: 'default', label: 'Account A', email: 'a@example.test', configDir: 'C:/Users/dev/.claude', isDefault: true, implicit: false, exists: true, windows: 4, weighted7d: 12_100_000, weighted5h: 1_900_000, savedPct7d: 14, lastUsedAt: iso(this.now - 2 * 60_000), tokenSecret: 'CLAUDE_TOKEN_A', tokenConfigured: true, limit: { state: 'unknown', kind: null, resetsAt: null, observedAt: null, source: 'transcript' } },
+        { id: 'b', label: 'Account B', email: 'b@example.test', configDir: 'C:/Users/dev/.claude-b', isDefault: false, implicit: false, exists: true, windows: 2, weighted7d: 6_800_000, weighted5h: 0, savedPct7d: 11, lastUsedAt: iso(this.now - HOUR), tokenSecret: null, tokenConfigured: false, limit: { state: 'limited', kind: 'weekly', resetsAt: iso(this.now + 26 * HOUR), observedAt: iso(this.now - HOUR), source: 'transcript' } },
       ],
       youtrack: [
         { id: 'acme', label: 'Acme', url: 'https://acme.youtrack.cloud', projects: ['SHOP', 'CL'], tokenConfigured: true, editable: true, mirror: { state: 'synced', syncedAt: iso(this.now - 2 * 60_000) } },

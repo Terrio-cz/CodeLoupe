@@ -1743,6 +1743,11 @@ rozhoduje launcher.
   účtu restartuje daemon. Tracker z `config.json` je v tabulce jen ke čtení.
 - Souběh: aplikace (CLI), daemon (poznamenání použití) i test zapisují do téhož vaultu; `SecretStore` teď čte-mění-zapisuje pod zámkem `vault.env.lock` (zámek souboru + zámek JVM),
   test se čtyřmi zapisovateli a dvěma čtenáři na samostatných instancích neztratil žádný záznam.
+- **Token launcheru, stav limitu a okno plánu (CL-210, 2026-10-10)**: Claude účet smí nést `tokenSecret` (jméno tajemství s dlouhodobým tokenem z `claude setup-token`; aplikace jméno při uložení
+  zachová, daemon tajemství nečte). Stav limitu se bere z odpovědí o limitu v transcriptech: syntetická `assistant` řádka s `error: rate_limit` (nebo modelem `<synthetic>`) a textem začínajícím
+  „You've hit your … limit“; čas obnovy je `quotaLimits.resetsAt` z téže řádky, jinak z textu („resets Oct 11, 8pm (Europe/Prague)“ v zóně, kterou jmenuje). Parser je ukládá do tabulky `limits`
+  (verze parseru 3: transcripty se přečtou znovu jednou), `GET /ui-api/v1/accounts` vrací `limit { state, kind, resetsAt, observedAt, source }`: `limited` do obnovy (odpověď bez času 30 min),
+  `ok` po ní, `unknown` bez odpovědi; plus `tokenSecret`, `tokenConfigured` a `weighted5h` (okno session).
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu, fixture složkám dvou účtů a lokálnímu fake YouTrack: přidání účtu, přejmenování, výchozí,
   filtr Overview (390 → 130), přidání YouTrack účtu s tokenem, test spojení (fake instance dostala uložený token), rotace (dostala nový), odebrání (token ze storu pryč); token se nikdy neobjevil v DOM ani v odpovědích daemona.
 

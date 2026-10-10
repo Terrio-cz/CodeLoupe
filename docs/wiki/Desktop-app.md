@@ -20,3 +20,10 @@ desktop app writes it, the daemon reads it afresh on every call. Without it the 
 that called CodeLoupe in the last 15 minutes, and `GET /ui-api/v1/overview?account=<id>` narrows the Overview to one. A YouTrack account is `{ id, label, url, projects, token }` where
 `token` is the name of a global secret in the store (`YOUTRACK_TOKEN_<ID>`); the daemon mirrors it like a tracker of `config.json` (a tracker of that file wins a name clash), reading the
 token from the store at most every 30 seconds. The API never returns a token, only whether one is stored.
+
+A Claude account may also carry `tokenSecret`, the name of the secret that holds its long-lived token (`claude setup-token`) for unattended runs; the app keeps the name
+when it saves the file, CodeLoupe itself never reads the secret. `GET /ui-api/v1/accounts` returns the name, `tokenConfigured` (the secret exists in the store), the cost
+of the last 5 hours (`weighted5h`, the session window) next to the 7 days, and `limit`: `{ state, kind, resetsAt, observedAt, source }`. The limit comes from the usage-limit
+answers Claude Code writes into the transcripts ("You've hit your weekly limit · resets Oct 11, 8pm (Europe/Prague)"): the reset time is the line's own `quotaLimits.resetsAt`,
+else read from the text in the zone it names. `state` is `limited` while the reset lies ahead, `ok` once it passed, `unknown` when the account's transcripts hold no such answer;
+`source` is `transcript`. The Accounts screen shows the limit, the reset time and the secret name.

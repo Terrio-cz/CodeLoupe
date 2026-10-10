@@ -19,10 +19,24 @@ data class AccountsView(val claude: List<Claude>, val youtrack: List<Youtrack>, 
         /** Distinct working directories of this account that called CodeLoupe in the last 15 minutes. */
         val windows: Int,
         val weighted7d: Long,
+        /** Weighted tokens of the last five hours, the length of the plan's session window. */
+        val weighted5h: Long,
         /** Percent this account's runs of the last 7 days saved against the baseline; null without a baseline or without a run to compare. */
         val savedPct7d: Double?,
         val lastUsedAt: String?,
-    )
+        /** The name of the secret that holds the account's long-lived token (`tokenSecret` in `accounts.json`); null when none is set. Never the token. */
+        val tokenSecret: String?,
+        /** Whether that secret exists in the store; false without a name. */
+        val tokenConfigured: Boolean,
+        val limit: Limit,
+    ) {
+        /**
+         * What the account's transcripts say about its usage limit: [state] `limited`, `ok` (a limit was hit and has lifted) or `unknown`
+         * (none seen), the [kind] of the newest one (`session`, `weekly`, a model, `spend`), when it [resetsAt] and when it was [observedAt].
+         */
+        @Serializable
+        data class Limit(val state: String, val kind: String?, val resetsAt: String?, val observedAt: String?, val source: String)
+    }
 
     @Serializable
     data class Youtrack(
