@@ -48,3 +48,45 @@ In this order, until a push costs about 10 billed minutes:
 2. Keep `concurrency` with `cancel-in-progress` (already on) and skip `app` and `installer-smoke` for pushes that only
    touch Kotlin or docs (a `changes` job on `git diff --name-only`).
 3. Re-measure with this table and check Settings → Billing → Actions after two weeks.
+
+## Wall time of a push to main (CL-195)
+
+Measured over the 23 successful CI runs of 2026-10-09 and 10: 12 to 19 minutes, median 14. The run takes as long as its
+slowest job. On run 38054115886 that was `test (windows-latest)` at 14.5 minutes (868 s of `./gradlew test`; Linux 425 s),
+then `update test (windows-latest)` at 11 minutes; the bundles take 5 to 7.5 minutes and the installer smoke tests one.
+
+- **Parallel test forks.** `tasks.test` sets `maxParallelForks` to half the CPUs, at least 1 and at most 2, so the 216 test
+  classes no longer run one after another in one JVM. `-PtestForks=N` overrides it. Capped at 2 so that a developer
+  machine with many agent windows is not flooded.
+- **Documentation-only pushes run almost nothing.** The `changes` job (`tools/changed-paths.mjs`) compares the push with its
+  base. When every changed file is under `docs/`, markdown, the licence or an issue template, the steps of `test`, `app` and
+  `bundle` and of both CodeQL analyses are skipped, and `manifests`, `libsecret`, `clipboard`, `installer smoke` and
+  `update test` do not run. The required checks still report: the ruleset on main requires `tools`, `test` on all three
+  systems, `app (ubuntu)`, `bundle (ubuntu)` and both CodeQL analyses, and a workflow filtered out by `paths-ignore`, or a
+  matrix job skipped by a job-level `if`, never reports them (a skipped matrix job is reported under its unexpanded
+  name), so those jobs start and skip their steps, which takes a runner start (about half a minute) instead of the run.
+  `tools` always runs; it checks the wiki links and the workflows. Tests, the build, the workflows and the plugin count as
+  code.
+- **The update test also skips tests and the plugin.** A push that only changes `src/test/`, `app/test/` or `plugin/` (besides
+  documentation) cannot change what an update does. It is not a required check, so the whole job is skipped.
+- **Unknown means everything.** A new branch, a tag, a force push that dropped the base, a scheduled run, or a failure of the
+  `changes` job itself runs every step: the answer is skipped only when it is known to be `false`.
+
+Trial run 1 (branch CL-195, run 38070132858; a new branch, so every step ran): 12 minutes, all green.
+
+| Job | Before (run 38054115886) | Now |
+|---|---|---|
+| test (windows-latest) | 868 s | 465 s |
+| test (ubuntu-latest) | 425 s | 340 s |
+| test (macos-latest) | 445 s | 479 s |
+| update test (windows-latest) | 655 s | 634 s |
+| bundle (macos-15-intel) | 437 s | 650 s |
+
+The Windows test is 46 % shorter. The run is now bounded by `bundle (macos-15-intel)` and the installer smoke test after it
+(650 s + 84 s), not by the tests; the Intel runner varies by minutes between runs. Further gains would come from the macOS
+Intel bundle and from the update test, which is unchanged for a push that touches code.
+
+Trial run 2 (same branch, a push that only changed `docs/ci.md`, CI run 38071077346 and CodeQL run 38071077352): CI 30 s,
+CodeQL 10 s, both green. Every required job reported (`tools`, `test` on three systems, `app`, `bundle`, both analyses) with
+its steps skipped, 7 to 14 s each; `update test`, `clipboard`, `libsecret`, `manifests` and `installer smoke` were skipped
+whole. Against 14 minutes for the same push before.

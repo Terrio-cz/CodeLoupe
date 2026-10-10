@@ -280,12 +280,43 @@ packet, read whole, which no search replaces. So the tool now gets used, but the
 prompts. Method, table and limits (4-10 runs per variant, the planner only 3, findings matched by pattern): docs/plan.md § 8.4;
 how to set up your own agents: [Claude Code integration](Claude-Code-integration#your-own-agents-subagents-with-a-tools-list).
 
+### A task pack that lets the planner stop (CL-190)
+
+The planner is the largest single cost of the Terrio flow (123 of about 420 million weighted units), and 36 % of a run is output tokens
+(thinking and the plan), 35 % cache writes and 29 % cache reads: tool results are only 20-30 %. So a bigger first answer only pays if it
+removes turns. `task_context` now also carries the description sections, the comment thread within a size budget (long comments cut in the
+middle, so a 29-comment thread keeps every decision), the files that reference the touched code, and the lines of `AGENTS.md` and the
+documents that name the touched files. The planner's instructions were changed to start from that pack, batch what it still has to
+read and stop at a budget of 8 turns. 33 analysed runs (Opus, high; 3 closed tasks with a known real plan; 37 runs and 42.9 USD in total
+with 2 trial and 2 discarded runs):
+
+| Variant | n | Weighted units, thousand: median (range) | Mean USD | Model calls, median |
+|---|---:|---|---:|---:|
+| A: instructions and pack before | 9 | 433 (255-506) | 1.45 | 38 |
+| **B: new instructions and pack** | 9 | **235 (198-259)** | 0.87 | 17 |
+| C: old instructions, new pack | 9 | 398 (268-511) | 1.34 | 34 |
+| D: the instructions as deployed, new pack | 3 | 251 (179-281) | 0.89 | 16 |
+| E: the instructions as deployed, old pack | 3 | 285 (236-345) | 1.08 | 29 |
+
+**B costs 54 % of A** (median and mean; permutation test p = 0.0014; per task 49, 57 and 58 %). Cache reads fall by 81 % (fewer turns), cache
+writes by 37 %, output by 31 %; shell code reads per run go from 17.6 to 7.7. **The pack alone (C) saves 8 %**: with the old
+instructions the planner still reads the issue again (1.8 calls per run) and `AGENTS.md` (1.1), so the rest, 46 points, is the
+instructions telling it to start from the pack and stop. Plan quality against the real plans (known review findings 27 of 30 in both,
+decisions of the real plan 98 % in both, files of the real solution 72 % against 77 %, premortem lines 16.4 against 18.1) is equal within
+the noise of nine runs, with the one visible loss on the smallest-diff task (files 82 % against 97 %, followed up in CL-194); B marks 2.6 facts per plan as
+`? unknown` with the step that resolves them instead of searching on. Limits: 3 tasks, 3 runs per cell (D and E only 3 in all), no prepared
+packet (the live planner has one, so part of the saving may already be taken), a pattern-based checklist, and a first-call hazard found on
+the way: a fresh subagent that reads a root another agent already read is told "unchanged since your read" (CL-192). Method and
+table: docs/plan.md § 8.4.
+
 ### What did not work, and what the numbers do not show
 
 - **Agents barely called CodeLoupe (CL-180, fixed in the agent instructions).** 1 call in 7 reviewer runs, 10 in 5 planner runs, 0 in 40
   sessions of the map experiment: the bodies named the tools in a bullet, `grep` was not in `tools:` and the hook only advised.
   With a routing table and `grep` the reviewer makes 6.0 calls per run, without any change in cost (above). Runs before 2026-10-10
   with and without the tool still differ mostly in what the prompts say.
+- **A bigger first answer alone saves little (CL-190).** The task pack with the old planner instructions saved 8 %; the 46-point rest came
+  from the instructions that tell the agent to start from the pack and stop searching.
 - **The suggester's cost did not fall (CL-182).** The local task index removed the tracker API calls, but the agent still reads
   as many issues as before (16.6 and 18.3 `issue` calls per run against 14.0 and 16.7 API reads), because its instructions
   tell it to read each candidate. Tracker reads are still 10.1 % (automatic) and 13.9 % (epic) of a run's cost.

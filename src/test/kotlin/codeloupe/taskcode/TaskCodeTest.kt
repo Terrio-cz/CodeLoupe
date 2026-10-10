@@ -25,6 +25,7 @@ import kotlinx.serialization.json.buildJsonObject
 import java.nio.file.Path
 import java.time.Instant
 import kotlin.io.path.createDirectories
+import kotlin.io.path.writeBytes
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -218,6 +219,28 @@ class TaskCodeTest {
         assertContains(text, "CL-16 landed ${plain.take(7)} ")
         assertFalse("CL-17 landed" in text)
         assertTrue(runCatching { context("ABC-1") }.exceptionOrNull()?.message.orEmpty().startsWith("no tracker mirrors the project of 'ABC-1'"))
+    }
+
+    @Test
+    fun `the pack carries the description, the comments, who references the touched code and the rules that apply`() {
+        write(repo, "AGENTS.md", "# Demo\n\n## Modules\n- The `Billing` rules live in the billing module and nowhere else.\n- Unrelated: releases are tagged by hand.\n")
+        val text = context("CL-91")
+        val description = text.substringAfter("## description\n").substringBefore("\n## ")
+        assertTrue(description.startsWith("### Context\nThe `Billing.total` path is read by"), description)
+        assertFalse("Routes keep answering" in description, "the checklist is shown by the issue section only")
+        assertContains(text, Regex("## callers\n$BILLING {2}← .*Use\\.kt"))
+        assertContains(text, "## norms\nAGENTS.md 5 lines, sections (first line): Demo 1 · Modules 3")
+        assertContains(text, "L4 [Modules] - The `Billing` rules live in the billing module")
+        assertFalse("releases are tagged" in text, text)
+        assertContains(context("CL-91", "sections" to "callers", "since" to "none"), "Use.kt")
+    }
+
+    @Test
+    fun `an AGENTS_md that cannot be read leaves the norms out and the rest of the pack stays`() {
+        repo.resolve("AGENTS.md").writeBytes(byteArrayOf(0xC3.toByte(), 0x28, 0xA0.toByte(), 0xA1.toByte()))
+        val text = context("CL-91")
+        assertContains(text, "## declarations")
+        assertFalse("## norms" in text, text)
     }
 
     private val contextTool = TaskContextTool(trackers, DocMemory())
