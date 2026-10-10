@@ -26,6 +26,12 @@ internal object Schema {
         if (description != null) put("description", description)
     }
 
+    fun array(items: JsonObject, description: String? = null) = buildJsonObject {
+        put("type", "array")
+        put("items", items)
+        if (description != null) put("description", description)
+    }
+
     fun enum(values: List<String>) = buildJsonObject {
         put("type", "string")
         put("enum", JsonArray(values.map(::JsonPrimitive)))

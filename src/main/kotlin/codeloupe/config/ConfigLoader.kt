@@ -36,6 +36,7 @@ object ConfigLoader {
             secrets = SecretsConfig.parse(file),
             write = WriteConfig.parse(file),
             api = ApiConfig.parse(file),
+            tools = ToolsConfig.parse(file),
         )
     }
 
