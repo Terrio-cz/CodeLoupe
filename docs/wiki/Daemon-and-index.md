@@ -75,6 +75,7 @@ the daemon's heap limit is 64 MB, with `parseWorkerIdleSeconds` 0 it is 80.
 | `daemon.json`, `daemon.log`, `calls.jsonl` | the running daemon's pid, port and version; its log; tool, latency and size of every call |
 | base and overlay databases, `aot/` | the indexes ([Worktrees and overlays](Worktrees-and-overlays)); the JVM AOT caches of the CLI and the daemon |
 | `jobs.db`, `jobs/`, `events.db` | jobs, their logs and the event log ([Jobs and events](Jobs-and-events)) |
+| `know.db` | the knowledge store, created on first use ([Knowledge store](Knowledge-store)) |
 | `trackers/` | tracker mirrors ([Trackers](Trackers)) |
 | `secrets/` | the encrypted store and its audit ([Environment and secrets](Environment-and-secrets)) |
 | `transcripts.db` | the ingested agent runs ([Metrics and savings](Metrics-and-savings)) |

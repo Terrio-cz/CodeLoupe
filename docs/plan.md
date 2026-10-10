@@ -1097,6 +1097,47 @@ Rozdíl součtu výstupu (maximum − první řádka) je ve všech skupinách **
 závěry CL-197 a CL-202 tedy nemění ani absolutní cena běhu, ani poměr, a nesplněná kritéria (reviewer 83 %, coder 129 % a 115 %, cena Sonnetu u kvality) zůstávají nesplněná. Hodnoty „před“ a „po“
 opravě jsou totožné i pro USD. Skripty (`scan`, `idx`, `groups`, `final`; počty jen z přepisů a výsledků CLI, žádný obsah) jsou přiložené ke kartě CL-206.
 
+### 8.10 Výsledek CL-203 — znalostní úložiště s kotvami v kódu (2026-10-11)
+
+Stavba strany CodeLoupe; řízené A/B retra a stewarda a napojení na živé Terrio přijdou později. Rozhodnutí z 8.6 (strop na
+tokenech ≈ 0,1 %, hodnota je kvalita) se nemění: úložiště se staví pro kvalitu faktů, ne pro úsporu.
+
+- **Návrh.** Balíček `codeloupe.know`, vlastní SQLite `know.db` v domově daemona (otevírá se líně při prvním použití, není v
+  `events.db`). Fakt: id (`k17`), scope (`repo`, `area:x`, `file:x`, `symbol:x`, `task:x`), kind (decision, pattern, blocker,
+  environment, other), text na jeden řádek, zdroj (task, run), `verifiedAtCommit`, `supersedes`, `related`, kotvy, stav
+  (active, stale, superseded). Hledání je FTS5 s BM25 (slova textu, scope, kind a task, stemování jako `find mode=search`),
+  filtr scope a kind, nejvýše N řádků s id. Zápis: fakt stejného scope s téměř shodnými kmeny (Jaccard ≥ 0,85 a stejná čísla,
+  tedy TER-167 a TER-168 jsou dva fakty) aktualizuje starší fakt.
+- **Kotvy a zastaralost.** Kotva je soubor, deklarace, nebo obojí. Při zápisu a `verify` se z indexu uloží otisk podpisu a těla
+  deklarace (u souboru všech jeho deklarací) a commit checkoutu; při každém zobrazení se kotva přečte znovu přes index s overlayem
+  worktree, takže se počítá i necommitnutá změna. Příznaky: `signature changed`, `body changed`, `declaration gone`,
+  `file gone`. Otisk místo čtení deklarace z `verifiedAtCommit`: je stejně přesný, nepotřebuje druhý parse a nezávisí na tom,
+  že commit je ještě v historii. Soubor mimo index (Markdown, YAML) se hledá na disku, i ve složce bez gitu; nečitelný
+  checkout stav nemění. Fakt bez otisku (import) kontroluje jen existenci cíle. Typ se otiskuje i s členy, proto fakt o třídě
+  zastará při každé změně v ní (kotvit se má člen).
+- **Rozhraní.** `GET /know/search`, `POST /know` (jeden fakt nebo `facts`), `GET /know/{id}`, `GET /know/stale`,
+  `POST /know/{id}/verify`, vše za tokenem daemona; CLI `codeloupe know search|put|show|stale|verify|import`. Seznam nástrojů
+  MCP ani kroky `batch` se nezměnily (MCP nástroj `know` je pozdější karta za volbou). Wiki: `Knowledge-store`.
+- **Import `brain/facts`** (14 souborů, jen čtení; `codeloupe know import … --root TerrioImporter --root workspace`, 27 s včetně
+  kontroly kotev): 1 095 neprázdných řádků, **1 059 faktů**, 35 řádků přeskočeno (nadpisy, standardní věta, `@` a `%`) a 1 zalomený řádek připojen k faktu nad ním.
+  **Duplicity: 0 přesných, 2 téměř shodné** (obě v `review-patterns`, sloučeny; stejný počet 2 vyjde, když se všech 14 souborů
+  vloží do jednoho scope, tedy mezi soubory žádná). Karta 8.6 uvádí 3 při trigramové shodě ≥ 0,6; kmenová metrika je přísnější a
+  nalezla ty, které jsou skutečně týž fakt. **Cesty:** 103 faktů cituje cestu; **10 z nich (9,7 %) cituje soubor, který není v
+  TerrioImporter ani ve workspace** (db 1, env-blockers 3, repo-notes 2, workflow 4; karta 8.6 měla 12 ze 102). Proti samotnému
+  TerrioImporter by jich bylo 72, protože většina citovaných cest je ve workspace (`run/`, `mcp/`, `brain/`): dvě kořenová
+  repozitáře jsou nutná, kotva nese vlastní `root`.
+- **Nalezení.** 30 otázek sestavených z faktů skutečných souborů (parafráze, 5 řádků, bez filtru, nad 1 059 fakty): **25 z 30
+  = 83 %** má správný fakt mezi 5 řádky (na 1. místě 18, na 2. 5, na 4. 2). Míjí je otázky, kde fakt otázku sdílí jen jedním slovem
+  („read-only query against the shared database“ proti „read-only recipe: docker exec …“). Sada otázek není v repozitáři (cituje
+  interní fakty), leží v předávací složce karty. Test v repozitáři má 44 vymyšlených faktů a 39 otázek a hlídá ≥ 80 %.
+- **Zastaralost na skutečné změně.** Test `KnowStaleTest` dělá skutečné git změny ve fixture repozitáři: změna těla (necommitnutá
+  přes overlay i commitnutá na hlavní větvi), změna podpisu, přidaná a odebraná deklarace, smazaný soubor, návrat k ověřenému
+  stavu a `verify`. Ruční běh přes CLI na dočasném repozitáři: `put` s kotvou, commit změny těla, `know stale` ukáže `STALE: body
+  changed`, `verify` příznak smaže.
+- **Kritéria karty.** Splněno: hit rate ≥ 80 % (83 % na 30 otázkách), detekce zastaralosti s příznakem v hledání, import 14
+  souborů s počty duplicit a mrtvých cest, rozhodnutí o úspoře (no-go na tokeny, bez změny). **Otevřeno:** řízené A/B retra a
+  stewarda (−40 % ceny při stejných zachovaných lekcích) a jejich zápis a čtení přes úložiště, tedy napojení na Terrio a MCP nástroj.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
