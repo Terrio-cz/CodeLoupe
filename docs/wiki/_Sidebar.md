@@ -21,6 +21,8 @@
 * [Daemon and index](Daemon-and-index)
 * [Worktrees and overlays](Worktrees-and-overlays)
 * [Benchmarks](Benchmarks)
+* [Agent runs](Agent-runs)
+* [Agent run details](Agent-run-details)
 * [Comparison](Comparison)
 
 **Install and contribute**

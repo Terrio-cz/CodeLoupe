@@ -99,10 +99,26 @@ jobs:
           cache-read-only: false
         if: needs.changes.outputs.code != 'false'
 
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+        if: needs.changes.outputs.code != 'false'
+
+      - name: Count the temp directory
+        run: node tools/temp-entries.mjs snapshot "$RUNNER_TEMP/temp-before.json"
+        shell: bash
+        if: needs.changes.outputs.code != 'false'
+
       - name: Test
         run: ./gradlew test --console=plain --no-daemon
         shell: bash
         if: needs.changes.outputs.code != 'false'
+
+      # The tests work in a directory of their own that is removed at the end, also after a failure (CL-208): the suite leaves a handful of entries at most.
+      - name: Check what the tests left in the temp directory
+        if: (always()) && needs.changes.outputs.code != 'false'
+        run: node tools/temp-entries.mjs check "$RUNNER_TEMP/temp-before.json" --max 20
+        shell: bash
 
       # A test that cannot run on this OS says so with a reason (assumeTrue); the job summary lists them (CL-166).
       - name: Skipped tests

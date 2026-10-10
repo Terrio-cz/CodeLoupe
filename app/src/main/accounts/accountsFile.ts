@@ -9,6 +9,8 @@ export interface ClaudeEntry {
   label: string;
   configDir: string;
   default: boolean;
+  /** Name of the secret that holds the account's long-lived token; the launcher of unattended runs sets it, the app only keeps it. */
+  tokenSecret?: string;
 }
 
 export interface YoutrackEntry {
@@ -36,7 +38,10 @@ export function readAccounts(home: string): AccountsData {
   const o = isObject(raw) ? raw : {};
   const claude: ClaudeEntry[] = [];
   for (const c of Array.isArray(o.claude) ? o.claude : []) {
-    if (isObject(c) && text(c.id) && text(c.label) && text(c.configDir)) claude.push({ id: c.id as string, label: c.label as string, configDir: c.configDir as string, default: c.default === true });
+    if (isObject(c) && text(c.id) && text(c.label) && text(c.configDir)) {
+      const tokenSecret = text(c.tokenSecret);
+      claude.push({ id: c.id as string, label: c.label as string, configDir: c.configDir as string, default: c.default === true, ...(tokenSecret ? { tokenSecret } : {}) });
+    }
   }
   const youtrack: YoutrackEntry[] = [];
   for (const y of Array.isArray(o.youtrack) ? o.youtrack : []) {

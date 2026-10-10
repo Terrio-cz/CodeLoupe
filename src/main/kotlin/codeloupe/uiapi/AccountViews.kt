@@ -1,5 +1,6 @@
 package codeloupe.uiapi
 
+import codeloupe.accounts.AccountLimit
 import codeloupe.accounts.AccountRoots
 import codeloupe.accounts.Accounts
 import codeloupe.accounts.ClaudeAccount
@@ -37,14 +38,19 @@ internal class AccountViews(
         val firstHour = Math.floorDiv(since, RunWriter.HOUR_MS)
         val untilHour = Math.floorDiv(now.toEpochMilli(), RunWriter.HOUR_MS) + 1
         val finishedBefore = now.minusSeconds(ACTIVE_WINDOW_S).toEpochMilli()
+        val stored = runCatching { secrets.store?.list().orEmpty().map { it.name }.toSet() }.getOrDefault(emptySet())
+        val sessionSince = now.minusSeconds(SESSION_WINDOW_S).toEpochMilli()
         fun saved(a: ClaudeAccount) = loaded?.let { Savings(transcripts.queries.usageRows(firstHour, untilHour, AccountUsage.prefix(a.projects)), it, finishedBefore).from(firstHour).savedPct }
         return AccountsView(
             claude = claude.map { a ->
                 val used = transcripts.usage.totals(a.projects, since)
                 AccountsView.Claude(
                     id = a.id, label = a.label, email = profiles.email(a), configDir = a.configDir.toString(), isDefault = a.isDefault, implicit = a.implicit,
-                    exists = Files.isDirectory(a.configDir), windows = windows[a.id] ?: 0, weighted7d = used.weighted, savedPct7d = saved(a),
+                    exists = Files.isDirectory(a.configDir), windows = windows[a.id] ?: 0, weighted7d = used.weighted,
+                    weighted5h = transcripts.usage.totals(a.projects, sessionSince).weighted, savedPct7d = saved(a),
                     lastUsedAt = used.lastUsedMs?.let { IsoTime.of(Instant.ofEpochMilli(it)) },
+                    tokenSecret = a.tokenSecret, tokenConfigured = a.tokenSecret != null && a.tokenSecret in stored,
+                    limit = limit(AccountLimit.of(transcripts.queries.lastLimit(AccountUsage.prefix(a.projects)), now)),
                 )
             },
             youtrack = youtrack(), baseline = BaselineInfo.of(baseline),
@@ -87,9 +93,14 @@ internal class AccountViews(
         return AccountsView.Youtrack.Mirror(state, synced)
     }
 
+    private fun limit(l: AccountLimit) = AccountsView.Claude.Limit(
+        l.state, l.kind, l.resetsAt?.let(IsoTime::of), l.observedAt?.let(IsoTime::of), l.source,
+    )
+
     private fun instant(r: CallRecord) = runCatching { Instant.parse(r.t) }.getOrNull()
 
     private companion object {
         const val ACTIVE_WINDOW_S = 15 * 60L
+        const val SESSION_WINDOW_S = 5 * 3600L
     }
 }

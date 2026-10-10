@@ -73,6 +73,30 @@ class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T1
             }
         }.toString()
 
+    /** A usage-limit answer the way Claude Code writes it: a synthetic assistant line flagged `rate_limit`, with the quota it hit when [resetsAt] is given. */
+    fun limit(text: String, resetsAt: Instant? = null, type: String = "seven_day") = apply {
+        turn++
+        lines += buildJsonObject {
+            put("type", "assistant")
+            put("timestamp", stamp())
+            putJsonObject("message") {
+                put("id", "m$turn")
+                put("model", "<synthetic>")
+                putJsonObject("usage") {
+                    put("input_tokens", 0)
+                    put("output_tokens", 0)
+                }
+                put("content", buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text) }) })
+            }
+            if (resetsAt != null) putJsonObject("quotaLimits") {
+                put("status", "rejected")
+                put("resetsAt", resetsAt.epochSecond)
+                put("rateLimitType", type)
+            }
+            put("error", "rate_limit")
+        }.toString()
+    }
+
     fun result(id: String, text: String, error: Boolean = false) = apply {
         lines += buildJsonObject {
             put("type", "user")
