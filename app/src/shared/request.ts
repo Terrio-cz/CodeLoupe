@@ -38,6 +38,7 @@ const SPECS: Record<Resource, ResourceSpec> = {
   settings: ui('settings'),
   events: ui('events', ['since', 'limit']),
   runs: ui('runs', ['range', 'sort', 'role', 'q', 'ter', 'limit', 'cursor']),
+  commands: ui('commands', ['since', 'role', 'top', 'sort']),
   'runs/:id': ui('runs/:id'),
   'runs/:id/steps': ui('runs/:id/steps', ['sort', 'limit', 'cursor']),
   'status/history': daemon('/status/history'),

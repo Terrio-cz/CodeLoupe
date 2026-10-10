@@ -51,7 +51,7 @@ CL-54 (Environment), API daemonu CL-39 (§ 9 je jeho kontrakt).
 | `#/overview` | Overview | — | `overview`, `/status` |
 | `#/branches` · `#/branches/:id` | Branches | drawer (520 px) | `worktrees`, `worktrees/{id}` |
 | `#/workspaces` · `#/workspaces/<repo>%2F<name>` | Workspaces (CL-72) | drawer (520 px) | `/workspaces`, `/resources`, `/reconcile`, `/workspaces/releases`, `/ports` (§ 9.18) |
-| `#/runs` · `#/runs/:id` | Runs (CL-40) | drawer (1040 px) | `runs`, `runs/{id}`, `runs/{id}/steps` |
+| `#/runs` · `#/runs/:id` · `#/runs?tab=commands` | Runs (CL-40), záložka Commands (CL-220) | drawer (1040 px) | `runs`, `runs/{id}`, `runs/{id}/steps`, `commands` |
 | `#/jobs` · `#/jobs/:id` | Jobs (CL-89) | drawer (1040 px) | `/jobs`, `/jobs/{id}`, `/status` (sloty), `/webhooks`, `/webhooks/deliveries`, `/events/stream` (§ 9.18) |
 | `#/tasks` · `#/tasks/:id` | Tasks | celá stránka s panelem vlastností vpravo | `tasks`, `tasks/{id}` |
 | `#/index` | Index | — | `index` |
@@ -191,6 +191,33 @@ Runs                         [Role ▾] [Sort ▾] [🔍 search prompt, task, ro
   kategorie, o čem volání bylo, velikost výsledku, doba, cena držení, chyba nebo mezera). Popis volání a zadání běhu jsou
   zkrácené a maskované daemonem, nikdy obsah výsledku; aplikace je nic dalšího nenačítá.
 - Mezi kroky se mezera CodeLoupe (`fallback`, `empty`, `candidates`) ukáže slovy, takže se dá od kroku ke Gaps.
+
+#### 3.3a Záložka Commands (CL-220)
+
+Přepínač **Runs | Commands** je v liště filtrů obrazovky; záložka je v adrese (`#/runs?tab=commands`), takže se na ni dá odkázat
+a po zavření detailu běhu se na ni aplikace vrátí. Odpovídá na otázku „které příkazy agenti používají nejvíc a kolik stojí“,
+ze stejných dat a týmž výpočtem jako `codeloupe metrics commands` (§ 9.7a), takže čísla v tabulce a v CLI jsou táž.
+
+```
+Runs | Commands          [Role ▾] [Period ▾] [Rank by ▾]
+┌ Runs counted 257 ┬ Tool calls 4,210 ┬ Result tokens 1.9M ┬ Cost carried by results 21.2% ┬ Money carried 38.20 USD ┐
+│ Command                     Kind    Calls Runs Results Arguments Repeats  Errors Cost share  Money  Most in      │
+│ rg -n <str> <path>          shell     620   88   310k    9.4k     41 · 7k   12     6.1%       2.30   #1042 #1018  │
+└ Top 30 of 412 groups, ranked by cost carried.
+```
+
+- Řádek je **skupina příkazů**: shell příkaz zredukovaný na program, podpříkaz, seřazené přepínače a zástupné znaky
+  (`<str>` řetězec v uvozovkách, `<path>`, `<n>`, `<arg>`); heredoc zápisy jsou vlastní skupiny (`heredoc write`, `heredoc python`),
+  souborové nástroje podle jména (`Read`, `Edit`, `Write (new file)` / `Write (existing file)`), MCP nástroje jako `server/nástroj`.
+  Popisek skupiny nikdy nenese argumenty volání.
+- Sloupce: volání, běhy, **Results** (tokeny výsledků, čtvrt tokenu na znak jako `metrics collect`), **Arguments** (co volání poslala),
+  **Repeats** (volání shodná s dřívějším voláním téhož běhu a tokeny, které přinesla znovu), chyby, **Cost share** (podíl ceny běhů, který
+  nesou výsledky skupiny: zapsané jednou do cache a čtené v každém dalším tahu; stejná váha jako `collect`) a peníze podle tabulky cen
+  (sloupec jen když má cenu aspoň jeden model období). Řadit lze podle ceny (výchozí), volání a velikosti výsledků.
+- **Period** je táž volba jako přepínač rozsahu nahoře (24h / 7d / 30d), **Role** je přesná role.
+- Klik na řádek otevře drawer skupiny (souhrn a tabulka tří **běhů, které nesly nejvíc**); `#1042` v řádku i v drawer
+  odkazuje na detail běhu (`#/runs/1042?tab=commands`). Pod tabulkou jsou sbalené sekce **By tool category** (kategorie
+  `metrics collect`, k porovnání), **By role** a **By week** (ISO týden začátku běhu) s nejdražšími příkazy.
 
 Původně (CL-42) byly běhy agentů a časová osa kroků vyřazeny rozhodnutím uživatele 2026-10-07:
 monitorování agentů patří launcheru, ne CodeLoupe. Data z transcriptů daemon dál používá pro spotřebu a úsporu na
@@ -726,6 +753,36 @@ interface RunPage extends Page<RunItem> {
 `ingest.running` je `true` během prvního průchodu přes gigabajty transcriptů (≈ minuta): odpověď je z toho, co už je
 uložené (nejnovější transcripty první), a klient volá znovu. Další volání čtou jen nové řádky a odpovídají v jednotkách ms.
 
+### 9.7a `GET /ui-api/v1/commands?since=&role=&top=&sort=` (CL-220)
+
+Které příkazy agenti používají a kolik stojí: zpráva `codeloupe metrics commands`, spočtená ze `steps` a `runs` v `transcripts.db`.
+`since` je `24h` | `7d` (výchozí) | `30d`, obecně `<n>d`, `<n>h`, den (`2026-10-01`) nebo ISO okamžik; `role` přesná role; `top` 1–100
+(výchozí 20) skupin; `sort` `cost` (výchozí) | `calls` | `tokens`. Odpověď se drží 20 s a platí jen pro stejný stav ingestu.
+```ts
+interface CommandsView { report: CommandReport; roles: string[]; ingest: IngestStatus }   // roles = všechny role pro filtr
+interface CommandReport {
+  generatedAt: Iso; since: Iso | null; until: Iso | null; role: string | null;
+  runs: number; calls: number; resultTokens: number; argTokens: number;
+  cost: number;                  // vážená cena započtených běhů
+  weighted: number; costPct: number;   // část ceny, kterou nesou výsledky nástrojů (jako `share` běhu), v %
+  money: number | null; currency: string; unpricedRuns: number;   // tabulka cen `metrics collect`; null, když nemá cenu žádný model
+  groupCount: number; groups: CommandGroup[];                // první `top` skupin podle `sort`
+  categories: { category: string; calls: number; resultTokens: number; errors: number; weighted: number; costPct: number }[];   // kategorie `collect`
+  roles: CommandSlice[]; weeks: CommandSlice[];              // tytéž skupiny po rolích a týdnech (`2026-W41`), po 5 nejdražších
+}
+interface CommandGroup {
+  command: string; kind: 'shell' | 'heredoc' | 'file' | 'search' | 'mcp' | 'agent' | 'other';
+  calls: number; runs: number; resultTokens: number; argTokens: number;
+  repeats: number; repeatTokens: number; errors: number;
+  weighted: number; costPct: number; money: number | null;
+  topRuns: { id: string; role: string; ter: string | null; title: string; calls: number; weighted: number }[];   // tři běhy s největším podílem; jen u celkových skupin
+}
+```
+Tokeny jsou znaky děleno 4. `weighted` skupiny je `znaky / 4 × (2 + 0,1 × tahy po výsledku)` (zápis do cache 1 h a čtení v dalších tazích, jako
+`metrics collect`), `costPct` jeho podíl na ceně započtených běhů, `money` stejný podíl peněz běhu v jeho modelu. **Argumenty** a **opakování** se berou
+z velikosti a otisku celého vstupu volání (`steps.in_chars`, `in_hash`); kroky uložené před CL-220 je nemají a platí zkrácený popis (≤ 200 znaků).
+Neplatné `since`, `top` nebo `sort` → `400 bad_request`.
+
 ### 9.8 `GET /ui-api/v1/runs/{id}` a `GET /ui-api/v1/runs/{id}/steps?sort=&limit=&cursor=` (CL-62)
 ```ts
 interface RunDetail {
@@ -879,6 +936,7 @@ webhooků (`budget.breach`, `gap.new`).
 | Branches, detail | `worktrees`, `worktrees/{id}` |
 | Tasks, detail | `tasks`, `tasks/{id}` |
 | Index | `index` |
+| Runs, záložka Commands (CL-220) | `runs`, `runs/{id}`, `commands` |
 | Gaps | `gaps` |
 | Environment | `environment` |
 | Accounts (CL-63) | `accounts` |
@@ -937,6 +995,7 @@ stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 
 | `nav` | workspace scan, mirror, stav indexu, mezery od `gapsSince` | – |
 | `overview` | `calls.jsonl` (nově s `root` volání): `toolCalls`, p50, `activeWindows` (různé rooty za 15 min), `queriedWorktrees`; z ingestu (CL-62) vážená cena dnes / včera do stejné hodiny / v rozsahu, `costSeries` (24h hodinové, jinak denní), `budget`, `gaps`, `newGaps` (posledních 24 h) | `baselineRange`, `savedTokens`, `savedPct`, `costSeries[].baseline` z `<home>/baseline.json` (CL-133, níže); bez něj 0/`null` a `baseline.state` říká proč; `savingsByTool` zůstává prázdné (úspora se nepřičítá nástrojům, nic to nezměří) |
 | `runs`, `runs/{id}`, `runs/{id}/steps` | ingest transcriptů (CL-62), indexy pro každé řazení | – |
+| `commands` | `steps` a `runs` z ingestu, jeden průchod kroky období (běh po běhu), 20 s cache | argumenty a opakování kroků z doby před CL-220 jen z krátkého popisu, dokud se přepisy nepřečtou znovu |
 | `worktrees` | workspace scan, `ahead`/`behind` z gitu, změněné soubory proti merge-base, stav vrstvy (`Overlays.layer`), počet volání za 24 h | `changedDecls` se počítá na pozadí (první odpověď ho může mít 0); první odpověď po startu u desítek worktrees trvá vteřiny, další jsou okamžité (poslední stav + obnova na pozadí) |
 | `worktrees/{id}` | `changes` ve strukturované podobě: deklarace, volající, testy | `index.layerFiles` = změněné indexované soubory, `parsedAt` null |
 | `tasks`, `tasks/{id}` | jen mirror (nikdy dotaz na tracker), kurzor = offset | `reads` 0, `mirror.lastReadAt` null (žádný čítač čtení) |

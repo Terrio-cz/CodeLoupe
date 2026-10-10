@@ -9,11 +9,11 @@ class MetricsCommand : CliktCommand(name = "metrics") {
     init {
         subcommands(
             MetricsCollectCommand(), MetricsCompareCommand(), MetricsWhatIfCommand(), MetricsGapsCommand(), MetricsBoilerplateCommand(),
-            MetricsHooksCommand(), MetricsOrientationCommand(), MetricsWeightCommand(),
+            MetricsHooksCommand(), MetricsOrientationCommand(), MetricsWeightCommand(), MetricsCommandsCommand(),
         )
     }
 
-    override fun help(context: Context) = "Measure agent runs from Claude Code transcripts: collect, compare, what-if, gaps, boilerplate, hooks, orientation, weight."
+    override fun help(context: Context) = "Measure agent runs from Claude Code transcripts: collect, compare, what-if, gaps, boilerplate, hooks, orientation, weight, commands."
 
     override fun run() = Unit
 }

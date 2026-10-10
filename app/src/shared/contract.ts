@@ -1,3 +1,4 @@
+import type { CommandsView } from './commands';
 import type { Delivery, JobChain, JobRecord, JobsSnapshot, Webhook } from './jobs';
 import type { RunDetail, RunPage, StepPage } from './runs';
 import type { PortReport, ReconcilePlan, ReleaseStatus, ResourceReport, WorkspaceList } from './workspaces';
@@ -398,6 +399,7 @@ export interface ResourceMap {
   settings: DaemonSettings;
   events: Events;
   runs: RunPage;
+  commands: CommandsView;
   'runs/:id': RunDetail;
   'runs/:id/steps': StepPage;
   'status/history': ResourceSample[];

@@ -11,6 +11,7 @@ import type { ApiRequest, Query } from '../../shared/request';
 import { HttpError } from '../daemon/DaemonClient';
 import type { ApiSource } from './ApiSource';
 import { MockData } from './mockData';
+import { MockCommands } from './mockCommands';
 import { MockJobs } from './mockJobs';
 import { MockRuns } from './mockRuns';
 import { MockWorkspaces } from './mockWorkspaces';
@@ -34,12 +35,14 @@ export class MockApi implements ApiSource {
   private readonly workspaces: MockWorkspaces;
   private readonly jobs: MockJobs;
   private readonly runs: MockRuns;
+  private readonly commands: MockCommands;
 
   constructor(now = Date.now()) {
     this.data = new MockData(now);
     this.workspaces = new MockWorkspaces(now);
     this.jobs = new MockJobs(now);
     this.runs = new MockRuns(now);
+    this.commands = new MockCommands(this.runs, now);
   }
 
   async get(req: ApiRequest): Promise<unknown> {
@@ -70,6 +73,7 @@ export class MockApi implements ApiSource {
       case 'releases': return this.workspaces.releases();
       case 'ports': return this.workspaces.ports();
       case 'runs': return this.runs.page(q);
+      case 'commands': return this.commands.view(q);
       case 'runs/:id': return found(this.runs.detail(req.id!));
       case 'runs/:id/steps': return found(this.runs.steps(req.id!, q));
       case 'status': return this.jobs.status({});

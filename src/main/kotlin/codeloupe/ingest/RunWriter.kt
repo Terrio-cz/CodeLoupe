@@ -82,7 +82,7 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
     }
 
     private fun insertSteps(c: Connection, runId: Long, results: List<ToolResult>) {
-        c.prepareStatement("INSERT OR REPLACE INTO steps(run_id, seq, turn, at_ms, name, category, summary, chars, ms, err, error, input, head) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").use { s ->
+        c.prepareStatement("INSERT OR REPLACE INTO steps(run_id, seq, turn, at_ms, name, category, summary, chars, ms, err, error, input, head, in_chars, in_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").use { s ->
             for (r in results) {
                 val category = categorizer.categorize(r.name, r.input)
                 val forGaps = category in GAP_INPUT
@@ -99,6 +99,9 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
                 s.setString(11, r.errText?.let { StepText.clean(it, ERROR_CHARS) })
                 s.setString(12, if (forGaps) Scrubber.json(r.input.plain()).toString() else null)
                 s.setString(13, if (category == "codeloupe") r.head?.let(Scrubber::text) else null)
+                val sent = r.input.toString()
+                s.setInt(14, sent.length)
+                s.setInt(15, sent.hashCode())
                 s.addBatch()
             }
             s.executeBatch()

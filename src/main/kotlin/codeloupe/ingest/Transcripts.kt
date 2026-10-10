@@ -1,6 +1,8 @@
 package codeloupe.ingest
 
 import codeloupe.accounts.Accounts
+import codeloupe.commands.CommandAnalyzer
+import codeloupe.commands.CommandSource
 import codeloupe.config.Config
 import codeloupe.metrics.BaselineStore
 import codeloupe.metrics.MetricsSetup
@@ -22,6 +24,7 @@ class Transcripts(
 ) : AutoCloseable {
     private val db = TranscriptDb(config.home.resolve("transcripts.db"))
     val queries = RunQueries(db)
+    val commands = CommandAnalyzer(CommandSource(db), config.metrics.prices)
     val usage = AccountUsage(queries)
     val baseline = BaselineStore(config.home.resolve(BaselineStore.FILE))
     val budgets = config.budgets

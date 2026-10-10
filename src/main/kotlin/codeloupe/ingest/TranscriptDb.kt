@@ -66,6 +66,7 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
 
     private fun open(): Connection = Sqlite.open(file, SCHEMA).also { db ->
         addTailColumn(db)
+        addStepInputColumns(db)
         db.createStatement().use { it.execute("PRAGMA cache_size = -2048") }
     }
 
@@ -73,6 +74,12 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
     private fun addTailColumn(db: Connection) {
         val has = db.createStatement().use { s -> s.executeQuery("PRAGMA table_info(files)").use { r -> generateSequence { if (r.next()) r.getString("name") else null }.toList() } }
         if ("tail" !in has) db.createStatement().use { it.execute("ALTER TABLE files ADD COLUMN tail TEXT") }
+    }
+
+    // `steps.in_chars` and `in_hash` (the size and a hash of a call's whole input, for `metrics commands`, CL-220) came later: null for steps stored before them.
+    private fun addStepInputColumns(db: Connection) {
+        val has = db.createStatement().use { s -> s.executeQuery("PRAGMA table_info(steps)").use { r -> generateSequence { if (r.next()) r.getString("name") else null }.toList() } }
+        for (column in listOf("in_chars", "in_hash")) if (column !in has) db.createStatement().use { it.execute("ALTER TABLE steps ADD COLUMN $column INTEGER") }
     }
 
     private companion object {

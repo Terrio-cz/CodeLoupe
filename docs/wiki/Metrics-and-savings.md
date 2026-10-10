@@ -16,6 +16,7 @@ codeloupe metrics boilerplate --since 2026-09-23         # skeleton share of the
 codeloupe metrics hooks --since 2026-10-01               # how often the plugin's steering hook spoke and was followed
 codeloupe metrics orientation --since 2026-10-01         # ls/find/Glob in the first turns, with and without the session-start context
 codeloupe metrics weight --since 2026-10-01              # at which turn the longest sessions would have been warned that they carry too much
+codeloupe metrics commands --since 10d --role coder      # which commands agents use most and what their results cost (reads the daemon's transcript database)
 ```
 
 `collect` writes one JSON report with, per role, median / p75 / sum of cost (relative price units: input 1, 5 min cache
@@ -26,6 +27,34 @@ symbol or file, calls answered busy or with candidates only, and empty answers t
 `CODELOUPE_OPTS=-Xmx1g` when a single transcript holds huge lines. `config.json` `metrics`: `transcriptDirs`,
 `categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
 ones), `defaultCategories` (false = only yours), `prices` (see Money) and `ingestTtlMs` (see below); the hook command is described in [Plugin hooks](Plugin-hooks).
+
+## Which commands agents use
+
+`codeloupe metrics commands [--since 10d] [--until] [--role coder] [--run <id>] [--top 15] [--sort cost|calls|tokens] [--json]` ranks the
+commands of the tool calls in the transcript database the daemon fills (`<home>/transcripts.db`, see [In the desktop app](#in-the-desktop-app)),
+so it needs no transcript scan but shows only what the daemon has ingested; the app's Runs screen has the same table on its Commands tab.
+`--since` takes `10d`, `24h`, a day (`2026-10-01`) or an instant (default `7d`); `--role` is the exact role of the run (`terrio-coder`);
+`--run` is one run's id (the Runs screen shows it), file name or session.
+
+A call falls in a **group**: a shell command is reduced to its program, subcommand, sorted flags and placeholders for what it passed
+(`git diff --stat <path>`, `rg -n <str> <path>`, `gradlew :app:test --console --tests <str>`, `sed -n <n> <path>`), a command with a heredoc is
+a group of its own (`heredoc write` for `cat > file <<EOF`, `heredoc python`, `heredoc git commit`), file tools are grouped by tool name, and a
+`Write` is `Write (new file)` or `Write (existing file)` (Claude Code makes an agent read a file before it overwrites it, so a path nothing
+touched earlier in the run is a new file). Only the first command of a chain or pipe counts, and the label never carries an argument. Per group the report gives
+
+| Column | Meaning |
+|---|---|
+| calls, runs | calls of the group, and the runs that made at least one |
+| results | tokens the results hold (a quarter token per character, as `collect` counts) |
+| arguments | tokens the calls sent (the whole tool input; steps stored before CL-220 only have the shortened description) |
+| repeats | calls identical to an earlier call of the same run, and the result tokens they brought again |
+| errors | calls that failed |
+| cost % | the share of the cost of the runs counted that the results carry: written once to the 1 h cache (2) and read on every later turn (0.1 each) |
+| money | that share of what the runs cost at the price table of `collect` (see Money); runs of an unpriced model add nothing and are counted |
+
+and the same by tool category (the categories of `collect`, so the two commands can be compared), by role and by week (ISO week of the start of the
+run). The last column of the table lists the three runs that carried most of a group. Checked on the transcripts of 2026-10-01 to 2026-10-11:
+for the `terrio-coder` role the category shares of this command equal those of `collect` to the tenth of a percent (see docs/plan.md § 8.11).
 
 ## Money
 
@@ -64,8 +93,8 @@ baseline file they show a dash and how to create one.
 
 ## In the desktop app
 
-The desktop app's Runs, Overview and Gaps screens read the same transcripts through the daemon. The daemon does not watch
-them: a UI API call (`/ui-api/v1/runs`, `overview`, `gaps`, `nav`, `events`) starts a pass that reads only the transcripts
+The desktop app's Runs (with its Commands tab), Overview and Gaps screens read the same transcripts through the daemon. The daemon does not watch
+them: a UI API call (`/ui-api/v1/runs`, `commands`, `overview`, `gaps`, `nav`, `events`) starts a pass that reads only the transcripts
 that grew since the last one, from the byte offset it stopped at, into `<home>/transcripts.db` (runs, steps, hourly cost,
 gaps). Nothing runs between calls, and passes are at least `metrics.ingestTtlMs` (10 s) apart. The first pass over a few
 gigabytes of transcripts takes about a minute and goes on in the background (`ingest.running` in the answer). Step texts

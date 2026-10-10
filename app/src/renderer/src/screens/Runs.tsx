@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Page } from '../../../shared/contract';
 import type { RunItem, RunPage, RunSortKey, StepItem, StepSortKey } from '../../../shared/runs';
 import { bridge, useApi } from '../api';
@@ -6,12 +6,13 @@ import { BarList } from '../components/Charts';
 import { DataTable, type Column } from '../components/DataTable';
 import { Drawer } from '../components/Drawer';
 import { CountUp } from '../components/CountUp';
-import { Banner, Card, ErrorState, KpiTile, Loading, Search, Section, Select } from '../components/Parts';
+import { Banner, Card, ErrorState, KpiTile, Loading, Search, Section, Segmented, Select } from '../components/Parts';
 import { StatusBadge } from '../components/StatusBadge';
 import { dateTime, ms, num, pct, tokens } from '../format';
 import { useDebounced, useRange, useSettings } from '../hooks';
 import { chars, GAP_LABELS, SORT_LABELS, span, usageParts } from '../runModel';
 import { go, type Route } from '../router';
+import { CommandsTab } from './RunCommands';
 
 const SORTS = Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label: `Sort: ${label.toLowerCase()}` }));
 
@@ -49,7 +50,24 @@ function usePages<T>(resource: 'runs' | 'runs/:id/steps', id: string | undefined
   return { items: [...(first?.items ?? []), ...(live?.items ?? [])], hasMore: next !== null, loading, load };
 }
 
+type RunsTab = 'runs' | 'commands';
+
+/** The Runs screen: the list of agent runs, and the Commands tab (`#/runs?tab=commands`) with which commands they used and what these cost. */
 export function Runs({ route }: { route: Route }) {
+  const tab: RunsTab = route.params.get('tab') === 'commands' ? 'commands' : 'runs';
+  const keep = tab === 'commands' ? { tab } : undefined;
+  const tabs = (
+    <Segmented<RunsTab> label="Runs view" value={tab} options={[{ value: 'runs', label: 'Runs' }, { value: 'commands', label: 'Commands' }]} onChange={v => go('runs', null, v === 'commands' ? { tab: v } : undefined)} />
+  );
+  return (
+    <>
+      {tab === 'commands' ? <CommandsTab tabs={tabs} onRun={id => go('runs', id, keep)} /> : <RunList route={route} tabs={tabs} />}
+      {route.id && <RunDrawer id={route.id} onClose={() => go('runs', null, keep)} />}
+    </>
+  );
+}
+
+function RunList({ route, tabs }: { route: Route; tabs: ReactNode }) {
   const [range] = useRange();
   const [role, setRole] = useState('');
   const [sort, setSort] = useState<RunSortKey>('start');
@@ -72,7 +90,14 @@ export function Runs({ route }: { route: Route }) {
     return () => clearInterval(t);
   }, [reading, page.reload]);
 
-  if (!page.data) return <Card bodyClass="">{page.loading ? <Loading variant="table" /> : <ErrorState message={page.error?.message ?? 'Could not load runs.'} onRetry={page.reload} />}</Card>;
+  if (!page.data) {
+    return (
+      <>
+        <div className="filterbar">{tabs}</div>
+        <Card bodyClass="">{page.loading ? <Loading variant="table" /> : <ErrorState message={page.error?.message ?? 'Could not load runs.'} onRetry={page.reload} />}</Card>
+      </>
+    );
+  }
   const data: RunPage = page.data;
   const shownCost = rows.items.reduce((a, r) => a + r.weighted, 0);
   const over = rows.items.filter(r => r.overBudget).length;
@@ -80,6 +105,7 @@ export function Runs({ route }: { route: Route }) {
   return (
     <>
       <div className="filterbar">
+        {tabs}
         <Select label="Role" value={role} onChange={setRole} options={[{ value: '', label: 'All roles' }, ...data.roles.map(r => ({ value: r, label: r }))]} />
         <Select label="Sort" value={sort} onChange={v => setSort(v as RunSortKey)} options={SORTS} />
         <Search label="Search prompt, task, role" value={q} onChange={setQ} />
@@ -107,7 +133,6 @@ export function Runs({ route }: { route: Route }) {
           </div>
         )}
       </Card>
-      {route.id && <RunDrawer id={route.id} onClose={() => go('runs')} />}
     </>
   );
 }

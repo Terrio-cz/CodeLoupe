@@ -36,6 +36,7 @@ class UiApi(
     private val index = IndexViews(registry, catalog, events, queue, config.budgets.rssMb)
     private val transcripts = Transcripts(config, { type, data -> events.emit(type, data) }, scope, log, waitMs)
     private val runViews = RunViews(transcripts)
+    private val commandViews = CommandViews(transcripts)
     private val gapViews = GapScreen(transcripts, GapViews(config.home.resolve(GapViews.FILE)))
     private val feed = EventFeed(events, registry, transcripts)
     private val overview = OverviewViews(callLog, worktrees, transcripts)
@@ -76,6 +77,8 @@ class UiApi(
     suspend fun run(id: String): RunDetail = runViews.detail(id)
 
     suspend fun steps(id: String, sort: String?, limit: String?, cursor: String?): StepPage = runViews.steps(id, sort, limit, cursor)
+
+    suspend fun commands(since: String?, role: String?, top: String?, sort: String?): CommandsView = commandViews.commands(since, role, top, sort)
 
     suspend fun gaps(range: String?, tool: String?, reason: String?): Gaps = gapViews.gaps(range, tool, reason)
 

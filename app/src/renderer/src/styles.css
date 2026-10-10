@@ -459,6 +459,7 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 .link { all: unset; color: var(--accent-text); cursor: pointer; border-radius: 3px; transition: color var(--dur-1); }
 .link:hover { text-decoration: underline; text-underline-offset: 2px; }
 .link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.run-links { display: inline-flex; gap: var(--s-2); }
 
 /* ── Bars ────────────────────────────────────────────────────────────────── */
 .bar-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }

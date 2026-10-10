@@ -2,7 +2,7 @@
 savings, p95 latency, daemon memory and CPU with the budget warnings), Branches (changed declarations, callers, tests, the
 runs of the task), Workspaces (every registry state with its Docker resources, ports, disk and memory; release and confirmed
 cleanup), Tasks, Jobs (states, slots and holders, live, logs with the summary first, chains, webhooks), Runs (what each agent
-run cost and where), Index, Gaps (the weekly gap report), Environment and Settings. They read the daemon's UI API and a few
+run cost and where, and a Commands tab: which commands the agents use most and what they cost), Index, Gaps (the weekly gap report), Environment and Settings. They read the daemon's UI API and a few
 of its read-only routes; the two actions that change something ask in a native dialog first. See [app/README.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/app/README.md)
 (running it, settings, security model, memory) and the UI spec
 [docs/ui-spec.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/docs/ui-spec.md) (Czech).
