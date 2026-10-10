@@ -341,6 +341,18 @@ Per task the medians of B2 are 56 to 88 % of the control, and one cell spans 150
 reviewer's cost is cache writes of a context of about 80 thousand tokens, 28 % is output (thinking and the report), and the packet is 12-13 thousand of those tokens; what the
 packet leaves out the reviewer reads on demand (code reads 4.6 → 7.4 % of cost). The compact packet was nevertheless adopted in the live Terrio workspace (low regret, reversible; a real pack of a large closed task shrank from 116 to 45 kB). Details and limits: docs/plan.md § 8.4.
 
+### Where the rest of an agent flow's tokens go: cache, big results, output (CL-199, CL-200, CL-201)
+
+Counts only, from 1,994 agent transcripts of ten days (1.99 billion weighted units; the flow's own roles are 46 %). Three levers, one applied
+for real: **the 1-hour cache TTL costs more than it returns for most subagents** (a 1-hour write costs 2 instead of 1.25 per token; over the period
+that premium was 79.7 M units for subagents against 23.5 M of rewrites avoided after 5-60 minute pauses plus 12.4 M of prefix reuse at start),
+so the reviewer, the nightly retro and the deep reviewer now ask for 5 minutes per agent (about 3 % of the flow's cost; the main thread of a
+phase run ignores the key and keeps 1 hour, which its resumed rounds need). **Big tool results are diffuse**: the 20 largest results carry only
+0.5-1.3 % of a role's cost, a 12k-character cap would save 1-4 % and lose information; one role (the nightly retro, 21.6 % of its cost in
+whole-file reads of 5-77 k character notes) got a one-line rule. **A terse-output rule did not pay for the coder**: 9 + 9 runs, median cost
+84 % of the control but inside a 65-123 k spread, output tokens -5 %, report length unchanged, 8 of 9 against 9 of 9 known-solution checks.
+Most of an agent's output is thinking (reviewer 66 %) or tool-call arguments (coder 74 %), not prose. Details: docs/plan.md § 8.6.
+
 ### What did not work, and what the numbers do not show
 
 - **Agents barely called CodeLoupe (CL-180, fixed in the agent instructions).** 1 call in 7 reviewer runs, 10 in 5 planner runs, 0 in 40

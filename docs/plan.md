@@ -754,6 +754,90 @@ cenou na obou stranách. Procento je z porovnaných běhů, vedle něj `coveredS
 nasazením, ne řízený benchmark (§ 8.4); mix úkolů se v baseline a po nasazení může lišit. Bez baseline obrazovky ukážou pomlčku
 a návod, nic se neodhaduje.
 
+### 8.6 Cena toku Terrio: cache, velké výsledky nástrojů, výstup (CL-199, CL-200, CL-201)
+
+Data: 1 994 běhů z přepisů 2026-10-01 až 10-10 (`run/codemetrics.mjs` a `tools/context-audit.mjs` čtou stejné zdroje; tady vlastní
+extrakce jen počtů a hashů, žádný obsah), 1,99 mld vážených jednotek (vstup 1, zápis 5 min 1,25, zápis 1 h 2, čtení 0,1, výstup 5):
+desktopová okna `main` 32,9 %, `general-purpose` 20,9 %, tok Terrio (role terrio-*) 46 % (subagenti 704,7 M, fázové běhy 209,9 M).
+Všechny zápisy do cache jsou 1h (`cache_creation.ephemeral_5m` je téměř 0).
+
+**Rozklad ceny role** (zápisy / čtení cache / výstup, % ceny role): reviewer 43/24/33, coder-high 19/64/17, coder 21/63/17,
+planner 27/50/23, tester 29/48/23, suggester 48/33/19, reviewer-opus 32/51/17, retro 53/29/19, deep-reviewer 26/48/26,
+changelog 66/20/14, steward 64/20/16; `main` 19/71/10, `general-purpose` 16/73/11.
+
+#### Oblast 1: cache (CL-199), pořadí podle tokenů
+
+| # | Nález | Velikost | Stav |
+|---|---|---|---|
+| 1 | Prémie 1h TTL (0,75 za zapsaný token) se u subagentů nevrací. Subagenti: prémie 79,7 M (11,3 % ceny) proti 23,5 M ušetřených přepisů po pauzách 5-60 min (241 tahů) a 12,4 M za znovupoužití prefixu při startu (všechny role). Po rolích (prémie / vrácení v subagentním režimu): reviewer 25,4 / 2,9 M, planner 11,2 / 1,9, coder-high 15,8 / 6,8, suggester 3,2 / 0,7, retro 3,6 / 0,8, deep-reviewer 1,1 / 0,05, tester 7,8 / 9,4, coder 7,9 / 8,0, reviewer-opus 0,9 / 1,2 | čistá úspora 5m: reviewer 24 M, planner 11 M, retro 3,6 M, suggester 3,2 M, deep 1,1 M (3 % ceny toku); coder-high jen při prahu 300 s (9,9 M), při 180 s už -8 M, proto zůstává 1h | **hotovo** pro reviewer, retro, deep-reviewer: `experimental: cacheTtl: 5m` ve frontmatteru, `subagentPromptCacheTtl` pryč, `ENABLE_PROMPT_CACHING_1H=1` v `settings.json` drží 1h pro ostatní; planner a suggester v CL-207 |
+| 2 | Hlavní vlákno (`claude -p --agent`, fázový režim) ignoruje klíč i `subagentPromptCacheTtl`: vždy 1h (sonda `%TEMP%\cl199-ttl`, 6 běhů). Fázové běhy: prémie 19,5 M, vrácení 15,5 M + 3,5 M při startu, tedy neutrální; resume kol (reviewer 14 z 16 fázových běhů, 35 resume, 6,4 M tokenů přečteno z cache proti 68 k zapsaným) žije jen díky 1h | 0 | beze změny, 1h pro fázové běhy správně |
+| 3 | CLAUDE.md (21-23 k znaků, 7 k tokenů) v každém subagentovi a fázovém běhu navzdory `omitClaudeMd`: 1 255 běhů toku, 38,7 M = 4,2 % ceny toku; start S 30-35 k na 10 k tokenů | 38,7 M | opraveno před touto kartou (CL-58/60: subagenti od 10-07 10:11, fáze od 10-09 20:26); data před opravou převažují, proto jsou čísla výše horní odhad |
+| 4 | Nestabilní prefix: SessionStart hook vkládá "Other windows" (mění se při každém claimu, liší se u 117 ze 133 po sobě jdoucích běhů stewarda) před stabilní blok; čerstvý fázový běh po CL-58 zapíše 2,6-2,9 k tokenů a přečte 7-8,8 k. Časové razítko v `context pack` (`run/context.mjs`) je ve výsledku nástroje, ne ve sdíleném prefixu: bez ceny | ~2,3 k jednotek na fázový start (0,4 % běhu) | **hotovo**: hook končí při `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` (fázové a dispečerské běhy) |
+| 5 | Vypršení cache po pauze > 1 h: `main` 77 případů, 43,1 M (6,6 % ceny `main`; 63 návratů uživatele, 14 čekání na nástroj), `general-purpose` 18, 10,8 M (vše Bash), subagenti toku 26, 3,9 M (Bash 17), fáze 0 | 3,9 M v toku | beze změny (návraty uživatele jsou neodstranitelné, čekání už jde přes `job start --wait`) |
+| 6 | Stejné velké čtení (>= 6 k znaků) opakované v jiném agentovi téhož úkolu: 9,5 M (1,03 % ceny toku; reviewer 4,2 M ze 330 čtení, coder-high 2,1 M), uvnitř běhu 0,2 M | 1 % | beze změny: resume by nesl celý starý kontext, a balíček CL-196 část čtení reviewera odstraňuje |
+
+Citlivost bodu 1: mezera se měří od konce předchozí odpovědi (dolní mez) a od jejího začátku (horní mez), výsledek je stejný; pásmo 180-300 s
+(1 238 tahů subagentů) rozhoduje u coder-high, codera a testeru, proto tyto tři zůstávají na 1h. Rozhodnutí z 2026-09-30 (odhad -25 % tokenů
+z 56,6 M přepisů za den) se na datech 10-01 až 10-10 nepotvrdilo: pauz 5-60 min je v subagentním režimu málo, hlavní vlákno a `general-purpose`
+(interaktivní, prémie 7 % a 5,9 % proti vrácení 60 % a 33 %) 1h potřebují a dostávají ho.
+
+#### Oblast 2: velké výsledky nástrojů (CL-200)
+
+Cena výsledku: velikost / 4 × (2 + 0,1 × zbývající tahy). Podíl výsledků nástrojů na ceně role a podíl 20 největších:
+
+| Role | Výsledky % role | 20 největších % role | Největší (znaků, nástroj) | Strop 12k / 20k ušetří | Hlavní třída |
+|---|---:|---:|---|---|---|
+| main | 19,1 | 1,2 | 78 k, MCP návrhové `search_*` | 4,1 / 2,5 % | Agent 2,4 % |
+| general-purpose | 24,6 | 0,5 | 55 k, Read | 2,1 / 0,7 | Read 9,3 % |
+| coder-high | 25,8 | 0,8 | 52 k, Read | 3,0 / 0,9 | Read 12,0 % (z toho > 12 k 6,2 %) |
+| reviewer | 22,0 | 0,5 | 67 k, Read | 3,6 / 1,3 | Read 9,5 % (5,0), `git diff` 2,9 % |
+| coder | 21,2 | 1,3 | 49 k, Read | 1,8 / 0,5 | `sed` 5,0 %, Read 3,5 % |
+| planner | 24,9 | 0,9 | 64 k, Read | 2,3 / 0,7 | Read 8,0 % (4,5) |
+| tester | 14,1 | 0,7 | 39 k, Read | 0,8 / 0,2 | Read 1,6 % |
+| suggester | 26,3 | 1,3 | 27 k, `suggest` | 1,4 / 0,2 | `yt_get_issue` 9,9 % |
+| reviewer-opus | 28,2 | 5,9 | 55 k, Read | 8,6 / 5,1 | Read 16,6 % (12,9) |
+| retro | 44,2 | 4,5 | 79 k, Read | 17,3 / 10,8 | Read 29,9 % (26,0) |
+| deep-reviewer | 23,8 | 6,8 | 49 k, Read | 4,1 / 1,1 | Read 13,8 % (8,7) |
+| changelog | 27,4 | 4,7 | 50 k, `yt_get_article` | 6,8 / 4,4 | `yt_get_article` 8,2 % |
+| steward | 13,8 | 1,7 | 15 k | 0,1 / 0,0 | `brain read` 4,1 % |
+
+Výsledek je negativní: cena velkých výsledků je rozptýlená, 20 největších nese 0,5-1,3 % ceny role (u malých rolí 4,5-6,8 %), strop by šetřil
+1-4 % a ztratil by informaci. Celý Read velkého souboru je dominantní třída: celé `.kt` Read > 12 k znaků 294 (reviewer, 2,6 % ceny role), 128
+(coder-high, 2,7 %), 107 (planner, 2,6 %), z toho 113 / 48 / 36 nad 20 k, tedy proti pravidlu "nad ~20 k nejdřív outline". **Hotovo**: retro
+čte `brain/facts/*.md` (5-77 k znaků) celé, 174 čtení = 21,6 % ceny role (0,2 % všeho); tělo teď zakazuje celý Read a posílá na `rg` + offset/limit.
+Zbytek (vynucení pravidla 20 k u reviewera, codera, planneru) by podle čísel dal nejvýš 1 % ceny role při riziku ztracené kontroly, proto jen
+pozorovat; suggester a planner patří jiným kartám (CL-188, CL-197).
+
+#### Oblast 3: výstup (CL-201)
+
+| Role | Výstup % ceny role | Výstup / tah (medián) | Myšlení % výstupu | Text % výstupu | Vyprávění mezi voláními % textu | Konečná zpráva (znaků, medián) |
+|---|---:|---:|---:|---:|---:|---:|
+| reviewer | 33 | 1 527 | 66 | 6 | 1 | 3 683 |
+| planner | 23 | 407 | 54 | 24 | 0 | 24 134 |
+| tester | 23 | 271 | 15 | 17 | 3 | 2 508 |
+| coder-high | 17 | 409 | 30 | 4 | 7 | 3 855 |
+| coder | 17 | 352 | 20 | 6 | 4 | 1 791 |
+| suggester | 19 | 445 | 48 | 7 | 3 | 1 224 |
+| retro | 18 | 216 | 63 | 11 | 24 | 879 |
+| steward | 16 | 227 | 12 | 49 | 1 | 1 388 |
+
+(Text vs. vstup nástrojů je odhad z počtu znaků; myšlení je `thinking_tokens` z přepisu.) Výstup coderu a testeru tvoří z 68-74 % vstupy nástrojů
+(Edit, Write, Bash), text 6 % a 17 %, vyprávění mezi voláními 4 % a 3 % textu. Strop pravidla "bez shrnutí, bez opakování zadání, bez vyprávění" je tedy
+asi 1 % ceny coderu a 4 % testeru. Největší podíl výstupu je myšlení (reviewer 66 %, deep 81 %, retro 63 %), to řídí `effort`, který tu nemění.
+
+Test na coderu (`%TEMP%\cl201-bench`, kopie bench CL-190, živé tělo coderu, Sonnet medium, 3 úkoly se známým řešením x 3 opakování x 2 varianty, daemony 47720/47721,
+3,20 USD): věta "terse: no recap, no restating the task or plan, no narration between tool calls, the result in the first line" v řádku Output.
+
+| Varianta | n | Jednotky (tis.), medián / průměr | Výstup (tokeny), průměr | Konečná zpráva (znaků), medián | Tahy, medián | Testy známého řešení |
+|---|---:|---|---:|---:|---:|---|
+| tělo dnes | 9 | 94 / 92 | 5 973 | 2 166 | 17 | 9 z 9 |
+| + terse | 9 | 79 / 85 (84 % / 92 %) | 5 691 (-5 %) | 2 183 | 14 | 8 z 9 (jeden běh se nezkompiloval) |
+
+Rozptyl opakování jednoho úkolu je 65-123 tis., rozdíl je v šumu a zpráva se nezkrátila: coder už píše notací `brain/README.md`. **Pravidlo se
+nezavádí.** Tester bench nemá (v `terrio-bench-cl190` ani `terrio-bench2` není) a jeho běh potřebuje Docker stack a Gradle slot na každý běh;
+horní mez z přepisů (text 17 % výstupu = 4 % ceny, vyprávění 3 % textu) leží hluboko pod šumem 9 běhů, proto se neměřil a kritérium je přepsáno
+na tento důkaz. Rozpočet `claude -p`: 3,2 USD z 12.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
