@@ -5,6 +5,11 @@ Stav 2026-10-07. Data: transcripty workspace Terrio 2026-09-23 → 10-06, **2 37
 [analysis.md](analysis.md): input 1, cache write 5m 1,25 / 1h 2, cache read 0,1, output 5).
 Skript: [`tools/context-audit.mjs`](../tools/context-audit.mjs) (~10 s, read-only, `--out` uloží JSON pro trend).
 
+> Oprava CL-206 (2026-10-10): podíly „z celkové ceny“ níže se dělí cenou, ve které byl výstup podhodnocen 2,1×
+> (bral se z první řádky zprávy). Skutečná celková cena je asi o 11 % vyšší, všechny tyto podíly jsou proto o ~10 % nižší
+> (startovní kontext ~16,5 % místo 18,3 %); `tools/context-audit.mjs` už počítá konečný výstup. Poměry mezi zdroji a úspory
+> v tokenech se nemění. Přepočet ceny po rolích: [plan.md](plan.md) § 8.
+
 ## Výsledek
 
 - **Startovní kontext = 18,3 % celkové ceny** (15,2 % jen opakovaná čtení z cache jako v analysis.md § 1

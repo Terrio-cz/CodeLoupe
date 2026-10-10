@@ -34,7 +34,8 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
 
     private var emitted = from?.emitted ?: 0
     // Both are bounded: a message repeats on neighbouring lines only, and a call whose result never comes is not worth carrying for ever.
-    private val seen = LinkedHashSet<Long>().apply { from?.seen?.let(::addAll) }
+    // The value is the output tokens counted for the message so far.
+    private val seen = LinkedHashMap<Long, Long>().apply { from?.seen?.let(::putAll) }
     private val pending = LinkedHashMap<String, Pending>().apply { from?.pending?.forEach { put(it.id, Pending(it.name, it.input, it.atMs, it.turn)) } }
     private val results = ArrayList<ToolResult>()
     private val usages = ArrayList<UsageAt>()
@@ -65,7 +66,7 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
     }
 
     fun snapshot() = ParserSnapshot(
-        role, start, end, model, turns, usage, peak, firstPrompt, emitted, seen.toList(),
+        role, start, end, model, turns, usage, peak, firstPrompt, emitted, seen.toMap(),
         pending.map { (id, c) -> ParserSnapshot.Call(id, c.name, c.input.plain(), c.atMs, c.turn) }, startTracker.state(),
     )
 
@@ -75,19 +76,7 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
     private fun assistant(message: JsonObject, timestamp: String?) {
         if (model == null) model = message["model"].str()
         val id = message["id"].str()?.takeIf { it.isNotEmpty() }
-        if (id != null && remember(hash(id))) {
-            turns++
-            val u = message["usage"].obj()
-            val written = u?.get("cache_creation").obj()
-            val written1h = written?.get("ephemeral_1h_input_tokens").num()
-            val written5m = written?.get("ephemeral_5m_input_tokens")?.let { it.num() }
-                ?: maxOf(0, u?.get("cache_creation_input_tokens").num() - written1h)
-            val counted = Usage(u?.get("input_tokens").num(), written5m, written1h, u?.get("cache_read_input_tokens").num(), u?.get("output_tokens").num())
-            usage += counted
-            startTracker.firstTurn(counted)
-            usages += UsageAt(millis(timestamp) ?: millis(end) ?: 0, counted)
-            peak = maxOf(peak, u?.get("input_tokens").num() + u?.get("cache_read_input_tokens").num() + u?.get("cache_creation_input_tokens").num())
-        }
+        if (id != null) usage(hash(id), message["usage"].obj(), timestamp)
         for (block in message["content"].arr().orEmpty()) {
             val b = block.obj() ?: continue
             if (b["type"].str() == "tool_use") {
@@ -98,11 +87,40 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
         }
     }
 
-    /** False for a message id seen before; the oldest ids are forgotten past [MAX_SEEN]. */
-    private fun remember(hash: Long): Boolean {
-        if (!seen.add(hash)) return false
-        if (seen.size > MAX_SEEN) seen.remove(seen.first())
-        return true
+    /**
+     * Claude Code writes a message on one line per content block, and the first line holds the streaming `output_tokens` (a
+     * handful), not the final count. Everything else is the same on every line, so the first line makes the turn and each
+     * later line only adds what the output has grown by.
+     */
+    private fun usage(key: Long, u: JsonObject?, timestamp: String?) {
+        val output = u?.get("output_tokens").num()
+        val before = seen[key]
+        if (before == null) {
+            remember(key, output)
+            turns++
+            val written = u?.get("cache_creation").obj()
+            val written1h = written?.get("ephemeral_1h_input_tokens").num()
+            val written5m = written?.get("ephemeral_5m_input_tokens")?.let { it.num() }
+                ?: maxOf(0, u?.get("cache_creation_input_tokens").num() - written1h)
+            val counted = Usage(u?.get("input_tokens").num(), written5m, written1h, u?.get("cache_read_input_tokens").num(), output)
+            usage += counted
+            startTracker.firstTurn(counted)
+            usages += UsageAt(at(timestamp), counted)
+            peak = maxOf(peak, u?.get("input_tokens").num() + u?.get("cache_read_input_tokens").num() + u?.get("cache_creation_input_tokens").num())
+        } else if (output > before) {
+            seen[key] = output
+            val grown = Usage(output = output - before)
+            usage += grown
+            usages += UsageAt(at(timestamp), grown, continuation = true)
+        }
+    }
+
+    private fun at(timestamp: String?): Long = millis(timestamp) ?: millis(end) ?: 0
+
+    /** Notes a first-seen message id with the output counted for it; the oldest ids are forgotten past [MAX_SEEN]. */
+    private fun remember(key: Long, output: Long) {
+        seen[key] = output
+        if (seen.size > MAX_SEEN) seen.remove(seen.keys.first())
     }
 
     private fun result(b: JsonObject, timestamp: String?) {

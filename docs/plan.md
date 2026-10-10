@@ -50,16 +50,23 @@ SerialGC), bloby načtené předem (~150 MB z peaku), parse + průchod celým st
 ## 1. Baseline — co dnes stojí tokeny (2026-09-23 → 10-06, 2 373 běhů)
 
 Zdroj: `run/codemetrics.mjs collect` nad transcripty Claude Code; report
-`.journal/metrics/code/baseline-2026-10-06.json`. Cena = vážené tokeny (input 1, cache write 5m 1,25 /
-1h 2, cache read 0,1, output 5).
+`.journal/metrics/code/baseline-cl206-2026-10-10.json` (stejné transcripty a období jako původní
+`baseline-2026-10-06.json`, přepočtené s konečným výstupem zprávy, CL-206). Cena = vážené tokeny (input 1,
+cache write 5m 1,25 / 1h 2, cache read 0,1, output 5).
 
 | Role | Běhů | Cena medián | Tahů medián | Kontext peak medián | Výsledky nástrojů z ceny | z toho kód (read + rg/sed/cat + git diff/show) |
 |---|---|---|---|---|---|---|
-| reviewer | 401 | 392k | 14 | 145k | 32,9 % | ~19 % |
-| planner | 172 | 1,0M | 52 | 182k | 29,3 % | ~22 % |
-| coder-high | 238 | 921k | 55 | 132k | 24,4 % | ~17 % |
-| coder | 257 | 187k | 17 | 61k | 23,3 % | ~15 % |
-| deep-reviewer | 30 | 2,1M | 74 | 324k | 39,7 % | ~27 % |
+| reviewer | 401 | 581k | 14 | 145k | 25,0 % | ~14 % |
+| planner | 172 | 1,2M | 52 | 182k | 25,8 % | ~19 % |
+| coder-high | 238 | 1,0M | 55 | 132k | 22,0 % | ~14 % |
+| coder | 257 | 212k | 17 | 61k | 21,2 % | ~13 % |
+| deep-reviewer | 30 | 2,6M | 74 | 324k | 32,2 % | ~22 % |
+
+Před opravou CL-206 vycházelo 392k / 1,0M / 921k / 187k / 2,1M a podíly 32,9 / 29,3 / 24,4 / 23,3 / 39,7 %
+(výstup se bral z první řádky zprávy, viz § 8, Vedlejší nález měření). Celková cena období je po opravě o 11 %
+vyšší (2,14 → 2,38 mld.), výstup 29,1 → 74,9 M tokenů, jeho podíl z ceny **6,8 → 15,7 %**; podíly ostatních
+složek jsou proto o ~10 % nižší (cache read 60 → 54 %, výsledky nástrojů 23,9 → 21,6 %). Pořadí lever se nemění,
+absolutní strop úspor z nástrojů o desetinu klesá.
 
 Zjištění, která mění odhady:
 - **Cache read je 48–66 % ceny** — kontext × počet tahů. Cena roste hlavně s *počtem tahů* a velikostí
@@ -876,9 +883,30 @@ včetně práce na CodeLoupe 4 899 USD, tedy D1 ≈ 1,5 × D2). Pravidlo 1 %: st
 3. Strukturované výstupy a deterministický triage (FM-11, včetně klasifikátoru selhání): 2,7 %, nízká jistota, závisí na tom, kolik z oken běží ještě mimo phase-mode.
 
 #### Vedlejší nález měření
-`codemetrics.mjs` i `TranscriptParser.kt` berou `usage` z **první** řádky zprávy se stejným `id`; ta nese průběžné `output_tokens`.
-Poslední řádka má konečný počet: výstup je tak podhodnocen **2,1 ×** (30,8 M místo 65,5 M tokenů za sledované období, tj. asi +9 %
-celkové vážené ceny; u retro +22 %). Podíly v této kapitole počítají tam, kde to šlo, s konečným výstupem; oprava v CL-206.
+`codemetrics.mjs` i `TranscriptParser.kt` brali `usage` z **první** řádky zprávy se stejným `id`; ta nese průběžné `output_tokens`.
+Claude Code zapisuje zprávu po řádce na každý blok obsahu a poslední řádka má konečný počet: výstup byl podhodnocen **2,1 ×**
+(30,8 M místo 65,5 M tokenů ve všech transcriptech od 2026-10-01; ostatní pole `usage` jsou na všech řádkách stejná, poslední
+hodnota je vždy maximum). Opraveno v CL-206: výstup zprávy = maximum přes její řádky, váhy beze změny (`TranscriptParser`, `codemetrics.mjs`,
+`context-audit.mjs`, `admin.mjs`); uložené běhy v databázi se při prvním průchodu načtou znovu (`parser` v tabulce `meta`, verze 2),
+bez oznámení starých mezer. Hlavní (desktopové) session mají konečný výstup už na první řádce, chyba se týkala jen subagentů
+(7,8 M → 42,5 M tokenů).
+
+Přepočet od 2026-10-01 (1 997 běhů, `.journal/metrics/code/cl206-before-2026-10-10.json` → `cl206-after-2026-10-10.json`):
+celková cena +9,4 %, výstup 27,8 → 62,1 M tokenů (zbytek do 65,5 M jsou běhy začaté před 10-01), jeho podíl z ceny **7,6 → 15,7 %**.
+
+| Role | Běhů | Podíl z ceny před → po | Výstup (M) před → po | Výstup z ceny role po opravě |
+|---|---|---|---|---|
+| main (desktop) | 161 | 36,0 → 32,9 % | 13,1 → 13,1 | 9,9 % |
+| general-purpose | 89 | 20,8 → 21,2 % | 1,1 → 9,6 | 11,4 % |
+| coder-high | 169 | 13,1 → 13,5 % | 3,1 → 9,0 | 16,7 % |
+| reviewer | 311 | 6,7 → 8,5 % | 1,5 → 11,2 | 33,0 % |
+| coder | 232 | 7,7 → 7,6 % | 2,8 → 5,0 | 16,5 % |
+| planner | 125 | 6,7 → 6,9 % | 3,3 → 6,4 | 23,2 % |
+| tester | 381 | 3,9 → 4,2 % | 1,6 → 3,9 | 23,3 % |
+| retro | 143 | 0,9 → 1,0 % | 0,0 → 0,7 | 18,5 % |
+
+Důsledek: výstup je u reviewera třetina ceny role a u testeru, planneru a retro přes pětinu, takže pokus se stručným výstupem
+(terse output) má větší strop, než se čekalo; startovní kontext a čtení z cache zůstávají největší složkou, ale o ~10 % menší.
 
 ## 9. Fáze
 
