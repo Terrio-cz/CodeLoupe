@@ -711,6 +711,16 @@ pod běžícím daemonem — a agent spadl na `issue` / `yt_*` (272 a 211 tis., 
 *Omezení.* 3 úkoly × 3 běhy (D, E po 3), kontrolní seznam je vzorcový (nálezy a rozhodnutí z poznámek brainu, rozhodnutí v textu plánu hledaná vzorci), bez packetu (živý planner dostává
 `context:` s issue a komentáři, takže část toho, co balíček nabízí, už má; živý medián 46 tahů je přesto vyšší než 17–38 v pokusu), uzavřené úkoly mají v komentářích i nálezy pozdějších kol
 (stejně A i B), wall orientační (dva běhy souběžně, při jednom z nich běžel Gradle), jedna iterace (druhá nebyla potřeba), rozpočet 42,9 USD proti plánovaným asi 40.
+*Pokrytí souborů balíčkem a plánem (CL-194, 2026-10-10).* Skriptová kontrola bez modelu (`node tools/pack-coverage.mjs`: stejný klon těsně před landem, počet souborů skutečného řešení, které balíček jmenuje): `task_context` nese novou sekci `cochange`
+(soubory, které dřívější úkoly na stejném kódu měnily spolu s ním a úkol je zatím nejmenuje; ukázkou jsou úpravy modelu a dokumentace, které krátká změna schová; úkoly, které změnily aspoň dva dotčené soubory najednou, vážou víc než průchod rušným souborem)
+a v `callers` u členů, které text úkolu jmenuje, soubory, které je volají (route volá metodu služby, ne třídu). TER-324: balíček jmenuje 5 z 11 souborů řešení před změnou a 7 z 11 po ní (z 8 už existujících souborů 5 → 7: přibyly `CurrentUserRoutes` a `docs/local-stack.md`);
+TER-321 8/16 a TER-62 5/15 beze změny; balíček je o 1–7 % delší (18,3 → 19,6 tis. znaků u TER-324).
+Řízený běh planneru (živé tělo ze CL-190, jen balíček se mění: P = daemon z mainu, Q = daemon z větve; Opus, effort high, klony těsně před landem, dva běhy souběžně, celkem 14 běhů, 11,9 USD): soubory řešení v plánu u TER-324 (n = 5 na variantu) P 46/55 = 0,84
+(rozsah 7–10 z 11), Q 47/55 = 0,85 (8–11), u TER-62 (n = 2) P 18/30, Q 21/30; řádky premortem TER-324 11,8 proti 13,0; jednotky 212 proti 222 tis. (+4 %), tahy 12–39 proti 18–30. Rozdíl v pokrytí souborů není měřitelný: **balíček plán nezlepšil**.
+Chybějící soubory u TER-324 jsou stále tytéž, `User.kt` a `Organization.kt` (chybí ve 2 z 5 běhů P a ve 3 z 5 běhů Q); oba balíček jmenuje už předtím jako tip (`? avatarMediaId`, `? rejectionReason` v `touch`) a historie je nepředpoví
+(se službami účtů je dřívější úkoly měnily jen 3 z asi 15), takže je planner vynechává vlastním rozhodnutím. Ztráta oproti starému tělu (0,97 → 0,82 v CL-190) se tedy balíčkem nezavře; zbývá věta v těle planneru
+(„vypiš každý soubor, který změna zasáhne, i jednořádkové úpravy a dokumentaci“), ta ale mění agenta `terrio-planner.md` v pracovním prostoru Terrio, což vyžaduje souhlas uživatele; ostatní rozhodnutí, nálezy a premortem v rozptylu stejné.
+
 Skripty a data: `%TEMP%\terrio-bench2\cl189` (`bench-ws`, `bench-run`, `lane`, `analyze`, `judge`, `trace`, `summ`; přiložené ke kartě CL-190).
 
 ### 8.5 Živé porovnání

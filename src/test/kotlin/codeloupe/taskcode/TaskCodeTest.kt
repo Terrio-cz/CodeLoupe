@@ -229,6 +229,7 @@ class TaskCodeTest {
         assertTrue(description.startsWith("### Context\nThe `Billing.total` path is read by"), description)
         assertFalse("Routes keep answering" in description, "the checklist is shown by the issue section only")
         assertContains(text, Regex("## callers\n$BILLING {2}← .*Use\\.kt"))
+        assertContains(text, Regex("Billing\\.total\\(\\) {2}← Use\\.kt"), "a member the text names is traced to the files that call it")
         assertContains(text, "## norms\nAGENTS.md 5 lines, sections (first line): Demo 1 · Modules 3")
         assertContains(text, "L4 [Modules] - The `Billing` rules live in the billing module")
         assertFalse("releases are tagged" in text, text)

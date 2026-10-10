@@ -20,11 +20,11 @@ class TaskContextTool(
     override val description = "Everything to start planning a task, in one call instead of issue + tasks + task_code + search: sections " +
         "issue (brief with criteria), description (its sections, capped), comments (the thread, capped), linked (dependencies and relations with state), " +
         "open-criteria (what related open tasks still owe), touch (landed, in a worktree, or predicted code), declarations (outline lines of those files), " +
-        "callers (files that reference them), prior (earlier tasks that changed them, with landing commit), norms (AGENTS.md lines and docs that bear on them). sections=[…] picks some; view=digest lists them with sizes. The same root asking again gets 'unchanged' in " +
+        "callers (files that reference them), prior (earlier tasks that changed them, with landing commit), cochange (files those tasks changed along with them that the task does not name yet), norms (AGENTS.md lines and docs that bear on them). sections=[…] picks some; view=digest lists them with sizes. The same root asking again gets 'unchanged' in " +
         "one line, or only the sections that changed; since=none sends everything again."
     override val properties = Schema.properties(
         "id" to Schema.string("e.g. TER-5"),
-        "sections" to Schema.strings("issue, description, comments, linked, open-criteria, touch, declarations, callers, prior, norms"),
+        "sections" to Schema.strings("issue, description, comments, linked, open-criteria, touch, declarations, callers, prior, cochange, norms"),
         "view" to Schema.enum(listOf("full", "digest")),
         "since" to Schema.string("none: send everything again"),
     )

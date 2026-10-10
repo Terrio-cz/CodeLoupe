@@ -48,8 +48,9 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
             "open-criteria" to openCriteria(context, mirror.store),
             "touch" to touch(facts, failure),
             "declarations" to declarations(root, paths),
-            "callers" to optional { callers.render(root, paths) },
+            "callers" to optional { callers.render(root, paths, facts?.let(::members).orEmpty()) },
             "prior" to prior(facts, canonical, paths, mirror.store),
+            "cochange" to optional { cochange(facts, canonical, paths) },
             "norms" to optional { norms(facts, paths) },
         )
         return Doc.of("context:$canonical", pieces.filter { it.second.isNotBlank() }.map { (handle, text) -> Triple(handle, handle, "## $handle\n$text") })
@@ -100,6 +101,10 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
         return sources(landed + predicted).ifEmpty { sources(a.worktree?.files.orEmpty()).take(WORKTREE_FILES) }.take(MAX_FILES)
     }
 
+    /** The member declarations the issue text surely or likely names, as `path:from-to`; they are the code a signature change reaches callers through. */
+    private fun members(f: TaskCodeQuery.Facts): List<String> =
+        f.answer.prediction?.predictions.orEmpty().filter { (it.mark == Prediction.SURE || it.mark == Prediction.LIKELY) && it.detail.startsWith("[") && it.path != null && ':' in it.target }.map { it.target }
+
     private suspend fun declarations(root: String, paths: List<String>): String {
         if (paths.isEmpty()) return ""
         val lines = registry.query(root, speculative = false) { view ->
@@ -130,6 +135,13 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
             val title = rows[task.task.uppercase()]?.summary ?: landing.subject
             "${task.task} landed ${landing.short} ${Times.short(landing.time)}  ${title.take(SUMMARY)}  ‹${touched.getValue(task.task).take(3).joinToString(", ") { it.substringAfterLast('/') }}›"
         }
+    }
+
+    /** Files the earlier tasks on this code changed along with it, which the task's own text and files do not name yet. */
+    private fun cochange(f: TaskCodeQuery.Facts?, self: String, paths: List<String>): String {
+        if (f == null || paths.isEmpty()) return ""
+        val named = f.answer.files.keys + f.answer.prediction?.predictions.orEmpty().mapNotNull { it.path }
+        return CoChange(f.store).render(self, paths, named)
     }
 
     /** The repository's own rules and documents that bear on the touched code, so the planner reads those lines and not the whole files. */
