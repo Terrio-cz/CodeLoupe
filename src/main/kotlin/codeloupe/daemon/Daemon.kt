@@ -24,6 +24,10 @@ import codeloupe.events.eventRoutes
 import codeloupe.jobs.JobRunner
 import codeloupe.jobs.JobTool
 import codeloupe.jobs.jobRoutes
+import codeloupe.know.AnchorChecker
+import codeloupe.know.Know
+import codeloupe.know.RegistryIndex
+import codeloupe.know.knowRoutes
 import codeloupe.ports.LocalPorts
 import codeloupe.ports.PortRegistry
 import codeloupe.ports.PortStore
@@ -132,6 +136,7 @@ class Daemon private constructor(
     val events = EventBus(eventStore, webhooks)
     val registry = Registry(config, queue, log = ::log, emit = events::emit)
     val jobs = JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
+    private val know = Know(config.home.resolve("know.db"), AnchorChecker(RegistryIndex(registry)), config.defaultRoot)
     private val secrets = SecretAccess(config.home, preset = secretStore, rotationDays = config.secrets.rotationDays)
     private val trackerSettings = TrackerSettingsLoader.load(config.home, store = { secrets.store })
     private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
@@ -208,6 +213,7 @@ class Daemon private constructor(
         uiApi.close()
         jobs.close()
         eventStore.close()
+        know.close()
         trackers.close()
         registry.close()
         runCatching {
@@ -320,6 +326,7 @@ class Daemon private constructor(
             eventRoutes(events, webhooks, webhookKey)
             uiApiRoutes(uiApi)
             envRoutes(secrets)
+            knowRoutes(know)
             post("/shutdown") {
                 val pending = jobs.pending()
                 if (pending > 0 && call.parameters["force"] != "1") {
