@@ -552,8 +552,8 @@ daemon z větve na 47620, nic do YouTrack), proti stejným 5 bězím A; `suggest
 | v5: stav v řádcích, ne `tasks` pro stav | 5 | 481 (medián B / A 67 %) | 487 | 1,62 | **5,9 % (4,1–8,2)** | 4,2 | 7,0 |
 
 Kritérium „podíl čtení trackeru ≤ 5 %“ **zůstává nesplněné** (5,9 %; v2 mělo 5,4 %; rozptyl mezi běhy je větší než rozdíl). Stav a epic v řádcích odpadl jen z části
-`tasks`: agenti dál volali `tasks mode=ready` s vlastním filtrem (4 z 5 běhů, 2,2 % ceny) a `mode=graph` na jednotlivé dormantní úkoly (běhy 21, 22), takže výpis backlogu
-nenahradil ani stav ve waiting řádcích, protože výchozí `dispatch_plan` bere jen 15 nejurgentnějších a z nich většinu zabere už rozpracovaná práce. Nejde o chybějící údaj, ale o to,
+`tasks`: agenti dál volali `tasks mode=ready` s vlastním filtrem (5 z 5 běhů), ve dvou i `mode=graph` na dormantní úkoly nebo výpis stavů; `tasks` stojí 2,8 % ceny, `issue` 2,5 %,
+`dispatch_plan` 0,3 %. Nejde o chybějící údaj, ale o to,
 že suggester chce vlastní výběr nad celým backlogem (typ, priorita, oblast), který `dispatch_plan` neumí. Cena (medián 67 % proti A, 1. kritérium) zůstává splněna. Dál se neiterovalo.
 
 ### 8.5 Živé porovnání
