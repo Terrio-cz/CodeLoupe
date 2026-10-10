@@ -266,14 +266,14 @@ Old and new build alternated on the same machine, medians.
 
 ### Why agents barely called the tool, and the fix (CL-180)
 
-One factor at a time, 74 headless runs (Opus, high effort, 90 USD), a reviewer on four closed tasks with known findings and a planner on
+One factor at a time, 77 headless runs (Opus, high effort, 95 USD), a reviewer on four closed tasks with known findings and a planner on
 three, in scratch copies of the workspace. The tools were not deferred (they are in the first turn's list, and none of 97 transcripts calls
 `ToolSearch`), and their descriptions are not the barrier (the same descriptions give 0.2 or 6.0 calls per run depending on the agent's
 body). The agent kept to `cd <worktree> && rg …` (13 shell `rg` calls per run), because its body mentioned CodeLoupe in one bullet, its
 `tools:` list lacked `grep`, and the plugin's steering hook, which is not even installed in that workspace, only advises: in `advise`
 mode it spoke 6-8 times per run and 0 of 6 runs followed it. A routing table in the body ("call X before `rg`, `sed`, `cat`, a whole
 `Read`"; `rg` only for non-Kotlin files) plus `grep` in `tools:` took the reviewer from **0.2 to 6.0 CodeLoupe calls per run (9 of 10
-runs)** and the planner from 2.3 to 13.0; the hook in `redirect` mode did the same (5.3, 4 of 4 runs), `grep` in `tools:` alone nothing
+runs)** and the planner from 2.3 to 8.0 (3 runs); the hook in `redirect` mode did the same (5.3, 4 of 4 runs), `grep` in `tools:` alone nothing
 (0 of 4), a softer wording 1.5. **Cost did not move** (median 333 to 323 thousand weighted units, mean 322 to 331, ranges of one
 variant 229-483), and findings stayed complete in all 56 reviewer runs: 53 % of a review run's tool results is the prepared review
 packet, read whole, which no search replaces. So the tool now gets used, but the saving measured earlier still belongs to the shorter

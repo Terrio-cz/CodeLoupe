@@ -542,7 +542,7 @@ TER-321 393 → 403 tis. (+3 %), TER-62 332 → 419 tis. (+26 %), USD průměr 1
 (`comments` TER-62 má 21 tis. znaků, proti `yt_comments` 26 tis.). Kritérium CL-183 se týká počtu volání, ne ceny.
 
 **Proč agenti nevolají CodeLoupe a co s tím (CL-180, 2026-10-10).** Řízený pokus po jednom faktoru v odlehlých kopiích workspace
-(živý workspace se nesahal), 9 variant, 74 běhů `claude -p --agent` (Opus, effort high, dva běhy souběžně), 90,41 USD. Reviewer běžel na čtyřech
+(živý workspace se nesahal), 10 variant, 77 běhů `claude -p --agent` (Opus, effort high, dva běhy souběžně), 95,02 USD. Reviewer běžel na čtyřech
 uzavřených kolech se známým výsledkem (TER-321 4 nálezy a TER-62 6 nálezů z CL-23, k tomu 1. kolo reálné recenze TER-637 se 3 a TER-559
 se 3 nálezy; klony ze stejného bare repozitáře, packet jako v CL-23), planner na TER-321, TER-62 a TER-324. Daemon na odděleném home
 a portu (47661; varianta s `redirect` 47662), `CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH=600` jako v živém workspace. Počty jsou z transkriptů
@@ -573,7 +573,7 @@ je jen guard), a ve scratch kopii v režimu `advise` (výchozí) radil 6–8krá
 | **V8** | **konečné znění (tabulka + `grep`, „`rg -n` jen pro nekotlinové soubory“)** | **10** | **6,0 (9/10)** | **5,6** | **120** | **323 / 331** | **1,17** | **100 %** |
 
 Planner (3 běhy na variantu, TER-321, TER-62, TER-324), volání CL na běh / jednotky tis. medián / USD: V0 2,3 / 445 / 1,40;
-V1 2,7 / 363 / 1,45; V2 4,3 / 399 / 1,31; V3 7,7 / 349 / 1,31; V7 1,3 / 429 / 1,38; V8 13,0 / 475 / 1,47.
+V1 2,7 / 363 / 1,45; V2 4,3 / 399 / 1,31; V3 7,7 / 349 / 1,31; V7 1,3 / 429 / 1,38; V8 13,0 / 475 / 1,47; V9 (konečné tělo planneru, zkrácené na 7 996 znaků, 3 běhy) 8,0 (6, 3, 15) / 488 / 1,54.
 
 *Co z toho plyne.* (1) *Adopci mění text těla, ne dostupnost.* Nástroj v seznamu sám nic (V4: 0 z 4 běhů), pokyny „použij nástroj místo
 `rg`“ s tabulkou co čím a s nástrojem `grep` ano (V2, V8: 5,5 a 6,0 volání, 9 z 10 běhů, aspoň 3 volání v 8 z 10); zkrácení věty
@@ -586,8 +586,8 @@ o 5 % výš (475 proti 445 tis., 3 běhy, v rámci šumu). Kritérium „nálezy
 jsou přítomny všechny známé nálezy (shoda vzorem a ruční kontrola vzorku; reviewer navíc u TER-559 našel
 skutečnou závadu `DATABASE_TIMEOUT` místo `DATABASE_UNREACHABLE`, opravenou v dalším kole). (3) *Omezení*: 4–10 běhů na variantu, planner
 jen 3, dva běhy souběžně (wall orientační), čtyři úkoly, jeden workspace, hodnocení nálezů vzorem, V8 planner běžel s tělem
-před zkrácením na 8 000 znaků. Živé úpravy (`.bak-cl180`): `terrio-reviewer` a `terrio-reviewer-opus` (tabulka v odrážce Code, `grep`
-v `tools:`, těla 7 973 znaků), planner viz CL-180.
+před zkrácením na 8 000 znaků (V9 je ověřuje). Živé úpravy (`.bak-cl180`): `terrio-reviewer`, `terrio-reviewer-opus` (tabulka v odrážce Code,
+`grep` v `tools:`, těla 7 973 znaků, zkrácené záhlaví Reading a řádek Code norms) a `terrio-planner` (totéž, tělo 7 996 znaků); `validate`, `run-all`, `doctor` zelené.
 
 **Stav úkolu v `dispatch_plan` (CL-182c, 2026-10-10, jedno měření).** `dispatch_plan` nese u řádků oken stav a epic (`TER-95 Critical To do ‹TER-88› …`) a u čekajících
 stav v závorce (`TER-92 (In Progress)  in a worktree already …`); žádný nový nástroj, jedno pole na řádek, testy v `DispatchTest`. Tělo suggesteru (Terrio workspace,
