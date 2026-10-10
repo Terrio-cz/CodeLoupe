@@ -541,6 +541,21 @@ kola 1 jako kritéria 13–16 u TER-321; nálezy kol 1–4 a větev Codex u TER-
 TER-321 393 → 403 tis. (+3 %), TER-62 332 → 419 tis. (+26 %), USD průměr 1,43 → 1,58 a 1,19 → 1,45, podíl čtení trackeru 3,1 → 4,0 % a 9,4 → 9,7 %
 (`comments` TER-62 má 21 tis. znaků, proti `yt_comments` 26 tis.). Kritérium CL-183 se týká počtu volání, ne ceny.
 
+**Stav úkolu v `dispatch_plan` (CL-182c, 2026-10-10, jedno měření).** `dispatch_plan` nese u řádků oken stav a epic (`TER-95 Critical To do ‹TER-88› …`) a u čekajících
+stav v závorce (`TER-92 (In Progress)  in a worktree already …`); žádný nový nástroj, jedno pole na řádek, testy v `DispatchTest`. Tělo suggesteru (Terrio workspace,
+záloha `.bak-cl182c`, 7 982 znaků) na ně spoléhá a zakazuje `tasks` pro stav, epic a závislosti. Měřeno jednou: 5 běhů `spec: auto` (Opus, high, odlehlá kopie workspace, throwaway
+daemon z větve na 47620, nic do YouTrack), proti stejným 5 bězím A; `suggest check` PASS u všech 5 plánů.
+
+| Tělo | n | Medián tis. | Průměr tis. | USD průměr | Podíl čtení trackeru (průměr, min–max) | `tasks` na běh | `issue` na běh |
+|---|---|---|---|---|---|---|---|
+| A, před task indexem | 5 | 718 | 769 | 2,49 | 16,3 % | – | 14,0 (`yt_get_issue`) |
+| v5: stav v řádcích, ne `tasks` pro stav | 5 | 481 (medián B / A 67 %) | 487 | 1,62 | **5,9 % (4,1–8,2)** | 4,2 | 7,0 |
+
+Kritérium „podíl čtení trackeru ≤ 5 %“ **zůstává nesplněné** (5,9 %; v2 mělo 5,4 %; rozptyl mezi běhy je větší než rozdíl). Stav a epic v řádcích odpadl jen z části
+`tasks`: agenti dál volali `tasks mode=ready` s vlastním filtrem (4 z 5 běhů, 2,2 % ceny) a `mode=graph` na jednotlivé dormantní úkoly (běhy 21, 22), takže výpis backlogu
+nenahradil ani stav ve waiting řádcích, protože výchozí `dispatch_plan` bere jen 15 nejurgentnějších a z nich většinu zabere už rozpracovaná práce. Nejde o chybějící údaj, ale o to,
+že suggester chce vlastní výběr nad celým backlogem (typ, priorita, oblast), který `dispatch_plan` neumí. Cena (medián 67 % proti A, 1. kritérium) zůstává splněna. Dál se neiterovalo.
+
 ### 8.5 Živé porovnání
 
 2 týdny po nasazení `codeloupe metrics compare baseline.json after.json`; týdenní report mezer.
