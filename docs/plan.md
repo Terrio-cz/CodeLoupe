@@ -50,16 +50,23 @@ SerialGC), bloby načtené předem (~150 MB z peaku), parse + průchod celým st
 ## 1. Baseline — co dnes stojí tokeny (2026-09-23 → 10-06, 2 373 běhů)
 
 Zdroj: `run/codemetrics.mjs collect` nad transcripty Claude Code; report
-`.journal/metrics/code/baseline-2026-10-06.json`. Cena = vážené tokeny (input 1, cache write 5m 1,25 /
-1h 2, cache read 0,1, output 5).
+`.journal/metrics/code/baseline-cl206-2026-10-10.json` (stejné transcripty a období jako původní
+`baseline-2026-10-06.json`, přepočtené s konečným výstupem zprávy, CL-206). Cena = vážené tokeny (input 1,
+cache write 5m 1,25 / 1h 2, cache read 0,1, output 5).
 
 | Role | Běhů | Cena medián | Tahů medián | Kontext peak medián | Výsledky nástrojů z ceny | z toho kód (read + rg/sed/cat + git diff/show) |
 |---|---|---|---|---|---|---|
-| reviewer | 401 | 392k | 14 | 145k | 32,9 % | ~19 % |
-| planner | 172 | 1,0M | 52 | 182k | 29,3 % | ~22 % |
-| coder-high | 238 | 921k | 55 | 132k | 24,4 % | ~17 % |
-| coder | 257 | 187k | 17 | 61k | 23,3 % | ~15 % |
-| deep-reviewer | 30 | 2,1M | 74 | 324k | 39,7 % | ~27 % |
+| reviewer | 401 | 581k | 14 | 145k | 25,0 % | ~14 % |
+| planner | 172 | 1,2M | 52 | 182k | 25,8 % | ~19 % |
+| coder-high | 238 | 1,0M | 55 | 132k | 22,0 % | ~14 % |
+| coder | 257 | 212k | 17 | 61k | 21,2 % | ~13 % |
+| deep-reviewer | 30 | 2,6M | 74 | 324k | 32,2 % | ~22 % |
+
+Před opravou CL-206 vycházelo 392k / 1,0M / 921k / 187k / 2,1M a podíly 32,9 / 29,3 / 24,4 / 23,3 / 39,7 %
+(výstup se bral z první řádky zprávy, viz § 8, Vedlejší nález měření). Celková cena období je po opravě o 11 %
+vyšší (2,14 → 2,38 mld.), výstup 29,1 → 74,9 M tokenů, jeho podíl z ceny **6,8 → 15,7 %**; podíly ostatních
+složek jsou proto o ~10 % nižší (cache read 60 → 54 %, výsledky nástrojů 23,9 → 21,6 %). Pořadí lever se nemění,
+absolutní strop úspor z nástrojů o desetinu klesá.
 
 Zjištění, která mění odhady:
 - **Cache read je 48–66 % ceny** — kontext × počet tahů. Cena roste hlavně s *počtem tahů* a velikostí
@@ -740,7 +747,37 @@ Dále `symbol path:1` (5×): řádek před první deklarací (balíček, importy
 Stejné transcripty, nový detektor: 365 → 196 mezer (9,3 %). Řízené běhy planneru (7 běhů na variantu): starý daemon 15 mezer v 78 voláních (19,2 %; nový detektor 11, 14,1 %), daemon s opravami 8 v 91 (8,8 %); zbylých 8 je 5 záporných odpovědí na jména, která úkol teprve zavádí
 (`location_search`, `LocationSearch*`, `AccountInput`) a 3 náhodné shody tokenu (`website`, `description`, `json`). Cíl 7 % se nesplnil (8,8 %), a protože zbytek nepochází z daemona, kritérium se přepisuje; metrika sama je karta CL-198.
 
-Skripty a data: `%TEMP%\terrio-bench2\cl189` (`bench-ws`, `bench-run`, `lane`, `analyze`, `judge`, `trace`, `summ`; přiložené ke kartě CL-190).
+*Věta o každém souboru v těle planneru (CL-197, 2026-10-10).* Řízený běh planneru (Opus, effort high, klony těsně před landem, bez packetu, tracker čte stejný YouTrack a nic do něj nepíše, throwaway daemon z `main` na 47682 se sekcí `cochange`, dva běhy souběžně; před každým během se agentovi zapomněla čtení kořene jako hookem `SubagentStart`). Tři těla: L = živé tělo z CL-190, S = L + věta v odrážce o přístupu („vypiš každý soubor, který změna zasáhne, i jednořádkové úpravy a model a dokumenty, které jmenuje `cochange`“; aby tělo zůstalo do 8 000 znaků, odpadla věta „Never a >20k-char file whole“, návod `rg -n '^## '` a „the other agents“ → „others“), O = staré tělo před CL-190 (`.bak-cl189`). Tři úkoly: TER-324 (11 souborů, dvě čtyřřádkové úpravy modelu `User.kt`, `Organization.kt` a `docs/local-stack.md`), TER-176 (5 souborů mimo testy: jednořádkový `AccountModule.kt`, `StaffService.kt`, `importer-architecture.md`) a TER-575 (5 souborů: jednořádkový `PostgisColumnType.kt`, `current-db-diagram.md`, `TourismQueryRepository.kt`). TER-176 a TER-575 vybral skript (`cand.mjs`) mezi uzavřenými úkoly s 4–9 soubory tak, že aspoň dva malé soubory text úkolu nejmenuje. Šestnáct nových běhů (S a O po 2 na úkol, L po 2 na TER-176 a TER-575) a pro L na TER-324 pět běhů z CL-194 (stejné tělo, daemon se `cochange`); celkem 20,35 USD i se suggesterem níže.
+
+| Úkol | Tělo | n | Soubory řešení | Z toho malé | Řádky premortem | Jednotky tis. (medián) | USD průměr |
+|---|---|---|---|---|---|---|---|
+| TER-324 | L | 5 (z CL-194) | 47/55 = 0,85 (po bězích 11, 8, 9, 11, 8) | 9/15 | 13,0 | 234 | 0,82 |
+| TER-324 | **S** | 2 | **21/22 = 0,95** (11, 10) | **6/6** | 11,0 | 221 | 0,81 |
+| TER-324 | O | 2 | 19/22 = 0,86 (9, 10) | 3/6 | 12,0 | 263 | 0,94 |
+| TER-176 | L / S / O | 2 | 10/10 u všech | 6/6 u všech | 11,5 / 12,5 / 13,5 | 187 / 168 / 234 | 0,70 / 0,64 / 0,83 |
+| TER-575 | L / S / O | 2 | 10/10 u všech | 6/6 u všech | 10,5 / 11,0 / 11,5 | 181 / 158 / 252 | 0,67 / 0,58 / 0,89 |
+| všechny | L (n = 9) | | 67/75 = 0,89 | 21/27 | 12,1 | 200 | 0,76 |
+| všechny | **S (n = 6)** | | **41/42 = 0,98** | **18/18** | 11,5 | **173** | 0,68 |
+| všechny | O (n = 6) | | 39/42 = 0,93 | 15/18 | 12,3 | 240 | 0,88 |
+
+TER-176 a TER-575 rozlišit nedokážou: balíček jim jmenuje malé soubory sám (`cochange`: `AccountModule.kt`, `current-db-diagram.md`), takže všechna tři těla je uvedla ve všech 12 bězích. Rozlišuje jen TER-324, kde `User.kt` a `Organization.kt` balíček jmenuje jen jako tip a planner je vynechává vlastním rozhodnutím: S je neminulo ani jednou (6/6 malých souborů, 10 a 11 z 11), L je vynechalo ve 3 z 5 bězích (9/15). Rozdíl **není statisticky prokázán** (S proti L na TER-324: dva běhy proti pěti, jednostranný permutační test p ≈ 0,29; stejně pro malé soubory), je ale ve směru, který vysvětluje mechanismus, a S nebylo na žádném úkolu horší než L ani O. Starý O na TER-324 tentokrát 0,86 (dříve 0,97 v CL-190, n = 2 proti 3), takže „ztráta oproti starému tělu“ je v rozptylu; rozhodnutí o větě to nemění. Řádky premortem jsou 11,5 proti 12,1 (L) a 12,3 (O), tedy −5 % v rozsahu 10–16 řádků na plán: šum. Cena: medián jednotek S / O 72 % (173 / 240 tis.; po úkolech 84 %, 72 %, 63 %), průměr jednotek 73 %, průměr USD 77 %; S / L 87 %. Kritérium „cena ≤ 75 % starého těla“ platí v jednotkách (metrika celého dokumentu), v USD je 77 %.
+
+*Nasazení (planner).* `terrio-planner.md` je živé s větou (záloha `.bak-cl197`, tělo 7 998 znaků). Omezení: dva běhy na buňku u nových úkolů, uzavřené úkoly mají v kritériích později přidané řádky `(found: …)`, které soubory někdy jmenují (proto výběr úkolů skriptem), L na TER-324 jsou běhy z jiného dne s daemonem z větve před sloučením (kód balíčku totožný).
+
+*Suggester: `dispatch_plan query=` místo `tasks` (CL-188, 2026-10-10).* `dispatch_plan` bere filtry přes `query=` už teď (`DispatchQuery`: typ, priorita, komponenta, stav; všechny otevřené listové úkoly, které sedí), CodeLoupe se tedy neměnil a katalog nástrojů zůstal bajtově stejný. Změnilo se tělo `terrio-suggester.md` (záloha `.bak-cl188`, tělo 7 542 znaků): z `tools:` odpadl `mcp__codeloupe__tasks`, filtry zadání (oblast, komponenta, typ, priorita, stav) jdou do prvního volání `dispatch_plan query=`, „bez `tasks`“ je řečeno výslovně a při chybějícím nástroji se padá na `yt_search`. Měření: `spec: auto`, `count: 3`, Opus high, odlehlá kopie workspace, throwaway daemon z `main` na 47681, skutečný stav workspace jen ke čtení, před každým během zapomenutá čtení kořene; v6 = nové tělo (5 běhů), v5 = tělo před úpravou (2 běhy téhož dne).
+
+| Tělo | n | Medián tis. | Průměr tis. | USD průměr | `tasks` na běh | `issue` na běh | Podíl čtení trackeru: průměr (min–max) | `suggest check` |
+|---|---|---|---|---|---|---|---|---|
+| A, před task indexem (CL-182c, jiný den) | 5 | 718 | 769 | 2,49 | – | 14,0 (`yt_get_issue`) | 16,3 % | |
+| v5, před touto úpravou (CL-182c, jiný den) | 5 | 481 | 487 | 1,62 | 4,2 | 7,0 | 5,9 % (4,1–8,2) | 5/5 |
+| v5, dnes | 2 | 325 | 325 | 1,13 | 0 | 5,5 | 5,3 % (3,8–6,8) | 2/2 |
+| **v6, `query=`, bez nástroje `tasks`** | 5 | **302** | 342 | 1,20 | **0** | 4,8 | **4,0 % (3,3–5,4)** | **5/5** |
+
+`tasks` na běh 4,2 → 0 (u v6 zaručeně: nástroj chybí; v5 dnes `tasks` také nevolalo ani jednou, takže příčina dřívějších 4,2 volání byla ve stavu workspace a náhodě, ne jen v těle). Podíl čtení trackeru 4,0 % (medián běhů 3,7 %; `issue` 2,7 %, `yt_search` 0,8 %, `dispatch_plan` 0,6 %), pod 5 %; jeden běh z pěti je nad (5,4 %). Cena: stav workspace se mezi dny změnil (v5 dnes 325 tis. proti 481 tis. v CL-182c), proto stojí za poměr téhož dne: v6 / v5 = 93 % (302 / 325 tis., rozdíl v šumu, v5 jen dva běhy), a spolu s v5 / A = 67 % z CL-182c vychází v6 / A asi 62 %; proti starému A z jiného dne je to 42 %. Staré tělo A se nepouštělo znovu (rozpočet). Všech 7 plánů projde `suggest check`.
+
+*Nasazení (suggester).* `terrio-suggester.md` živé (v6, `.bak-cl188`). Omezení: v5 má jen dva běhy; stav workspace (volná okna, dormantní worktrees) se měnil, takže absolutní tisíce jednotek se mezi dny nesrovnávají. Rozpočet obou karet 20,35 USD za 23 běhů (z 25), bez další iterace.
+
+Skripty a data: `%TEMP%\terrio-bench2\cl189` (`bench-ws`, `bench-run`, `lane`, `analyze`, `judge`, `trace`, `summ`; přiložené ke kartě CL-190), `%TEMP%\cl197` (`setup`, `mkvariants`, `cand`, `bench-run`, `lane`, `judge`, `analyze`; přiložené ke kartám CL-197 a CL-188).
 
 ### 8.5 Živé porovnání
 
@@ -876,9 +913,157 @@ včetně práce na CodeLoupe 4 899 USD, tedy D1 ≈ 1,5 × D2). Pravidlo 1 %: st
 3. Strukturované výstupy a deterministický triage (FM-11, včetně klasifikátoru selhání): 2,7 %, nízká jistota, závisí na tom, kolik z oken běží ještě mimo phase-mode.
 
 #### Vedlejší nález měření
-`codemetrics.mjs` i `TranscriptParser.kt` berou `usage` z **první** řádky zprávy se stejným `id`; ta nese průběžné `output_tokens`.
-Poslední řádka má konečný počet: výstup je tak podhodnocen **2,1 ×** (30,8 M místo 65,5 M tokenů za sledované období, tj. asi +9 %
-celkové vážené ceny; u retro +22 %). Podíly v této kapitole počítají tam, kde to šlo, s konečným výstupem; oprava v CL-206.
+`codemetrics.mjs` i `TranscriptParser.kt` brali `usage` z **první** řádky zprávy se stejným `id`; ta nese průběžné `output_tokens`.
+Claude Code zapisuje zprávu po řádce na každý blok obsahu a poslední řádka má konečný počet: výstup byl podhodnocen **2,1 ×**
+(30,8 M místo 65,5 M tokenů ve všech transcriptech od 2026-10-01; ostatní pole `usage` jsou na všech řádkách stejná, poslední
+hodnota je vždy maximum). Opraveno v CL-206: výstup zprávy = maximum přes její řádky, váhy beze změny (`TranscriptParser`, `codemetrics.mjs`,
+`context-audit.mjs`, `admin.mjs`); uložené běhy v databázi se při prvním průchodu načtou znovu (`parser` v tabulce `meta`, verze 2),
+bez oznámení starých mezer. Hlavní (desktopové) session mají konečný výstup už na první řádce, chyba se týkala jen subagentů
+(7,8 M → 42,5 M tokenů).
+
+Přepočet od 2026-10-01 (1 997 běhů, `.journal/metrics/code/cl206-before-2026-10-10.json` → `cl206-after-2026-10-10.json`):
+celková cena +9,4 %, výstup 27,8 → 62,1 M tokenů (zbytek do 65,5 M jsou běhy začaté před 10-01), jeho podíl z ceny **7,6 → 15,7 %**.
+
+| Role | Běhů | Podíl z ceny před → po | Výstup (M) před → po | Výstup z ceny role po opravě |
+|---|---|---|---|---|
+| main (desktop) | 161 | 36,0 → 32,9 % | 13,1 → 13,1 | 9,9 % |
+| general-purpose | 89 | 20,8 → 21,2 % | 1,1 → 9,6 | 11,4 % |
+| coder-high | 169 | 13,1 → 13,5 % | 3,1 → 9,0 | 16,7 % |
+| reviewer | 311 | 6,7 → 8,5 % | 1,5 → 11,2 | 33,0 % |
+| coder | 232 | 7,7 → 7,6 % | 2,8 → 5,0 | 16,5 % |
+| planner | 125 | 6,7 → 6,9 % | 3,3 → 6,4 | 23,2 % |
+| tester | 381 | 3,9 → 4,2 % | 1,6 → 3,9 | 23,3 % |
+| retro | 143 | 0,9 → 1,0 % | 0,0 → 0,7 | 18,5 % |
+
+Důsledek: výstup je u reviewera třetina ceny role a u testeru, planneru a retro přes pětinu, takže pokus se stručným výstupem
+(terse output) má větší strop, než se čekalo; startovní kontext a čtení z cache zůstávají největší složkou, ale o ~10 % menší.
+
+### 8.7 Levnější model nebo nižší effort u planneru a reviewera (CL-202, 2026-10-10)
+
+Planner (`terrio-planner`, Opus high) a reviewer (`terrio-reviewer-opus`, Opus high) jsou spolu přes polovinu útraty Terria. Otázka: drží kvalitu na Sonnetu 5.5 nebo na nižším effortu?
+Řízený pokus stejnými skripty, prompty, packety, klony a body jako CL-189 / CL-190 (scratch kopie workspace, živý workspace se nesahal; jediný rozdíl je `model` / `effort` v hlavičce agenta
+a v `--model` / `--effort`), throwaway daemony 47700 (planner, build CL-189 s novým balíčkem `task_context`) a 47701 (reviewer, build CL-190), `claude -p --agent`, dva běhy souběžně. **Baseline se nepouštěla znovu**:
+planner Opus high = běhy B a D z CL-190 (živé tělo, 12 běhů na 3 úlohách TER-321, TER-62, TER-324), reviewer Opus high = varianta RC z CL-189 (živé kompaktní packet, 12 platných běhů po vyřazení běhu s přesunutým
+`origin/master`, 4 úlohy, 16 známých nálezů na sadu). Nové: V1 planner Sonnet high (3 běhy na úlohu = 9), V3 reviewer Sonnet high (2 na úlohu = 8), V4 reviewer Opus medium (2 na úlohu = 8). Celkem 25 běhů,
+10,9 USD z rozpočtu 30. **V2 (planner Sonnet medium) se nepouštěl**: V1 už kvalitu nedrží (pravidlo karty).
+
+Cena. Vážené jednotky počítají tokeny stejnou váhou u všech modelů (`codemetrics.mjs`: „stejný poměr pro současné modely“), takže při změně modelu neříkají nic o penězích; kritérium ≤ 60 % se proto posuzuje
+na **USD z CLI** (nese cenu modelu), jednotky jsou uvedeny vedle. Kvalita reviewera: všechny známé nálezy v každém běhu. Vzorec z `gt.mjs` se ukázal příliš volný: hledá slova v celé zprávě, tedy i v části
+„co jsem ověřil“, kde reviewer popisuje kód, ale nález nevznáší. Proto je přidána **přísná varianta** (`findings.mjs`: vzorce jen nad sekcí `Findings`); u baseline RC dává přísná i volná varianta 100 %, takže baseline se
+tím nemění. Nálezy, které přísná varianta nenašla, jsem ověřil ručně.
+
+| Role | Var. | n | Jednotky tis. (medián) | USD medián / průměr | Poměr proti Opus high (USD / jednotky) | Známé nálezy volně / přísně | Volání CL na běh |
+|---|---|---:|---:|---|---|---|---:|
+| reviewer | Opus high (RC, baseline) | 12 | 267 | 0,97 / 0,94 | 100 % | 48 z 48 / 48 z 48 | 5,1 |
+| reviewer | **V3 Sonnet high** | 8 | 156 | 0,31 / 0,31 | **32 % / 58 %** | 100 % / **88 %** (28 z 32) | 0,4 |
+| reviewer | **V4 Opus medium** | 8 | 168 | 0,62 / 0,64 | **64 % / 63 %** (průměr 68 %) | 100 % / 97 % (32 z 32 po ruční kontrole) | 2,0 |
+| planner | Opus high (B+D, baseline) | 12 | 240 | 0,87 | 100 % | viz níže | – |
+| planner | **V1 Sonnet high** | 9 | 184 | 0,36 | **41 % / 77 %** | viz níže | – |
+
+*V3, reviewer Sonnet high: cena splněna (32 % USD), kvalita ne.* U TER-637 (3 známé nálezy) V3 ve **2 ze 2 běhů** nahlásil jen jeden nález (dokumentace tvrdí jedno čtení `pg_index`, kód čte dvakrát) a vynechal
+dva: osud přejmenovaného držáku indexu (`_old`) bez návodu k úklidu a chybějící test varování pro ledger. Volný vzorec je ale i u těchto běhů označil za nalezené (slova stála v části „ověřeno“); ruční čtení sekcí
+`Findings` obou běhů potvrdilo, že tam nejsou. Pravidlo karty (reviewer, který vynechá známý nález ve dvou bězích, končí) tak V3 vyřazuje; TER-321 (4/4), TER-62 (6/6) a TER-559 (3/3) V3 splnil v obou bězích.
+Zbytek chování: 7 tahů místo 12, CodeLoupe 0,4 volání na běh (shell a `Read`), zpráva podobně dlouhá (5-10 tis. znaků).
+
+*V4, reviewer Opus medium: kvalita drží, cena ne o několik bodů.* 32 z 32 známých nálezů (jeden běh TER-559 hlásil zdvojenou kontrolu parsování jako „stejné kontroly na dvou místech“, vzorec chtěl „two copies“; ruční kontrola ho uznala).
+Cena ale vychází na 64 % mediánu (USD i jednotky), 68 % průměru a po úlohách 61 % (TER-321), 68 % (TER-62), 70 % (TER-559) a 76 % (TER-637): kritérium ≤ 60 % nesplněno. Rozpětí buňky je u baseline 150-340 tis., takže
+rozdíl od 60 % je v šumu, ale na špatné straně ve všech čtyřech úlohách.
+
+*V1, planner Sonnet high: cena splněna (41 % USD, jednotky 77 %), kvalita ne.* Kontrolní seznam CL-23 (stejný `judge.mjs`; Opus B+D / V1): známé nálezy reálných kol 0,93 / 0,90 (37 z 40 a 27 z 30; chybí stejný
+třetí nález TER-321), rozhodnutí reálného plánu 0,99 / 0,97, soubory reálného řešení **0,74 / 0,67** (−7 bodů, u B samotného 0,72, rozdíl −5), řádky premortem **16,4 / 12,1 (−26 %)**, různé čočky premortem **7,4 / 4,7**.
+Po úlohách (Opus / V1): soubory 0,75 / 0,67, 0,65 / 0,60, 0,86 / 0,79; řádky premortem 18,8 / 13,3, 17,0 / 11,7, 13,5 / 11,3; čočky 6,0 / 5,0, 7,5 / 4,3, 8,8 / 4,7, tedy všude stejným směrem. Rozhodnutí
+a nálezy jsou v rozptylu (±3 body), soubory a hloubka premortem ne: Sonnet plánuje přímočařeji (8 tahů proti 16,5, 21 tis. znaků), vynechá více jednořádkových úprav a méně čoček rizik, což je přesně to, co planner
+před kódem dodává. Kritérium „do 3 bodů v každé položce“ nesplněno, V2 (medium) by bylo horší a nepustilo se.
+
+*Nasazení: žádné.* Žádná varianta nesplnila obě podmínky, živý workspace zůstává beze změny (žádné `.bak-cl202`); CL-197 a CL-188, které upravují stejná těla, se nečekalo. Nejbližší je V4 (reviewer Opus medium, −36 % USD bez
+ztráty nálezu): stojí za opakování, až se změní packet nebo tělo reviewera, ale hlavička `terrio-reviewer` (xhigh, kolo 1) a `terrio-reviewer-opus` (high) se tímto pokusem neměnila.
+Zjištění k harnessu: Sonnet v jednom z 9 plánovacích běhů spustil `find / -iname ...` v Git Bashi; claude -p na něj čekal přes 10 minut po hotovém plánu (JSON pak nese jen poslední krátkou zprávu a spotřebu posledního tahu,
+proto `tr.mjs` bere text a jednotky z transcriptu); další běhy hlídá watchdog, který shellové potomky starší 4 minut ukončí. Omezení: 2-3 běhy na buňku, kontrolní seznam planneru je vzorcový, reviewer se hodnotí jen
+na známé nálezy (ne na falešné nálezy ani jejich závažnost), jeden kontrolní den a jedna sada úloh, baseline z předchozích dnů (stejný CLI 2.1.295). Skripty: `%TEMP%\terrio-bench-cl3` (`setup.mjs`, `bench-run.mjs`, `lane.sh`, `judge.mjs`, `analyze.mjs`, `findings.mjs`, `tr.mjs`).
+
+### 8.8 Cena toku Terrio: cache, velké výsledky nástrojů, výstup (CL-199, CL-200, CL-201)
+
+Data: 1 994 běhů z přepisů 2026-10-01 až 10-10 (`run/codemetrics.mjs` a `tools/context-audit.mjs` čtou stejné zdroje; tady vlastní
+extrakce jen počtů a hashů, žádný obsah), 1,99 mld vážených jednotek (vstup 1, zápis 5 min 1,25, zápis 1 h 2, čtení 0,1, výstup 5):
+desktopová okna `main` 32,9 %, `general-purpose` 20,9 %, tok Terrio (role terrio-*) 46 % (subagenti 704,7 M, fázové běhy 209,9 M).
+Všechny zápisy do cache jsou 1h (`cache_creation.ephemeral_5m` je téměř 0).
+
+**Rozklad ceny role** (zápisy / čtení cache / výstup, % ceny role): reviewer 43/24/33, coder-high 19/64/17, coder 21/63/17,
+planner 27/50/23, tester 29/48/23, suggester 48/33/19, reviewer-opus 32/51/17, retro 53/29/19, deep-reviewer 26/48/26,
+changelog 66/20/14, steward 64/20/16; `main` 19/71/10, `general-purpose` 16/73/11.
+
+#### Oblast 1: cache (CL-199), pořadí podle tokenů
+
+| # | Nález | Velikost | Stav |
+|---|---|---|---|
+| 1 | Prémie 1h TTL (0,75 za zapsaný token) se u subagentů nevrací. Subagenti: prémie 79,7 M (11,3 % ceny) proti 23,5 M ušetřených přepisů po pauzách 5-60 min (241 tahů) a 12,4 M za znovupoužití prefixu při startu (všechny role). Po rolích (prémie / vrácení v subagentním režimu): reviewer 25,4 / 2,9 M, planner 11,2 / 1,9, coder-high 15,8 / 6,8, suggester 3,2 / 0,7, retro 3,6 / 0,8, deep-reviewer 1,1 / 0,05, tester 7,8 / 9,4, coder 7,9 / 8,0, reviewer-opus 0,9 / 1,2 | čistá úspora 5m: reviewer 24 M, planner 11 M, retro 3,6 M, suggester 3,2 M, deep 1,1 M (3 % ceny toku); coder-high jen při prahu 300 s (9,9 M), při 180 s už -8 M, proto zůstává 1h | **hotovo** pro reviewer, retro, deep-reviewer: `experimental: cacheTtl: 5m` ve frontmatteru, `subagentPromptCacheTtl` pryč, `ENABLE_PROMPT_CACHING_1H=1` v `settings.json` drží 1h pro ostatní; planner a suggester v CL-207 |
+| 2 | Hlavní vlákno (`claude -p --agent`, fázový režim) ignoruje klíč i `subagentPromptCacheTtl`: vždy 1h (sonda `%TEMP%\cl199-ttl`, 6 běhů). Fázové běhy: prémie 19,5 M, vrácení 15,5 M + 3,5 M při startu, tedy neutrální; resume kol (reviewer 14 z 16 fázových běhů, 35 resume, 6,4 M tokenů přečteno z cache proti 68 k zapsaným) žije jen díky 1h | 0 | beze změny, 1h pro fázové běhy správně |
+| 3 | CLAUDE.md (21-23 k znaků, 7 k tokenů) v každém subagentovi a fázovém běhu navzdory `omitClaudeMd`: 1 255 běhů toku, 38,7 M = 4,2 % ceny toku; start S 30-35 k na 10 k tokenů | 38,7 M | opraveno před touto kartou (CL-58/60: subagenti od 10-07 10:11, fáze od 10-09 20:26); data před opravou převažují, proto jsou čísla výše horní odhad |
+| 4 | Nestabilní prefix: SessionStart hook vkládá "Other windows" (mění se při každém claimu, liší se u 117 ze 133 po sobě jdoucích běhů stewarda) před stabilní blok; čerstvý fázový běh po CL-58 zapíše 2,6-2,9 k tokenů a přečte 7-8,8 k. Časové razítko v `context pack` (`run/context.mjs`) je ve výsledku nástroje, ne ve sdíleném prefixu: bez ceny | ~2,3 k jednotek na fázový start (0,4 % běhu) | **hotovo**: hook končí při `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` (fázové a dispečerské běhy) |
+| 5 | Vypršení cache po pauze > 1 h: `main` 77 případů, 43,1 M (6,6 % ceny `main`; 63 návratů uživatele, 14 čekání na nástroj), `general-purpose` 18, 10,8 M (vše Bash), subagenti toku 26, 3,9 M (Bash 17), fáze 0 | 3,9 M v toku | beze změny (návraty uživatele jsou neodstranitelné, čekání už jde přes `job start --wait`) |
+| 6 | Stejné velké čtení (>= 6 k znaků) opakované v jiném agentovi téhož úkolu: 9,5 M (1,03 % ceny toku; reviewer 4,2 M ze 330 čtení, coder-high 2,1 M), uvnitř běhu 0,2 M | 1 % | beze změny: resume by nesl celý starý kontext, a balíček CL-196 část čtení reviewera odstraňuje |
+
+Citlivost bodu 1: mezera se měří od konce předchozí odpovědi (dolní mez) a od jejího začátku (horní mez), výsledek je stejný; pásmo 180-300 s
+(1 238 tahů subagentů) rozhoduje u coder-high, codera a testeru, proto tyto tři zůstávají na 1h. Rozhodnutí z 2026-09-30 (odhad -25 % tokenů
+z 56,6 M přepisů za den) se na datech 10-01 až 10-10 nepotvrdilo: pauz 5-60 min je v subagentním režimu málo, hlavní vlákno a `general-purpose`
+(interaktivní, prémie 7 % a 5,9 % proti vrácení 60 % a 33 %) 1h potřebují a dostávají ho.
+
+#### Oblast 2: velké výsledky nástrojů (CL-200)
+
+Cena výsledku: velikost / 4 × (2 + 0,1 × zbývající tahy). Podíl výsledků nástrojů na ceně role a podíl 20 největších:
+
+| Role | Výsledky % role | 20 největších % role | Největší (znaků, nástroj) | Strop 12k / 20k ušetří | Hlavní třída |
+|---|---:|---:|---|---|---|
+| main | 19,1 | 1,2 | 78 k, MCP návrhové `search_*` | 4,1 / 2,5 % | Agent 2,4 % |
+| general-purpose | 24,6 | 0,5 | 55 k, Read | 2,1 / 0,7 | Read 9,3 % |
+| coder-high | 25,8 | 0,8 | 52 k, Read | 3,0 / 0,9 | Read 12,0 % (z toho > 12 k 6,2 %) |
+| reviewer | 22,0 | 0,5 | 67 k, Read | 3,6 / 1,3 | Read 9,5 % (5,0), `git diff` 2,9 % |
+| coder | 21,2 | 1,3 | 49 k, Read | 1,8 / 0,5 | `sed` 5,0 %, Read 3,5 % |
+| planner | 24,9 | 0,9 | 64 k, Read | 2,3 / 0,7 | Read 8,0 % (4,5) |
+| tester | 14,1 | 0,7 | 39 k, Read | 0,8 / 0,2 | Read 1,6 % |
+| suggester | 26,3 | 1,3 | 27 k, `suggest` | 1,4 / 0,2 | `yt_get_issue` 9,9 % |
+| reviewer-opus | 28,2 | 5,9 | 55 k, Read | 8,6 / 5,1 | Read 16,6 % (12,9) |
+| retro | 44,2 | 4,5 | 79 k, Read | 17,3 / 10,8 | Read 29,9 % (26,0) |
+| deep-reviewer | 23,8 | 6,8 | 49 k, Read | 4,1 / 1,1 | Read 13,8 % (8,7) |
+| changelog | 27,4 | 4,7 | 50 k, `yt_get_article` | 6,8 / 4,4 | `yt_get_article` 8,2 % |
+| steward | 13,8 | 1,7 | 15 k | 0,1 / 0,0 | `brain read` 4,1 % |
+
+Výsledek je negativní: cena velkých výsledků je rozptýlená, 20 největších nese 0,5-1,3 % ceny role (u malých rolí 4,5-6,8 %), strop by šetřil
+1-4 % a ztratil by informaci. Celý Read velkého souboru je dominantní třída: celé `.kt` Read > 12 k znaků 294 (reviewer, 2,6 % ceny role), 128
+(coder-high, 2,7 %), 107 (planner, 2,6 %), z toho 113 / 48 / 36 nad 20 k, tedy proti pravidlu "nad ~20 k nejdřív outline". **Hotovo**: retro
+čte `brain/facts/*.md` (5-77 k znaků) celé, 174 čtení = 21,6 % ceny role (0,2 % všeho); tělo teď zakazuje celý Read a posílá na `rg` + offset/limit.
+Zbytek (vynucení pravidla 20 k u reviewera, codera, planneru) by podle čísel dal nejvýš 1 % ceny role při riziku ztracené kontroly, proto jen
+pozorovat; suggester a planner patří jiným kartám (CL-188, CL-197).
+
+#### Oblast 3: výstup (CL-201)
+
+| Role | Výstup % ceny role | Výstup / tah (medián) | Myšlení % výstupu | Text % výstupu | Vyprávění mezi voláními % textu | Konečná zpráva (znaků, medián) |
+|---|---:|---:|---:|---:|---:|---:|
+| reviewer | 33 | 1 527 | 66 | 6 | 1 | 3 683 |
+| planner | 23 | 407 | 54 | 24 | 0 | 24 134 |
+| tester | 23 | 271 | 15 | 17 | 3 | 2 508 |
+| coder-high | 17 | 409 | 30 | 4 | 7 | 3 855 |
+| coder | 17 | 352 | 20 | 6 | 4 | 1 791 |
+| suggester | 19 | 445 | 48 | 7 | 3 | 1 224 |
+| retro | 18 | 216 | 63 | 11 | 24 | 879 |
+| steward | 16 | 227 | 12 | 49 | 1 | 1 388 |
+
+(Text vs. vstup nástrojů je odhad z počtu znaků; myšlení je `thinking_tokens` z přepisu.) Výstup coderu a testeru tvoří z 68-74 % vstupy nástrojů
+(Edit, Write, Bash), text 6 % a 17 %, vyprávění mezi voláními 4 % a 3 % textu. Strop pravidla "bez shrnutí, bez opakování zadání, bez vyprávění" je tedy
+asi 1 % ceny coderu a 4 % testeru. Největší podíl výstupu je myšlení (reviewer 66 %, deep 81 %, retro 63 %), to řídí `effort`, který tu nemění.
+
+Test na coderu (`%TEMP%\cl201-bench`, kopie bench CL-190, živé tělo coderu, Sonnet medium, 3 úkoly se známým řešením x 3 opakování x 2 varianty, daemony 47720/47721,
+3,20 USD): věta "terse: no recap, no restating the task or plan, no narration between tool calls, the result in the first line" v řádku Output.
+
+| Varianta | n | Jednotky (tis.), medián / průměr | Výstup (tokeny), průměr | Konečná zpráva (znaků), medián | Tahy, medián | Testy známého řešení |
+|---|---:|---|---:|---:|---:|---|
+| tělo dnes | 9 | 94 / 92 | 5 973 | 2 166 | 17 | 9 z 9 |
+| + terse | 9 | 79 / 85 (84 % / 92 %) | 5 691 (-5 %) | 2 183 | 14 | 8 z 9 (jeden běh se nezkompiloval) |
+
+Rozptyl opakování jednoho úkolu je 65-123 tis., rozdíl je v šumu a zpráva se nezkrátila: coder už píše notací `brain/README.md`. **Pravidlo se
+nezavádí.** Tester bench nemá (v `terrio-bench-cl190` ani `terrio-bench2` není) a jeho běh potřebuje Docker stack a Gradle slot na každý běh;
+horní mez z přepisů (text 17 % výstupu = 4 % ceny, vyprávění 3 % textu) leží hluboko pod šumem 9 běhů, proto se neměřil a kritérium je přepsáno
+na tento důkaz. Rozpočet `claude -p`: 3,2 USD z 12.
 
 ## 9. Fáze
 

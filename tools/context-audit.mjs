@@ -49,7 +49,7 @@ const textLen = c => typeof c === 'string' ? c.length : Array.isArray(c) ? c.red
 
 async function readRun(m) {
   const r = { role: m.role, kind: m.kind, start: null, turns: 0, S: 0, first: null, cost: 0, src: {}, tools: {} };
-  const seen = new Set(); let before = true;
+  const seen = new Map(); let before = true; // message id -> output counted: Claude Code writes a streamed message on several lines and the output grows from line to line (CL-206)
   const add = (k, n) => { r.src[k] = (r.src[k] || 0) + n; };
   const rl = readline.createInterface({ input: fs.createReadStream(m.file, 'utf8'), crlfDelay: Infinity });
   for await (const line of rl) {
@@ -64,7 +64,8 @@ async function readRun(m) {
     if (o.type === 'user' && before && o.message) add('prompt', textLen(o.message.content));
     if (o.type === 'assistant' && o.message) {
       const msg = o.message;
-      if (msg.id && !seen.has(msg.id)) { seen.add(msg.id); r.turns++; const u = msg.usage || {};
+      if (msg.id && seen.has(msg.id)) { const out = msg.usage?.output_tokens || 0; if (out > seen.get(msg.id)) { r.cost += (out - seen.get(msg.id)) * W.output; seen.set(msg.id, out); } }
+      if (msg.id && !seen.has(msg.id)) { seen.set(msg.id, msg.usage?.output_tokens || 0); r.turns++; const u = msg.usage || {};
         const cw1h = u.cache_creation?.ephemeral_1h_input_tokens || 0, cw5m = u.cache_creation?.ephemeral_5m_input_tokens ?? Math.max(0, (u.cache_creation_input_tokens || 0) - cw1h);
         const c = { input: u.input_tokens || 0, cw5m, cw1h, cacheRead: u.cache_read_input_tokens || 0, output: u.output_tokens || 0 };
         r.cost += Object.entries(W).reduce((n, [k, w]) => n + c[k] * w, 0);

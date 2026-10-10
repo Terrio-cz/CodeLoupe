@@ -43,7 +43,7 @@ internal class WeightState(private val path: Path) {
         }
         val (results, usages) = parser.drain()
         results.forEach { items += Item(it.turn, it.name, it.chars) }
-        usages.lastOrNull()?.let { context = tokens(it.usage) }
+        usages.lastOrNull { !it.continuation }?.let { context = tokens(it.usage) }
         offset = consumed
         return true
     }
@@ -82,7 +82,7 @@ internal class WeightState(private val path: Path) {
                 // The first line of the tail is cut in the middle unless the tail starts the file.
                 text.lineSequence().drop(if (start > 0) 1 else 0).filter { it.isNotEmpty() }.forEach(parser::feed)
             }
-            return parser.drain().second.lastOrNull()?.let { tokens(it.usage) } ?: 0
+            return parser.drain().second.lastOrNull { !it.continuation }?.let { tokens(it.usage) } ?: 0
         }
 
         private const val TAIL = 1_048_576L

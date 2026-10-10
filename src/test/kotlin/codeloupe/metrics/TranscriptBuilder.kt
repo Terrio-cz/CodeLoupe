@@ -29,7 +29,22 @@ class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T1
     /** One assistant turn with its own message id, calling [tools] (id, name, input). */
     fun turn(input: Long = 10, output: Long = 5, cacheRead: Long = 100, written1h: Long = 30, written5m: Long = 20, vararg tools: Triple<String, String, JsonObject>) = apply {
         turn++
-        lines += buildJsonObject {
+        lines += assistantLine(input, output, cacheRead, written1h, written5m, tools.toList())
+    }
+
+    /**
+     * One assistant turn written the way Claude Code streams it: a line per content block under one message id, with the
+     * output tokens growing from line to line ([outputs]); the tool calls come with the last line.
+     */
+    fun streamed(outputs: List<Long>, input: Long = 10, cacheRead: Long = 100, written1h: Long = 30, written5m: Long = 20, vararg tools: Triple<String, String, JsonObject>) = apply {
+        turn++
+        outputs.forEachIndexed { i, output ->
+            lines += assistantLine(input, output, cacheRead, written1h, written5m, if (i == outputs.lastIndex) tools.toList() else emptyList())
+        }
+    }
+
+    private fun assistantLine(input: Long, output: Long, cacheRead: Long, written1h: Long, written5m: Long, tools: List<Triple<String, String, JsonObject>>): String =
+        buildJsonObject {
             put("type", "assistant")
             put("timestamp", stamp())
             putJsonObject("message") {
@@ -57,7 +72,6 @@ class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T1
                 })
             }
         }.toString()
-    }
 
     fun result(id: String, text: String, error: Boolean = false) = apply {
         lines += buildJsonObject {

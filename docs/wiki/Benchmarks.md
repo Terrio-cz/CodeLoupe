@@ -341,6 +341,39 @@ Per task the medians of B2 are 56 to 88 % of the control, and one cell spans 150
 reviewer's cost is cache writes of a context of about 80 thousand tokens, 28 % is output (thinking and the report), and the packet is 12-13 thousand of those tokens; what the
 packet leaves out the reviewer reads on demand (code reads 4.6 → 7.4 % of cost). The compact packet was nevertheless adopted in the live Terrio workspace (low regret, reversible; a real pack of a large closed task shrank from 116 to 45 kB). Details and limits: docs/plan.md § 8.4.
 
+### A cheaper model or lower effort for the planner and reviewer (CL-202)
+
+The planner and the reviewer (Opus, high) are together over half of the spend of the flow. Same scripts, prompts, packets, clones and agent instructions as the two
+experiments above, only the model and effort change; the Opus high cells are the earlier runs (planner 12, reviewer 12), not rerun. 25 new runs, 10.9 USD. Weighted units
+count tokens with the same weight for every model, so the cost criterion (at most 60 % of Opus high) is judged on the CLI's USD, which carries the model price; units are shown next to it.
+
+| Role | Variant | n | Units, thousand (median) | USD, median / mean | Cost against Opus high (USD / units) | Quality |
+|---|---|---:|---:|---|---|---|
+| reviewer | Opus high | 12 | 267 | 0.97 / 0.94 | 100 % | all 48 known findings |
+| reviewer | **Sonnet high** | 8 | 156 | 0.31 / 0.31 | **32 % / 58 %** | **misses 2 of 3 known findings on one task, in 2 of 2 runs** (28 of 32 overall) |
+| reviewer | **Opus medium** | 8 | 168 | 0.62 / 0.64 | **64 % / 63 %** (mean 68 %) | all 32 known findings |
+| planner | Opus high | 12 | 240 | 0.87 (mean) | 100 % | findings 0.93, decisions 0.99, files 0.74, 16.4 premortem lines, 7.4 lenses |
+| planner | **Sonnet high** | 9 | 184 | 0.36 (mean) | **41 % / 77 %** | findings 0.90, decisions 0.97, files **0.67**, premortem lines **12.1**, lenses **4.7** |
+
+**Neither variant passes.** Sonnet is cheap on the reviewer (a third of the cost, 7 turns instead of 12) but reports the headline defect and drops the secondary ones; counting words over the whole report
+would have called that 100 %, because the words reappear in the "verified" section, so the findings are also counted inside the Findings section only (the Opus runs score the same either way).
+Opus medium keeps every finding but saves 36 %, four points short of the 40 % target, and falls short on each of the four tasks (61-76 % of the cost). The Sonnet planner is a third of the
+cost per plan but plans in 8 turns instead of 16 and writes 26 % fewer premortem lines and a third fewer risk lenses, covers 7 points fewer of the real solution's files, in all three tasks; the decisions and known
+findings stay within the noise. Sonnet medium for the planner was not run, since high already loses the premortem. Nothing was changed in the live agents. Limits: 2-3 replicates per cell, patterns over the text of the report
+as the quality measure (not graded independently, false findings not counted), one set of closed tasks.
+
+### Where the rest of an agent flow's tokens go: cache, big results, output (CL-199, CL-200, CL-201)
+
+Counts only, from 1,994 agent transcripts of ten days (1.99 billion weighted units; the flow's own roles are 46 %). Three levers, one applied
+for real: **the 1-hour cache TTL costs more than it returns for most subagents** (a 1-hour write costs 2 instead of 1.25 per token; over the period
+that premium was 79.7 M units for subagents against 23.5 M of rewrites avoided after 5-60 minute pauses plus 12.4 M of prefix reuse at start),
+so the reviewer, the nightly retro and the deep reviewer now ask for 5 minutes per agent (about 3 % of the flow's cost; the main thread of a
+phase run ignores the key and keeps 1 hour, which its resumed rounds need). **Big tool results are diffuse**: the 20 largest results carry only
+0.5-1.3 % of a role's cost, a 12k-character cap would save 1-4 % and lose information; one role (the nightly retro, 21.6 % of its cost in
+whole-file reads of 5-77 k character notes) got a one-line rule. **A terse-output rule did not pay for the coder**: 9 + 9 runs, median cost
+84 % of the control but inside a 65-123 k spread, output tokens -5 %, report length unchanged, 8 of 9 against 9 of 9 known-solution checks.
+Most of an agent's output is thinking (reviewer 66 %) or tool-call arguments (coder 74 %), not prose. Details: docs/plan.md § 8.8.
+
 ### What did not work, and what the numbers do not show
 
 - **Agents barely called CodeLoupe (CL-180, fixed in the agent instructions).** 1 call in 7 reviewer runs, 10 in 5 planner runs, 0 in 40
