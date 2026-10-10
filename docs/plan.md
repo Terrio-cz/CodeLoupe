@@ -1142,6 +1142,34 @@ případný další pokus patří jen k planneru (jediná role s dobrým výsled
 **Vedlejší nálezy.** (a) Testy nechávaly dočasné adresáře v `%TEMP%`: 120 tisíc položek zaplnilo disk 931 GB na 0 a shodilo plný `gradlew test`; po úklidu uvolněno ≈ 280 GB. Opravu mezitím dodala CL-208 (moje verze byla nahrazena při merge).
 (b) `SessionStartDaemonTest` „no caller lines“ padá lokálně na Windows i na čistém `origin/main` (CI na Linuxu zelené): řádek `^ 17-19 [Big] …` z výstupu `changes` začíná šesti mezerami; nesouvisí s touto kartou.
 
+### 8.10a Nástroj `batch` jen pro planner (CL-212, 2026-10-11)
+
+**Otázka.** Zapnout `tools.batch` v daemonu a uvést `mcp__codeloupe__batch` jen v `tools:` planneru nestojí ostatní role nic (agent dostane jen nástroje ze svého `tools:`). Opravdu planner ušetří? V § 8.10 měl sám −18 % (3 běhy, jedna úloha, rozptyl běh od běhu 15–40 %).
+
+**Provedení.** Planner Opus, effort high, tři úlohy dřívějších planner pokusů (TER-321, TER-62, TER-324; scratch klon na commitu před landem, bez packetu, prompt z CL-190/CL-205), kopie workspace ve `%TEMP%`
+(živý workspace ani živý daemon se nedotkly), 2 `claude -p` souběžně, nic do YouTrack. A = **živé** tělo planneru bez `batch`; B = totéž s `mcp__codeloupe__batch` v `tools:` a větou z CL-205 doslova shodnou
+(„each ONE `mcp__codeloupe__batch` call … for the independent reads“); tělo B se muselo o 54 znaků zkrátit (starý záložní odstavec pro daemon bez `description`/`comments`, dvě slovní zkrácení), aby zůstalo ≤ 8 000 znaků (7 944).
+Daemony z `main` (f73bdf2, vlastní `CODELOUPE_HOME`, porty 47820/47821), `tools.batch` zapnuto jen pro B. Střídání A/B po párech (stejná úloha a opakování souběžně, strany lane se střídají).
+**Rozsah snížen z 24 na 18 běhů** (3 opakování na úkol a variantu, ne 4): průměr vyšel 0,92 USD/běh, 24 běhů by stálo ≈ 22 USD proti rozpočtu 18; skutečně **16,59 USD**, žádný limit využití ani chyba běhu.
+
+| Úloha | n/var. | Jednotky tis. (medián) A → B | Poměr B / A | USD (medián) A → B |
+|---|---:|---|---:|---|
+| TER-321 | 3 | 299 → 291 | 97 % | 1,11 → 1,12 |
+| TER-324 | 3 | 196 → 210 | 107 % | 0,73 → 0,78 |
+| TER-62 | 3 | 258 → 235 | 91 % | 0,96 → 0,90 |
+
+**Sdruženě** (každý běh dělený mediánem A své úlohy): medián B **0,97**, průměr 0,98 (bootstrap 95 % interval mediánu 0,88–1,07; rozpětí jednotlivých běhů A 0,70–1,21, B 0,89–1,07); USD medián 1,01, součet **8,27 proti 8,32**.
+Cíl (medián ≤ 0,90) nesplněn. `batch` použilo **9 z 9** běhů B (4,7 volání po 6,4 částech, 0 selhaných částí, 0 odmítnutých). Tahů ubylo (zprávy modelu 9,9 → 8,4; `num_turns` CLI 23,0 → 15,2; paralelní čtecí tahy 72 → 84 %,
+sériové čtecí hned po čtecím 21 → 11), cena ne: výstup na běh je stejný (21 790 → 21 795 tokenů, tedy ≈ 44 % vážených jednotek), výsledky nástrojů o 4 % větší (90 → 94 kB) a každý ušetřený tah stál jen čtení cache (váha 0,1).
+
+**Kvalita** (stejný checklist jako CL-189/CL-190: nálezy, rozhodnutí a soubory skutečného řešení, řádky premortem): známé nálezy 28/30 → 30/30, rozhodnutí 60/60 → 60/60, soubory skutečného řešení **101/126 → 92/126 (80 % → 73 %, −7 bodů)**,
+řádky premortem na plán 11,9 → 14,4. Soubory ztrácí B stabilně u několika položek (TER-324: dva modelové soubory 3/3 → 0/3; TER-62: soubor kurzoru 3/3 → 0/3); podle souborů, které skutečně přistály, je TER-321 58 % → 55 %, TER-62 39 % → 52 %.
+Kritérium „kvalita do 3 bodů na každé položce“ tedy není doložené ani na položce souborů.
+
+**Rozhodnutí: odmítnuto, nic se nenasazuje.** Medián 0,97 > 0,90 a soubory −7 bodů. Hodnota −18 % z § 8.10 byla šum jednoho úkolu: TER-321 měla tehdy poměr 85 %, teď 97 % při stejné větě i stejném chování
+(nástroj použit v každém běhu). Planner už paralelizoval čtení, takže `batch` mění počet tahů, ne cenu. Živé tělo ani `config.json` živého daemonu se nemění; `tools.batch` zůstává v produktu jako volba (dokumentovaná v `Configuration`),
+žádná role ji nepoužívá. Další pokus s `batch` nemá smysl.
+
 ### 8.11 Výsledek CL-203 — znalostní úložiště s kotvami v kódu (2026-10-11)
 
 Stavba strany CodeLoupe; řízené A/B retra a stewarda a napojení na živé Terrio přijdou později. Rozhodnutí z 8.6 (strop na
@@ -1182,6 +1210,99 @@ tokenech ≈ 0,1 %, hodnota je kvalita) se nemění: úložiště se staví pro 
 - **Kritéria karty.** Splněno: hit rate ≥ 80 % (83 % na 30 otázkách), detekce zastaralosti s příznakem v hledání, import 14
   souborů s počty duplicit a mrtvých cest, rozhodnutí o úspoře (no-go na tokeny, bez změny). **Otevřeno:** řízené A/B retra a
   stewarda (−40 % ceny při stejných zachovaných lekcích) a jejich zápis a čtení přes úložiště, tedy napojení na Terrio a MCP nástroj.
+
+### 8.12 Ocas ceny coderu a testeru: go/no-go pro run governor (CL-214, 2026-10-11)
+
+Měřeno jen počty z transcriptů Terria od 2026-10-01 (2 009 běhů, žádný nový `claude -p`, žádný obsah): zdroje a pravidlo výstupu jako `run/codemetrics.mjs collect` po CL-206
+(výstup zprávy = maximum), USD podle `PriceTable.DEFAULT` (2026-10-06), jmenovatel cena Terrio pipeline **3 224 USD** (§ 8.6; 1 % = 32,2 USD). Coder = `terrio-coder` + `terrio-coder-high` včetně
+fázových běhů (401 běhů, 1 034 USD podle mé tabulky, tedy 32 % jmenovatele, ne 26 % z karty: úspory níže jsou proto při přepočtu na 26 % o pětinu menší, žádné rozhodnutí se tím nemění).
+Karta uvádí průměr/medián/p75 606/151/378 tis. jednotek; na dnešních datech vychází `terrio-coder` 655/174/413 tis. (Opus coder-high 1 589/725/1 856 tis.). Soubory úkolu z gitu `master`
+(commity s předponou `TER-<n> `, sjednocení souborů), kola z `state round` v brain logu (úkoly bez záznamu = 0 kol, lehká pipeline). Skripty `cl214-extract.mjs`, `cl214-analyze.mjs` jsou přiložené ke kartě.
+
+**1. Podíl ceny, který nesou běhy nad percentilem** (jednotky; USD v závorce shodné na ±2 body):
+
+| Role (běhů) | nad p50 | nad p75 | nad p90 | nad p95 |
+|---|---|---|---|---|
+| coder (401) | 93,0 % | **79,4 %** (100 běhů, 815 USD) | 57,3 % (40 běhů) | 41,4 % (20 běhů) |
+| z toho Sonnet `terrio-coder` (232) | 93,5 % | 82,7 % | 67,4 % | 55,0 % |
+| z toho Opus `terrio-coder-high` (169) | 88,0 % | 69,7 % | 43,6 % | 28,4 % |
+| tester (381) | 80,2 % | 57,8 % (95 běhů, 96 USD) | 34,0 % | 21,6 % |
+| planner (125), kontrast | 67,8 % | 40,0 % | 18,4 % | 10,1 % |
+| reviewer + opus (339), kontrast | 72,0 % | 45,0 % | 23,0 % | 13,4 % |
+
+Ocas je tedy jen u codera (a míň u testeru); planner a reviewer mají tenký. Podle velikosti úkolu: úkoly s **11+ soubory** v konečném diffu jsou 64 % coder běhů, nesou **78,9 %** ceny a jejich
+běhy nad p75 samy 66,7 % ceny codera; úkoly do 5 souborů jen 4,8 %. Podle kol: 53 % běhů patří úkolům bez kola (lehká pipeline, 62,1 % ceny), 1 kolo 11,5 %, 2 kola 13,0 %, 3+ kola 13,4 %.
+
+**2. Vlastnosti běhů nad p75** (medián / p90, coder): pásmo p75–p90 (60 běhů) 75/94 tahů, 18/28 tahů s editací, 7/15 editovaných souborů, nejdelší čistě čtecí řada 10/22 tahů, 7/13 buildů,
+neúspěšných buildů před prvním zeleným 0/2; pásmo nad p90 (40 běhů) 148/252 tahů, 45/86 editací, 21/54 souborů, řada 16/41, buildů 10/23, 0/3 před zeleným. Přesné opakování téhož příkazu
+(mimo buildy) je medián **0**, p90 0–2 ve všech pásmech: model se neopakuje. Čistě čtecí tahy jsou 49 % všech tahů codera (46 % ceny), tahy nad 10. v řadě bez editace a buildu jen 48 USD (1,5 % z 3 224)
+ve všech během, z toho 43 USD v ocasu. Vše před první editací stojí 14,5 % ceny codera (včetně startu kontextu).
+
+**3. Klasifikace 100 běhů codera nad p75** (pravidla: *compile-loop* = ≥ 3 neúspěšné buildy před prvním zeleným, nebo ≥ 4 neúspěšné a aspoň polovina buildů; *wandering* = nejdelší čtecí řada nebo čtení před první
+editací ≥ 12 tahů a ≥ 2× tahů s editací, nebo ≥ 10 opakování příkazu; *large-productive* = editace rozložené do ≥ 4 desetin běhu a ≥ 6 souborů; zbytek *other*):
+
+| Třída (pravidlo primární) | Běhů | Podíl ceny ocasu | Podíl ceny codera | USD | Medián: tahů / editací / souborů / řada |
+|---|---|---|---|---|---|
+| large-productive | 84 | 83,0 % | 65,9 % | 679 | 86 / 25 / 9 / 14 |
+| compile-loop | 12 | 14,9 % | 11,8 % | 118 | 133 / 37 / 19 / 16 (4 neúspěšné buildy před zeleným) |
+| wandering | 2 | 0,8 % | 0,7 % | 8 | 79 / 14 / 9 / 34 |
+| other | 2 | 1,2 % | 1,0 % | 10 | 129 / 31 / 4 / 8 |
+
+Citlivost: striktní pravidlo (řada ≥ 20 a ≥ 4×, ≥ 15 opakování) dává **0 wandering běhů**, volné pravidlo (řada ≥ 8 a ≥ 1×, ≥ 6 opakování) **19 běhů, 9,9 % ceny ocasu, 7,8 % ceny codera, 94 USD**.
+Ocas je tedy velký a produktivní (úkoly s mnoha soubory), ne bloudící. Tester nad p75 (95 běhů, 96 USD): `stack-work` (docker, API, evidence) 80 běhů 76 USD, bloudění (čtecí řada ≥ 12 a ≥ 2× buildů) 14 běhů 19,2 USD, smyčka buildů 1 běh.
+
+**4. Úspora, kdyby se bloudící část snížila o 30 % / 50 %** (podíl ze 3 224 USD; v závorce podíl ceny codera):
+
+| Základ „bloudící části“ | Primární pravidlo 30 % / 50 % | Volné pravidlo 30 % / 50 % |
+|---|---|---|
+| celé wandering běhy (8 USD / 94 USD) | 0,07 % / 0,12 % (0,2 % / 0,4 %) | 0,87 % / **1,46 %** (2,7 % / 4,5 %) |
+| jen čtecí tahy těchto běhů (4 / 48 USD) | 0,04 % / 0,07 % | 0,44 % / 0,74 % |
+| řada nad 10 čtecích tahů (2 / 13 USD) | 0,02 % / 0,03 % | 0,12 % / 0,20 % |
+| tester, bloudící běhy (19 USD) | 0,18 % / 0,30 % | – |
+
+**5. Rozhodnutí: governor běhů (CL-215) no-go.** Pravidlo 1 % (stavět jen při úspoře při 30 % ≥ 1 % z 3 224 USD, tedy ≥ 32 USD) nesplňuje žádná varianta: nejvyšší hodnota 0,87 % (volné pravidlo, celá cena běhů, která
+jsou zároveň horní mez) a 0,07 % při primárním. 1 % překročí až 50 % řez volného pravidla (1,46 %), což je horní mez bez kontroly kvality. **Výhrada kvality:** řez bloudění může ubrat
+čtení, které kvalitu drží (coder test známého řešení 9/9, kritérium CL-189 až CL-205); proti 0,07–0,87 % úspory by zhoršení jediného úkolu z deseti stálo víc než celá úspora. Mimo to: podíl bloudění je malý, protože se příkazy neopakují
+(medián 0 přesných opakování) a velké běhy jsou velké úkoly. **Vedlejší nález mimo governor:** 12 běhů ve smyčce buildů nese 118 USD (3,7 % z 3 224); 30 % z toho je 35 USD = **1,10 %**, tedy nad pravidlem 1 %, ale neúspěšný build je zpětná vazba,
+ne zbytečný tah, a bez řízeného pokusu (nerozlišíme smyčku od nutné opravy) to není stavitelné; vede na kartu výzkumu.
+
+**6. Co coder píše a čte (doplnění vlastníka; 401 běhů coder, cena nesená = generování argumentu + zápis do cache + čtení v pozdějších tazích, jednotky převedené na USD):**
+
+| Zápis | Volání (běhů) | Průměrný argument | Cena | Podíl ceny codera / z 3 224 |
+|---|---|---|---|---|
+| `Edit` | 1 755 (216) | 1 040 znaků | 14 USD | 1,4 % / 0,44 % |
+| `MultiEdit` | 0 | – | 0 | – |
+| `Write` nový soubor | 1 103 (123) | 5 164 znaků, 100 řádků | 51 USD | 4,9 % / 1,58 % |
+| `Write` existující soubor | 83 (45) | 5 634 znaků, 107 řádků | 6 USD | 0,5 % / 0,17 % |
+| z toho existující > 40 řádků | 49 (31) | 8 809 znaků, 165 řádků | 5,2 USD | 0,5 % / 0,16 % |
+| Bash heredoc, který zapisuje (typicky `python - <<`) | 1 751 (267) | 2 778 znaků | 39 USD | 3,8 % / 1,22 % |
+| Bash zápis bez heredoc (`cat >`, `sed -i`, `tee`) | 773 (229) | 538 znaků | 3 USD | 0,3 % / 0,10 % |
+| Bash heredoc bez zápisu | 606 (213) | 1 712 znaků | 6 USD | 0,6 % / 0,19 % |
+
+Existence souboru: výsledek `Write` („created“ proti přepsání), jinak předchozí `Read`. U 21 z 49 velkých přepisů známe starý obsah z `Read` v běhu: **56 % řádků je beze změny**.
+
+| Čtení v shellu (výsledek) | Volání | Průměr řádků / znaků | Cena nesená (podíl codera / z 3 224) | Později `Read` nebo úprava téhož souboru (znaky se známým souborem) | Z toho úprava |
+|---|---|---|---|---|---|
+| `rg` | 2 168 | 28 / 2 343 | 28 USD (2,7 % / 0,87 %) | 31 % (29 % výstupu bez rozpoznaného souboru) | 15 % |
+| `grep` | 593 | 24 / 1 831 | 5 USD (0,5 % / 0,15 %) | 34 % (36 % neznámo) | 17 % |
+| `sed -n` | 1 580 | 71 / 4 107 | 35 USD (3,4 % / 1,09 %) | 54 % | 46 % |
+| `cat` | 493 | 123 / 6 624 | 23 USD (2,2 % / 0,71 %) | 36 % | 31 % |
+| `git diff` | 192 | 63 / 4 117 | 2 USD (0,2 % / 0,08 %) | 30 % | 24 % |
+| `git log` | 48 | 47 / 2 977 | 1 USD (0,1 % / 0,03 %) | 92 % (69 % neznámo) | 25 % |
+| `head` | 42 | 20 / 1 415 | 0,2 USD (0,0 % / 0,01 %) | 14 % | 7 % |
+
+„Použito“ je dolní mez (soubor, jehož cesta je v příkazu nebo ve výstupních řádcích, byl později čten `Read`/`sed -n`/`cat`/nástrojem CodeLoupe nebo upraven; úpravy přes `python` se hledají podle cest v příkazu), ne využití konkrétního řádku.
+**Přesvědčení vlastníka se potvrdilo jen napůl:** `rg` je nejčastější čtení (5,4 volání na běh), ale nese 2,7 % ceny codera; celé přepisování existujících souborů je vzácné (83 volání proti 1 755 `Edit` a 1 751 heredoc úpravám) a stojí 0,5 %.
+Největší položka zápisu je `Write` nového souboru (4,9 %) a heredoc úpravy (3,8 %).
+
+**Dvě myšlenky, pravidlo 1 %:**
+
+| Myšlenka | Strop | Realisticky | Rozhodnutí |
+|---|---|---|---|
+| Průhledný kompaktní shim `rg` | veškerá cena výsledků `rg` 28,1 USD = **0,87 %** (`rg` + `grep` 32,8 USD = 1,02 %, jen při 100% odstranění) | řez nepoužité části (soubory, které nikdo nečetl) o 50 % 6,5 USD = 0,20 %; řez všech výsledků o 30 % 8,4 USD = 0,26 % | **no-go** (< 1 %) |
+| Hook `PreToolUse`, který jednou odmítne `Write` do existujícího souboru nad 40 řádků | všech 49 volání, ušetří se 56 % nezměněných řádků: 2,9 USD = **0,09 %** | odmítnuté volání už je vygenerované a zůstává v kontextu; ušetří se jen pozdější přepisy téhož běhu: 1,2 USD = 0,04 % (bez ceny odmítnutí) | **no-go** (< 1 %) |
+
+Omezení měření: `edit` je odhad podle tvaru příkazu (heuristika zápisu v shellu), úspěšný build podle `gradle exit 0` / `BUILD SUCCESSFUL` (82 z 336 běhů s buildem nemá zelený build ve svém běhu: odevzdání na review po předběžné kontrole); soubory úkolu z gitu mají 26 běhů bez shody (6 %); USD je z cenové tabulky (ne z `total_cost_usd`), součet `terrio-*` rolí 3 255 USD proti 3 224 USD jmenovateli.
 
 ## 9. Fáze
 
