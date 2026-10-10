@@ -45,6 +45,6 @@ class HookUsage(private val home: Path) {
 
     companion object {
         val FOLLOW: Duration = Duration.ofSeconds(180)
-        private val CODE_TOOLS = setOf("find", "grep", "outline", "symbol", "context", "usages", "calls", "hierarchy", "changes")
+        private val CODE_TOOLS = setOf("find", "grep", "outline", "symbol", "context", "usages", "calls", "hierarchy", "changes", "batch")
     }
 }

@@ -45,6 +45,9 @@ Code tools take `root`: the absolute path of the repository or worktree you work
 
 ## Working rules
 
+- Independent reads go in one turn: issue them as parallel tool calls in one message, or as one `batch` call when it is on offer
+  (`tools.batch` in the daemon's `config.json`; `calls` = `[{tool, args}]`, up to 8 read-only calls, answers in order, an error stays in its part).
+  A call that needs the previous answer waits for it.
 - Start with `outline` or `find`, then `symbol` for the one declaration you need; read a whole file only when the index
   cannot answer (non-Kotlin files, configuration, text).
 - `usages` marks unsure hits with `?` instead of dropping them. A name shared by unrelated declarations must be

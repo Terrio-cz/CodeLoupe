@@ -24,4 +24,5 @@ data class Config(
     val secrets: SecretsConfig = SecretsConfig(),
     val write: WriteConfig = WriteConfig(),
     val api: ApiConfig = ApiConfig(),
+    val tools: ToolsConfig = ToolsConfig(),
 )

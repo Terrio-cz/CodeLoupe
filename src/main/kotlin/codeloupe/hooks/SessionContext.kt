@@ -74,6 +74,6 @@ class SessionContext(private val registry: Registry, private val projects: () ->
         private const val FOOTER_TOKENS = 24
         private const val EXTRA_LINES = 6
         private const val MAX_FOCUS = 8
-        private const val HINT = "Orient with outline, find, symbol and usages (CodeLoupe) instead of ls, find and reading files."
+        private const val HINT = "Orient with outline, find, symbol and usages (CodeLoupe) instead of ls, find and reading files; independent reads go in one message."
     }
 }

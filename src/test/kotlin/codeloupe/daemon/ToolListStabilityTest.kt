@@ -4,6 +4,7 @@ import codeloupe.CodeLoupe
 import codeloupe.TestRepos
 import codeloupe.config.BudgetsConfig
 import codeloupe.config.Config
+import codeloupe.config.ToolsConfig
 import codeloupe.config.WriteConfig
 import codeloupe.tools.FindTool
 import io.ktor.client.HttpClient
@@ -35,9 +36,9 @@ import io.ktor.client.engine.cio.CIO as ClientCIO
 class ToolListStabilityTest {
     private val http = JdkHttpClient.newHttpClient()
 
-    private fun config(write: WriteConfig = WriteConfig(mode = WriteConfig.OFF), budgets: BudgetsConfig = BudgetsConfig()): Config {
+    private fun config(write: WriteConfig = WriteConfig(mode = WriteConfig.OFF), budgets: BudgetsConfig = BudgetsConfig(), tools: ToolsConfig = ToolsConfig()): Config {
         val port = ServerSocket(0).use { it.localPort }
-        return Config(TestRepos.tmpDir("toollist"), port, queryTimeoutMs = 60_000, buildTimeoutMs = 120_000, buildHeapMb = 512, defaultRoot = null, write = write, budgets = budgets)
+        return Config(TestRepos.tmpDir("toollist"), port, queryTimeoutMs = 60_000, buildTimeoutMs = 120_000, buildHeapMb = 512, defaultRoot = null, write = write, budgets = budgets, tools = tools)
     }
 
     private fun listing(config: Config): String = runBlocking {
@@ -119,6 +120,28 @@ class ToolListStabilityTest {
         } finally {
             daemonOff.stop()
             daemonAuto.stop()
+        }
+    }
+
+    @Test
+    fun `batch is off by default and, when switched on, is the only difference and a small one`() {
+        val off = config()
+        val on = config(tools = ToolsConfig(batch = true))
+        val daemonOff = Daemon.start(off)
+        val daemonOn = Daemon.start(on)
+        try {
+            val without = listing(off)
+            val with = listing(on)
+            assertFalse(without.contains("\"name\":\"batch\""))
+            assertTrue(with.contains("\"name\":\"batch\""))
+            assertEquals(toolList(off)["tools"]!!.jsonPrimitive.content.toInt() + 1, toolList(on)["tools"]!!.jsonPrimitive.content.toInt())
+            assertNotEquals(fingerprint(off), fingerprint(on))
+            val added = with.length - without.length
+            println("CL-205 batch adds $added chars to a tool list of ${without.length} (${"%.1f".format(100.0 * added / without.length)} %)")
+            assertTrue(added < 1_300, "batch adds $added chars (~${added / 5} tokens at 5 chars per token)")
+        } finally {
+            daemonOff.stop()
+            daemonOn.stop()
         }
     }
 

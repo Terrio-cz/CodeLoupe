@@ -55,6 +55,7 @@ import codeloupe.tracker.TrackerSettingsLoader
 import codeloupe.tracker.Trackers
 import codeloupe.uiapi.UiApi
 import codeloupe.uiapi.uiApiRoutes
+import codeloupe.tools.BatchTool
 import codeloupe.tools.EditTool
 import codeloupe.tools.Sessions
 import codeloupe.tools.Tool
@@ -135,7 +136,9 @@ class Daemon private constructor(
     private val trackerSettings = TrackerSettingsLoader.load(config.home, store = { secrets.store })
     private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
     private val docs = DocMemory()
-    private val baseTools = Tools.catalog(trackers, jobs, secrets, config.home, docs)
+    // `batch` is optional (config `tools.batch`): it adds to the tool list every session carries.
+    private val batchTool = BatchTool({ tools() }) { tool, args -> runner.run(tool, args, "batch").let { BatchTool.Outcome(it.ok, it.text) } }
+    private val baseTools = Tools.catalog(trackers, jobs, secrets, config.home, docs) + listOfNotNull(batchTool.takeIf { config.tools.batch })
     private val writeGate = WriteGate(config.write, config.home.resolve("write-gate.json")) { since ->
         val setup = MetricsSetup(config)
         MetricsCollector(setup.categorizer()).runs(setup.projectDirs(emptyList()), since, null)
