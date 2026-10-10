@@ -303,7 +303,7 @@ writes by 37 %, output by 31 %; shell code reads per run go from 17.6 to 7.7. **
 instructions the planner still reads the issue again (1.8 calls per run) and `AGENTS.md` (1.1), so the rest, 46 points, is the
 instructions telling it to start from the pack and stop. Plan quality against the real plans (known review findings 27 of 30 in both,
 decisions of the real plan 98 % in both, files of the real solution 72 % against 77 %, premortem lines 16.4 against 18.1) is equal within
-the noise of nine runs, with the one visible loss on the smallest-diff task (files 82 % against 97 %); B marks 2.6 facts per plan as
+the noise of nine runs, with the one visible loss on the smallest-diff task (files 82 % against 97 %, followed up in CL-194); B marks 2.6 facts per plan as
 `? unknown` with the step that resolves them instead of searching on. Limits: 3 tasks, 3 runs per cell (D and E only 3 in all), no prepared
 packet (the live planner has one, so part of the saving may already be taken), a pattern-based checklist, and a first-call hazard found on
 the way: a fresh subagent that reads a root another agent already read is told "unchanged since your read" (CL-192). Method and
