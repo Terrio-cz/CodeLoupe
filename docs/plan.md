@@ -1304,6 +1304,65 @@ Největší položka zápisu je `Write` nového souboru (4,9 %) a heredoc úprav
 
 Omezení měření: `edit` je odhad podle tvaru příkazu (heuristika zápisu v shellu), úspěšný build podle `gradle exit 0` / `BUILD SUCCESSFUL` (82 z 336 běhů s buildem nemá zelený build ve svém běhu: odevzdání na review po předběžné kontrole); soubory úkolu z gitu mají 26 běhů bez shody (6 %); USD je z cenové tabulky (ne z `total_cost_usd`), součet `terrio-*` rolí 3 255 USD proti 3 224 USD jmenovateli.
 
+### 8.13 Skriptovaný tester Terria bez LLM: strop, stavba, offline brána (FM-23, 2026-10-11)
+
+Karta FM-23 (Foreman, dřív Launcher) ověřuje, zda se dá tester Terria (`terrio-tester`, Sonnet) nahradit skriptem, který generuje případy z OpenAPI kontraktu a model volá jen při selhání.
+Čtyři fáze po sobě; každá má tady svůj výsledek. Měřeno jen počty z transcriptů, evidence a YouTrack (read-only), žádný nový `claude -p`, žádný obsah transcriptů. Skripty (v Terrio workspace):
+`run/tester-ceiling.mjs` (běhy), `run/tester-ceiling-cases.mjs` a `run/tester-ceiling-batches.mjs` (případy), vše znovu spustitelné.
+
+#### Fáze 1: strop (bez běhů)
+
+Okno: běhy testeru od 2026-10-01 (podle prvního záznamu transcriptu): **381 běhů, 83,1 M vážených jednotek** (váhy `codemetrics`: input 1, zápis cache 1,25/2, čtení cache 0,1, výstup 5), tedy shoda s kartou. Tester je asi 2,6 % ceny pipeline.
+
+**(a) Podíl běhů, které skončily celé zeleně bez nálezu.** Zelený = závěrečná zpráva bez řádku `!` (nález) a bez řádku `FAIL`, poslední `api batch` s FAIL 0; u fázových běhů (tester jen napíše dávku) rozhoduje verdikt navazujícího `test run` pro stejné kolo.
+
+| Třída běhu | Běhů | Zelených | Jednotky M | z toho zelených M |
+|---|---|---|---|---|
+| jen plný test land kandidáta (`ci test` / `gradle test`, bez API dávky) | 126 | 110 (87 %) | 19,2 | 17,2 |
+| spustil `api batch` / `api call` | 158 | 111 (70 %) | 49,1 | 34,8 |
+| fázový běh „batch only“ (verdikt z `test run`) | 63 | 34 (54 %) | 6,2 | 2,9 |
+| ostatní (měření, diagnostika, baseline, seed) | 34 | 25 (74 %) | 8,5 | 6,7 |
+| **celkem** | **381** | **280 (73,5 %)** | **83,1** | **61,7 (74,2 %)** |
+
+Plný test na land kandidátu (126 běhů, 23 % jednotek testeru) už skript umí celý (`test run --full`): model v něm jen čeká na slot a opisuje souhrn. To je samostatná úspora 17,2 M zelených jednotek = **0,54 %** ceny pipeline
+bez jakéhokoli nového enginu.
+
+**(b) Kolik zaznamenaných případů je odvoditelných z kontraktu.** Kontrakt = veřejný OpenAPI dokument úkolu (`.journal/openapi/TER-<n>.json`). Případ je *odvoditelný*, když jeho očekávaný stav a tvar plyne z operace, požadavku na klíč, zdokumentovaných stavů
+a schématu (401 bez klíče u operace s klíčem, 404 u cesty s id, 406, 400/422 jen když požadavek porušuje schéma parametru nebo těla, 2xx na zdokumentovaný stav bez nedeklarovaných parametrů); *doménový* je zbytek (metering, replay, odmítnutí, které schéma nevysvětlí,
+nedokumentovaný stav, pozorování bez očekávání, SQL). Dva pohledy:
+
+| Pohled | Základ | Odvoditelné z kontraktu | z toho čistě (bez doménové aserce) | Doménové |
+|---|---|---|---|---|
+| dávky tester napsal (nejnovější dávka úkolu, 112 úkolů, 1 799 kroků; bez 277 setup a 86 mimo dokument) | 1 436 | **890 (62,0 %)** | 578 (40,3 %) | 546 (38,0 %): SQL 310, metering/replay 126, odmítnutí mimo schéma 92, ostatní 18 |
+| provedené výměny v evidenci (kola od 2026-10-01, 11 490 záznamů, 113 úkolů; bez 3 417 setup a 913 mimo dokument) | 7 160 | 5 729 (80,0 %) | – | 1 431 (20,0 %) |
+| totéž bez opakování kol (unikát na úkol) | 1 534 | 1 122 (73,1 %) | – | 412 |
+
+Provedené výměny nadhodnocují (stejná dávka se opakuje v každém kole a v zátěži), proto je primární pohled na napsané dávky. **Jen 19 ze 112 úkolů (17 %)** má dávku, jejíž každý krok je z kontraktu odvoditelný (4 úkoly čistě);
+medián podílu odvoditelných kroků v úkolu 60 %. Skript tedy sám nenahradí tester, jen jeho kontraktovou část; doménové případy (38 %) musí někdo napsat (planner, později).
+
+**(c) Nálezy testeru.** 297 issues TER aktualizovaných od 2026-10-01 nese 1 556 kritérií `(found: …)`: `plan` 786, **`review` 592** (136 issues), **`test` 118 (7,6 %, 53 issues)**, ostatní 60. Ručně zařazeno všech 118 kritérií `(found: test)` podle textu:
+
+| Třída | Počet | Význam |
+|---|---|---|
+| S | 40 (34 %) | už zachytí existující skript: plný test (`test`/`scaleTest`), `openapi check` a jeho api-impact; tester je jen ohlásil |
+| A | 18 (15 %) | chyba v dávce samotného testeru (špatné názvy parametrů, pořadí kroků, seed, SQL sonda); z kontraktu generovaný případ by ji neudělal |
+| C | **2 (1,7 %)** | zachytí nový kontraktový případ nebo schema/regresní kontrola (OpenAPI příklady proti schématu, rozdíl OpenAPI oproti master) |
+| D | 58 (49 %) | doména a úsudek: dokumentace a KDoc, výkon a plány, nástroje, web s dokumentací, sémantika chování |
+
+Z nálezů, které opravdu potřebovaly úsudek modelu (C + D = 60), zachytí kontraktový případ nebo schema kontrola 2 (3 %); z reálných vad bez chyb testeru (S + C + D = 100) je dosažitelných skriptem a enginem 42 %. Review nese 5× víc kritérií než test
+(592 proti 118); klíčová slova kontraktu (stav, OpenAPI, schema, pole) má 88 z 592 review kritérií (14,9 %) a 22 ze 118 test kritérií (18,6 %), hrubý proxy. Test tedy neobjevuje víc kontraktových vad než review.
+
+**Strop a go/no-go podle pravidla 1 % ceny pipeline** (tester 2,6 %; 1 % = 38 % ceny testeru = 32,0 M jednotek):
+
+| Co by skript nahradil | Jednotky M | Podíl testeru | Podíl ceny pipeline |
+|---|---|---|---|
+| zelené API/fázové běhy úkolů, jejichž celá dávka je odvoditelná (28 běhů) | 8,9 | 10,7 % | **0,28 %** |
+| horní mez: cena zelených API/fázových běhů × podíl odvoditelných kroků úkolu | 22,4 | 27,0 % | **0,70 %** |
+| zelené běhy jen s plným testem (už skriptované, nepotřebují engine) | 17,2 | 20,7 % | 0,54 % |
+
+**Rozhodnutí fáze 1: NO-GO jako úsporný projekt** (engine 0,28 % realisticky, 0,70 % jako nedosažitelná horní mez, obojí pod 1 %). Samostatný drobný úkol mimo engine: nespouštět model pro plný test land kandidáta (0,54 %, potřebuje jen
+změnu v orchestraci). Fáze 2 až 4 se přesto dokončí, jak zadala karta, protože engine je levný (0 tokenů, sekundy, deterministický) a brána ukáže, jestli má smysl jako kontrola kvality vedle testeru.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
