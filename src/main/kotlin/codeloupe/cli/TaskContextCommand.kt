@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 class TaskContextCommand : ToolCommand("task_context") {
     private val id by argument(help = "Task id, e.g. TER-5")
-    private val section by option(help = "Only this section: issue, linked, open-criteria, touch, declarations, prior").multiple()
+    private val section by option(help = "Only this section: issue, description, comments, linked, open-criteria, touch, declarations, callers, prior, norms").multiple()
     private val view by option(help = "full (default) or digest").choice("full", "digest")
     private val since by option(help = "'none' sends everything again even when you already have it")
 

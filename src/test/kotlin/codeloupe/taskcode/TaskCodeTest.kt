@@ -220,6 +220,20 @@ class TaskCodeTest {
         assertTrue(runCatching { context("ABC-1") }.exceptionOrNull()?.message.orEmpty().startsWith("no tracker mirrors the project of 'ABC-1'"))
     }
 
+    @Test
+    fun `the pack carries the description, the comments, who references the touched code and the rules that apply`() {
+        write(repo, "AGENTS.md", "# Demo\n\n## Modules\n- The `Billing` rules live in the billing module and nowhere else.\n- Unrelated: releases are tagged by hand.\n")
+        val text = context("CL-91")
+        val description = text.substringAfter("## description\n").substringBefore("\n## ")
+        assertTrue(description.startsWith("### Context\nThe `Billing.total` path is read by"), description)
+        assertFalse("Routes keep answering" in description, "the checklist is shown by the issue section only")
+        assertContains(text, Regex("## callers\n$BILLING {2}← .*Use\\.kt"))
+        assertContains(text, "## norms\nAGENTS.md 5 lines, sections (first line): Demo 1 · Modules 3")
+        assertContains(text, "L4 [Modules] - The `Billing` rules live in the billing module")
+        assertFalse("releases are tagged" in text, text)
+        assertContains(context("CL-91", "sections" to "callers", "since" to "none"), "Use.kt")
+    }
+
     private val contextTool = TaskContextTool(trackers, DocMemory())
 
     private fun context(id: String, vararg more: Pair<String, String>, session: String = repo.toString()): String = runBlocking {

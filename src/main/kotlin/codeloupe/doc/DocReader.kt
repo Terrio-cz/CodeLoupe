@@ -7,7 +7,7 @@ import codeloupe.tracker.Times
  * structure, the text of named sections, or all of it. A reader who already has the version gets one line; one who has
  * an older version gets what changed. Without a session key nothing is remembered.
  */
-class DocReader(private val memory: DocMemory, private val clock: () -> Long = System::currentTimeMillis) {
+class DocReader(private val memory: DocMemory, private val maxChars: Int = MAX_CHARS, private val clock: () -> Long = System::currentTimeMillis) {
     enum class View { DIGEST, OUTLINE, FULL }
 
     fun read(session: String, doc: Doc, view: View, names: List<String>, forget: Boolean = false): String {
@@ -83,8 +83,8 @@ class DocReader(private val memory: DocMemory, private val clock: () -> Long = S
         "${doc.id} unchanged since your read at ${Times.short(previous.at)} (#${doc.hash}, ${doc.sections.size} sections; since=none shows it again)"
 
     private fun cap(text: String, doc: Doc): String =
-        if (text.length <= MAX_CHARS) text
-        else text.take(MAX_CHARS).substringBeforeLast('\n') + "\n… cut at ${MAX_CHARS / 1000}k characters of ${text.length}; ${doc.id}: fetch a section or L<from>-<to> for the rest"
+        if (text.length <= maxChars) text
+        else text.take(maxChars).substringBeforeLast('\n') + "\n… cut at ${maxChars / 1000}k characters of ${text.length}; ${doc.id}: fetch a section or L<from>-<to> for the rest"
 
     private fun own(s: DocSection) = s.handle + "~"
 

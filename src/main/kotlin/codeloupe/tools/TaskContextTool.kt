@@ -14,16 +14,17 @@ class TaskContextTool(
     private val initialWaitMs: Long = 10_000,
     private val staleWaitMs: Long = 3_000,
 ) : Tool {
-    private val reader = DocReader(memory)
+    // A pack for a big task runs past the 20k of an ordinary document; cutting its tail would drop the norms and the prior tasks.
+    private val reader = DocReader(memory, maxChars = 26_000)
     override val name = "task_context"
     override val description = "Everything to start planning a task, in one call instead of issue + tasks + task_code + search: sections " +
-        "issue (brief with criteria), linked (dependencies and relations with state), open-criteria (what related open tasks still owe), " +
-        "touch (landed, in a worktree, or predicted code), declarations (outline lines of those files), prior (earlier tasks that changed them, with " +
-        "landing commit). sections=[…] picks some; view=digest lists them with sizes. The same root asking again gets 'unchanged' in " +
+        "issue (brief with criteria), description (its sections, capped), comments (the thread, capped), linked (dependencies and relations with state), " +
+        "open-criteria (what related open tasks still owe), touch (landed, in a worktree, or predicted code), declarations (outline lines of those files), " +
+        "callers (files that reference them), prior (earlier tasks that changed them, with landing commit), norms (AGENTS.md lines and docs that bear on them). sections=[…] picks some; view=digest lists them with sizes. The same root asking again gets 'unchanged' in " +
         "one line, or only the sections that changed; since=none sends everything again."
     override val properties = Schema.properties(
         "id" to Schema.string("e.g. TER-5"),
-        "sections" to Schema.strings("issue, linked, open-criteria, touch, declarations, prior"),
+        "sections" to Schema.strings("issue, description, comments, linked, open-criteria, touch, declarations, callers, prior, norms"),
         "view" to Schema.enum(listOf("full", "digest")),
         "since" to Schema.string("none: send everything again"),
     )

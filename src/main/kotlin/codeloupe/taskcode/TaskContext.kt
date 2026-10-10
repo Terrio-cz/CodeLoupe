@@ -15,12 +15,15 @@ import kotlinx.coroutines.CancellationException
 
 /**
  * What a planner needs to start on a task, as one [Doc] of sections instead of the issue, related and search round trips:
- * the brief issue with its criteria, the linked tasks, the open criteria of the related open tasks, what the task
- * landed or is predicted to touch, the declarations of those files as outline lines, and the earlier tasks that
- * changed the same files, each with its landing commit. Every part is compact and capped; reading it again goes through
+ * the brief issue with its criteria, the description sections and the comment thread (capped), the linked tasks, the open
+ * criteria of the related open tasks, what the task landed or is predicted to touch, the declarations of those files as
+ * outline lines, who references them, the earlier tasks that changed the same files, each with its landing commit, and the
+ * lines of AGENTS.md and the documents that bear on that code. Every part is compact and capped; reading it again goes through
  * the shared document reader, so an unchanged task costs one line and a changed one only its changed sections.
  */
 class TaskContext(private val registry: Registry, private val trackers: Trackers, private val code: TaskCodeQuery) {
+    private val callers = TouchedCallers(registry)
+
     suspend fun build(root: String, id: String): Doc {
         val (mirror, canonical) = trackers.mirror(id)
             ?: throw IllegalArgumentException("no tracker mirrors the project of '$id'; mirrored: ${trackers.projects().joinToString(", ")}")
@@ -39,11 +42,15 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
         val paths = facts?.let { paths(it) }.orEmpty()
         val pieces = listOf(
             "issue" to IssueRender.render(context, Parts.of(null, emptyList())),
+            "description" to IssueDescription.render(issue.description),
+            "comments" to CommentDigest.render(context.comments),
             "linked" to linked(context),
             "open-criteria" to openCriteria(context, mirror.store),
             "touch" to touch(facts, failure),
             "declarations" to declarations(root, paths),
+            "callers" to callers.render(root, paths),
             "prior" to prior(facts, canonical, paths, mirror.store),
+            "norms" to norms(facts, paths),
         )
         return Doc.of("context:$canonical", pieces.filter { it.second.isNotBlank() }.map { (handle, text) -> Triple(handle, handle, "## $handle\n$text") })
     }
@@ -116,20 +123,32 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
         }
     }
 
+    /** The repository's own rules and documents that bear on the touched code, so the planner reads those lines and not the whole files. */
+    private fun norms(f: TaskCodeQuery.Facts?, paths: List<String>): String {
+        if (f == null) return ""
+        // New files count for the areas they join: their module and folders tell which rules apply.
+        val fresh = f.answer.prediction?.predictions.orEmpty().filter { it.mark == Prediction.NEW }.mapNotNull { it.path }
+        val terms = NormTerms.of((paths + fresh).distinct())
+        val docs = DocMentions.render(f.worktree, terms)
+        val docsText = if (docs.isEmpty()) "" else "documents that name the touched files:" + NL + docs
+        return listOf(AgentsNorms.render(f.worktree, terms), docsText).filter { it.isNotEmpty() }.joinToString(NL)
+    }
+
     private fun shorten(sig: String) = sig.lineSequence().first().let { if (it.length <= SIG) it else it.take(SIG - 1).trimEnd() + "…" }
 
     private companion object {
+        const val NL = "\n"
         const val MAX_LINKED = 12
         const val MAX_RELATED = 6
         const val PER_TASK = 3
-        const val MAX_CRITERIA = 14
+        const val MAX_CRITERIA = 6
         const val CRITERION = 110
         const val TOUCH_LINES = 20
         const val MAX_FILES = 6
         const val WORKTREE_FILES = 3
-        const val MAX_DECLS = 10
+        const val MAX_DECLS = 8
         const val COMMITS_PER_FILE = 40
-        const val MAX_PRIOR = 8
+        const val MAX_PRIOR = 6
         const val SUMMARY = 70
         const val SIG = 100
     }
