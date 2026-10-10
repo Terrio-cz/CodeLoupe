@@ -15,12 +15,15 @@
 * [Hooks and token savings](Hooks-and-token-savings)
 * [Plugin hooks](Plugin-hooks)
 * [Metrics and savings](Metrics-and-savings)
+* [Knowledge store](Knowledge-store)
 * [Desktop app](Desktop-app)
 
 **How it works**
 * [Daemon and index](Daemon-and-index)
 * [Worktrees and overlays](Worktrees-and-overlays)
 * [Benchmarks](Benchmarks)
+* [Agent runs](Agent-runs)
+* [Agent run details](Agent-run-details)
 * [Comparison](Comparison)
 
 **Install and contribute**

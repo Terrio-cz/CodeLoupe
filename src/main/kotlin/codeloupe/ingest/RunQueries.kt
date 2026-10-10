@@ -1,5 +1,6 @@
 package codeloupe.ingest
 
+import codeloupe.metrics.LimitHit
 import codeloupe.metrics.Usage
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -168,6 +169,16 @@ class RunQueries(private val db: TranscriptDb) {
         db.reader.prepareStatement("SELECT max(end_ms) FROM runs WHERE path LIKE ? ESCAPE '\\'").use { s ->
             s.setString(1, likePrefix(transcriptPrefix))
             s.executeQuery().use { r -> r.next(); r.getLong(1).takeIf { !r.wasNull() } }
+        }
+    }
+
+    /** The newest usage-limit answer written under [transcriptPrefix], or null when there is none. */
+    fun lastLimit(transcriptPrefix: String): LimitHit? = synchronized(db.reader) {
+        db.reader.prepareStatement(
+            "SELECT l.at_ms, l.resets_ms, l.kind, l.text FROM limits l JOIN runs r ON r.id = l.run_id WHERE r.path LIKE ? ESCAPE '\\' ORDER BY l.at_ms DESC LIMIT 1",
+        ).use { s ->
+            s.setString(1, likePrefix(transcriptPrefix))
+            s.executeQuery().use { r -> if (r.next()) LimitHit(r.getLong(1), r.getLong(2).takeIf { !r.wasNull() }, r.getString(3), r.getString(4)) else null }
         }
     }
 

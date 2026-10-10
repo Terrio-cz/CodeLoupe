@@ -352,9 +352,23 @@ export interface Accounts {
     /** Working directories of this account that called CodeLoupe in the last 15 minutes. */
     windows: number;
     weighted7d: number;
+    /** Weighted tokens of the last five hours, the length of the plan's session window. */
+    weighted5h: number;
     /** Null without a baseline or without a run of this account to compare. */
     savedPct7d: number | null;
     lastUsedAt: Iso | null;
+    /** Name of the secret that holds the account's long-lived token; never the token. */
+    tokenSecret: string | null;
+    /** Whether that secret exists in the store. */
+    tokenConfigured: boolean;
+    /** The newest usage-limit answer in the account's transcripts: `unknown` when none was seen, `ok` once the limit lifted. */
+    limit: {
+      state: 'limited' | 'ok' | 'unknown';
+      kind: string | null;
+      resetsAt: Iso | null;
+      observedAt: Iso | null;
+      source: string;
+    };
   }[];
   youtrack: {
     id: string;

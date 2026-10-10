@@ -747,6 +747,20 @@ Dále `symbol path:1` (5×): řádek před první deklarací (balíček, importy
 Stejné transcripty, nový detektor: 365 → 196 mezer (9,3 %). Řízené běhy planneru (7 běhů na variantu): starý daemon 15 mezer v 78 voláních (19,2 %; nový detektor 11, 14,1 %), daemon s opravami 8 v 91 (8,8 %); zbylých 8 je 5 záporných odpovědí na jména, která úkol teprve zavádí
 (`location_search`, `LocationSearch*`, `AccountInput`) a 3 náhodné shody tokenu (`website`, `description`, `json`). Cíl 7 % se nesplnil (8,8 %), a protože zbytek nepochází z daemona, kritérium se přepisuje; metrika sama je karta CL-198.
 
+*Pravidlo mezer CL-198 (2026-10-10).* `metrics gaps` počítá jako mezeru prázdnou odpověď jen tehdy, když agent pak hledal totéž jinde (fallback); prázdné odpovědi, které přijal (záporná odpověď na jméno,
+které úkol teprve zavádí), vypíše zvlášť jako „settled negatives“. Fallback na běžné slovo (`description`, `website`, `json`, ...) nebo kratší než 5 znaků se počítá jen při čtení kódového souboru, který odpověď CodeLoupe
+sama jmenuje (v prvních 200 znacích odpovědi nebo v dotazu). `--all` dává staré počty (každá prázdná odpověď je mezera, každé pozdější hledání téhož slova fallback), takže řada zůstává srovnatelná.
+Přepočet řízených běhů CL-194 (`codeloupe metrics gaps --since 2026-10-01 --dir <transcripty cl194-ws-P|Q>`, 7 běhů na variantu):
+
+| Varianta (daemon) | Volání | Mezery staré pravidlo (`--all`) | Mezery nové pravidlo | z toho settled negatives |
+|---|---|---|---|---|
+| P (starý daemon) | 78 | 11 (14,1 %) | 5 (6,4 %) | 6 |
+| Q (daemon s opravami CL-191) | 91 | 8 (8,8 %) | 0 (0 %) | 5 |
+| celkem | 169 | 19 (11,2 %) | 5 (3,0 %) | 11 |
+
+Q: 5 prázdných odpovědí (`location_search`, `LocationSearch*`, `AccountInput` ×2, `querySet`) je teď settled, 3 náhodné shody (`website`, `description`, `json`) odpadly. Cíl 7 % platí pro nové pravidlo (Q 0 %, P 6,4 %);
+stará čísla zůstávají v `--all`. Uložené mezery v `transcripts.db` (obrazovka Gaps) se přepočtou při dalším čtení transcriptu; `GapReport` nese `settled` a `legacy`.
+
 *Věta o každém souboru v těle planneru (CL-197, 2026-10-10).* Řízený běh planneru (Opus, effort high, klony těsně před landem, bez packetu, tracker čte stejný YouTrack a nic do něj nepíše, throwaway daemon z `main` na 47682 se sekcí `cochange`, dva běhy souběžně; před každým během se agentovi zapomněla čtení kořene jako hookem `SubagentStart`). Tři těla: L = živé tělo z CL-190, S = L + věta v odrážce o přístupu („vypiš každý soubor, který změna zasáhne, i jednořádkové úpravy a model a dokumenty, které jmenuje `cochange`“; aby tělo zůstalo do 8 000 znaků, odpadla věta „Never a >20k-char file whole“, návod `rg -n '^## '` a „the other agents“ → „others“), O = staré tělo před CL-190 (`.bak-cl189`). Tři úkoly: TER-324 (11 souborů, dvě čtyřřádkové úpravy modelu `User.kt`, `Organization.kt` a `docs/local-stack.md`), TER-176 (5 souborů mimo testy: jednořádkový `AccountModule.kt`, `StaffService.kt`, `importer-architecture.md`) a TER-575 (5 souborů: jednořádkový `PostgisColumnType.kt`, `current-db-diagram.md`, `TourismQueryRepository.kt`). TER-176 a TER-575 vybral skript (`cand.mjs`) mezi uzavřenými úkoly s 4–9 soubory tak, že aspoň dva malé soubory text úkolu nejmenuje. Šestnáct nových běhů (S a O po 2 na úkol, L po 2 na TER-176 a TER-575) a pro L na TER-324 pět běhů z CL-194 (stejné tělo, daemon se `cochange`); celkem 20,35 USD i se suggesterem níže.
 
 | Úkol | Tělo | n | Soubory řešení | Z toho malé | Řádky premortem | Jednotky tis. (medián) | USD průměr |
@@ -1097,6 +1111,78 @@ Rozdíl součtu výstupu (maximum − první řádka) je ve všech skupinách **
 závěry CL-197 a CL-202 tedy nemění ani absolutní cena běhu, ani poměr, a nesplněná kritéria (reviewer 83 %, coder 129 % a 115 %, cena Sonnetu u kvality) zůstávají nesplněná. Hodnoty „před“ a „po“
 opravě jsou totožné i pro USD. Skripty (`scan`, `idx`, `groups`, `final`; počty jen z přepisů a výsledků CLI, žádný obsah) jsou přiložené ke kartě CL-206.
 
+### 8.10 Nástroj `batch`: více nezávislých čtení v jednom tahu (CL-205, 2026-10-10)
+
+**Co se postavilo.** `batch` (MCP i `/api/batch`): `calls` = `[{tool, args}]`, nejvýš 8 čtecích volání (`find`, `grep`, `outline`, `symbol`, `context`, `usages`, `calls`,
+`hierarchy`, `changes`, `doc`, `issue`, `task_context`, `task_code`), odpovědi v pořadí s popiskem `[n] nástroj cíl`, chyba nebo odmítnutí zůstane ve své části
+(`(failed)`), každá část se ořízne na svůj díl 48 000 znaků (min. 4 000). Zapisující a procesní nástroje, neznámý nástroj i vnořený `batch` se odmítnou. Volba
+`tools.batch` v `config.json`, **výchozí vypnuto**: výchozí katalog zůstává beze změny (`ToolListStabilityTest` zelený), zapnutí přidá **772 znaků = 7,1 % seznamu**
+(10 862 → 11 634; ≈ 155 tokenů při 5 znacích na token, ≈ 240 při 3,2). Čtení souboru s offsetem a limitem nástroj nemá (v katalogu žádné není; `doc` section=`L120-160` pokrývá textové soubory).
+Druhá páka (b): řádek v `SKILL.md` a věta v session-start nápovědě „nezávislá čtení v jedné zprávě“. Testy: `BatchToolTest` (pořadí, chyba v části, odmítnutí, plochý tvar, oříznutí, cena v seznamu, config) + test stability.
+
+**A/B** (`%TEMP%	errio-bench-cl205`, kopie workspace, vlastní daemony z větve na 47740/47741, nic do YouTrack). A = živé tělo agenta, B = tělo + `mcp__codeloupe__batch` v `tools:` + jedna věta
+(coder, reviewer-opus, planner; těla v B o 48, 92 a 115 znaků delší, tedy by se při nasazení musela zkrátit o stejně). 3 opakování na úkol a variantu, 2 `claude -p` souběžně, 36 běhů, **22,43 USD**.
+Coder Sonnet medium (light, TER-670/545/536, test známého řešení), reviewer Opus high (TER-321, TER-62), planner Opus high (TER-321).
+
+| Role | n/var. | jednotky tis. A → B | USD A → B | tahy/běh | použil `batch` | kvalita |
+|---|---:|---|---|---|---|---|
+| coder | 9 | 762 → 802 (+5 %) | 1,52 → 1,60 | 12,4 → 13,0 | **0 z 9** | test známého řešení 9/9 → 7/9 (TER-545: 2 běhy selhaly na jedné aserci) |
+| reviewer | 6 | 1 789 → 1 948 (+9 %) | 6,33 → 6,84 | 11,3 → 12,3 | 6 z 6 (3,2 volání po 5,0 částech) | známé nálezy 30/30 → 30/30 |
+| planner | 3 | 897 → 734 (−18 %) | 3,36 → 2,78 | 10,3 → 8,3 | 3 z 3 (5,3 volání po 6,6 částech) | soubory skutečného řešení 50 % → 54 % |
+
+Po buňkách (medián B / medián A, jednotky): coder 536 93 %, 545 92 %, 670 132 %; planner 85 %; reviewer 321 98 %, 62 116 %. **Sdruženě** (každý běh dělený mediánem A své buňky): medián B **0,97**, průměr 1,05
+(cíl: medián ≤ 0,90). Celkem USD A 11,21, B 11,22. Podíl paralelních čtecích tahů 34 % (A) → 31 % (B), sériových čtecích tahů hned po čtecím 81 → 99.
+
+**Rozhodnutí: nepřijato, živá těla se nemění.** Kritérium (medián ≤ 90 %, kvalita ne horší) nesplněno: medián 0,97, a kvalita codera na TER-545 je 1/3 proti 3/3 (selhání jedné aserce nad
+implementačním detailem, coder `batch` nikdy nevolal, takže jde o rozptyl, ne o vliv nástroje, ale „ne horší“ to nedokládá). Vysvětlení nulového přínosu: (1) těla už nezávislá čtení paralelizují (planner 93 % čtecích tahů paralelních
+už v A, takže `batch` jen mění několik paralelních volání za jedno, ušetřil 2 tahy z 10); (2) reviewer `batch` použil, ale dál posílal jednotlivá čtení po něm a jeho tahů přibylo; (3) Sonnet jako coder
+nástroj ignoroval i s větou v těle. Strop 7,3 % z § 8.6 tedy zůstává horní mez, kterou tahle páka nedosáhla: realitu určuje chování modelu, ne dostupnost nástroje. Nástroj zůstává v produktu jako volba (`tools.batch`);
+případný další pokus patří jen k planneru (jediná role s dobrým výsledkem, −18 %, n = 3, jedna úloha), ne ke coderovi.
+
+**Vedlejší nálezy.** (a) Testy nechávaly dočasné adresáře v `%TEMP%`: 120 tisíc položek zaplnilo disk 931 GB na 0 a shodilo plný `gradlew test`; po úklidu uvolněno ≈ 280 GB. Opravu mezitím dodala CL-208 (moje verze byla nahrazena při merge).
+(b) `SessionStartDaemonTest` „no caller lines“ padá lokálně na Windows i na čistém `origin/main` (CI na Linuxu zelené): řádek `^ 17-19 [Big] …` z výstupu `changes` začíná šesti mezerami; nesouvisí s touto kartou.
+
+### 8.11 Výsledek CL-203 — znalostní úložiště s kotvami v kódu (2026-10-11)
+
+Stavba strany CodeLoupe; řízené A/B retra a stewarda a napojení na živé Terrio přijdou později. Rozhodnutí z 8.6 (strop na
+tokenech ≈ 0,1 %, hodnota je kvalita) se nemění: úložiště se staví pro kvalitu faktů, ne pro úsporu.
+
+- **Návrh.** Balíček `codeloupe.know`, vlastní SQLite `know.db` v domově daemona (otevírá se líně při prvním použití, není v
+  `events.db`). Fakt: id (`k17`), scope (`repo`, `area:x`, `file:x`, `symbol:x`, `task:x`), kind (decision, pattern, blocker,
+  environment, other), text na jeden řádek, zdroj (task, run), `verifiedAtCommit`, `supersedes`, `related`, kotvy, stav
+  (active, stale, superseded). Hledání je FTS5 s BM25 (slova textu, scope, kind a task, stemování jako `find mode=search`),
+  filtr scope a kind, nejvýše N řádků s id. Zápis: fakt stejného scope s téměř shodnými kmeny (Jaccard ≥ 0,85 a stejná čísla,
+  tedy TER-167 a TER-168 jsou dva fakty) aktualizuje starší fakt.
+- **Kotvy a zastaralost.** Kotva je soubor, deklarace, nebo obojí. Při zápisu a `verify` se z indexu uloží otisk podpisu a těla
+  deklarace (u souboru všech jeho deklarací) a commit checkoutu; při každém zobrazení se kotva přečte znovu přes index s overlayem
+  worktree, takže se počítá i necommitnutá změna. Příznaky: `signature changed`, `body changed`, `declaration gone`,
+  `file gone`. Otisk místo čtení deklarace z `verifiedAtCommit`: je stejně přesný, nepotřebuje druhý parse a nezávisí na tom,
+  že commit je ještě v historii. Soubor mimo index (Markdown, YAML) se hledá na disku, i ve složce bez gitu; nečitelný
+  checkout stav nemění. Fakt bez otisku (import) kontroluje jen existenci cíle. Typ se otiskuje i s členy, proto fakt o třídě
+  zastará při každé změně v ní (kotvit se má člen).
+- **Rozhraní.** `GET /know/search`, `POST /know` (jeden fakt nebo `facts`), `GET /know/{id}`, `GET /know/stale`,
+  `POST /know/{id}/verify`, vše za tokenem daemona; CLI `codeloupe know search|put|show|stale|verify|import`. Seznam nástrojů
+  MCP ani kroky `batch` se nezměnily (MCP nástroj `know` je pozdější karta za volbou). Wiki: `Knowledge-store`.
+- **Import `brain/facts`** (14 souborů, jen čtení; `codeloupe know import … --root TerrioImporter --root workspace`, 27 s včetně
+  kontroly kotev): 1 095 neprázdných řádků, **1 059 faktů**, 35 řádků přeskočeno (nadpisy, standardní věta, `@` a `%`) a 1 zalomený řádek připojen k faktu nad ním.
+  **Duplicity: 0 přesných, 2 téměř shodné** (obě v `review-patterns`, sloučeny; stejný počet 2 vyjde, když se všech 14 souborů
+  vloží do jednoho scope, tedy mezi soubory žádná). Karta 8.6 uvádí 3 při trigramové shodě ≥ 0,6; kmenová metrika je přísnější a
+  nalezla ty, které jsou skutečně týž fakt. **Cesty:** 103 faktů cituje cestu; **10 z nich (9,7 %) cituje soubor, který není v
+  TerrioImporter ani ve workspace** (db 1, env-blockers 3, repo-notes 2, workflow 4; karta 8.6 měla 12 ze 102). Proti samotnému
+  TerrioImporter by jich bylo 72, protože většina citovaných cest je ve workspace (`run/`, `mcp/`, `brain/`): dvě kořenová
+  repozitáře jsou nutná, kotva nese vlastní `root`.
+- **Nalezení.** 30 otázek sestavených z faktů skutečných souborů (parafráze, 5 řádků, bez filtru, nad 1 059 fakty): **25 z 30
+  = 83 %** má správný fakt mezi 5 řádky (na 1. místě 18, na 2. 5, na 4. 2). Míjí je otázky, kde fakt otázku sdílí jen jedním slovem
+  („read-only query against the shared database“ proti „read-only recipe: docker exec …“). Sada otázek není v repozitáři (cituje
+  interní fakty), leží v předávací složce karty. Test v repozitáři má 44 vymyšlených faktů a 39 otázek a hlídá ≥ 80 %.
+- **Zastaralost na skutečné změně.** Test `KnowStaleTest` dělá skutečné git změny ve fixture repozitáři: změna těla (necommitnutá
+  přes overlay i commitnutá na hlavní větvi), změna podpisu, přidaná a odebraná deklarace, smazaný soubor, návrat k ověřenému
+  stavu a `verify`. Ruční běh přes CLI na dočasném repozitáři: `put` s kotvou, commit změny těla, `know stale` ukáže `STALE: body
+  changed`, `verify` příznak smaže.
+- **Kritéria karty.** Splněno: hit rate ≥ 80 % (83 % na 30 otázkách), detekce zastaralosti s příznakem v hledání, import 14
+  souborů s počty duplicit a mrtvých cest, rozhodnutí o úspoře (no-go na tokeny, bez změny). **Otevřeno:** řízené A/B retra a
+  stewarda (−40 % ceny při stejných zachovaných lekcích) a jejich zápis a čtení přes úložiště, tedy napojení na Terrio a MCP nástroj.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
@@ -1365,6 +1451,16 @@ rozhoduje launcher.
   ho ohlásil `lost` se zachovaným logem (daemon je sám v job objectu s KILL_ON_JOB_CLOSE, každý job má navíc vlastní
   vnořený pro cancel); po pádu bez job objectu (ne-Windows) přeživší ukončí podle pid + času startu.
   `codeloupe stop` s běžícími joby odmítne (`--force`).
+- **Historie jobů (CL-209)**: dokončený job zůstává v `jobs.db` (i s logem) aspoň **7 dní** a dokud je mezi 500 nejnovějšími; strop 20 000.
+  Úklid běží při otevření databáze a každých 100 zápisů; běžící a čekající job se nemaže nikdy. Záznam, který tato verze nepřečte (novější
+  verze), se ve výpisu přeskočí, ne selže celý. Test: JVM, která zapíše joby a skončí `halt` bez zavření databáze (jako `taskkill /F`),
+  a čtení z druhého procesu; restart démona nad stejným domovem; záznam ve formátu 0.1.0. *Proč zmizely joby z 9. 10. po výměně 0.1.0 → 0.1.1
+  (nález 10. 10.)*: kód démona `jobs.db` nikdy nemaže (`JobStore` jen vkládá a čistí podle stáří) a formát záznamu se od CL-84 nezměnil. `jobs.db`
+  v domovu aplikace má hlavní soubor 4096 B (jen hlavička) a WAL o 7 rámcích: schéma a jediný job z 10. 10. 21:15; hlavní soubor psán v 21:07:35,
+  tedy databáze byla **založena znovu** při startu 0.1.1 (tehdy `PRAGMA journal_mode=WAL` zapíše prázdnou stránku do nového souboru), přitom
+  `jobs/` drží šest logů z 9. 10. (18:16–21:16) a `daemon.log` jejich „started/done“. Soubory `jobs.db*` tedy někdo odstranil mezi posledním jobem
+  0.1.0 (21:16 9. 10.) a startem 0.1.1, `events.db` ve stejném domově zůstal. Kdo, z dat nejde zjistit (`daemon.log` o tom mlčí); démon teď při startu
+  napíše `jobs: N records kept` a varování, když je v `jobs/` víc logů než záznamů.
 - **Sloty**: `slots` v `config.json` (Terrio `gradle-test` ×2, `vps-test`), nekonfigurovaný slot = 1. Ověřeno: dva
   `gradle-test` obsazené, třetí job čekal v daemonu (`/status` `jobs.slots.waiting`) a spustil se po uvolnění; čekání
   je suspendovaná korutina (semafor FIFO), ne smyčka.
@@ -1743,6 +1839,11 @@ rozhoduje launcher.
   účtu restartuje daemon. Tracker z `config.json` je v tabulce jen ke čtení.
 - Souběh: aplikace (CLI), daemon (poznamenání použití) i test zapisují do téhož vaultu; `SecretStore` teď čte-mění-zapisuje pod zámkem `vault.env.lock` (zámek souboru + zámek JVM),
   test se čtyřmi zapisovateli a dvěma čtenáři na samostatných instancích neztratil žádný záznam.
+- **Token launcheru, stav limitu a okno plánu (CL-210, 2026-10-10)**: Claude účet smí nést `tokenSecret` (jméno tajemství s dlouhodobým tokenem z `claude setup-token`; aplikace jméno při uložení
+  zachová, daemon tajemství nečte). Stav limitu se bere z odpovědí o limitu v transcriptech: syntetická `assistant` řádka s `error: rate_limit` (nebo modelem `<synthetic>`) a textem začínajícím
+  „You've hit your … limit“; čas obnovy je `quotaLimits.resetsAt` z téže řádky, jinak z textu („resets Oct 11, 8pm (Europe/Prague)“ v zóně, kterou jmenuje). Parser je ukládá do tabulky `limits`
+  (verze parseru 3: transcripty se přečtou znovu jednou), `GET /ui-api/v1/accounts` vrací `limit { state, kind, resetsAt, observedAt, source }`: `limited` do obnovy (odpověď bez času 30 min),
+  `ok` po ní, `unknown` bez odpovědi; plus `tokenSecret`, `tokenConfigured` a `weighted5h` (okno session).
 - Ověřeno živě: skript řídí reálnou aplikaci (Electron přes DevTools protokol) proti jednorázovému daemonu, fixture složkám dvou účtů a lokálnímu fake YouTrack: přidání účtu, přejmenování, výchozí,
   filtr Overview (390 → 130), přidání YouTrack účtu s tokenem, test spojení (fake instance dostala uložený token), rotace (dostala nový), odebrání (token ze storu pryč); token se nikdy neobjevil v DOM ani v odpovědích daemona.
 

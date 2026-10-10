@@ -141,7 +141,7 @@ class TranscriptIngest(
         }
         val (results, usages) = parser.drain()
         val ter = metaTer ?: TER.find(parser.firstPrompt)?.value
-        val delta = FileDelta(f, ter, parser, results, usages, consumed, TailHash.at(f.path, consumed))
+        val delta = FileDelta(f, ter, parser, results, usages, parser.drainLimits(), consumed, TailHash.at(f.path, consumed))
         val added = writer.write(delta)
         known[f.key] = FileState(f.size, f.mtime, consumed, ter, JsonFormat.json.encodeToString(ParserSnapshot.serializer(), parser.snapshot()), delta.tail)
         return added
@@ -177,8 +177,8 @@ class TranscriptIngest(
         const val BASELINE = "baseline"
         const val PARSER = "parser"
 
-        /** Bumped when [TranscriptParser] counts differently, so the runs already stored are read again (2: output is the final count of a message, CL-206). */
-        const val PARSER_VERSION = "2"
+        /** Bumped when [TranscriptParser] counts differently, so the runs already stored are read again (2: output is the final count of a message, CL-206; 3: usage-limit answers are kept, CL-210). */
+        const val PARSER_VERSION = "3"
         const val CATEGORIES = "categories"
         const val META_GRACE_MS = 60_000L
         const val BATCH_FILES = 50

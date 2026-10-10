@@ -39,6 +39,7 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
     private val pending = LinkedHashMap<String, Pending>().apply { from?.pending?.forEach { put(it.id, Pending(it.name, it.input, it.atMs, it.turn)) } }
     private val results = ArrayList<ToolResult>()
     private val usages = ArrayList<UsageAt>()
+    private val limits = ArrayList<LimitHit>()
 
     /** False when [line] is not a JSON object, in which case nothing changed. */
     fun feed(line: String): Boolean {
@@ -54,7 +55,10 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
         o["attachment"].obj()?.let(startTracker::attachment)
         if (type == "user" && message != null) startTracker.userLine(message)
         if (type == "user" && firstPrompt.isEmpty()) message?.get("content").str()?.let { firstPrompt = it.take(PROMPT_CHARS) }
-        if (type == "assistant" && message != null) assistant(message, timestamp)
+        if (type == "assistant" && message != null) {
+            assistant(message, timestamp)
+            limit(o, message, timestamp)
+        }
         if (type == "user") for (block in message?.get("content").arr().orEmpty()) result(block.obj() ?: continue, timestamp)
         return true
     }
@@ -64,6 +68,9 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
         results.clear()
         usages.clear()
     }
+
+    /** The usage-limit answers read since the last call. */
+    fun drainLimits(): List<LimitHit> = limits.toList().also { limits.clear() }
 
     fun snapshot() = ParserSnapshot(
         role, start, end, model, turns, usage, peak, firstPrompt, emitted, seen.toMap(),
@@ -85,6 +92,11 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
                 if (pending.size > MAX_PENDING) pending.remove(pending.keys.first())
             }
         }
+    }
+
+    private fun limit(line: JsonObject, message: JsonObject, timestamp: String?) {
+        val text = message["content"].arr().orEmpty().firstNotNullOfOrNull { b -> b.obj()?.takeIf { it["type"].str() == "text" }?.get("text").str() }
+        if (limits.size < MAX_LIMITS) LimitMessage.of(line, message, text, at(timestamp))?.let { limits += it }
     }
 
     /**
@@ -163,6 +175,7 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
         const val PROMPT_CHARS = 400
         const val MAX_SEEN = 5_000
         const val MAX_PENDING = 1_000
+        const val MAX_LIMITS = 100
         const val ERROR_CHARS = 80
         const val HEAD_CHARS = 200
         const val IMAGE_CHARS = 6000

@@ -4,6 +4,7 @@ import codeloupe.JsonFormat
 import codeloupe.events.Scrubber
 import codeloupe.metrics.Categorizer
 import codeloupe.metrics.GapDetector
+import codeloupe.metrics.LimitHit
 import codeloupe.metrics.LocatedGap
 import codeloupe.metrics.Run
 import codeloupe.metrics.ToolCall
@@ -36,7 +37,7 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
     /** Forgets a file and its run, for a transcript that was replaced by a shorter one. */
     fun forget(key: String) = db.transaction { c ->
         val id = runId(c, key)
-        if (id != null) listOf("steps", "usage_hours", "gaps").forEach { table -> c.prepareStatement("DELETE FROM $table WHERE run_id = ?").use { it.setLong(1, id); it.executeUpdate() } }
+        if (id != null) listOf("steps", "usage_hours", "gaps", "limits").forEach { table -> c.prepareStatement("DELETE FROM $table WHERE run_id = ?").use { it.setLong(1, id); it.executeUpdate() } }
         c.prepareStatement("DELETE FROM runs WHERE path = ?").use { it.setString(1, key); it.executeUpdate() }
         c.prepareStatement("DELETE FROM files WHERE path = ?").use { it.setString(1, key); it.executeUpdate() }
     }
@@ -49,6 +50,7 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
             val id = upsertRun(c, delta)
             insertSteps(c, id, delta.results)
             addHours(c, id, delta)
+            insertLimits(c, id, delta.limits)
             aggregate(c, id)
             added = replaceGaps(c, id, delta.found.key, p)
         }
@@ -97,6 +99,21 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
                 s.setString(11, r.errText?.let { StepText.clean(it, ERROR_CHARS) })
                 s.setString(12, if (forGaps) Scrubber.json(r.input.plain()).toString() else null)
                 s.setString(13, if (category == "codeloupe") r.head?.let(Scrubber::text) else null)
+                s.addBatch()
+            }
+            s.executeBatch()
+        }
+    }
+
+    private fun insertLimits(c: Connection, runId: Long, limits: List<LimitHit>) {
+        if (limits.isEmpty()) return
+        c.prepareStatement("INSERT OR REPLACE INTO limits(run_id, at_ms, resets_ms, kind, text) VALUES (?, ?, ?, ?, ?)").use { s ->
+            for (l in limits) {
+                s.setLong(1, runId)
+                s.setLong(2, l.atMs)
+                l.resetsAtMs?.let { s.setLong(3, it) } ?: s.setNull(3, java.sql.Types.INTEGER)
+                s.setString(4, l.kind)
+                s.setString(5, Scrubber.text(l.text))
                 s.addBatch()
             }
             s.executeBatch()

@@ -44,20 +44,22 @@ class AccountsApiTest {
     private val home = TestRepos.tmpDir("acct-home")
     private val port = ServerSocket(0).use { it.localPort }
     private val hourAgo = Instant.now().minusSeconds(3600)
+    private val launcherToken = "fake-claude-launcher-token-2718"
     private val store = SecretStore(home.resolve("secrets").resolve("vault.env"), PassphraseProtector("pw".toCharArray(), iterations = 1_000)).also {
         it.set("YOUTRACK_TOKEN_TERRIO", SecretScope.GLOBAL, token)
+        it.set("CLAUDE_TOKEN_A", SecretScope.GLOBAL, launcherToken)
     }
 
     init {
         // Account A worked in the fixture repository (two turns), account B in some other directory (one turn).
-        TranscriptBuilder(hourAgo).prompt("a").turn().turn().write(claudeA.resolve("projects").resolve(ProjectDirName.of(repo.toRealPath().toString())).resolve("s1.jsonl"))
-        TranscriptBuilder(hourAgo).prompt("b").turn().write(claudeB.resolve("projects").resolve("C--elsewhere-project").resolve("s2.jsonl"))
+        TranscriptBuilder(hourAgo).prompt("a").turn().turn().limit("You've hit your weekly limit · resets Oct 11, 8pm (Europe/Prague)", Instant.now().plusSeconds(26 * 3600)).write(claudeA.resolve("projects").resolve(ProjectDirName.of(repo.toRealPath().toString())).resolve("s1.jsonl"))
+        TranscriptBuilder(hourAgo).prompt("b").turn().limit("You've hit your session limit", Instant.now().minusSeconds(1800), "five_hour").write(claudeB.resolve("projects").resolve("C--elsewhere-project").resolve("s2.jsonl"))
         Files.writeString(
             home.resolve(AccountsFile.FILE),
             JsonFormat.json.encodeToString(
                 AccountsFile.serializer(),
                 AccountsFile(
-                    claude = listOf(AccountsFile.Claude("a", "Account A", claudeA.toString()), AccountsFile.Claude("b", "Account B", claudeB.toString()), AccountsFile.Claude("gone", "Missing", claudeA.resolveSibling("no-such-dir").toString())),
+                    claude = listOf(AccountsFile.Claude("a", "Account A", claudeA.toString(), tokenSecret = "CLAUDE_TOKEN_A"), AccountsFile.Claude("b", "Account B", claudeB.toString(), tokenSecret = "CLAUDE_TOKEN_B"), AccountsFile.Claude("gone", "Missing", claudeA.resolveSibling("no-such-dir").toString())),
                     youtrack = listOf(
                         AccountsFile.Youtrack("terrio", "Terrio", "http://127.0.0.1:9", listOf("ter", "cl"), "YOUTRACK_TOKEN_TERRIO"),
                         AccountsFile.Youtrack("other", null, "http://127.0.0.1:9", listOf("X"), "YOUTRACK_TOKEN_OTHER"),
@@ -128,6 +130,34 @@ class AccountsApiTest {
 
         assertFalse(token in body.toString(), "no token in the response")
         assertFalse(daemonLog().contains(token))
+    }
+
+    @Test
+    fun `an account shows the name of its token secret and whether it is stored, the limit its transcripts report and the cost of the session window`() {
+        tool("find", "q" to "total", "root" to repo.toString())
+        val body = awaitAccounts()
+        val claude = body["claude"]!!.jsonArray.map { it.jsonObject }.associateBy { it["id"]!!.jsonPrimitive.content }
+        fun field(id: String, name: String) = claude.getValue(id)[name]!!.jsonPrimitive.content
+        assertEquals("CLAUDE_TOKEN_A", field("a", "tokenSecret"))
+        assertEquals("true", field("a", "tokenConfigured"))
+        assertEquals("CLAUDE_TOKEN_B", field("b", "tokenSecret"))
+        assertEquals("false", field("b", "tokenConfigured"), "named, but not in the store")
+        assertEquals("null", field("gone", "tokenSecret"))
+        assertEquals("false", field("gone", "tokenConfigured"))
+
+        val limitA = claude.getValue("a")["limit"]!!.jsonObject
+        assertEquals("limited", limitA["state"]!!.jsonPrimitive.content)
+        assertEquals("weekly", limitA["kind"]!!.jsonPrimitive.content)
+        assertEquals("transcript", limitA["source"]!!.jsonPrimitive.content)
+        assertTrue(Instant.parse(limitA["resetsAt"]!!.jsonPrimitive.content).isAfter(Instant.now().plusSeconds(25 * 3600)))
+        val limitB = claude.getValue("b")["limit"]!!.jsonObject
+        assertEquals("ok", limitB["state"]!!.jsonPrimitive.content, "the limit it hit has lifted")
+        assertEquals("session", limitB["kind"]!!.jsonPrimitive.content)
+        assertEquals("unknown", claude.getValue("gone")["limit"]!!.jsonObject["state"]!!.jsonPrimitive.content)
+        assertEquals(260L, field("a", "weighted5h").toLong(), "the turns ran an hour ago, inside the five-hour window")
+
+        assertFalse(launcherToken in body.toString(), "the secret's value is never returned")
+        assertFalse(daemonLog().contains(launcherToken))
     }
 
     @Test

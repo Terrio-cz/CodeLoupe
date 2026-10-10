@@ -28,6 +28,7 @@ short version, a landing page and the download, is the
 | [Hooks and token savings](Hooks-and-token-savings) | the session hook, `doc` and the layers that keep the context small |
 | [Plugin hooks](Plugin-hooks) | the `PreToolUse` hook that points searches and whole-file reads at CodeLoupe, its modes and measurements |
 | [Metrics and savings](Metrics-and-savings) | where an agent's cost goes, measured from transcripts |
+| [Knowledge store](Knowledge-store) | facts agents learned, with scope and code anchors that flag them stale, searched by relevance |
 | [Desktop app](Desktop-app) | the tray app and its screens, accounts |
 
 ## How it works
@@ -36,7 +37,9 @@ short version, a landing page and the download, is the
 |---|---|
 | [Daemon and index](Daemon-and-index) | one daemon per machine, what the index holds, memory and latency |
 | [Worktrees and overlays](Worktrees-and-overlays) | one base index, an overlay per worktree, no watchers |
-| [Benchmarks](Benchmarks) | answer size against grep and whole-file reads, cost of having the tool, controlled runs of real agents |
+| [Benchmarks](Benchmarks) | answer size against grep, whole-file reads and GitNexus, cost of having the tool |
+| [Agent runs](Agent-runs) | short read: what an agent run costs, what made it cheaper and what did not, with takeaways for your own agent flow |
+| [Agent run details](Agent-run-details) | every controlled experiment on real agents, with tables, method and limits |
 | [Comparison](Comparison) | against GitNexus and an IDE's MCP server |
 
 ## Install and contribute
