@@ -754,6 +754,132 @@ cenou na obou stranách. Procento je z porovnaných běhů, vedle něj `coveredS
 nasazením, ne řízený benchmark (§ 8.4); mix úkolů se v baseline a po nasazení může lišit. Bez baseline obrazovky ukážou pomlčku
 a návod, nic se neodhaduje.
 
+### 8.6 Strop úspor: deterministická práce místo tahů agenta (CL-204, CL-203, FM-8, 2026-10-10)
+
+Měřeno na transcriptech Terria od 2026-10-01 (1 995 běhů, jen počty, žádný nový `claude -p`). Peníze: USD podle
+cenové tabulky z 2026-10-06 (`codeloupe metrics collect`), převod jednotek na dolary podle role. **Jmenovatel** =
+cena Terrio pipeline **3 224 USD** (role `terrio-*` plus sessions a `general-purpose` s TER id; celý workspace
+včetně práce na CodeLoupe 4 899 USD, tedy D1 ≈ 1,5 × D2). Pravidlo 1 %: staví se jen položka se stropem ≥ 1 % z 3 224 USD
+(≈ 32 USD za 10 dní). **Strop** = co by se ušetřilo při 100% nasazení; skutečný výsledek rozhodne A/B v kartě stavby.
+
+| # | Položka (co nahrazuje) | Strop USD | Podíl | Jistota | Rozhodnutí |
+|---|---|---|---|---|---|
+| 1 | `batch`: po sobě jdoucí nezávislé čtecí tahy po jednom volání → jeden tah | 234 (horní mez 384) | **7,3 %** (11,9 %) | střední | **GO** |
+| 2 | `check`: nálezy reviewera, které umí pravidlo z AGENTS.md | 8–17 (teor. 69) | 0,3–0,5 % (2,1 %) | střední | no-go |
+| 3 | Strukturované výstupy: steward + tahy orchestrátoru po zprávě reviewera/testera | 16 + 71 = 87 | **2,7 %** | nízká | **GO** (Foreman, FM-3) |
+| 4 | Klasifikátor environmentálních selhání (bind, Testcontainers, zrušené CI, síť) | 17,7 | 0,55 % | střední | no-go samostatně |
+| 5 | Cache čtení napříč agenty / hook na opakovaná čtení | 26 / 30 | 0,81 % / 0,92 % | střední | no-go |
+| 6 | Generování kostry nových souborů | 6,0 (z 44 za nové soubory) | 0,19 % | vysoká | no-go |
+| 7 | Deterministický retro | ≤ 5 (retro celé 15,6) | 0,15 % (0,48 %) | střední | no-go |
+| 8 | Pool sessions (teplé workery) | −4 (úspora jen steward/tester) | 0,1 % | střední | no-go |
+| 8b | Stabilita prefixu: konstantní vytváření startu (cache creation) | do 38 | **do 1,2 %** | střední | **GO** (Foreman, FM-10) |
+| CL-203 | Znalostní úložiště: retro + steward celkem 31,7, z toho čtení facts 2,3 | ≤ 3 | 0,1 % | střední | no-go na tokeny |
+
+#### Položka 1: `batch`
+- Terrio subagenti: 1 822 běhů, 52 251 tahů. Čistě čtecích tahů (Read/Grep/Glob, codeloupe, `rg`/`cat`/`git diff`, YouTrack
+  čtení) je 19 989 (38 %); z nich 84 % je jedno volání na tah, jen 16 % paralelních.
+- Tahy, které šlo sloučit do předchozího: **7 814 (15,0 % všech tahů)** podle závislostního odhadu (další volání nepoužívá
+  nový identifikátor z výsledku předchozího), horní mez 12 169 (23,3 %). Cena sloučeného tahu = znovu přečtený cachovaný kontext
+  (0,1 × kontext) plus výstup.
+- Po rolích (podíl tahů dolní/horní mez; podíl ceny role dolní mez): planner 34 %/58 %, 20 %; coder-high 16 %/25 %, 11 %;
+  coder 13 %/18 %, 9 %; suggester 30 %/56 %, 13 %; retro 50 %/61 %, 16 %; reviewer 8 %/19 %, 2 %; tester 3 %/4 %, 2 %.
+- Počet tahů na běh (p50/p75/p90): planner 46/60/74; coder-high 47/81/132; coder 15/32/66; tester 20/32/47; reviewer
+  13/16/20; suggester 12/18/25; retro 13/18/22; steward 5/6/8.
+- Výhrada: strop počítá s plným využitím nástroje; modely dnes paralelizují jen 16 % čtecích tahů, takže realita se
+  ukáže až v A/B (kritérium stavební karty). Závislostní odhad je heuristika (nové tokeny ve vstupu nalezené ve výsledku
+  předchozího tahu), proto „střední“.
+
+#### Položka 2: `check`
+- Uzavřených TER úkolů od 2026-10-01: 160. Kola (z `state round` v brain logu): 0 kol (lehká pipeline) 82, 1 kolo 41,
+  2 kola 22, 3 kola 13, 4 kola 2, tedy **37 úkolů s ≥ 2 koly**. Přebytečná kola (reviewer + tester) stála 214 USD (6,6 %),
+  s opravami kodéra a stewardem 340 USD. Medián reviewer + tester na jedno kolo 3,6 USD.
+- Nálezy zapsané v brain poznámkách (`!P1-P3`, `(found: review)`): 503 unikátních (10 P1, 71 P2, 422 P3). Pravidlem
+  z AGENTS.md nebo dotazem nad indexem je zjistitelných **24 (4,8 %)**: 8× nepoužité/mrtvé deklarace, 5× whitespace/EOF/délka
+  řádku, 5× zastaralé `soubor:řádek` nebo počet v dokumentaci, 3× kontrakt/oasdiff, 3× zákaz slov/katalog/scale tag.
+  **Z 81 nálezů P1+P2 jsou zjistitelné 2.** Z 37 úkolů s ≥ 2 koly nemá **žádný** všechny nálezy zjistitelné pravidlem
+  (6 jich má aspoň jeden), takže zrušené kolo = 0; horní mez 69 USD (2,1 %) platí jen kdyby pravidla pokryla každý nález
+  kola, což data vyvrací. Klasifikace je regexem (ručně zkontrolovaný vzorek 25 nezařazených nálezů: sémantika, ne pravidlo),
+  podhodnocení řádově ×2 (např. nálezy „whitespace:“ bez klíčového slova).
+- Závěr: pravidla AGENTS.md jsou už dnes hlídána testy a CI (`ScaleTagGuardTest`, `VersionCatalogGuardTest`, `openapi-contract`,
+  `git diff --check`); kola způsobuje sémantika, ne porušená invariantní pravidla.
+
+#### Položka 3: strukturované výstupy
+- Steward: 134 běhů, 16,05 USD (0,50 %); 5 tahů na běh, **start kontextu je 52–66 % ceny běhu** (triage 52 %, preland 66 %,
+  closeout 54 %), čtení 6–13 %, výstup 10–17 %, žádné zápisy faktů. Skript, který ze strukturovaného nálezu reviewera a
+  testera napíše kritéria a odmítnutí, nahradí hlavně tyto běhy.
+- Orchestrátor (sessions a `general-purpose` s TER id): tahy do dvou kroků po výsledku agenta reviewer/tester/steward
+  stály 71 USD (2,2 %); všechny „zápisové“ tahy (`brain.mjs note/state/fact`, YouTrack zápisy, evidence) 130 USD (4,0 %), z toho
+  část model napíše vždy. Jistota nízká: tyto okna jsou starší režim, který phase-mode (Foreman) nahrazuje.
+- Z launcheru (Foreman) krátkých (< 5 min) běhů je mechanických 215 (steward 146 včetně closeout/triage fází, tester `verify`
+  69), 31 USD = 2,6 % jeho ceny; dalších 208 záznamů (`test`, `test-full`, `land`, `finish`) už jsou skripty bez modelu.
+
+#### Položka 4: environmentální selhání
+- 323 událostí v 206 bězích (regex nad výsledky buildu s příznakem selhání): bind 134, síť 70, zdroj/zámek 49, zrušené CI 45,
+  Testcontainers 25; 167 z nich model opakoval stejný příkaz (rerun). Ušetřené tahy (diagnóza a rerun) 17,7 USD (0,55 %), samotný
+  `BindException` 4,8 USD (0,15 %). Pod 1 %, tedy samostatná stavba ne; může jako drobnost v FM-3.
+
+#### Položka 5: cache čtení a hook
+- Čtení > 400 znaků: 25 653 (135 M znaků). Opakované stejného obsahu v rámci běhu: **5** (Claude Code vrací stub „beze změny“),
+  tedy hook neřeší nic. Stejné čtení (cesta + obsah) v jiném běhu stejného TER: 589 čtení, 26 USD (0,81 %); nejvíc
+  reviewer 1,9 % své ceny, deep-reviewer 2,6 %.
+- Hook „dlouhý běh bez editace“: tahy kodéra po 20. tahu před první editací 29,6 USD (0,92 %) jen jako horní mez, protože hook
+  tah neodstraní, jen upozorní.
+
+#### Položka 6: kostra
+- `codeloupe metrics boilerplate`: 1 525 nových souborů, 5,4 M znaků, **13,6 % kostra** (práh 30 %), zápis + nesení 1,4 % ceny
+  běhů, kostra z toho 0,2 %. Vlastní počet: 1 672 `Write` nových kódových souborů 44 USD, kostra 6 USD. No-go potvrzeno.
+
+#### Položka 7 a CL-203: retro, steward, facts
+- Retro (143 běhů, 15,6 USD, model haiku): start kontextu 12 %, výstup 18 %, **čtení úkolů a deníku (extrakce metrik) 29 %**
+  (634 volání), **čtení facts 15 %** (845 volání), zápis facts 1,4 % (278 volání), zbytek je znovu čtený kontext 23 %.
+  Deterministická extrakce tedy nahradí nanejvýš ~30 % z 15,6 USD.
+- Retro + steward = 31,7 USD = **0,98 %** z 3 224 USD (v jednotkách metrik 2,2 %, protože retro běží na levném modelu);
+  čtení facts retro 2,3 USD (0,07 %). Strop znalostního úložiště na tokenech je asi 0,1 %, tedy pod pravidlem 1 %.
+  Hodnota je kvalita, ne tokeny.
+- `brain/facts`: 14 souborů, 1 053 řádků faktů, 265 KB. **Duplicity: 0 přesných a 3 téměř shodné** (trigramová shoda ≥ 0,6),
+  tedy téměř žádné. **Zastaralé odkazy:** 102 faktů cituje cestu, 12 cest už neexistuje (11,8 % z nich, 1,1 % všech);
+  21 faktů cituje TER id (33), které nemá poznámku ani commit (nemusí být zastaralé, bez YouTrack nerozhodnutelné).
+  Bez invalidace při změně kódu nelze zastaralost poznat dřív, než ji fakt způsobí chybu.
+
+#### Položka 8: pool sessions a stabilita prefixu (FM-8)
+- Vstup: 525 běhů Foremanu s transcriptem (steward 134, coder 103, reviewer 99, tester 63, suggester 60, planner 25, ostatní);
+  výsledky 742 ok běhů 1 180 USD, 634 kratších než 5 min 521 USD (44 %), 14 chyb 49,6 USD.
+- **Skutečný start dnes:** system prompt je mezi po sobě jdoucími běhy stejné role identický v 89–100 % případů; start kontextu
+  se přesto skládá z čtení z cache a **konstantního vytváření 11,5–15 tis. tokenů (1h zápis, ×2) v každém běhu**: podíl
+  čtení při startu medián 0,44 steward, 0,57 suggester/coder, 0,66 tester, 0,70 reviewer, 0,71 planner. Podíl čtení je stejný,
+  ať předchozí běh stejné role skončil před < 5 min nebo před 5–60 min (steward 0,44/0,44, tester 0,66/0,66), takže TTL cache drží a
+  příčinou není prodleva. Start nového běhu stejné role do 60 min od předchozího: steward 98 %, tester 92 %, reviewer 94 %, coder 81 %,
+  suggester 85 %, planner 56 %. Creation části startu stojí **38 USD (3,2 % ceny Foremanu, 1,2 % z 3 224 USD)**.
+- Po transcriptech se mění mezi běhy `hook_additional_context` (≈ 1 000–1 400 znaků, shodný v 3–23 % dvojic) a zadání
+  (`user_msg`); `instructions` (22 000 znaků) je shodné v 89–97 %. Bajt prvního rozdílu v pořadí API požadavku transcripty neobsahují:
+  zbývá FM-10 (zachytit požadavek).
+- **Simulace poolu** (reset 60k/100k/200k/600k tokenů × TTL 5 a 60 min, příští běh stejné role na volném workeru, jinak
+  studený start; nový zápis 1,25 ×, resp. 2 ×, čtení 0,1 ×; jednotky metrik převedené na dolary): čistá změna ceny proti skutečnosti
+  - steward −11,0 % (−1,7 USD) při 60k/5 min a −14,5 % (−2,3 USD) při 60k/60 min; tester −3,4 % (−0,4) a −8,0 % (−1,0 USD);
+  - coder, reviewer, planner, suggester, task od 0 % do **+39 % (+146 USD coder při 600k/60 min)**; reviewer 600k/60 min +33,5 % (+162 USD);
+  - celkem −0,1 % (−1,2 USD) nejlépe při 60k/5 min, +6,5 % (+77 USD) při 200k/60 min, +31 % (+368 USD) při 600k/60 min.
+  Vyrovnání: úspora startu je ≈ 21–28 tis. jednotek na znovupoužití (planner 40 tis.), ale každý další tah platí 0,1 × nahromaděný kontext;
+  zlomový přírůstek kontextu (úspora ÷ (0,1 × tahy)) je steward 41 tis., tester 38 tis., closeout 28 tis., suggester 26 tis.,
+  retro 21 tis., coder 4,4 tis., reviewer 7,3 tis., planner 9,8 tis. tokenů. Steward a tester přidají na běh jen 7,7 tis. a 12 tis. tokenů,
+  proto jediné vycházejí kladně a to jen o jednotky USD; role s dlouhými běhy (coder přidá 111 tis., reviewer 178 tis. tokenů na běh)
+  se po prvním znovupoužití vyplácejí záporně. Hranice držení cache: ping stojí 0,1 × kontext, mrtvá cache 2 × kontext, držet se vyplatí
+  při dalším použití do ≈ 20 h; ping každou hodinu na jeden worker role stojí 0,04–0,37 USD/den (≈ 1,7–2,9 USD/den za všechny role) a vyplatí se jen tam, kde
+  by jinak byla mezera > 60 min.
+- Strop „nulového nahromadění“ (každý běh startuje z teplého základu): 6,7 USD při TTL 5 min (0,6 %), 23 USD při 60 min (2,0 %
+  ceny Foremanu); s pingem na worker a roli čistě 22 USD za 4,4 dne. To je ale totéž, co dá stabilní prefix bez sessions.
+- **Rozhodnutí:** pool s nahromaděným kontextem **no-go** (nejlepší politika −4 USD, tedy 0,1 % z 3 224 USD); karta FM-9 se nestaví.
+  Páka je **stabilní a bajtově shodný prefix** (FM-2, FM-10): konstantní creation start 38 USD, strop 1,2 %.
+
+#### Pořadí stavby
+1. `batch` (CL-205): největší strop (7,3 %), jedno místo (CodeLoupe MCP), snadné kontrolované A/B proti stejným úkolům.
+2. Stabilita prefixu (FM-10, existující karta): levná oprava (přesunout nebo odstranit proměnný blok), strop 1,2 %; může běžet souběžně.
+3. Strukturované výstupy a deterministický triage (FM-11, včetně klasifikátoru selhání): 2,7 %, nízká jistota, závisí na tom, kolik z oken běží ještě mimo phase-mode.
+
+#### Vedlejší nález měření
+`codemetrics.mjs` i `TranscriptParser.kt` berou `usage` z **první** řádky zprávy se stejným `id`; ta nese průběžné `output_tokens`.
+Poslední řádka má konečný počet: výstup je tak podhodnocen **2,1 ×** (30,8 M místo 65,5 M tokenů za sledované období, tj. asi +9 %
+celkové vážené ceny; u retro +22 %). Podíly v této kapitole počítají tam, kde to šlo, s konečným výstupem; oprava v CL-206.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
