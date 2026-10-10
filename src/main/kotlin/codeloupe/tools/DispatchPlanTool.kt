@@ -20,7 +20,7 @@ class DispatchPlanTool(
     override val description = "Plan the next windows of work: from candidates=[ids], epic=<id>, or query=<filters> (none: the most urgent open leaf " +
         "tasks) it predicts each task's touch set (landed files, else the code its text names), compares them with each other and with the " +
         "live worktrees, and answers windows — a batch of up to 3 light tasks, a chain of up to 3 steps, or one task — each with the shared " +
-        "code that put its tasks together and per-task keys (file:/dir:), then what waits and why (fights with a live worktree, unmet " +
+        "code that put its tasks together and per-task state, epic and keys (file:/dir:), then what waits (with its state) and why (fights with a live worktree, unmet " +
         "dependency, no free slot) and the live windows. slots = free windows (default 4); width=dir (default) also treats one directory as a " +
         "clash, file only one file. replay=true plans past work again (resolved tasks with their landed files, no live windows) to check a recorded dispatch. Asking again answers 'unchanged' or only the changed sections. You keep the final judgment."
     override val properties = Schema.properties(

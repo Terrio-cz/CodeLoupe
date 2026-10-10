@@ -15,6 +15,7 @@ import codeloupe.tracker.TrackerMirror
 import codeloupe.tracker.TrackerSettings
 import codeloupe.tracker.Trackers
 import codeloupe.tracker.mirror.MirrorStore
+import codeloupe.tracker.read.TaskRows
 import codeloupe.tracker.youtrack.YouTrackAdapter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +66,7 @@ class DispatchTest {
         val text = plan(ids("CL-27", "CL-28", "CL-30"))
         assertContains(text, "dispatch plan: 2 windows of 4 slots")
         assertContains(text, Regex("W1 batch CL-27\\+CL-28 · .*$BILLING"))
-        assertContains(text, Regex("CL-27 light .* keys file:$BILLING dir:src/main/kotlin/demo/"))
+        assertContains(text, Regex("CL-27 light \\S+ \\S+ .* keys file:$BILLING dir:src/main/kotlin/demo/"))
         assertContains(text, "W2 single CL-30 · clear of the others and of the live windows")
         assertFalse("## waiting" in text, text)
     }
@@ -77,8 +78,8 @@ class DispatchTest {
         worktree.resolve(ROUTES).also { it.parent.createDirectories() }.writeText(ROUTES_TEXT.replace("orders", "orders2"))
         val text = plan(ids("CL-27", "CL-28", "CL-30", "CL-29"))
         assertContains(text, "W1 batch CL-27+CL-28")
-        assertContains(text, Regex("CL-30 +CL-30 fights with live CL-29 \\(.*cl29\\): $ROUTES"))
-        assertContains(text, Regex("CL-29 +in a worktree already \\(CL-29\\)"))
+        assertContains(text, Regex("CL-30 \\(.+\\) +CL-30 fights with live CL-29 \\(.*cl29\\): $ROUTES"))
+        assertContains(text, Regex("CL-29 \\(.+\\) +in a worktree already \\(CL-29\\)"))
         assertContains(text, "## live\nCL-29 (")
         assertContains(text, ROUTES)
         git(repo, "worktree", "remove", "--force", worktree.toString())
@@ -88,8 +89,8 @@ class DispatchTest {
     fun `a task with an unfinished dependency waits, slots cut the windows, and a repeated call is one line`() {
         val text = plan(ids("CL-27", "CL-30", "CL-91"), "slots" to JsonPrimitive(1))
         assertContains(text, "W1 single CL-27")
-        assertContains(text, Regex("CL-30 +no free window \\(slots 1\\)"))
-        assertContains(text, Regex("CL-91 +depends on CL-26"))
+        assertContains(text, Regex("CL-30 \\(.+\\) +no free window \\(slots 1\\)"))
+        assertContains(text, Regex("CL-91 \\(.+\\) +depends on CL-26"))
         val again = plan(ids("CL-27", "CL-30", "CL-91"), "slots" to JsonPrimitive(1))
         assertTrue(again.startsWith("dispatch:"), again)
         assertContains(again, "unchanged since your read")
@@ -98,8 +99,18 @@ class DispatchTest {
     }
 
     @Test
+    fun `window and waiting rows carry the task state and the window rows the epic`() {
+        fun row(id: String) = trackers.mirror(id)!!.let { (mirror, canonical) -> TaskRows.row(mirror.store, canonical)!! }
+        val text = plan(ids("CL-27", "CL-30", "CL-91"), "slots" to JsonPrimitive(1))
+        val first = row("CL-27")
+        assertContains(text, Regex("CL-27 \\S+ \\S+ ${Regex.escape(first.state!!)}( ‹${first.parent}›)? "))
+        assertContains(text, "CL-30 (${row("CL-30").state})  no free window")
+        assertContains(text, "CL-91 (${row("CL-91").state})  depends on")
+    }
+
+    @Test
     fun `resolved tasks wait unless the plan is a replay of past work`() {
-        assertContains(plan(ids("CL-16", "CL-27")), Regex("CL-16 +already resolved"))
+        assertContains(plan(ids("CL-16", "CL-27")), Regex("CL-16 \\(.+\\) +already resolved"))
         val replay = plan(ids("CL-16", "CL-27"), "replay" to JsonPrimitive(true))
         assertContains(replay, "CL-16")
         assertFalse("already resolved" in replay, replay)
