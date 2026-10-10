@@ -5,14 +5,13 @@ import codeloupe.repo.Registry
 
 object ChangesTool : Tool {
     override val name = "changes"
-    override val description = "What a branch or worktree changed against the merge-base with the default branch, committed and " +
-        "uncommitted, by declaration: + added, ~ body changed, ^ signature changed (with the old one), - removed. `./f` is a file " +
-        "in the directory of the one above, a lone `[T]` line heads its members. callers=true adds callers (= exact, candidate " +
-        "marked) and tests, bodies=true a line diff, tests=true the Gradle command for the tests that use the changes."
+    override val description = "Declarations a branch or worktree changed against the merge-base, committed and uncommitted: + added, ~ body, " +
+        "^ signature (old one shown), - removed; `./f` = same directory. callers=true adds callers and tests, bodies=true " +
+        "line diffs, tests=true the Gradle command for the affected tests."
     override val properties = Schema.properties(
-        "bodies" to Schema.boolean("Add a compact line diff of every changed declaration"),
-        "callers" to Schema.boolean("Also each declaration's callers and tests"),
-        "tests" to Schema.boolean("Instead of the list: the Gradle command that runs the tests which use the changed declarations"),
+        "bodies" to Schema.boolean("Line diffs"),
+        "callers" to Schema.boolean("Callers and tests"),
+        "tests" to Schema.boolean("Gradle command for affected tests"),
         "limit" to Schema.integer(1, 500),
     )
     override val required = emptyList<String>()

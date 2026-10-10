@@ -215,12 +215,62 @@ populaci běhů z CL-31 (podíl role z ceny × tokeny / S role):
 
 Audit přeceňoval schémata: JSON nástrojů má v transcriptu ≈ 5,0 znaku na token, ne 3,16 (u coderu je skutečný rozdíl A75 − B 7,4 tis. tokenů, analyticky 11,9 tis.).
 Odhad 0,40 % nepočítal nástroje CodeLoupe (v `context-audit.mjs` se http server přeskakuje). Práh 0,7 % splňuje to, co CL-57 nechal
-(0,15 %), součet i s CodeLoupe ho přesahuje o 0,10 pp; zúžení schémat CodeLoupe u rolí je v CL-184.
+(0,15 %), součet i s CodeLoupe ho přesahoval o 0,10 pp; zúžení schémat CodeLoupe u rolí je výsledek CL-184 níže (≈ 0,63 %).
 
 Tahy a nástroje: v 16 během A75 nezavolala žádná role žádný z odebraných nástrojů (GitNexus, IDEA, DataGrip: 0 volání) a B nepřesunulo
 dotazy do `run/terrio.mjs gitnexus` (0 Bash-volání). Tahy (průměr B / A75 / A76): coder 4,4 / 4,0 / 4,4; reviewer 13,3 / 11,7 / 15,3;
 tester 5,8 / 4,8 / 5,2; planner 17,3 / 23,3 / 17,3. Rozptyl uvnitř stejné výbavy (B proti A76) je ±1–2 tahy, tester B +1,0 proti A75 je
 v něm; planner A75 má o 6 tahů víc než B. Žádný nárůst tahů nejde přičíst odebraným nástrojům.
+
+### CL-184: užší schémata nástrojů CodeLoupe, které nesou role (2026-10-10)
+
+Změna: zkrácené popisy (`description`) a popisy parametrů devíti nástrojů, které role nesou (`find`, `outline`, `symbol`, `context`, `usages`, `calls`, `changes`, `task_code`, `doc`),
+a popis parametru `root` (společný všem). Typy, `enum`, meze a `required` zůstaly, stejně tak pokyny, o které se těla rolí opírají (`outline` před čtením souboru, `symbol` pro členy,
+„použij místo grep/rg“); `issue` a `task_context` se nezměnily (editoval je jiný pracovník). Výchozí katalog má dál 14 nástrojů a `ToolListStabilityTest` zůstává zelený.
+
+| Nástroj | JSON před (znaky) | po |
+|---|---:|---:|
+| `find` | 1 078 | 775 |
+| `outline` | 1 152 | 718 |
+| `symbol` | 702 | 523 |
+| `context` | 615 | 458 |
+| `usages` | 685 | 514 |
+| `calls` | 592 | 489 |
+| `changes` | 1 057 | 708 |
+| `task_code` | 897 | 631 |
+| `doc` | 1 153 | 840 |
+| devět nástrojů dohromady | 7 931 | 5 656 (−29 %) |
+| výchozí katalog, 14 nástrojů | 13 329 | 10 837 (−18,7 %; při 3,16 znaku/token 4 218 → 3 429 tokenů) |
+
+Měření startovního kontextu: stejné jednorázové sondy jako v CL-75 (`probe-<role>`, stejné prompty, workspace s dnešními těly), dva démoni CodeLoupe na zahozených home a vlastních portech
+(A = plná schémata z dnešního `main`, T = zkrácená; oba s nastaveným zrcadlem trackeru, aby `issue` a `task_context` byly v nabídce), 3 opakování na roli a variantu, S = první tah.
+Rozptyl uvnitř buňky je ≤ 10 tokenů.
+
+| Role | S před (A) | S po (T) | rozdíl | CodeLoupe část z CL-75 | úspora části |
+|---|---:|---:|---:|---:|---:|
+| coder | 10 717 | 10 293 | −424 | 1 500 | 28 % |
+| tester | 10 406 | 10 067 | −339 | 1 380 | 25 % |
+| reviewer | 11 077 | 10 519 | −558 | 2 160 | 26 % |
+| planner | 12 729 | 12 096 | −633 | 2 520 | 25 % |
+
+Projekce na populaci CL-31 stejným výpočtem jako v CL-75 (podíl role z ceny × tokeny / S role; pokryto 10,7 % celkové ceny): CodeLoupe část **0,62 → 0,46 %** (v měřítku zveřejněných 0,65 → **≈ 0,48 pp**),
+`bySource.mcpSchemas` včetně CodeLoupe 0,80 → **≈ 0,63 %**. První průchod zkrácení (−373 / −311 / −493 / −574 tokenů) vycházel na 0,48 (0,50 v měřítku 0,65), tedy na hraně, proto druhý. Na vymazaném textu vychází
+2,9–3,0 znaku na token (coder: −1 244 znaků = −424 tokenů); „asi 5 znaků na token“ z CL-75 platí pro celé schéma s pevnou režií nástroje, kterou zkracování nezmenší.
+
+Regrese (pevné prompty z CL-23, A i T proti dvěma démonům, Opus high, `terrio-reviewer-opus` a `terrio-planner`):
+
+| Běh | n (A / T) | Nálezy ze skutečných kol (A / T) | USD průměr A / T | Jednotky tis. A / T | Volání modelu A / T |
+|---|---|---|---|---|---|
+| reviewer, úkol 1 | 3 / 3 | 4 z 4 ve všech | 1,21 / 1,15 | 340 / 324 | 12,3 / 12,0 |
+| reviewer, úkol 2 | 3 / 3 | 6 z 6 ve všech | 1,33 / 1,31 | 391 / 380 | 16,0 / 15,0 |
+| planner, úkol 2 | 2 / 2 | plán se nehodnotí | 1,51 / 1,56 | 447 / 461 | 25,0 / 23,5 |
+
+Nálezy reviewera shodné (4 z 4, resp. 6 z 6 ve všech 12 bězích), cena a tahy v rozptylu 15–40 % mezi opakováním. Agenti zavolali CodeLoupe 12× (A) a 10× (T) za 8 běhů každé varianty; chyby byly jen 2× `task_context`
+v obou variantách (zrcadlo trackeru v pokusu je atrapa bez tokenu, tedy stejné v A i T, ne od zkrácení). Kromě toho stejná volání devíti nástrojů (14 volání včetně `changes callers/tests`, `task_code`, `doc view=outline`) na obou démonech:
+odpovědi **bajt po bajtu stejné**, žádná chyba. Skripty (`cl184-run`, `cl184-score`, `ctx184-ws`, `smoke184`) jsou přiložené ke kartě CL-184.
+
+Co zůstává: `issue` (351 znaků popisu) a `task_context` (576) nese několik rolí, jejich zkrácení přidá asi 0,03–0,05 pp po landu změny, která je teď v práci; vyřazení nástroje z role (alternativa karty) by znamenalo úpravu
+frontmatter agentů ve workspace a potřebuje schválení uživatele, měření to neukazuje jako nutné (cíl ≤ 0,5 pp splněn).
 
 ### CL-76: CLAUDE.md mimo subagenty a fázové běhy
 
@@ -264,7 +314,8 @@ v aplikaci (6,1 tis. znaků instrukcí) přidá ≈ 0,15 pp, tj. 0,57 pp.
 
 | Karta | Kritérium | Výsledek |
 |---|---|---|
-| CL-75 | `bySource.mcpSchemas` ≤ 0,7 % | to, co CL-57 nechal, 0,15 % (splněno); včetně CodeLoupe 0,80 % (o 0,10 pp víc, CL-184) |
+| CL-75 | `bySource.mcpSchemas` ≤ 0,7 % | to, co CL-57 nechal, 0,15 % (splněno); včetně CodeLoupe 0,80 %, po CL-184 ≈ 0,63 % (splněno) |
+| CL-184 | schémata CodeLoupe u rolí ≤ 0,5 pp | 0,65 → ≈ 0,48 pp (3 sondy na roli a variantu), nálezy a odpovědi beze změny, splněno |
 | CL-75 | medián S coder ≤ 18k, reviewer ≤ 17k, tester ≤ 12k | 11,0 / 10,6 / 10,0 tis., splněno |
 | CL-75 | bez nárůstu tahů | žádné volání odebraných nástrojů v 16 běhech A75, tahy B ≤ A75 + šum, splněno |
 | CL-76 | `claudeMd` ≤ 0,5 %; medián subagenta 0 | ≈ 0,4 %; 0 ve 34 / 34 běhech B, splněno |

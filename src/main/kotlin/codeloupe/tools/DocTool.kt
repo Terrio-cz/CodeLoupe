@@ -17,15 +17,14 @@ class DocTool(
 ) : Tool {
     private val reader = DocReader(memory)
     override val name = "doc"
-    override val description = "A text file without re-reading it: the default is a digest of at most 1000 characters — size, hash, the sections " +
-        "by handle with their line counts, the lines that look like errors — then section=[handle or heading prefix, L<from>-<to>] fetches " +
-        "just those parts, view=outline lists every section, view=full the whole text. A repeated read with the same root answers " +
-        "'unchanged' in one line, or only what changed; since=none reads it again. For plans, brain notes and large persisted tool outputs."
+    override val description = "A text file without re-reading: default a digest (size, hash, sections by handle with line counts, error-like lines); " +
+        "section=[handle, heading prefix, L<from>-<to>] fetches parts, view=outline lists sections, view=full everything. " +
+        "A repeat read answers 'unchanged' or what changed; since=none reads again. For plans, notes, large tool outputs."
     override val properties = Schema.properties(
-        "path" to Schema.string("File, absolute or relative to root (under root or the agent harness's folders), or job:<id>, the full output of a run or job"),
+        "path" to Schema.string("File or job:<id> (a run's full output)"),
         "view" to Schema.enum(listOf("digest", "outline", "full")),
-        "section" to Schema.strings("Section handles or heading prefixes, or line windows like L120-160"),
-        "since" to Schema.string("none: read again whatever you already have"),
+        "section" to Schema.strings("Handles, heading prefixes, L120-160"),
+        "since" to Schema.string("none: read again"),
     )
     override val required = listOf("path")
     override val needsRoot = false

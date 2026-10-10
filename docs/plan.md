@@ -1760,6 +1760,14 @@ Rozhodnutí: **odstranit oba servery z `.mcp.json`**. Hotovo v živém workspace
 `node mcp/jetbrains-call.mjs --target idea`). Nejdřív ve scratch kopii (`validate`, `run-all`, `doctor` zelené), pak živě: `node mcp/validate.mjs` ok, `bash mcp/test/run-all.sh` zelený (guard 985/985), `node mcp/doctor.mjs` 27 ok, 2 warn, 0 down.
 Zpět: záznam do `.mcp.json` a `SERVERS_EXPECTED`.
 
+### Výsledek CL-184 — užší schémata nástrojů CodeLoupe (2026-10-10)
+
+- Zkrácené popisy a popisy parametrů devíti nástrojů, které role nesou (`find`, `outline`, `symbol`, `context`, `usages`, `calls`, `changes`, `task_code`, `doc`), a popis `root`: JSON těchto devíti 7 931 → 5 656 znaků,
+  výchozí katalog 14 nástrojů 13 329 → 10 837 znaků (4 218 → 3 429 tokenů při 3,16 znaku/token). Schéma (typy, `enum`, meze) a odpovědi nástrojů beze změny, `ToolListStabilityTest` zelený.
+- Měřeno na sondách startovního kontextu jako CL-75: první tah coder −424, tester −339, reviewer −558, planner −633 tokenů (3 opakování, rozptyl ≤ 10); CodeLoupe část schémat u rolí 0,65 → ≈ 0,48 pp,
+  `bySource.mcpSchemas` včetně CodeLoupe 0,80 → ≈ 0,63 %. Regrese: 12 běhů reviewera (6 na variantu, dva uzavřené úkoly) a 4 běhy planneru, nálezy 4/4 a 6/6 ve všech, ceny v rozptylu; odpovědi 14 volání devíti nástrojů bajt po bajtu stejné.
+  Podrobnosti a tabulky: `docs/context-audit.md`, „CL-184“.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |

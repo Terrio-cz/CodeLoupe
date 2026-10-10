@@ -13,7 +13,7 @@ object Tools {
     val ALL: List<Tool> = listOf(FindTool, GrepTool, OutlineTool, SymbolTool, ContextTool, UsagesTool, CallsTool, HierarchyTool, ChangesTool)
 
     val ROOT: JsonObject = Schema.string(
-        "Path to the repository or worktree to answer for (absolute). Defaults to the configured defaultRoot.",
+        "Repository or worktree (absolute).",
     )
 
     fun named(name: String): Tool? = ALL.firstOrNull { it.name == name }
@@ -28,7 +28,7 @@ object Tools {
     }
 
     /** Tools that need no repository take `root` only as the caller's identity. */
-    private val CALLER: JsonObject = Schema.string("Your worktree or repository (absolute): remembers what you already read.")
+    private val CALLER: JsonObject = Schema.string("Your worktree (absolute); keys what you already read.")
 
     /** `root` first, then the tool's own arguments. */
     fun properties(tool: Tool): JsonObject = JsonObject(linkedMapOf("root" to if (tool.needsRoot) ROOT else CALLER) + tool.properties)

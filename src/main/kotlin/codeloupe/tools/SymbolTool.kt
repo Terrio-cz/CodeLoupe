@@ -5,13 +5,12 @@ import codeloupe.query.View
 
 object SymbolTool : ViewTool {
     override val name = "symbol"
-    override val description = "Source of one declaration — KDoc, annotations and body — by name: Type.member, member(ParamType, …) " +
-        "for an overload, pkg.Type, or path/File.kt:line. Types over 120 lines return their header and member list unless full=true. " +
-        "Each result carries hash= for later edits."
+    override val description = "Source of one declaration by Type.member, member(ParamType) for an overload, pkg.Type or path/File.kt:line. " +
+        "Types over 120 lines give header and members unless full=true."
     override val properties = Schema.properties(
         "name" to Schema.string(),
-        "full" to Schema.boolean("Whole body even for large types"),
-        "all" to Schema.boolean("Return every match instead of listing ambiguous ones"),
+        "full" to Schema.boolean("Whole body of large types"),
+        "all" to Schema.boolean("Every match, not a list of ambiguous ones"),
     )
     override val required = listOf("name")
 

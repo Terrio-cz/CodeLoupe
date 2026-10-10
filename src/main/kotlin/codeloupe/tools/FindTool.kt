@@ -5,17 +5,15 @@ import codeloupe.query.View
 
 object FindTool : ViewTool {
     override val name = "find"
-    override val description = "Find declarations (classes, functions, properties, …) by name, qualified name (Type.member) or glob " +
-        "(*Routes), or with mode=search rank declarations for words (\"token limit\"). One line per hit: path:lines [container] signature. " +
-        "Use instead of grep/rg to locate code."
+    override val description = "Find declarations by name, Type.member or glob (*Routes); mode=search ranks them for words. Use instead of grep/rg."
     override val properties = Schema.properties(
-        "q" to Schema.string("Name, Type.member, package.Type or glob with * ?; with mode=search the words of a question"),
+        "q" to Schema.string("Name, Type.member or glob (* ?); words with mode=search"),
         "mode" to Schema.enum(listOf("name", "search")),
         "kind" to Schema.enum(
             listOf("class", "interface", "object", "enum", "companion", "annotation", "fun", "property", "constructor", "enum_entry", "typealias"),
         ),
-        "module" to Schema.string("Module path prefix, e.g. \"api\" or \"services/billing\""),
-        "test" to Schema.boolean("true = only test sources, false = exclude them"),
+        "module" to Schema.string("Module path prefix"),
+        "test" to Schema.boolean("true = tests only, false = no tests"),
         "limit" to Schema.integer(1, 200),
     )
     override val required = listOf("q")
