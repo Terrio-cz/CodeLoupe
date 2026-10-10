@@ -77,7 +77,7 @@ Same run:
 
 | | CodeLoupe | GitNexus |
 |---|---:|---:|
-| Tool definitions in the agent's context (`tools/list`) | 14 tools, 4,223 tokens (3,429 after trimming the descriptions, [Agent runs](Agent-runs#a-shorter-start)) | 17 tools, 22,140 tokens |
+| Tool definitions in the agent's context (`tools/list`) | 14 tools, 4,223 tokens (3,429 after trimming the descriptions, [Agent runs](Agent-run-details#a-shorter-start)) | 17 tools, 22,140 tokens |
 | First index, Exposed / CodeLoupe | 7.3 s / 2.7 s | 128 s / 68 s |
 | Peak memory while indexing, Exposed | 517 MB | 2,583 MB |
 | Memory after the queries | 206 MB daemon, both repositories | 3,325 MB MCP server after 82 queries (114 MB at start) |

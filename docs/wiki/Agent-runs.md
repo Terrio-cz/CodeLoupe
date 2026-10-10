@@ -1,325 +1,80 @@
 *Last updated: 2026-10-10.*
 
-## Summary
+What does a coding-agent run cost, and which changes make it cheaper without making it worse? Controlled experiments on the author's own multi-agent flow (planner, coder, reviewer, tester and dispatcher on a Kotlin backend). Method and tables: [Agent run details](Agent-run-details).
 
-This page reports controlled experiments on the coding agents of the author's own multi-agent software workflow (a planner, a coder, a reviewer, a tester and a dispatcher working on a Kotlin backend), made to find out what an agent run costs and which changes make it cheaper without making it worse.
-Most of the cost is not the code an agent reads: the context a run starts with is about 16 % of the bill, tool results about 22 % and the agent's own output about 16 %, and the rest is mostly the growing conversation, which the model re-reads from its cache on every turn (those re-reads are 54 % of the bill in total).
-What saved cost was fewer turns (a prepared task pack and a stop rule took the planner to 54 % of its cost), a stable prompt prefix, a shorter start (the first prompt shrank from 17-26 thousand tokens to 10-12 thousand), a compact review packet (the reviewer at 83 %) and rewritten dispatcher instructions (to 42 %, measured against a run of another day).
-What did not save cost was a steering hook for the coder (129 % of the cost), a terse-output rule for the coder (inside the noise), a cheaper model for the reviewer (a third of the cost, but known findings missed) and a warm session pool (at best 0.1 %).
-The honest finding is that search tools alone save little: reading code is only 13-19 % of the cost of a run in the four main roles, so even a perfect replacement for grep and file reads can remove only part of that, and agents that now call the code index 6 times per run cost the same as before.
-The samples are small (3-12 runs per variant), all from one project, quality is judged by pattern checks, and the experiment scripts are not published yet; see [what these numbers do not show](#what-these-numbers-do-not-show).
+## TL;DR
 
-## How to read the numbers
+- **Reading code is only 13-19 % of a run's cost.** Cache reads (the model re-reading its growing conversation on every turn) are 54 % of the bill.
+- **What saved money:** fewer turns (a task pack and a turn budget took the planner to 54 % of its cost), a shorter and stable prompt start, a compact review packet, rewritten dispatcher instructions.
+- **What did not:** search tools alone (agents calling the code index 6 times per run cost the same), a hook that redirects the coder's searches (129 %), a cheaper model (a third of the cost, but findings missed), a warm session pool.
+- **Bottom line:** about 16-22 % of the flow's cost from the changes of the last days, about 22-30 % with the earlier prompt trimming (an estimate, see [Bottom line](#bottom-line)).
 
-**An agent run** is one call of one agent, from its first prompt to its final report, on a fixed task with a fixed prompt. Every number comes from the log files Claude Code writes for each run; only counts are read, never the content. A **turn** is one model call.
+## What to take away for your own agent flow
 
-**Roles.** A task goes through the *flow*: plan, code, review and test, then land.
+1. **Give the planner a prepared task pack and a turn budget.** A pack (task, comments, related files) plus an instruction to start from it and stop at 8 turns cut a planner run to 54 % of its cost (235 against 433 thousand units); the pack alone saved only 8 %.
+2. **Keep the start of every prompt byte-identical, and keep project docs out of small helper agents.** A changing block in front of the stable part cost about 2.3 thousand units per start; leaving the project instructions file out of helper agents took the first prompt from 19-21 to 10-12 thousand tokens, no rule lost (54 of 54).
+3. **Trim tools and prompt size at the start.** Each role keeps only the tool servers it uses: first prompt 17-26 down to 10-12 thousand tokens, and two unused servers made a run 7-10 % dearer.
+4. **Choose cache settings that match the pause between runs.** For the reviewer the 1-hour premium was 25.4 million units and 2.9 came back, so 5 minutes saves about 3 % of the flow; for the coder and tester, with pauses of 180-300 seconds, 1 hour stays.
+5. **Do not expect search tools alone to cut cost.** The reviewer called the code index 6.0 times per run instead of 0.2 and cost stayed the same (333 against 323 thousand units).
+6. **Always measure with replicates and a quality gate.** Replicates of one variant differ by 15-40 %, so a smaller difference is noise. A cheaper variant that loses findings is not cheaper: the smaller model cost a third as much and missed 2 of 3 known findings on one task.
 
-| Role | What it does |
-|---|---|
-| Planner | Reads a task and the code and writes the plan, with the risks it sees, before any code is written. |
-| Coder | Implements the plan. |
-| Reviewer | Reads the finished change and reports findings against the task and the repository's rules. |
-| Tester | Builds the change, runs the tests and exercises the service. |
-| Dispatcher | Picks which open tasks to start next, so that no two of them edit the same code. |
+## Bottom line
 
-**Tasks.** The reviewer and planner experiments replay closed changes of the author's backend service, at the commit just before each one landed. They are called task A to E here and differ in size and kind. For the reviewer, the real review of the task gives a list of known findings, so a run can be checked for what it missed.
+**This is an estimate from small controlled runs, not a measured total.** The adopted changes of the last days (task pack and turn budget, file-list sentence, compact review packet, dispatcher instructions, shorter cache for some helper agents) come to about **16-22 % of the cost of the agent flow**. With the earlier prompt trimming (fewer tools, no project instructions in helper agents, unused servers dropped) it is about **22-30 %**. The coder and tester did not improve: what was tried on them was rejected or too small to see.
 
-| Task | The change | Known review findings |
-|---|---|---|
-| A | security headers and static assets of the API documentation (16 files) | 4 |
-| B | search for locations (15 files; a task with 29 comments) | 6 |
-| C | a check of database index names at startup | 3 |
-| D | waiting for the database at startup | 3 |
-| E | validation of account input (11 files; planner runs only) | - |
+*How we arrived at it:* each role's measured saving was weighted by that role's share of the flow's cost (the planner alone is 123 of about 420 million units in the period), then the cache setting (about 3 %) and the project-instructions file (up to 4.2 %) were added. No run measured the whole flow before and after, so the range is wide.
 
-**Cost.** *USD* is the price the Claude Code command line reports for a run. *Weighted units* count tokens with a weight per kind, which makes runs comparable across models and prices: input 1, writing to the cache 1.25 (kept 5 minutes) or 2 (kept 1 hour), reading from the cache 0.1, output 5. The *cache* is a store of the already processed beginning of the prompt: a turn that starts with the same beginning pays 0.1 per token instead of 1, but pays it again on every turn, so a long conversation is mostly cache reads. The *prefix* is that beginning (system prompt, tool definitions, instructions); it only counts as the same if it is identical byte for byte. The *start context* is everything a run is born with before the first turn of real work. Weighted units give the same weight to every model, so a change of model is judged in USD.
+## Small glossary
 
-**Noise.** Each variant ran 3-12 times ("replicates") on the same task. **Replicates of the same variant differ by 15-40 %**, as much as most differences between variants, so a difference smaller than that is not reported as an effect, and the tables give ranges where it matters. Where a test is quoted, it is a permutation or Mann-Whitney test on the runs.
-
-**Throwaway workspaces.** Each experiment ran in a scratch copy of the workspace (agent instructions and tool configuration) and in fresh clones of the repository, each variant with its own CodeLoupe daemon on a separate home and port, so the author's real workspace was never touched. The runs were headless (`claude -p`, no person in the loop). Model and effort (how much the model reasons before it answers) were the same for both variants (Opus, high effort, unless a row says otherwise), the two variants ran at the same time where the machine allowed, never more than two runs at once.
-
-**A correction.** On 2026-10-10 the way output tokens are counted from the logs was fixed: they had been read from the first line of a message instead of its last, which undercounted output by a factor of 2.1 overall (the logs of subagents were affected). All experiments below were recomputed from the original logs. No ratio and no conclusion changed, because the experiment runs are main sessions, where the first line was already complete. The shares in the next section use the corrected count.
+- **Run:** one call of one agent, from its first prompt to its final report. **Turn:** one model call inside a run.
+- **Role:** what an agent does in the flow: planner, coder, reviewer, tester, dispatcher (picks the next tasks). A **helper agent** is one started by another agent.
+- **Cache read vs write:** the provider can keep the processed beginning of a prompt. Writing it costs 1.25 or 2 times a normal input token, reading it 0.1, paid on every turn.
+- **Prompt prefix:** that beginning (system prompt, tool definitions, instructions). It is reused from the cache only if it is identical byte for byte.
+- **Weighted unit:** tokens counted with a weight per kind (input 1, cache write 1.25 or 2, cache read 0.1, output 5), so runs compare across prices; USD where the model changes.
+- **Replicate:** a repeat of the same run on the same task. "Larger" and "smaller" model mean Opus and Sonnet.
 
 ## All changes at a glance
 
-"Cost" is the median weighted units of the changed variant against the variant before it, unless USD is named. Verdicts: adopted, rejected, inconclusive.
+"Effect" is the change in one run's cost against the previous version, in weighted units unless USD is named; negative is cheaper.
 
-| Change | Role | Cost against before | Quality | Verdict |
+| Change | Role | Effect on the run's cost | Quality | Verdict |
 |---|---|---|---|---|
-| A prepared task pack, instructions to start from it and stop at 8 turns | planner | 54 % (235 against 433 thousand) | known findings 27 of 30 in both | adopted |
-| One sentence: list every file the change touches | planner | 87 % of the version before it (173 against 200 thousand) | files of the real solution 98 % against 89 % | adopted |
-| Compact review packet (25 instead of 78 kB) | reviewer | 83 % (267 against 323 thousand) | 48 of 48 known findings | adopted (target 80 %) |
-| Local task index, rewritten instructions, one query call | dispatcher | 42 % (302 against 718 thousand; the older run is from another day) | every plan passes the plan check | adopted |
-| Fewer tools in the first prompt | all four | first prompt 10-12 thousand tokens instead of 17-26 | the dropped tools were never called (0 of 16 runs) | adopted |
-| Project instructions not loaded into subagents | all four | first prompt 10-12 thousand tokens instead of 19-21 | no rule lost (54 of 54) | adopted |
-| Two unused tool servers dropped | reviewer, planner | 7-10 % cheaper | 4 of 4 and 6 of 6 | adopted |
-| Shorter descriptions of CodeLoupe's tools | all four | 339-633 tokens off the first prompt (0.48 % of cost) | same findings (12 of 12 runs) | adopted |
-| Stable prompt prefix (a changing block removed) | all headless runs | about 2.3 thousand units per start (0.4 % of a run) | no effect expected | adopted |
-| Cache kept 5 minutes instead of 1 hour | reviewers, nightly summary | about 3 % of the flow's cost | none (billing only) | adopted |
-| One blocking call instead of polling for long commands | coder | 12.8 against 29.2 thousand units (3 minutes), 23.4 against 39.5 (4-6 minutes) | all 18 job starts correct | adopted |
-| A routing table so agents call the code index | reviewer, planner | unchanged (333 to 323 thousand) | 56 of 56 reviews complete | adopted (use, not saving) |
-| Batch tool: several reads in one call | all | running | running | running |
-| First comparison with the code index | reviewer, planner | reviewer 83 %, planner 101 % | reviewer lost a check | inconclusive |
-| A shorter reviewer prompt | reviewer | 1.07 against 1.10 USD (mean), 1.31 after the repair | lost a known finding (3 of 4) | rejected (repaired) |
-| Local task index alone | dispatcher | 96 % (median), 86 % (mean); no proof of a saving | plans pass | inconclusive |
-| Repository map at session start | all | 106.6 % (mean) | n/a | rejected |
-| Routing table plus steering hook | coder | 129 % and 115 % | 15 of 15; 6 of 9 | rejected |
-| Terse-output rule | coder | 84 % (inside the spread) | 8 of 9 against 9 of 9 | rejected |
-| Sonnet instead of Opus | reviewer | 32 % of the USD | misses 2 of 3 findings on one task | rejected |
-| Sonnet instead of Opus | planner | 41 % of the USD | fewer risks and files | rejected |
-| Opus at medium effort | reviewer | 64 % of the USD (target 60 %) | all 32 known findings | inconclusive |
-| A cap on large tool results | all | 1-4 % at most | information lost | rejected |
-| A warm session pool | all | best case -0.1 %, worst +31 % | n/a | rejected |
-
-## Experiments
-
-### Where the cost goes
-
-This is an analysis of the logs, not an experiment: about 2,400 runs of the author's workspace from 2026-09-23 to 10-06, with the corrected output count.
-
-| Part of a run | Share of cost |
-|---|---|
-| Start context (system prompt, tool definitions, instructions, role prompt, task) | 16.5 % |
-| Tool results (what the agent reads from tools) | 21.6 % |
-| Output (thinking, tool-call arguments, text) | 15.7 % |
-| The rest: the conversation's own growth (messages, edits, reports of subagents) | about 46 % |
-
-By kind of token, cache reads are 54 % of the cost. The split depends on the role: cache reads are 24 % of a reviewer run and 63 % of a coder run (planner 50 %), output is 33 % of a reviewer run and 17 % of a coder run (planner 23 %; from the ten days of 2026-10-01 to 10-10, 1,994 runs). Cost therefore grows with the number of turns times the size of the context: each turn saved saves one more cache read of the whole context. Reading code (file reads, shell searches, diffs) is a part of the tool results, and it is 13-19 % of the cost in the four main roles (coder 13, reviewer 14, high-effort coder 14, planner 19 %) and 22 % in the deep reviewer.
-
-### A shorter start
-
-*What was tried:* each role keeps only the tool servers it uses (a tool server, or MCP server, is a program that gives the agent extra tools; its tool definitions go into every first prompt), the project instructions file is not loaded into subagents, and the descriptions of CodeLoupe's tools are shorter. First-turn context, medians of 3-5 runs per role and variant on the same prompt:
-
-| Change | Measured | Before | After |
-|---|---|---:|---:|
-| Roles keep only the tools they use (coder / reviewer / tester / planner) | first turn, thousand tokens | 18.4 / 25.0 / 17.3 / 26.4 | 11.0 / 10.6 / 10.0 / 12.1 |
-| Project instructions file not loaded into subagents | first turn, thousand tokens, all four roles | 20.3 / 19.9 / 19.3 / 21.4 | 11.0 / 10.6 / 10.0 / 12.1 |
-| Session-start payload of the main session (27 sessions before, 5 after) | first turn, thousand tokens | 74.6 | 64.5 |
-
-The roles still carry CodeLoupe's own tool definitions (1.5 to 2.5 thousand tokens per run, 0.65 % of total agent cost in the period measured). Shortening the descriptions of the nine code and document tools they use (7,931 to 5,656 characters; the whole default catalog of 14 tools, 13,329 to 10,837) took 424 (coder), 339 (tester), 558 (reviewer) and 633 (planner) tokens off the first turn, about 0.48 % of cost. Nothing broke: on the two fixed reviews, 6 runs each per variant, the known findings were the same (4 of 4 and 6 of 6 in all 12 runs), the cost was within the spread (mean 1.27 against 1.23 USD) and 14 calls to the nine tools returned byte-equal answers. Moving the project rules from the shared instructions file into the agent prompts lost no rule (54 of 54 rule questions answered correctly in both variants), and none of the 16 runs that had the dropped tools back (two code-graph servers, the database client, three tracker reads) called one.
-
-### Dropping two unused tool servers
-
-*What was tried:* removing tool servers an agent never calls. 18 runs (reviewer on tasks A and B, planner on task B; 3 replicates): the first variant had a code-graph server and an IDE server enabled, the second had them removed.
-
-| Role, task | Cost USD with / without (3 runs) | Units, thousand | Calls to the two servers | Known findings found |
-|---|---|---|---|---|
-| reviewer, A | 1.20 / 1.18 | 334 / 333 | 0 / 0 | 4 of 4 in all 6 |
-| reviewer, B | 1.32 / 1.12 | 398 / 314 | 0 / 0 | 6 of 6 in all 6 |
-| planner, B | 1.42 / 1.33 | 420 / 378 | 0 / 0 | n/a |
-
-The variant with the servers cost 7-10 % more (spread inside a cell 0.84-1.55 USD), which matches its first call carrying 21.0 instead of 11.1 thousand tokens of tool definitions. In live use over the same period the two servers were called 0 times. The IDE server could not be reached in the run (the IDE was closed), so its definitions were not measured; both servers were removed.
-
-### A repository map at session start
-
-*What was tried:* adding a map of the repository to the context a session starts with. 40 short read-only sessions (Sonnet; 10 questions about the code, each twice per variant), the full plugin, two daemons differing only in the map.
-
-| | no map | map |
-|---|---|---|
-| context added at start | about 60 tokens | about 1,220 tokens |
-| orientation calls (`ls`, `find`, `Glob`) per session | 0.25 | 0.15 |
-| file reads / searches per session | 0.9 / 2.0 | 0.9 / 2.0 |
-| turns per session | 3.4 | 3.3 |
-| weighted cost per session, mean / median | 44,451 / 39,172 | 47,366 / 43,370 (+6.6 % / +10.7 %) |
-
-The map was dearer in 7 of 10 questions and cheaper in 3. It stays off. In none of the 40 sessions did the model call a CodeLoupe tool.
-
-### First comparison: reviewer and planner with the code index
-
-*What was tried:* the reviewer and planner as they were before the code index against today's agents with the CodeLoupe tools. 24 runs, tasks A to E, one run per task and role (the reviewer twice on two of them); sums over the five tasks.
-
-| Role | Variant | Cost USD | Units (thousand) | Model calls | Code reads | Index calls |
-|---|---|---:|---:|---:|---:|---:|
-| reviewer | before | 5.83 | 1,628 | 58 | 55 | 0 |
-| reviewer | after | 4.89 | 1,352 | 48 | 40 | 1 |
-| planner | before | 6.55 | 1,814 | 76 | 96 | 0 |
-| planner | after | 6.39 | 1,828 | 102 | 101 | 10 |
-
-The reviewer was 16 % cheaper (17 % in units), and the planner unchanged (units +1 %, model calls +34 %, wall time -20 %). **None of that can be credited to CodeLoupe**: the agents called it once in seven reviewer runs and ten times in five planner runs, and used `rg`, `git` and file reads for everything else. What differs between the variants is mostly the agent instructions, which were rewritten in the same period; the next experiment shows what it took to get the tool used at all.
-
-### Getting agents to use the code index
-
-*What was tried:* one change at a time, 77 runs (10 variants, about 95 USD): a reviewer on four tasks with known findings (A to D) and a planner on three (A, B, E). The tools were not hidden from the agent and their descriptions were not the barrier. The agent kept to `rg` in the shell (about 13 searches per run) out of habit: its prompt named CodeLoupe in one bullet, its list of allowed tools lacked `grep`, and the plugin's *steering hook* (a script that points a shell search over source files at the equivalent CodeLoupe call) only advised: it spoke 6-8 times per run and 0 of 6 runs followed it. Reviewer, 4-10 runs per row:
-
-| Change to the reviewer | Runs | Index calls per run (runs with at least one) | Units, thousand (median / mean) | USD | Known findings |
-|---|---:|---|---|---:|---|
-| none (the prompt of the day) | 10 | 0.2 (1 of 10) | 333 / 322 | 1.14 | 100 % |
-| steering hook, advice only | 6 | 0.0 (0 of 6) | 350 / 338 | 1.20 | 100 % |
-| `grep` allowed in the tool list, nothing else | 4 | 0.0 (0 of 4) | 373 / 366 | 1.27 | 100 % |
-| routing table in the prompt, no `grep` | 4 | 2.8 (3 of 4) | 329 / 359 | 1.27 | 100 % |
-| routing table and `grep` | 6 | 5.5 (5 of 6) | 314 / 315 | 1.12 | 100 % |
-| steering hook that refuses the first shell search, `grep`, no table | 4 | 5.3 (4 of 4) | 318 / 320 | 1.14 | 100 % |
-| table with a shortened last sentence | 6 | 1.5 (3 of 6) | 305 / 316 | 1.13 | 100 % |
-| **final wording: table, `grep`, "`rg` only for non-Kotlin files"** | **10** | **6.0 (9 of 10)** | **323 / 331** | **1.17** | **100 %** |
-
-A *routing table* is a table in the agent's prompt saying which tool answers which question. Adoption is decided by the wording of the prompt, not by availability: the table plus `grep` moved the reviewer from 0.2 to 6.0 calls per run and the planner from 2.3 to 8.0 (3 runs); a softer last sentence brought it back to 1.5. **Cost did not move** (median 333 to 323 thousand units, mean 322 to 331, the range of one variant 229-483), and findings stayed complete in all 56 reviewer runs. The reason: of the 149 kB of tool results in a review run, 79 kB (53 %) is the prepared review packet, which the agent reads whole and no search replaces; shell searches are 19 %, and only that part is open to CodeLoupe. The planner cost 445 thousand units before and 488 after (3 runs each, inside the noise). How to set up your own agents: [Claude Code integration](Claude-Code-integration#your-own-agents-subagents-with-a-tools-list).
-
-### A shorter reviewer prompt lost a check
-
-*What was tried:* the reviewer's prompt was shortened (8.6 thousand characters instead of 13.9 thousand). The known findings of two tasks showed the cost: on task A it found 3 of 4 in both replicates, because it moved the check that a change comes with a matching pair of release-note entries to a reference file it never opened. Putting the check back, twice, 2 replicates each, same packet and clones:
-
-| Reviewer prompt | Findings, task A (of 4) | Findings, task B (of 6) | Cost USD (A / B) | Model calls (A / B) |
-|---|---|---|---|---|
-| before the shortening | 4, 4 | 6, 6 | 1.20 / 1.18 | 11 / 13 |
-| shortened | 3, 3 | 6, 6 | 0.86 / 1.34 | 7 / 15 |
-| repair 1: a sentence saying the pair must be checked | 3, 3 | 6, 6 | 1.11-1.31 / 1.07-1.43 | 13-19 / 13-21 |
-| repair 2: a missing pair is a finding, with a proposal | 4, 4 | 6, 6 | 1.39 and 0.98 / 1.59 and 1.27 | 26 and 12 / 25 and 17 |
-
-The first repair was not enough: the reviewer mentioned the pair but listed it as "unknown, verify before landing". Only an instruction that makes the omission itself a finding brought the finding back, at a cost about a fifth higher than the shortened prompt (mean 1.31 against 1.07 USD; before the shortening 1.10). The lesson for anyone trimming an agent prompt: re-run a fixed-findings check, because a cheaper run that finds less is not cheaper.
-
-### A task pack that lets the planner stop
-
-*What was tried:* the planner is the largest single cost of the flow (123 of about 420 million weighted units in the period), and in these runs 36 % of a run was output (thinking and the plan), 35 % cache writes and 29 % cache reads, with tool results only 20-30 %. So a bigger first answer pays only if it removes turns. CodeLoupe's `task_context` tool now also carries the description sections of the task, the comment thread within a size budget (long comments cut in the middle, so a 29-comment thread keeps every decision), the files that reference the touched code, and the lines of the repository rules and documents that name the touched files. The planner's instructions were changed to start from that pack, batch what it still has to read, and stop at a budget of 8 turns. 33 analysed runs (Opus, high; tasks A, B and E, each with a known real plan; 37 runs and 42.9 USD in total including 2 trial and 2 discarded runs):
-
-| Variant | Runs | Units, thousand: median (range) | Mean USD | Model calls, median |
-|---|---:|---|---:|---:|
-| before: old instructions, old pack | 9 | 433 (255-506) | 1.45 | 38 |
-| **new instructions, new pack** | 9 | **235 (198-259)** | 0.87 | 17 |
-| old instructions, new pack | 9 | 398 (268-511) | 1.34 | 34 |
-| instructions as deployed, new pack | 3 | 251 (179-281) | 0.89 | 16 |
-| instructions as deployed, old pack | 3 | 285 (236-345) | 1.08 | 29 |
-
-**The new variant costs 54 % of the old one** (median and mean; permutation test p = 0.0014; per task 49, 57 and 58 %). Cache reads fall by 81 % (fewer turns), cache writes by 37 %, output by 31 %; shell code reads per run go from 17.6 to 7.7. **The pack alone saves 8 %**: with the old instructions the planner still reads the task again (1.8 calls per run) and the repository rules (1.1), so the other 46 points are the instructions telling it to start from the pack and stop. Plan quality against the real plans (known review findings 27 of 30 in both, decisions of the real plan 98 % in both, files of the real solution 72 % against 77 %, premortem lines 16.4 against 18.1) is equal within the noise of nine runs; the one visible loss is on the smallest-diff task (files 82 % against 97 %), which the next experiment follows up. ("Premortem" lines are the plan's list of ways the change could fail.) The new variant marks 2.6 facts per plan as "unknown" with the step that resolves them instead of searching on. Limits: 3 tasks, 3 runs per cell, no prepared context file (the live planner is given one, so part of the saving may already be taken), a pattern-based checklist, and a hazard found and fixed on the way: a fresh subagent that read a root another agent had already read was told "unchanged since your read".
-
-### One sentence about every file
-
-*What was tried:* the planner skipped one-line changes and documentation, so its plans covered fewer of the files of the real solution on task E. Adding a section to the pack with files that earlier tasks changed together with the touched code named more files (5 to 7 of 11) but did not change the plans (0.84 against 0.85 of the real files, 5 runs each). A sentence in the instructions did: "list every file the change touches, including one-line edits, the model and the documents the pack names". 21 runs (16 of them new) on task E and two further closed tasks (Opus, high):
-
-| Instructions | Runs | Files of the real solution in the plan | Small files named | Units, thousand (median) | Mean USD |
-|---|---:|---|---|---:|---:|
-| from before the task pack | 6 | 39 of 42 = 0.93 | 15 of 18 | 240 | 0.88 |
-| with the task pack | 9 | 67 of 75 = 0.89 | 21 of 27 | 200 | 0.76 |
-| **with the pack and the sentence** | 6 | **41 of 42 = 0.98** | **18 of 18** | **173** | 0.68 |
-
-Only task E tells the variants apart (the pack names the small files of the other two itself): the sentence missed none of them, the instructions without it missed them in 3 of 5 runs (6 of 6 against 9 of 15 small files). That difference is **not statistically proven** (p about 0.29, two runs against five), but it goes the way the mechanism explains, and the sentence was never worse. Cost against the instructions from before the pack: 72 % in median units (73 % mean; 77 % in USD); against the version without the sentence 87 %. Limits: two runs per cell on the new tasks, and closed tasks whose criteria sometimes already name files.
-
-### Dispatcher: a local task index, then rewritten instructions
-
-*What was tried:* the dispatcher read issues from the issue tracker's API; CodeLoupe's local task index answers those reads from a mirror. First the tools were swapped (28 runs, 47.65 USD, every plan passed the workspace's plan check, 16 of 16). Tracker calls per run fell from 39 to 0.2 (automatic choice) and from 29 to 0.3 (one epic), and one issue read is about half the size, but **cost did not fall**: pooled over 8 runs per variant, the median went from 575 to 551 thousand units (-4 %; mean -14 %; p = 0.80), because the instructions still said to read each candidate (16.6 and 18.3 issue reads per run against 14.0 and 16.7 before). The planner was unchanged too (median 357 to 374 thousand, p = 0.48). Then the instructions were rewritten in four intermediate versions (all of them 49-64 % of the original cost) and finally to read the candidate list once and filter with one query call instead of a separate task-list tool. Automatic choice, 5 runs per row:
-
-| Dispatcher | Runs | Units, thousand (median) | Mean USD | Share of cost spent reading the tracker | Plan check |
-|---|---:|---:|---:|---:|---|
-| before the local index | 5 | 718 | 2.49 | 16.3 % | passes |
-| local index only | 5 | 602 | 1.90 | 10.1 % | passes |
-| **final instructions** | 5 | **302** | 1.20 | **4.0 %** | **5 of 5** |
-
-The runs of the last row are from another day than the first, and the workspace changed in between (a rerun of the previous wording on the same day cost 325 thousand against its 481 of the earlier day), so the fair numbers are the same-day ones: final against previous wording 93 % (302 against 325, two runs), previous against before 67 %, which chains to about 62 %; against the older run of another day it is 42 %. The best intermediate wording, measured in one batch against the original, was 49 % of it (309 against 629 thousand units, 8 runs each, p = 0.003). Limits: 3-5 runs per cell, the plans are only checked by the plan check, not compared for which tasks they chose.
-
-### A compact review packet
-
-*What was tried:* the reviewer is given a prepared *packet* (the diff, the repository's rules index and, optionally, the changed declarations with callers and tests). Four closed review rounds with 16 known findings, 12 runs per variant (Opus, high): the full packet (about 78 kB: the diff with 12 lines of context), a compact one (40 kB: declarations with callers and tests, a diff with 3 lines of context, tests with 1) and a smaller one (25 kB: 2 lines of context, test and documentation diffs on demand with the command in the packet).
-
-| Packet | Runs | Units, thousand (median / mean) | Median USD | Tool results kB | Known findings |
-|---|---:|---|---:|---:|---|
-| full (78 kB) | 12 | 323 / 324 | 1.13 | 147 | 48 of 48 |
-| compact (40 kB) | 12 | 288 / 280 (89 % / 86 %) | 1.01 | 127 | 48 of 48 |
-| **smaller (25 kB)** | 12 | **267 / 263 (83 % / 81 %)** | 0.96 | 114 | 48 of 48 |
-
-A saving of 17 %, three points short of the 20 % target, with no finding lost. Per task the medians of the smaller packet are 56 to 88 % of the full one, and one cell spans 150-340 thousand, so three points are inside the noise of 12 runs. The ceiling is structural: half of a reviewer's cost is cache writes of a context of about 80 thousand tokens, 28 % is output (thinking and the report), and the packet is only 12-13 thousand of those tokens; what the packet leaves out the reviewer reads on demand (code reads rose from 4.6 to 7.4 % of cost). The smaller packet was adopted anyway (low regret, reversible): the packet of a large closed task shrank from 116 to 45 kB.
-
-### Coder: a routing table and a steering hook
-
-*What was tried:* the same two levers as for the reviewer, aimed at the coder. Three closed tasks with a known solution (a command-line option change, a refusal in a weekly import, a nullability change across three modules); 15 and 9 runs per variant (Sonnet, medium effort). After each run the known solution's tests were laid over the coder's tree and the targeted check ran again.
-
-| Coder | Runs | Units, thousand (median / mean) | Model calls | Shell searches per run, share of cost | Known-solution checks |
-|---|---:|---|---:|---|---|
-| today, plan with line hints | 15 | 80 / 84 | 11.3 | 1.5, 4.2 % | 15 of 15 pass |
-| **table, `grep`, steering hook that refuses the first search** | 15 | **103 / 105 (129 %)** | 13.7 | 2.5, 1.3 % | 15 of 15 |
-| today, issue only (no plan) | 9 | 70 / 73 | 9.6 | 2.9, 7.3 % | 9 of 9 |
-| **table, `grep`, hook** | 9 | **81 / 82 (115 %)** | 11.2 | 3.4, 5.1 % | 6 of 9 (one implementation-specific assertion in one task) |
-
-The target was 85 % of today's cost; the variant costs more. Shell search is only 4-7 % of a coder run here, so there is little to save, and the table moves part of it to `outline` and `grep` calls that add two turns. The hook spoke in 4 of 15 runs (10 times) and in none of the 9 runs without a plan. Rejected.
-
-### Coder: a terse-output rule
-
-*What was tried:* one added sentence in the coder's prompt: "terse: no recap, no restating the task or plan, no narration between tool calls, the result in the first line". 3 tasks with a known solution, 3 replicates, 2 variants (Sonnet, medium), 3.20 USD.
-
-| Coder | Runs | Units, thousand (median / mean) | Output tokens (mean) | Final message (characters) | Model calls | Known-solution tests |
-|---|---:|---|---:|---:|---:|---|
-| today | 9 | 94 / 92 | 5,973 | 2,166 | 17 | 9 of 9 |
-| with the rule | 9 | 79 / 85 (84 % / 92 %) | 5,691 (-5 %) | 2,183 | 14 | 8 of 9 (one run did not compile) |
-
-The spread of replicates of one task is 65-123 thousand, so the difference is noise, and the report did not get shorter: the coder already writes in a compact notation. Most of an agent's output is thinking (reviewer 66 %) or tool-call arguments (coder 74 %), not prose. The rule was not adopted. For the tester the logs bound the saving at about 4 % of its cost, far below the noise of nine runs, so it was not tried.
-
-### A cheaper model or lower effort for the planner and reviewer
-
-*What was tried:* the planner and the reviewer (Opus, high effort) are together over half of the spend of the flow. The same scripts, prompts, packets and clones as in the two experiments above, only the model and effort change; the Opus rows are the earlier runs, not rerun. 25 new runs, 10.9 USD. The cost criterion (at most 60 % of Opus high) is judged on USD.
-
-| Role | Variant | Runs | Units, thousand (median) | USD, median / mean | Cost against Opus high (USD / units) | Quality |
-|---|---|---:|---:|---|---|---|
-| reviewer | Opus high | 12 | 267 | 0.97 / 0.94 | 100 % | all 48 known findings |
-| reviewer | **Sonnet high** | 8 | 156 | 0.31 / 0.31 | **32 % / 58 %** | **misses 2 of 3 known findings on task C, in 2 of 2 runs** (28 of 32 overall) |
-| reviewer | **Opus medium** | 8 | 168 | 0.62 / 0.64 | **64 % / 63 %** (mean 68 %) | all 32 known findings |
-| planner | Opus high | 12 | 240 | 0.87 (mean) | 100 % | findings 0.93, decisions 0.99, files 0.74, 16.4 premortem lines, 7.4 lenses |
-| planner | **Sonnet high** | 9 | 184 | 0.36 (mean) | **41 % / 77 %** | findings 0.90, decisions 0.97, files **0.67**, premortem lines **12.1**, lenses **4.7** |
-
-**Neither Sonnet variant passes.** Sonnet is cheap on the reviewer (a third of the cost, 7 turns instead of 12) but reports the headline defect and drops the secondary ones; counting words over the whole report would have called that 100 %, because the words reappear in the "verified" section, so the findings are also counted inside the Findings section only (the Opus runs score the same either way). Opus medium keeps every finding but saves 36 %, four points short of the 40 % target, and falls short on each of the four tasks (61-76 % of the cost). The Sonnet planner is a third of the cost per plan but plans in 8 turns instead of 16, writes 26 % fewer premortem lines and a third fewer risk lenses (kinds of risk considered), and covers 7 points fewer of the real solution's files, in all three tasks; the decisions and known findings stay within the noise. Sonnet at medium effort for the planner was not run, since high already loses the premortem. Nothing was changed in the live agents. Limits: 2-3 replicates per cell, patterns over the text of the report as the quality measure (not graded independently, false findings not counted), one set of closed tasks.
-
-### Waiting for long commands
-
-*What was tried:* turns whose only call is waiting (`sleep`, a status poll, `job wait`) were 9.1 % of all agent cost in 2,651 live runs. The controlled task: a coder agent compiles three clean clones one after another, read-only. *Before:* long commands run in the background and are polled with `sleep` every few minutes. *Two calls:* `job start`, then `job wait`, through the CodeLoupe daemon. *One call:* `job start --wait`, which starts the job and blocks until it ends. Two command lengths, 3 replicates each, 18 runs; waiting turns and units are sums over the replicates, the other columns are per run.
-
-| Command length | Variant | Model calls per run | Waiting turns | Waiting share of units | Units per run (thousand) | USD per run |
-|---|---|---:|---:|---:|---:|---:|
-| about 3 min | before | 6.7 | 8 | 32.2 % | 29.2 | 0.058 |
-| about 3 min | two calls | 12.0 | 12 | 20.6 % | 45.8 | 0.092 |
-| about 3 min | **one call** | 4.0 | 0 | 0 % | 12.8 | 0.026 |
-| 4-6 min | before | 11.7 | 14 | 39.9 % | 39.5 | 0.079 |
-| 4-6 min | two calls | 10.3 | 12 | 27.1 % | 33.9 | 0.068 |
-| 4-6 min | **one call** | 4.0 | 0 | 0 % | 23.4 | 0.047 |
-
-The two-call variant first looked like a failure: its waiting units per run against the variant before were 1.00 at 3 minutes and 0.58 at 4-5 minutes, which on the live 9.1 % is about 5.3 %, not the target of 1 %. The runs showed why. A headless `claude -p` waits in the foreground, so every long command costs one waiting turn however it is waited for, and in five of six runs of the two-call variant the agent wrote its first `job start` with a doubled command prefix and paid for a second start and a second wait. The one-call variant fixes both (a repeated leading command is dropped with a one-line note instead of an error): in all 6 runs no turn was only waiting, all 18 starts were correct, and a run took 4 model calls (3 blocking compiles and the report) against 10-15. **Waiting did not become free**: the blocking call is still one model call per long command, so 0 waiting turns is a floor of one call, not zero cost. The cost differences between the variants also carry the replicate spread (the three long runs of the one-call variant cost 0.056, 0.056 and 0.029 USD). Not covered: commands over about 9 minutes (one more call), waiting for a free build slot, and sessions that are not headless.
-
-### Fewer turns per run: a batch tool (running)
-
-> **Pending.** A tool that runs several independent read-only calls in one turn is being measured against the same tasks; its result will be filled in here.
-
-<!-- batch-tool-result: fill in this section in place, then update the overview table and the summary -->
-
-### Cache kept 5 minutes instead of 1 hour
-
-*What was tried (an analysis of 1,994 runs of ten days, 1.99 billion weighted units; the flow's own roles are 46 % of them):* the agents asked the provider to keep the processed prompt for 1 hour, which costs 2 per token to write instead of 1.25 for 5 minutes. For most subagents the premium is not returned. Over the period the premium was 79.7 million units for subagents, against 23.5 million of rewrites avoided after pauses of 5-60 minutes plus 12.4 million of prefix reuse at start.
-
-| Role | Premium paid (million units) | Returned (million units) | Decision |
-|---|---:|---:|---|
-| reviewer | 25.4 | 2.9 | 5 minutes |
-| planner | 11.2 | 1.9 | 5 minutes, next |
-| nightly summary agent | 3.6 | 0.8 | 5 minutes |
-| deep reviewer | 1.1 | 0.05 | 5 minutes |
-| coder | 7.9 | 8.0 | stays 1 hour |
-| tester | 7.8 | 9.4 | stays 1 hour |
-
-The reviewer, the nightly summary agent and the deep reviewer now ask for 5 minutes, per agent (about 3 % of the flow's cost). The main thread of a run launched for one phase of a task ignores the setting and keeps 1 hour, which its resumed rounds need (35 resumed rounds read 6.4 million tokens from the cache against 68 thousand written). The result depends on the gap between turns: the coder, the tester and a high-effort coder stay on 1 hour because their gaps of 180-300 seconds decide it.
-
-### A stable prompt prefix
-
-*What was found (analysis of the same logs):* the system prompt of consecutive runs of one role is identical in 89-100 % of cases, and yet every run wrote 11.5-15 thousand tokens fresh to the cache at its start. One cause was a block that a startup hook put in front of the stable part, a list of the other open windows that changes with every task claim (different in 117 of 133 consecutive runs of one role). The hook now stays out of headless runs, which saves about 2.3 thousand units per start (0.4 % of a run). The whole instability, if every start were byte-identical, could be worth at most 1.2 % of the cost; the rest was not found in the logs and needs the request itself to be captured. A second block, a timestamp in a prepared context, sits in a tool result, not in the shared prefix, and costs nothing.
-
-### Capping large tool results
-
-*What was found (same logs, no experiment):* the cost of large tool results is spread thinly. The 20 largest results of a role carry only 0.5-1.3 % of its cost (4.5-6.8 % in the small roles); a cap of 12 thousand characters would save 1-4 % and lose information. Reading a whole large source file is the biggest class (reviewer 2.6 % of its cost, high-effort coder 2.7 %, planner 2.6 %). One role, the nightly summary agent, spent 21.6 % of its cost on whole-file reads of notes of 5-77 thousand characters, and got a one-line rule against it. The rest was left alone.
-
-### A warm session pool
-
-*What was simulated (no runs):* keep one worker session per role alive and give the next run of that role a warm start. The saving of a reuse is 21-28 thousand units (planner 40), but every later turn pays 0.1 per token of the accumulated context, and roles with long runs add 111 (coder) or 178 (reviewer) thousand tokens per run. Result over several reset sizes and cache lifetimes: the two smallest roles (a bookkeeping agent and the tester) gain 3-15 %; the larger ones lose from 0 to +39 %; in total the best policy is -0.1 %, and 200 thousand tokens of reset with a 60-minute cache is +6.5 %, 600 thousand +31 %. A pool is not built. What it would have bought is the same as a stable prefix, without the sessions.
+| Rewritten instructions and local task index, one query call | Dispatcher | -58 % (302 against 718 thousand units; other day) | every plan passes the plan check (5 of 5) | Adopted |
+| One blocking call instead of polling for long commands | Coder | -56 % (12.8 against 29.2 thousand units, 3-minute commands); -41 % (23.4 against 39.5, 4-6 minutes) | all 18 job starts correct | Adopted |
+| Prepared task pack, start from it, stop at 8 turns | Planner | -46 % (235 against 433 thousand units) | known findings 27 of 30 in both | Adopted |
+| Compact review packet (25 instead of 78 kB) | Reviewer | -17 % (267 against 323 thousand units) | 48 of 48 known findings | Adopted |
+| One sentence: list every file the change touches | Planner | -13 % (173 against 200 thousand units) | files of the real solution 98 % against 89 % | Adopted |
+| Two unused tool servers dropped | Reviewer, planner | -7 to -10 % (USD) | 4 of 4 and 6 of 6 | Adopted |
+| Cache kept 5 minutes instead of 1 hour | Reviewer, other helpers | about -3 % of the flow's cost | none | Adopted |
+| Prompt table: which tool answers which question | Reviewer, planner | -3 % (323 against 333; noise), but agents now use the index | 56 of 56 reviews complete | Adopted |
+| Shorter descriptions of the code index's tools | All four | -0.5 % (339-633 tokens off the first prompt) | same findings (12 of 12 runs) | Adopted |
+| Stable prompt prefix (changing block removed) | Non-interactive runs | -0.4 % (about 2.3 thousand units per start) | no effect expected | Adopted |
+| Fewer tools in the first prompt | All four | n/a (first prompt 10-12, was 17-26 thousand tokens) | dropped tools never called (0 of 16 runs) | Adopted |
+| Project instructions not loaded into helper agents | All four | n/a (first prompt 10-12, was 19-21 thousand tokens) | no rule lost (54 of 54) | Adopted |
+| Same model at medium instead of high effort | Reviewer | -36 % (USD 0.62 against 0.97; target was -40 %) | all 32 known findings | Inconclusive |
+| First comparison with the code index | Reviewer, planner | reviewer -17 %, planner +1 % (units) | reviewer lost a check | Inconclusive |
+| Local task index alone | Dispatcher | -4 % (551 against 575 thousand units; no proof of a saving) | plans pass | Inconclusive |
+| Smaller model (Sonnet) instead of the larger (Opus) | Reviewer | -68 % (USD 0.31 against 0.97) | misses 2 of 3 findings on one task | Rejected |
+| Smaller model (Sonnet) instead of the larger (Opus) | Planner | -59 % (USD 0.36 against 0.87) | fewer risks and files | Rejected |
+| A cap on large tool results | All | -1 to -4 % at most (estimate) | information lost | Rejected |
+| Terse-output rule | Coder | -16 % (median; inside the spread) | 8 of 9 against 9 of 9 | Rejected |
+| A shorter reviewer prompt | Reviewer | -3 % (USD 1.07 against 1.10); +19 % repaired (1.31) | lost a known finding (3 of 4) until repaired | Rejected |
+| Repository map at session start | All | +6.6 % (mean) | n/a | Rejected |
+| Prompt table plus a hook that redirects shell searches | Coder | +29 % and +15 % | 15 of 15; 6 of 9 | Rejected |
+| A warm session pool | All | -0.1 % at best, +31 % at worst (simulation) | n/a | Rejected |
+| Batch tool: several reads in one call | All | n/a (being measured) | being measured | Running |
 
 ## What did not work
 
-- **Search tools alone.** The agents barely called the code index until their prompts said so; once they did (6 calls per run), the cost did not change. Most of the saving measured so far comes from shorter prompts, fewer tool definitions and fewer turns.
-- **A bigger first answer alone** saved little: the task pack with the old planner instructions saved 8 %; the other 46 points came from the instructions to start from it and stop.
-- **The local task index alone** did not make the dispatcher cheaper: it still read as many issues as before; only rewritten instructions did.
-- **A trimmed prompt can lose a check** (reviewer), and a session-start map cost more than it saved.
-- **Waiting is still a model call**; the floor per long command is one call.
-- **For the coder:** a routing table with a steering hook (129 % of the cost), a terse-output rule (no measurable effect).
-- **Cheaper models:** Sonnet for the reviewer misses known findings, for the planner it plans shallower; Opus at medium effort is the closest (64 % of the cost, all findings) and may be worth re-running.
-- **Ideas dropped before building** because the logs showed a ceiling under 1 % of cost: a rule checker for review findings (only 24 of 503 recorded findings, 4.8 %, and 2 of 81 serious ones could be found by a rule), generating file skeletons (0.19 %), a classifier for environmental failures such as port clashes (0.55 %), a deterministic nightly summary (at most 0.15 %), a hook against repeated reads (5 repeats in 25,653 reads), a warm session pool (0.1 %) and a cap on large results (1-4 % with lost information).
+- **Search tools alone:** agents barely called the code index until their prompts said so, and once they did (6 calls per run) the cost did not change.
+- **A bigger first answer alone:** the task pack saved 8 %; the other 46 points came from telling the planner to start from it and stop.
+- **A new tool without new instructions:** the local task index alone left the dispatcher reading as many issues as before.
+- **Changing a prompt blindly:** a shorter reviewer prompt lost a check; a repository map at session start cost 6.6 % more.
+- **Cheaper models and coder rules:** the smaller model misses findings or plans shallower; the coder's table-plus-hook cost 129 %, a terse-output rule was noise.
 
 ## What these numbers do not show
 
-- **Small samples.** 3-12 runs per variant, often 3, and replicates of one variant differ by 15-40 %. Differences below that are not effects; where a test is quoted, many of them are not significant.
-- **One project.** Every run is on the author's own Kotlin backend and its closed tasks; the roles and prompts are the author's, and other code or other prompts can give other numbers. The tasks were closed, so their comment threads also contain findings of later review rounds.
-- **Quality is checked by patterns.** Known findings, decisions and files of the real solution are matched in the agents' text by patterns and spot checks, not graded independently, and false findings are not counted. A run that finds the known findings may still have been worse in ways nobody measured.
-- **Wall time is only indicative:** two runs at a time on a busy machine.
-- **Live use is not the experiment.** The runs are headless, with hooks off as in a scratch workspace, and without the prepared context some live agents get; absolute numbers move from day to day with the state of the workspace, so only same-day comparisons are fair.
-- **The experiment scripts are not published yet.** The numbers cannot be reproduced from this repository today; the method is described above, and the scripts will be published when they are cleaned of the author's workflow.
+- **Small samples:** 3-12 runs per variant, often 3; replicates differ by 15-40 %.
+- **One project:** the author's own Kotlin backend, roles and prompts; other code or prompts can give other numbers.
+- **Quality by pattern checks:** known findings and files are matched in the agents' text, not graded independently, and false findings are not counted.
+- **Scripts not published yet:** the numbers cannot be reproduced from this repository today; the method is in [Agent run details](Agent-run-details).
