@@ -18,8 +18,10 @@ import java.time.Instant
 
 val tempRoot: File = File(System.getProperty("java.io.tmpdir"))
 
-// The path stays short for Windows.
-val testScratch: File = File(tempRoot, "cl-test-${ProcessHandle.current().pid()}")
+// The path stays short: Windows limits it, and a Unix domain socket made by a test (the fake Docker engine) may not exceed ~100 characters,
+// which the long per-user temp folder of macOS (/var/folders/xx/yyyy/T) leaves no room for. There /tmp is used.
+val scratchRoot: File = File("/tmp").takeIf { !System.getProperty("os.name").startsWith("Windows") && it.isDirectory && it.canWrite() } ?: tempRoot
+val testScratch: File = File(scratchRoot, "cl-test-${ProcessHandle.current().pid()}")
 
 // What the test helpers made before the scratch directory existed, and a scratch directory of a build that was killed.
 val staleName = Regex(
@@ -73,7 +75,9 @@ val cleanStaleTemp = tasks.register("cleanStaleTemp") {
     description = "Removes what earlier test runs left in the system temp directory more than a day ago."
     doLast {
         val cutoff = Instant.now().minus(staleAfter).toEpochMilli()
-        val old = tempRoot.listFiles { f -> staleName.matches(f.name) && f.lastModified() < cutoff }.orEmpty()
+        val old = listOf(tempRoot, scratchRoot).distinct().flatMap { root ->
+            root.listFiles { f -> staleName.matches(f.name) && f.lastModified() < cutoff }.orEmpty().toList()
+        }
         old.forEach { removeTree(it.toPath()) }
         if (old.isNotEmpty()) logger.lifecycle("Removed ${old.size} stale test directories from $tempRoot")
     }

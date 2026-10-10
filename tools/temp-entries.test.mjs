@@ -12,12 +12,14 @@ const script = fileURLToPath(new URL('./temp-entries.mjs', import.meta.url));
 test('lists only the names that were not there before', () => {
   assert.deepEqual(newEntries(['a', 'b'], ['b', 'c', 'a', 'd']), ['c', 'd']);
   assert.deepEqual(newEntries(['a'], ['a']), []);
-  assert.deepEqual(newEntries([], ['kotlin-daemon.1.log', 'kotlin-compiler-client-1-is-running', 'codeloupe-repo-1', 'cl-test-7']), ['cl-test-7', 'codeloupe-repo-1']);
+  const win = (name) => ['C:', 'Temp', name].join('\\');
+  const names = ['kotlin-daemon.1.log', win('kotlin-compiler-client-1-is-running'), '/tmp/hsperfdata_x', '/tmp/codeloupe-repo-1', win('cl-test-7')];
+  assert.deepEqual(newEntries([], names), ['/tmp/codeloupe-repo-1', win('cl-test-7')]);
 });
 
 test('check passes within the limit and fails above it, naming the leftovers', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'temp-entries-'));
-  const env = { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir };
+  const env = { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, TEMP_ENTRIES_DIRS: dir };
   const snapshot = path.join(os.tmpdir(), `temp-entries-snapshot-${process.pid}.json`);
   try {
     execFileSync(process.execPath, [script, 'snapshot', snapshot], { env });
