@@ -36,7 +36,7 @@ short version, a landing page and the download, is the
 |---|---|
 | [Daemon and index](Daemon-and-index) | one daemon per machine, what the index holds, memory and latency |
 | [Worktrees and overlays](Worktrees-and-overlays) | one base index, an overlay per worktree, no watchers |
-| [Benchmarks](Benchmarks) | answer size against grep and whole-file reads, cost of having the tool |
+| [Benchmarks](Benchmarks) | answer size against grep and whole-file reads, cost of having the tool, controlled runs of real agents |
 | [Comparison](Comparison) | against GitNexus and an IDE's MCP server |
 
 ## Install and contribute

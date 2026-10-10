@@ -14,7 +14,7 @@ With a tracker configured it also mirrors your issues (YouTrack first) and answe
 An agent working on a Kotlin repository keeps asking where something is declared, what a file contains, who uses or calls
 it and what its branch changed. Without an index it answers with `rg` and whole-file reads; CodeLoupe answers each question
 with one call. Over two public repositories its answers are 3-41 % of the size of grep plus reading (8 % summed over all
-questions), measured, not estimated ([Benchmarks](https://github.com/Terrio-cz/CodeLoupe/wiki/Benchmarks)):
+questions), measured, not estimated ([Benchmarks](https://github.com/Terrio-cz/CodeLoupe/wiki/Benchmarks); controlled runs of real agents: [Agent runs](https://github.com/Terrio-cz/CodeLoupe/wiki/Benchmarks#agent-runs)):
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks-dark.svg">
@@ -98,7 +98,7 @@ The manual is the [wiki](https://github.com/Terrio-cz/CodeLoupe/wiki); its sourc
 |---|---|
 | Use | [Getting started](https://github.com/Terrio-cz/CodeLoupe/wiki/Getting-started), [Claude Code integration](https://github.com/Terrio-cz/CodeLoupe/wiki/Claude-Code-integration), [Tools reference](https://github.com/Terrio-cz/CodeLoupe/wiki/Tools-reference), [Configuration](https://github.com/Terrio-cz/CodeLoupe/wiki/Configuration), [FAQ and troubleshooting](https://github.com/Terrio-cz/CodeLoupe/wiki/FAQ-and-troubleshooting) |
 | Features | [Jobs and events](https://github.com/Terrio-cz/CodeLoupe/wiki/Jobs-and-events), [Workspaces and Docker cleanup](https://github.com/Terrio-cz/CodeLoupe/wiki/Workspaces-and-Docker-cleanup), [Trackers](https://github.com/Terrio-cz/CodeLoupe/wiki/Trackers), [Environment and secrets](https://github.com/Terrio-cz/CodeLoupe/wiki/Environment-and-secrets), [Hooks and token savings](https://github.com/Terrio-cz/CodeLoupe/wiki/Hooks-and-token-savings), [Metrics and savings](https://github.com/Terrio-cz/CodeLoupe/wiki/Metrics-and-savings), [Desktop app](https://github.com/Terrio-cz/CodeLoupe/wiki/Desktop-app) |
-| How it works | [Daemon and index](https://github.com/Terrio-cz/CodeLoupe/wiki/Daemon-and-index), [Worktrees and overlays](https://github.com/Terrio-cz/CodeLoupe/wiki/Worktrees-and-overlays), [Benchmarks](https://github.com/Terrio-cz/CodeLoupe/wiki/Benchmarks), [Comparison with GitNexus and IDE servers](https://github.com/Terrio-cz/CodeLoupe/wiki/Comparison) |
+| How it works | [Daemon and index](https://github.com/Terrio-cz/CodeLoupe/wiki/Daemon-and-index), [Worktrees and overlays](https://github.com/Terrio-cz/CodeLoupe/wiki/Worktrees-and-overlays), [Benchmarks](https://github.com/Terrio-cz/CodeLoupe/wiki/Benchmarks) ([agent runs](https://github.com/Terrio-cz/CodeLoupe/wiki/Benchmarks#agent-runs)), [Comparison with GitNexus and IDE servers](https://github.com/Terrio-cz/CodeLoupe/wiki/Comparison) |
 | Install and contribute | [Installers and updates](https://github.com/Terrio-cz/CodeLoupe/wiki/Installers-and-updates), [Packaging and releasing](https://github.com/Terrio-cz/CodeLoupe/wiki/Packaging-and-releasing), [Development](https://github.com/Terrio-cz/CodeLoupe/wiki/Development) |
 
 In the repository: [docs/plan.md](docs/plan.md) (plan, decisions, measurements; Czech), [docs/ui-spec.md](docs/ui-spec.md)
