@@ -1142,6 +1142,34 @@ případný další pokus patří jen k planneru (jediná role s dobrým výsled
 **Vedlejší nálezy.** (a) Testy nechávaly dočasné adresáře v `%TEMP%`: 120 tisíc položek zaplnilo disk 931 GB na 0 a shodilo plný `gradlew test`; po úklidu uvolněno ≈ 280 GB. Opravu mezitím dodala CL-208 (moje verze byla nahrazena při merge).
 (b) `SessionStartDaemonTest` „no caller lines“ padá lokálně na Windows i na čistém `origin/main` (CI na Linuxu zelené): řádek `^ 17-19 [Big] …` z výstupu `changes` začíná šesti mezerami; nesouvisí s touto kartou.
 
+### 8.10a Nástroj `batch` jen pro planner (CL-212, 2026-10-11)
+
+**Otázka.** Zapnout `tools.batch` v daemonu a uvést `mcp__codeloupe__batch` jen v `tools:` planneru nestojí ostatní role nic (agent dostane jen nástroje ze svého `tools:`). Opravdu planner ušetří? V § 8.10 měl sám −18 % (3 běhy, jedna úloha, rozptyl běh od běhu 15–40 %).
+
+**Provedení.** Planner Opus, effort high, tři úlohy dřívějších planner pokusů (TER-321, TER-62, TER-324; scratch klon na commitu před landem, bez packetu, prompt z CL-190/CL-205), kopie workspace ve `%TEMP%`
+(živý workspace ani živý daemon se nedotkly), 2 `claude -p` souběžně, nic do YouTrack. A = **živé** tělo planneru bez `batch`; B = totéž s `mcp__codeloupe__batch` v `tools:` a větou z CL-205 doslova shodnou
+(„each ONE `mcp__codeloupe__batch` call … for the independent reads“); tělo B se muselo o 54 znaků zkrátit (starý záložní odstavec pro daemon bez `description`/`comments`, dvě slovní zkrácení), aby zůstalo ≤ 8 000 znaků (7 944).
+Daemony z `main` (f73bdf2, vlastní `CODELOUPE_HOME`, porty 47820/47821), `tools.batch` zapnuto jen pro B. Střídání A/B po párech (stejná úloha a opakování souběžně, strany lane se střídají).
+**Rozsah snížen z 24 na 18 běhů** (3 opakování na úkol a variantu, ne 4): průměr vyšel 0,92 USD/běh, 24 běhů by stálo ≈ 22 USD proti rozpočtu 18; skutečně **16,59 USD**, žádný limit využití ani chyba běhu.
+
+| Úloha | n/var. | Jednotky tis. (medián) A → B | Poměr B / A | USD (medián) A → B |
+|---|---:|---|---:|---|
+| TER-321 | 3 | 299 → 291 | 97 % | 1,11 → 1,12 |
+| TER-324 | 3 | 196 → 210 | 107 % | 0,73 → 0,78 |
+| TER-62 | 3 | 258 → 235 | 91 % | 0,96 → 0,90 |
+
+**Sdruženě** (každý běh dělený mediánem A své úlohy): medián B **0,97**, průměr 0,98 (bootstrap 95 % interval mediánu 0,88–1,07; rozpětí jednotlivých běhů A 0,70–1,21, B 0,89–1,07); USD medián 1,01, součet **8,27 proti 8,32**.
+Cíl (medián ≤ 0,90) nesplněn. `batch` použilo **9 z 9** běhů B (4,7 volání po 6,4 částech, 0 selhaných částí, 0 odmítnutých). Tahů ubylo (zprávy modelu 9,9 → 8,4; `num_turns` CLI 23,0 → 15,2; paralelní čtecí tahy 72 → 84 %,
+sériové čtecí hned po čtecím 21 → 11), cena ne: výstup na běh je stejný (21 790 → 21 795 tokenů, tedy ≈ 44 % vážených jednotek), výsledky nástrojů o 4 % větší (90 → 94 kB) a každý ušetřený tah stál jen čtení cache (váha 0,1).
+
+**Kvalita** (stejný checklist jako CL-189/CL-190: nálezy, rozhodnutí a soubory skutečného řešení, řádky premortem): známé nálezy 28/30 → 30/30, rozhodnutí 60/60 → 60/60, soubory skutečného řešení **101/126 → 92/126 (80 % → 73 %, −7 bodů)**,
+řádky premortem na plán 11,9 → 14,4. Soubory ztrácí B stabilně u několika položek (TER-324: dva modelové soubory 3/3 → 0/3; TER-62: soubor kurzoru 3/3 → 0/3); podle souborů, které skutečně přistály, je TER-321 58 % → 55 %, TER-62 39 % → 52 %.
+Kritérium „kvalita do 3 bodů na každé položce“ tedy není doložené ani na položce souborů.
+
+**Rozhodnutí: odmítnuto, nic se nenasazuje.** Medián 0,97 > 0,90 a soubory −7 bodů. Hodnota −18 % z § 8.10 byla šum jednoho úkolu: TER-321 měla tehdy poměr 85 %, teď 97 % při stejné větě i stejném chování
+(nástroj použit v každém běhu). Planner už paralelizoval čtení, takže `batch` mění počet tahů, ne cenu. Živé tělo ani `config.json` živého daemonu se nemění; `tools.batch` zůstává v produktu jako volba (dokumentovaná v `Configuration`),
+žádná role ji nepoužívá. Další pokus s `batch` nemá smysl.
+
 ### 8.11 Výsledek CL-203 — znalostní úložiště s kotvami v kódu (2026-10-11)
 
 Stavba strany CodeLoupe; řízené A/B retra a stewarda a napojení na živé Terrio přijdou později. Rozhodnutí z 8.6 (strop na

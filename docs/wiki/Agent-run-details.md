@@ -318,9 +318,19 @@ The one-call variant fixes both (a repeated leading command is dropped with a on
 
 Pooled over all 18 pairs, each run divided by the median of its task's current-version runs: median 0.97, mean 1.05; the goal was a median of 0.90 or less. Total USD 11.22 against 11.21.
 
-- **Where it helped:** the planner, which reads many declarations in a row: it used the tool in every run and needed 2 turns fewer. Its current instructions already made 93 % of its read turns parallel, so the saving is the difference between several parallel calls and one, not a new kind of parallelism.
+- **Where it helped:** the planner, which reads many declarations in a row: it used the tool in every run and needed 2 turns fewer (a repeat on three tasks, below, did not confirm a saving). Its current instructions already made 93 % of its read turns parallel, so the saving is the difference between several parallel calls and one, not a new kind of parallelism.
 - **Where it did not:** the reviewer used the tool but also kept issuing single reads afterwards (turns 11.3 to 12.3), and one task cost 16 % more; the coder, a smaller model, never called it in 9 runs, so its numbers are run-to-run spread. Parallel read turns went from 34 % to 31 % of read turns.
 - **Limits:** 3 replicates per cell, one planner task, the tool and its sentence were measured together, and a failed assertion of the known tests is an implementation difference that the tool cannot have caused (it was unused). Not adopted in the live agents; the tool stays in the product as an option (`tools.batch`).
+
+**Planner only, repeated on three tasks.** Since an agent only gets the tools its own definition lists, the tool could be switched on for the planner alone without costing the other roles anything. The planner (Opus, high) was run again on three tasks (the earlier one and two more), 3 replicates per task and variant, 18 runs, 16.6 USD (24 runs would have cost about 22 USD, over the budget). Today's instructions against the same instructions with the tool and its sentence:
+
+| Task | Weighted units, thousand (median) today -> batch | Ratio | USD (median) |
+|---|---|---:|---|
+| first | 299 -> 291 | 97 % | 1.11 -> 1.12 |
+| second | 196 -> 210 | 107 % | 0.73 -> 0.78 |
+| third | 258 -> 235 | 91 % | 0.96 -> 0.90 |
+
+Pooled, each run divided by the median of its task's current-version runs: median 0.97, mean 0.98 (a rough 95 % interval for the median is 0.88-1.07); the goal was 0.90 or less. USD 8.27 against 8.32. The planner used the tool in 9 of 9 runs (4.7 calls of 6.4 parts, no failed part) and made fewer turns (model messages 9.9 to 8.4, parallel read turns 72 % to 84 %), but the cost did not follow: about 44 % of a run's weighted units is the written plan (21,800 output tokens either way), and a saved turn only saves a cheap cache read. Against the real plan's checklist, known findings were 28 of 30 against 30 of 30, decisions 60 of 60 either way, and the real solution's files named in 73 % of the plans against 80 % (the plans with the tool lost the same few files in all three runs of a task). The first experiment's -18 % for the planner came from one task whose ratio is 97 % here, so it was spread. Not adopted; no live instructions or settings changed, and the option stays available (`tools.batch`) for anyone who wants it.
 
 ### Cache kept 5 minutes instead of 1 hour
 
