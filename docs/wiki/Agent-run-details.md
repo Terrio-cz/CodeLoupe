@@ -303,11 +303,24 @@ The one-call variant fixes both (a repeated leading command is dropped with a on
 
 **Waiting did not become free**: the blocking call is still one model call per long command, so 0 waiting turns is a floor of one call, not zero cost. The cost differences between the variants also carry the replicate spread (the three long runs of the one-call variant cost 0.056, 0.056 and 0.029 USD). Not covered: commands over about 9 minutes (one more call), waiting for a free build slot, and interactive sessions.
 
-### Fewer turns per run: a batch tool (running)
+### Fewer turns per run: a batch tool
 
-> **Pending.** A tool that runs several independent read-only calls in one turn is being measured against the same tasks; its result will be filled in here.
+*What was tried:* a tool that answers up to 8 independent read-only calls (symbol, usages, search, document sections and so on) in one turn, each part labelled, an error staying in its own part. The agents' instructions already said to put independent reads in one message, yet only about a third of their read turns were parallel. The tool is off by default (it adds about 770 characters, 7 %, to the tool list) and was switched on for the second variant together with one sentence in the instructions of the coder, reviewer and planner. 36 runs, 22.4 USD in total: coder (Sonnet, medium; three tasks, each with a known solution whose tests were run on the result), reviewer (Opus, high; two tasks) and planner (Opus, high; one task), 3 replicates per task and variant, the two variants run side by side.
 
-<!-- batch-tool-result: fill in this section in place, then add its row to the overview table on Agent-runs and update the TL;DR there -->
+| Role | Runs per variant | Weighted units, thousand (sum) | USD (sum) | Turns per run | Used the tool | Quality |
+|---|---:|---|---:|---|---|---|
+| coder, today | 9 | 762 | 1.52 | 12.4 | - | 9 of 9 pass the known tests |
+| **coder, batch** | 9 | 802 (+5 %) | 1.60 | 13.0 | **0 of 9 runs** | 7 of 9 (two runs of one task fail one assertion of the known tests) |
+| reviewer, today | 6 | 1,789 | 6.33 | 11.3 | - | 30 of 30 known findings |
+| **reviewer, batch** | 6 | 1,948 (+9 %) | 6.84 | 12.3 | 6 of 6 runs, 3.2 calls of 5.0 parts | 30 of 30 |
+| planner, today | 3 | 897 | 3.36 | 10.3 | - | 50 % of the real solution's files named |
+| **planner, batch** | 3 | 734 (-18 %) | 2.78 | 8.3 | 3 of 3 runs, 5.3 calls of 6.6 parts | 54 % |
+
+Pooled over all 18 pairs, each run divided by the median of its task's current-version runs: median 0.97, mean 1.05; the goal was a median of 0.90 or less. Total USD 11.22 against 11.21.
+
+- **Where it helped:** the planner, which reads many declarations in a row: it used the tool in every run and needed 2 turns fewer. Its current instructions already made 93 % of its read turns parallel, so the saving is the difference between several parallel calls and one, not a new kind of parallelism.
+- **Where it did not:** the reviewer used the tool but also kept issuing single reads afterwards (turns 11.3 to 12.3), and one task cost 16 % more; the coder, a smaller model, never called it in 9 runs, so its numbers are run-to-run spread. Parallel read turns went from 34 % to 31 % of read turns.
+- **Limits:** 3 replicates per cell, one planner task, the tool and its sentence were measured together, and a failed assertion of the known tests is an implementation difference that the tool cannot have caused (it was unused). Not adopted in the live agents; the tool stays in the product as an option (`tools.batch`).
 
 ### Cache kept 5 minutes instead of 1 hour
 
