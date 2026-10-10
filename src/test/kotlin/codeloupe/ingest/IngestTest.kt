@@ -334,19 +334,23 @@ class IngestTest {
                 .result("a", "src/Order.kt:10-20  class OrderService")
                 .turn(tools = arrayOf(Triple("b", "Bash", args("command" to "rg -n handle src"))))
                 .result("b", "src/Order.kt:12")
-                .turn(tools = arrayOf(Triple("c", "mcp__codeloupe__find", args("q" to "Missing"))))
+                .turn(tools = arrayOf(Triple("c", "mcp__codeloupe__find", args("q" to "Missing")), Triple("e", "mcp__codeloupe__find", args("q" to "Absent"))))
                 .result("c", "no declaration Missing")
+                .result("e", "no declaration Absent")
+                .turn(tools = arrayOf(Triple("d", "Grep", args("pattern" to "Missing"))))
+                .result("d", "src/Missing.kt")
                 .write(rig.project.resolve("s1.jsonl"))
             rig.ingest.passNow()
 
             val gaps = rig.queries.gaps(0, null, emptyList(), 50)
             assertEquals(setOf("fallback", "empty"), gaps.map { it.kind }.toSet())
-            val fallback = gaps.single { it.kind == "fallback" }
+            assertEquals(setOf("Missing"), gaps.filter { it.kind == "empty" }.mapNotNull { it.token }.toSet(), "an empty answer nobody looked up elsewhere (Absent) is no gap")
+            val fallback = gaps.single { it.kind == "fallback" && it.token == "handle" }
             assertEquals("rg", fallback.fallback)
             assertEquals("handle", fallback.token)
             assertEquals("s1", fallback.session)
             assertEquals(1, fallback.turn)
-            assertEquals(listOf("gap.new", "gap.new"), rig.eventTypes())
+            assertEquals(listOf("gap.new", "gap.new", "gap.new"), rig.eventTypes())
             assertEquals("fallback", rig.queries.steps(rig.runs().single().id, StepSort.SEQ, 0, 10).items[0].gap)
 
             TranscriptBuilder(today)
@@ -355,13 +359,16 @@ class IngestTest {
                 .result("a", "src/Order.kt:10-20  class OrderService")
                 .turn(tools = arrayOf(Triple("b", "Bash", args("command" to "rg -n handle src"))))
                 .result("b", "src/Order.kt:12")
-                .turn(tools = arrayOf(Triple("c", "mcp__codeloupe__find", args("q" to "Missing"))))
+                .turn(tools = arrayOf(Triple("c", "mcp__codeloupe__find", args("q" to "Missing")), Triple("e", "mcp__codeloupe__find", args("q" to "Absent"))))
                 .result("c", "no declaration Missing")
+                .result("e", "no declaration Absent")
+                .turn(tools = arrayOf(Triple("d", "Grep", args("pattern" to "Missing"))))
+                .result("d", "src/Missing.kt")
                 .turn()
                 .write(rig.project.resolve("s1.jsonl"))
             rig.ingest.passNow()
-            assertEquals(4, rig.runs().single().turns)
-            assertEquals(2, rig.events.size, "a run that grew does not announce its old gaps again")
+            assertEquals(5, rig.runs().single().turns)
+            assertEquals(3, rig.events.size, "a run that grew does not announce its old gaps again")
         }
     }
 
