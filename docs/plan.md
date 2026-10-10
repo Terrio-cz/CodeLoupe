@@ -1676,6 +1676,64 @@ a dostalo podtypy na 124 % a změny na 131 %; zbytek byl strukturální, ne form
 - Odpověď `changes` je u velkých větví řezaná limitem 60 deklarací (poslední řádek říká kolik chybí); srovnání s `git diff --stat` je tedy
   „co agent přečte na první pohled“, ne úplný výpis. Úplnost: `limit`.
 
+### Výsledek CL-88, CL-74 a CL-47 — řízená měření místo týdne pozorování (2026-10-10)
+
+Tři karty čekaly na „7+ dní běhu“. Nahrazují je řízené pokusy podle vzoru § 8.4 (stejný úkol, dvě varianty, ≥ 3 opakování na variantu, výsledek za hodiny):
+`claude -p` v kopii workspace Terria (živý workspace se nemění), odlehlé klony uzavřených tasků a vlastní daemon CodeLoupe (vlastní `CODELOUPE_HOME` a port),
+počty jen z transcriptů (váhy jako v § 8.4: vstup + 1,25 × zápis cache 5 min + 2 × zápis cache 1 h + 0,1 × čtení cache + 5 × výstup; tah = jedno volání modelu).
+
+**CL-88 — čekací tahy.** Pevný úkol pro agenta `terrio-coder` (Sonnet, medium, jen čtení): tři studené kompilace tří klonů po sobě
+(`gradle compile --no-daemon --rerun-tasks --no-build-cache`), vyhodnotit PASS/FAIL. Varianta A = stav před CL-88 (kopie `.bak-cl88`: tělo agenta, `terrio.mjs`, `jobs.mjs`;
+dlouhé běhy na pozadí a čekání po ≤ 4 min), varianta B = dnešek (`job start` / `job wait` přes daemon). Dvě délky: krátká (příkaz ~3 min, celý běh ~9 min)
+a dlouhá (`org.gradle.workers.max=1` v klonu, příkaz 4–5 min, běh ~14 min). Tah je čekací, když jeho jediné volání je `sleep`/`until`, `job wait|status`
+nebo `brain status`. 12 běhů, součet za 3 opakování (čekací jednotky = váha čekacích tahů):
+
+| Délka | Var. | Čekací tahy (na běh) | Čekací jednotky z celku | Cena běhu USD | Wall (s) |
+|---|---|---|---|---|---|
+| krátká | A | 8 (2,7) | 28,2 tis. z 87,7 tis. = 32,2 % | 0,058 | 549 |
+| krátká | B | 12 (4,0) | 28,3 tis. z 137,3 tis. = 20,6 % | 0,092 | 552 |
+| dlouhá | A | 14 (4,7) | 47,3 tis. z 118,6 tis. = 39,9 % | 0,079 | 816 |
+| dlouhá | B | 12 (4,0) | 27,5 tis. z 101,6 tis. = 27,1 % | 0,068 | 810 |
+
+Podíl čekání na ceně takto malého běhu (jen čekání a tři startovací volání) neříká nic o podílu na ceně reálného běhu; srovnatelný je poměr
+čekacích jednotek B proti A na běh: **1,00 u krátkého a 0,58 u dlouhého čekání** (0,74 za všech 12 běhů). Přenesen na naměřených 9,1 % z baseline (§ 1) vychází
+**9,1 % → asi 5,3 % při 4–5minutových příkazech a bez změny při 3minutových**, tedy nad cílem ≤ 1 % o 4,3 procentního bodu a víc. Kritérium **není splněno**.
+Proč: (1) `claude -p` čeká na příkaz v popředí, takže `job wait` je jeden čekací tah na příkaz, stejně jako jeden `sleep` do ~230 s; úspora vzniká až u příkazů
+delších než jeden krok (A měl při 4–5 min 3–7 čekacích tahů, B pořád 4); nejmenší možné je jedno volání modelu na dlouhý příkaz, nikdy nula; (2) v **5 ze 6 běhů B** agent
+první `job start` napsal s dvojitou předponou (`job start -- node run/terrio.mjs gradle …`, `unknown group "node"`) a ztratil tím jedno volání i jedno čekání;
+tělo `terrio-coder` říká `job start -- <command>` a „command“ čte jako celý příkaz. Co v pokusu **nejde ověřit**: probuzení notifikací z `job wait`
+na pozadí (v `-p` se úlohy na pozadí na konci tahu ztrácejí), čekání na volný slot (`gradle-test`; tělo coderu zakazuje čekat, takže A ani B neprobíhají) a reálná délka 10–30 min.
+Zbytek je karta CL-185: `job start --wait` v `terrio.mjs` (jeden tah na příkaz), shovívavý `job start` a znovuspuštění stejného pokusu.
+
+**CL-74 — uvolnění workspace.** Šest cyklů (3 s `reconcile.auto: false` jako v živém configu, 3 s `true`) na scratch repozitáři s vlastními názvy `s74-*`, daemon s adopcí podle jména a pravidlem `protect`.
+V každém cyklu 6 worktrees a 6 stacků po čtyřech zdrojích (kontejner, síť, volume, image): jeden stack označený přes `ws up`, jeden jen adoptovaný jménem, jeden adoptovaný, ale chráněný,
+jeden aktivní, dva ze zalandovaných workspaců (označený a adoptovaný), a k tomu kontejner bez vlastníka. `ws release` na tři workspace (označený, adoptovaný, chráněný):
+
+- **Smazáno přesně to, co mělo:** 8 zdrojů dvou nechráněných uvolněných stacků zmizelo v 23–25 s (kontejnery `sleep` čekají na `docker stop`), 6/6 cyklů; zbylých 13 zdrojů zůstalo
+  (aktivní, chráněný, zalandovaný bez uvolnění, kontejner bez vlastníka). Inventář Dockeru mimo `s74-*` (kontejnery, volumes, sítě a images uživatele) je před a po stejný ve všech cyklech.
+- `ws reconcile --run` (automatické položky) nesmazal nic navíc; zalandovaný stack bez uvolnění plán řadí do `confirm` („workspace landed, but it has running containers“ / „adopted by a rule, not labelled“)
+  a `ws reconcile --run --workspace TER-n --plan <hash>` smazal přesně jeho 4 zdroje (za ~0,75 s), 6/6.
+- Na disku: po `git worktree remove` zmizely adresáře uvolněných workspaců, adresáře ostatních zůstaly; `ws release --list` je po dokončení prázdný.
+- `release` čistí i při `auto: false` (je to výslovný pokyn); bez něj se nemaže nic, co není chráněné a jen zalandované. Neověřeno tímto pokusem: haky `git cleanup` a `docker down` v `terrio.mjs`
+  (volají tentýž `ws release`, krytý self-testem a reálným close-outem TER-99999), takže kritérium je dokázané na straně CodeLoupe.
+
+**CL-47 — GitNexus a IntelliJ MCP.** Stejné zadání (reviewer `terrio-reviewer-opus` na TER-321 a TER-62 na commitech těsně před zalandováním, planner na TER-62; Opus, high, 3 opakování), varianta A = GitNexus + IDEA MCP
+povolené (řádek `tools` agenta i `--mcp-config`), B = odebrané. 18 běhů:
+
+| Role | Úkol | Var. | Cena USD (3 běhy) | Jednotky (tis.) | Volání GitNexus + IDEA | Nálezy známé z reálných kol |
+|---|---|---|---|---|---|---|
+| reviewer | TER-321 | A / B | 1,20 / 1,18 | 334 / 333 | 0 / 0 | 4/4 ve všech 6 |
+| reviewer | TER-62 | A / B | 1,32 / 1,12 | 398 / 314 | 0 / 0 | 6/6 ve všech 6 |
+| planner | TER-62 | A / B | 1,42 / 1,33 | 420 / 378 | 0 / 0 | — |
+
+Nálezy jsou počítány podle klíčových frází proti nálezům reálných kol (TER-321: 4, TER-62: 6; ručně ověřeny dva reporty). Varianta A je dražší o 7–10 % (rozptyl uvnitř buňky 0,84–1,55 USD), což odpovídá
+tomu, že první volání modelu nese **21,0 tis. tokenů proti 11,1 tis.** (schémata GitNexus +9,9 tis. na každé volání). **IDEA nebyla dosažitelná** (`ECONNREFUSED 127.0.0.1:64342`, IntelliJ zavřený; krátce předtím běžel
+bez otevřeného projektu TerrioImporter), takže se měřit nedala; živá čísla `readcalls --servers --since 2026-10-08`: **GitNexus 0 a IDEA 0 volání** od přepnutí agentů (dříve za 15 dní 262 a 28 volání, z GitNexu 166× `list_repos`).
+Rozhodnutí: **odstranit oba servery z `.mcp.json`**. Hotovo v živém workspace se zálohami `.bak-cl47`: `.mcp.json` (−2 servery), `mcp/validate.mjs` (`SERVERS_EXPECTED`), `mcp/doctor.mjs` (sondy MCP gitnexus a idea),
+`.claude/settings.json` (−29 řádků `allow` pro `mcp__gitnexus__*` a `mcp__idea__*`), `CLAUDE.md`, `brain/facts/mcp.md`, skilly `terrio-gitnexus` a `terrio-intellij` (cesta přes CLI `node run/terrio.mjs gitnexus` a
+`node mcp/jetbrains-call.mjs --target idea`). Nejdřív ve scratch kopii (`validate`, `run-all`, `doctor` zelené), pak živě: `node mcp/validate.mjs` ok, `bash mcp/test/run-all.sh` zelený (guard 985/985), `node mcp/doctor.mjs` 27 ok, 2 warn, 0 down.
+Zpět: záznam do `.mcp.json` a `SERVERS_EXPECTED`.
+
 ## 10. Rizika
 
 | Riziko | Uzavřeno |
