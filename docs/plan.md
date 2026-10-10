@@ -652,7 +652,7 @@ Kvalita plánu (kontrolní seznam podle CL-23: známé nálezy reálných kol �
 Nálezy a rozhodnutí jsou u B stejné jako u A (shodně chybí třetí nález TER-321: dvojice `Public-Change`, v bench packetu není brain). Rozdíl je v pokrytí souborů (0,77 → 0,72) a v počtu
 řádků premortem (−9 %), soustředěný na TER-324 (soubory 0,97 → 0,82: B vynechal čtyřřádkové změny `User.kt`, `Organization.kt` a `docs/local-stack.md`; premortem 16,3 → 14,0), u TER-321
 a TER-62 stejné (0,75 / 0,75 a 0,64 / 0,62). B píše víc `? unknown` (2,6 na plán, např. sloupce projekce TER-63, existující typ provenance), tedy místo dohledávání nechá krok, který fakt
-ověří. Při devíti běhech na variantu je to „nehorší v rozptylu“, ne „prokazatelně stejné“.
+ověří. Při devíti běhech na variantu je to „nehorší v rozptylu“, ne „prokazatelně stejné“. Pokrytí souborů a hloubku premortem přebírá karta CL-194 (opakovaný pokus na malých diffech, případně věta v těle).
 
 *Kam jde úspora (medián A → B).* Tahy 38 → 17, čtení cache 1,31 → 0,25 mil. tokenů (−81 %), zápis cache 74 → 47 tis., výstup 31 → 21 tis. (myšlení 11,5 → 7,7 tis.). Čtení kódu shellem
 (`rg`, `sed`, `cat`) 17,6 → 7,7 volání a 60 → 44 kB na běh, `Read` 3,3 → 1,1, ostatní volání CodeLoupe 13,1 → 7,2, balíček 1 volání (18 kB) místo 1,7 volání (12 kB). Podíl C (jen balíček)
