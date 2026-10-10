@@ -59,7 +59,7 @@ A connected server is not enough for an agent you define yourself. In a controll
 
 What this buys is adoption, not tokens: the same runs cost the same (median 333 against 323 thousand weighted units, findings unchanged),
 because more than half of the tool results of a review run is the review packet the agent reads whole; CodeLoupe only replaces the searches
-and range reads around it. Numbers, method and limits: [Benchmarks, Agent runs](Benchmarks#agent-runs).
+and range reads around it. Numbers, method and limits: [Agent runs](Agent-run-details#getting-agents-to-use-the-code-index).
 
 ## From the desktop app
 

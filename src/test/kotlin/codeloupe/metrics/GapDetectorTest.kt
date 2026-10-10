@@ -92,18 +92,54 @@ class GapDetectorTest {
     }
 
     @Test
-    fun `empty, busy and candidate-only answers are gaps even without a fallback`() {
+    fun `busy and candidate-only answers are gaps even without a fallback, an empty one when the agent then looks elsewhere`() {
         val gaps = GapDetector.detect(
             run {
                 turn(tools = arrayOf(find("a", "*Missing"), find("b", "Busy"), Triple("c", "mcp__codeloupe__usages", args("name" to "Account.rename"))))
                 result("a", "no declaration \"*Missing\"")
                 result("b", "busy: build running")
                 result("c", "usages of Account.rename\n0 exact, 3 candidate")
+                turn(tools = arrayOf(Triple("d", "Grep", args("pattern" to "Missing"))))
+                result("d", "...")
             },
         )
         assertEquals(
-            listOf("find:glob:empty", "find:name:busy", "usages:qualified:candidates"),
+            listOf("find:glob:empty", "find:glob:fallback", "find:name:busy", "usages:qualified:candidates"),
             gaps.map { "${it.shape}:${it.kind}" },
+        )
+    }
+
+    @Test
+    fun `an empty answer the agent accepted is a settled negative, not a gap`() {
+        val run = run {
+            turn(tools = arrayOf(find("a", "LocationSearch")))
+            result("a", "no declaration \"LocationSearch\"")
+            turn(tools = arrayOf(Triple("b", "Read", args("file_path" to "src/main/Other.kt"))))
+            result("b", "...")
+        }
+        assertEquals(emptyList(), GapDetector.detect(run))
+        assertEquals(listOf("find:name:settled"), GapDetector.settled(run).map { "${it.gap.shape}:${it.gap.kind}" })
+        assertEquals(listOf("find:name:empty"), GapDetector.detect(run, GapRule.LEGACY).map { "${it.shape}:${it.kind}" })
+    }
+
+    @Test
+    fun `a common word or a short one counts as a fallback only when the read is of a code file the answer named`() {
+        val run = run {
+            turn(tools = arrayOf(find("a", "json"), find("b", "description")))
+            result("a", "src/json/Order.kt:3-10  class Order")
+            result("b", "no declaration \"description\"")
+            turn(tools = arrayOf(Triple("c", "Grep", args("pattern" to "description")), Triple("d", "Read", args("file_path" to "src/json/Other.kt"))))
+            result("c", "...")
+            result("d", "...")
+            turn(tools = arrayOf(Triple("e", "Read", args("file_path" to "src/json/Order.kt"))))
+            result("e", "...")
+        }
+        assertEquals(listOf("find:name:fallback:json"), GapDetector.detect(run).map { "${it.shape}:${it.kind}:${it.token}" })
+        assertEquals(listOf("find:name:settled"), GapDetector.settled(run).map { "${it.gap.shape}:${it.gap.kind}" })
+        // The old rule takes the search for `description` and the read of the other file as well.
+        assertEquals(
+            setOf("find:name:fallback:json", "find:name:empty:description", "find:name:fallback:description"),
+            GapDetector.detect(run, GapRule.LEGACY).map { "${it.shape}:${it.kind}:${it.token}" }.toSet(),
         )
     }
 
@@ -114,6 +150,7 @@ class GapDetectorTest {
                 turn(tools = arrayOf(Triple("a", "Bash", args("command" to "codeloupe symbol OrderService.total --root /w"))))
                 result("a", "no declaration \"OrderService.total\"")
             },
+            GapRule.LEGACY,
         )
         assertEquals(listOf("symbol:qualified:empty"), gaps.map { "${it.shape}:${it.kind}" })
     }
@@ -127,11 +164,30 @@ class GapDetectorTest {
                 result("b", "no declaration \"Bar\"")
             },
         )
-        val report = GapReport.of(runs.asSequence())
+        val report = GapReport.of(runs.asSequence(), GapRule.LEGACY)
         assertEquals(2, report.calls)
         assertEquals(listOf(GapRow("2026-W41", "find", "find:name", "empty", 2, listOf("Foo", "Bar"))), report.rows)
-        assertContains(report.render(), "2 CodeLoupe calls in 1 runs, 2 gaps")
+        assertContains(report.render(), "2 CodeLoupe calls in 1 runs, 2 gaps (all empty answers counted)")
         assertContains(report.render(), "  2×  empty  find:name  (Foo, Bar)")
         assertTrue(GapReport.of(emptySequence()).render().startsWith("no gaps"))
+    }
+
+    @Test
+    fun `the report says how many settled negatives and how many gaps there are`() {
+        val runs = listOf(
+            run {
+                turn(tools = arrayOf(find("a", "FooService"), find("b", "BarService"), find("c", "BazService")))
+                result("a", "no declaration \"FooService\"")
+                result("b", "no declaration \"BarService\"")
+                result("c", "busy: build running")
+                turn(tools = arrayOf(Triple("d", "Grep", args("pattern" to "BarService"))))
+                result("d", "...")
+            },
+        )
+        val report = GapReport.of(runs.asSequence())
+        assertEquals(1, report.settled)
+        assertEquals(listOf("busy", "empty", "fallback"), report.rows.map { it.kind }.sorted())
+        assertContains(report.render(), "3 CodeLoupe calls in 1 runs, 3 gaps, 1 settled negatives")
+        assertContains(GapReport.of(runs.asSequence(), GapRule.LEGACY).render(), "4 gaps (all empty answers counted)")
     }
 }

@@ -104,4 +104,4 @@ All behind the daemon token (`x-codeloupe-token`), like every route that is not 
 
 ## Measured
 
-The numbers, and what they mean for the cost of agents, are in `docs/plan.md` (section 8.10).
+The numbers, and what they mean for the cost of agents, are in `docs/plan.md` (section 8.11).
