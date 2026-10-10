@@ -72,4 +72,16 @@ then `update test (windows-latest)` at 11 minutes; the bundles take 5 to 7.5 min
 - **Unknown means everything.** A new branch, a tag, a force push that dropped the base, a scheduled run, or a failure of the
   `changes` job itself runs every step: the answer is skipped only when it is known to be `false`.
 
-Result of the trial run: not measured yet.
+Trial run 1 (branch CL-195, run 38070132858; a new branch, so every step ran): 12 minutes, all green.
+
+| Job | Before (run 38054115886) | Now |
+|---|---|---|
+| test (windows-latest) | 868 s | 465 s |
+| test (ubuntu-latest) | 425 s | 340 s |
+| test (macos-latest) | 445 s | 479 s |
+| update test (windows-latest) | 655 s | 634 s |
+| bundle (macos-15-intel) | 437 s | 650 s |
+
+The Windows test is 46 % shorter. The run is now bounded by `bundle (macos-15-intel)` and the installer smoke test after it
+(650 s + 84 s), not by the tests; the Intel runner varies by minutes between runs. Further gains would come from the macOS
+Intel bundle and from the update test, which is unchanged for a push that touches code.
