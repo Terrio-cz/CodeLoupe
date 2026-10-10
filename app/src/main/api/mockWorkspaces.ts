@@ -17,7 +17,7 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 interface Seed {
-  repo: 'TerrioImporter' | 'CodeLoupe';
+  repo: 'shop-api' | 'CodeLoupe';
   name: string;
   role: Workspace['role'];
   state: WorkspaceState;
@@ -30,24 +30,24 @@ interface Seed {
 }
 
 const SEEDS: Seed[] = [
-  { repo: 'TerrioImporter', name: 'TerrioImporter', role: 'main', state: 'active', ageDays: 0.1, merged: true, sizeMb: 1_900 },
-  { repo: 'TerrioImporter', name: 'TER-671', role: 'worktree', state: 'active', ageDays: 0.05, ahead: 3, task: ['In Progress', false, 'Scope the statistics anti-join to complete revisions'], sizeMb: 640 },
-  { repo: 'TerrioImporter', name: 'TER-672', role: 'worktree', state: 'active', ageDays: 0.3, ahead: 1, task: ['In Progress', false, 'Batch geometry lookups for the parcel endpoint'], sizeMb: 580 },
-  { repo: 'TerrioImporter', name: 'TER-664', role: 'worktree', state: 'landed', ageDays: 1.2, ahead: 4, merged: true, task: ['Done', true, 'Attribution block on every dataset response'], sizeMb: 710 },
-  { repo: 'TerrioImporter', name: 'TER-591', role: 'worktree', state: 'abandoned', ageDays: 21, ahead: 2, merged: false, task: ['Ready for testing', false, 'Rate-limit headers for token-priced operations'], note: 'untouched for 21 days, 2 commits are not on origin/master', sizeMb: 530 },
-  { repo: 'TerrioImporter', name: 'TER-92', role: 'worktree', state: 'landed', ageDays: 3, ahead: 1, merged: true, task: ['Done', true, 'Importer retries for partial RÚIAN downloads'], sizeMb: 420 },
-  { repo: 'TerrioImporter', name: 'TER-420-old', role: 'directory', state: 'orphan', ageDays: 40, note: 'no .git: git has no worktree here', sizeMb: 310 },
+  { repo: 'shop-api', name: 'shop-api', role: 'main', state: 'active', ageDays: 0.1, merged: true, sizeMb: 1_900 },
+  { repo: 'shop-api', name: 'SHOP-671', role: 'worktree', state: 'active', ageDays: 0.05, ahead: 3, task: ['In Progress', false, 'Fix order totals when a coupon expires during checkout'], sizeMb: 640 },
+  { repo: 'shop-api', name: 'SHOP-672', role: 'worktree', state: 'active', ageDays: 0.3, ahead: 1, task: ['In Progress', false, 'Batch stock lookups for the product list endpoint'], sizeMb: 580 },
+  { repo: 'shop-api', name: 'SHOP-664', role: 'worktree', state: 'landed', ageDays: 1.2, ahead: 4, merged: true, task: ['Done', true, 'Add pagination links to every list response'], sizeMb: 710 },
+  { repo: 'shop-api', name: 'SHOP-591', role: 'worktree', state: 'abandoned', ageDays: 21, ahead: 2, merged: false, task: ['Ready for testing', false, 'Send rate-limit headers on every API response'], note: 'untouched for 21 days, 2 commits are not on origin/master', sizeMb: 530 },
+  { repo: 'shop-api', name: 'SHOP-92', role: 'worktree', state: 'landed', ageDays: 3, ahead: 1, merged: true, task: ['Done', true, 'Retry partial downloads in the catalog importer'], sizeMb: 420 },
+  { repo: 'shop-api', name: 'SHOP-420-old', role: 'directory', state: 'orphan', ageDays: 40, note: 'no .git: git has no worktree here', sizeMb: 310 },
   { repo: 'CodeLoupe', name: 'CodeLoupe', role: 'main', state: 'active', ageDays: 0.2, merged: true, sizeMb: 260 },
   { repo: 'CodeLoupe', name: 'CL-43', role: 'worktree', state: 'active', ageDays: 0.1, ahead: 5, task: ['In Progress', false, 'Electron app: window, tray, notifications, daemon management'], sizeMb: 190 },
   { repo: 'CodeLoupe', name: 'CL-56', role: 'worktree', state: 'landed', ageDays: 2, ahead: 9, merged: true, task: ['Done', true, 'Port CodeLoupe to Kotlin/JVM with parity to phase 1'], sizeMb: 240 },
 ];
 
 const REPO_PATH: Record<Seed['repo'], string> = {
-  TerrioImporter: 'C:/Users/dev/IdeaProjects/TerrioImporter',
+  'shop-api': 'C:/Users/dev/IdeaProjects/shop-api',
   CodeLoupe: 'C:/Users/dev/IdeaProjects/CodeLoupe',
 };
 const ROOT: Record<Seed['repo'], string> = {
-  TerrioImporter: 'C:/Users/dev/IdeaProjects/terrio-worktrees',
+  'shop-api': 'C:/Users/dev/IdeaProjects/shop-api-worktrees',
   CodeLoupe: 'C:/Users/dev/IdeaProjects/codeloupe-worktrees',
 };
 
@@ -68,7 +68,7 @@ export class MockWorkspaces {
   constructor(private readonly now: number) {}
 
   workspaces(size: boolean): WorkspaceList {
-    const repos = (['TerrioImporter', 'CodeLoupe'] as const).map(name => {
+    const repos = (['shop-api', 'CodeLoupe'] as const).map(name => {
       const workspaces = SEEDS.filter(s => s.repo === name).map((s): Workspace => ({
         path: s.role === 'main' ? REPO_PATH[name] : `${ROOT[name]}/${s.name}`,
         name: s.name, role: s.role, state: s.state, note: s.note ?? null,
@@ -102,19 +102,19 @@ export class MockWorkspaces {
         state: kind === 'container' ? 'running' : null, created: iso(this.now - 2 * DAY), project: null, publishedPorts: [], memoryBytes: null, ...extra,
       });
     };
-    add('container', 'ter-671-app-1', 'TerrioImporter', 'TER-671', { publishedPorts: [19001] });
-    add('container', 'ter-671-postgres-1', 'TerrioImporter', 'TER-671', { publishedPorts: [19002] });
-    add('volume', 'ter-671_pgdata', 'TerrioImporter', 'TER-671');
-    add('network', 'ter-671_default', 'TerrioImporter', 'TER-671');
-    add('container', 'ter-672-app-1', 'TerrioImporter', 'TER-672', { ownership: 'adopted', via: 'adoption rule 1 (ter-672)', publishedPorts: [19010] });
-    add('container', 'ter-664-app-1', 'TerrioImporter', 'TER-664', { state: 'exited', created: iso(this.now - 3 * DAY) });
-    add('volume', 'ter-664_pgdata', 'TerrioImporter', 'TER-664', { created: iso(this.now - 3 * DAY) });
-    add('network', 'ter-664_default', 'TerrioImporter', 'TER-664', { created: iso(this.now - 3 * DAY) });
-    add('image', 'ter-664-app:latest', 'TerrioImporter', 'TER-664', { created: iso(this.now - 3 * DAY) });
-    add('container', 'ter-591-postgres-1', 'TerrioImporter', 'TER-591', { state: 'exited', created: iso(this.now - 22 * DAY) });
-    add('volume', 'ter-591_pgdata', 'TerrioImporter', 'TER-591', { created: iso(this.now - 22 * DAY) });
-    add('volume', 'ter-92_pgdata', 'TerrioImporter', 'TER-92', { created: iso(this.now - 4 * DAY) });
-    add('volume', 'ter-420_pgdata', 'TerrioImporter', 'TER-420-old', { created: iso(this.now - 41 * DAY) });
+    add('container', 'shop-671-app-1', 'shop-api', 'SHOP-671', { publishedPorts: [19001] });
+    add('container', 'shop-671-postgres-1', 'shop-api', 'SHOP-671', { publishedPorts: [19002] });
+    add('volume', 'shop-671_pgdata', 'shop-api', 'SHOP-671');
+    add('network', 'shop-671_default', 'shop-api', 'SHOP-671');
+    add('container', 'shop-672-app-1', 'shop-api', 'SHOP-672', { ownership: 'adopted', via: 'adoption rule 1 (shop-672)', publishedPorts: [19010] });
+    add('container', 'shop-664-app-1', 'shop-api', 'SHOP-664', { state: 'exited', created: iso(this.now - 3 * DAY) });
+    add('volume', 'shop-664_pgdata', 'shop-api', 'SHOP-664', { created: iso(this.now - 3 * DAY) });
+    add('network', 'shop-664_default', 'shop-api', 'SHOP-664', { created: iso(this.now - 3 * DAY) });
+    add('image', 'shop-664-app:latest', 'shop-api', 'SHOP-664', { created: iso(this.now - 3 * DAY) });
+    add('container', 'shop-591-postgres-1', 'shop-api', 'SHOP-591', { state: 'exited', created: iso(this.now - 22 * DAY) });
+    add('volume', 'shop-591_pgdata', 'shop-api', 'SHOP-591', { created: iso(this.now - 22 * DAY) });
+    add('volume', 'shop-92_pgdata', 'shop-api', 'SHOP-92', { created: iso(this.now - 4 * DAY) });
+    add('volume', 'shop-420_pgdata', 'shop-api', 'SHOP-420-old', { created: iso(this.now - 41 * DAY) });
     add('container', 'cl-43-daemon-1', 'CodeLoupe', 'CL-43', { publishedPorts: [19020] });
     add('volume', 'cl-56_cache', 'CodeLoupe', 'CL-56', { created: iso(this.now - 3 * DAY) });
     for (const n of ['sample-db-1', 'other-postgres', 'other-redis']) add('container', n, null, null, { publishedPorts: [25460] });
@@ -146,7 +146,7 @@ export class MockWorkspaces {
       };
     });
     entries.push({
-      key: `directory:${ROOT.TerrioImporter}/TER-420-old`, kind: 'directory', name: `${ROOT.TerrioImporter}/TER-420-old`, repo: 'TerrioImporter', workspace: 'TER-420-old', ownership: null,
+      key: `directory:${ROOT['shop-api']}/SHOP-420-old`, kind: 'directory', name: `${ROOT['shop-api']}/SHOP-420-old`, repo: 'shop-api', workspace: 'SHOP-420-old', ownership: null,
       workspaceState: 'orphan', verdict: 'confirm', reason: 'a directory under a worktree root that git has no worktree for', released: false, attempts: 0, nextAttempt: null, lastError: null,
     });
     const counts: Record<string, number> = {};
@@ -155,17 +155,17 @@ export class MockWorkspaces {
   }
 
   releases(): { items: ReleaseStatus[] } {
-    return { items: [{ repo: 'TerrioImporter', workspace: 'TER-92', at: iso(this.now - 25 * 60_000), pending: 1, retrying: 1 }] };
+    return { items: [{ repo: 'shop-api', workspace: 'SHOP-92', at: iso(this.now - 25 * 60_000), pending: 1, retrying: 1 }] };
   }
 
   ports(): PortReport {
-    const a = (port: number, workspace: string, name: string, state: 'free' | 'in-use' | 'conflict', usedBy: string | null, repo = 'TerrioImporter') =>
+    const a = (port: number, workspace: string, name: string, state: 'free' | 'in-use' | 'conflict', usedBy: string | null, repo = 'shop-api') =>
       ({ allocation: { port, repo, workspace, name, at: iso(this.now - 2 * DAY) }, state, usedBy });
     return {
       generatedAt: iso(this.now), range: '19000-19999',
       allocations: [
-        a(19001, 'TER-671', 'app', 'in-use', 'container ter-671-app-1'), a(19002, 'TER-671', 'postgres', 'in-use', 'container ter-671-postgres-1'),
-        a(19005, 'TER-664', 'app', 'free', null), a(19010, 'TER-672', 'app', 'conflict', 'process 4321 (java)'), a(19020, 'CL-43', 'daemon', 'in-use', 'container cl-43-daemon-1', 'CodeLoupe'),
+        a(19001, 'SHOP-671', 'app', 'in-use', 'container shop-671-app-1'), a(19002, 'SHOP-671', 'postgres', 'in-use', 'container shop-671-postgres-1'),
+        a(19005, 'SHOP-664', 'app', 'free', null), a(19010, 'SHOP-672', 'app', 'conflict', 'process 4321 (java)'), a(19020, 'CL-43', 'daemon', 'in-use', 'container cl-43-daemon-1', 'CodeLoupe'),
       ],
       foreign: [{ port: 19003, usedBy: 'container other-db-1' }], problems: [],
     };

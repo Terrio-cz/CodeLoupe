@@ -32,7 +32,7 @@ describe('job model', () => {
     expect(f('active')).toHaveLength(4);
     expect(f('failed')).toEqual(['J20261008-A1B2', 'J20261008-J9K1', 'J20261008-L2M3']);
     expect(f('finished')).toHaveLength(8);
-    expect(f('', 'ter-672')).toEqual(['J20261008-P4TX']);
+    expect(f('', 'shop-672')).toEqual(['J20261008-P4TX']);
   });
 
   it('never shows the query or the credentials of a webhook address', () => {

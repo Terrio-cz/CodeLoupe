@@ -1,23 +1,23 @@
 /* Design tokens: docs/design-revamp.md. Dark mode is its own set of steps, not an inversion. */
 :root {
   color-scheme: light;
-  --sidebar: #f1f1f4;
-  --bg: #fcfcfd;
+  --sidebar: #e9ece4;
+  --bg: #f3f5ef;
   --surface: #ffffff;
-  --surface-2: #f4f4f6;
-  --surface-3: #ebebef;
-  --border: #e7e7eb;
-  --border-strong: #d7d7dd;
-  --border-control: #84848f;
-  --text: #101014;
-  --text-2: #464651;
-  --text-muted: #5f5f6b;
-  --accent: #5b63e6;
-  --accent-text: #4650d4;
-  --accent-weak: #eef0fe;
-  --btn-primary-bg: #4f57dd;
+  --surface-2: #edf0e8;
+  --surface-3: #e3e7dc;
+  --border: #e1e5da;
+  --border-strong: #d0d5c8;
+  --border-control: #7b8374;
+  --text: #0c0f14;
+  --text-2: #3c4450;
+  --text-muted: #566070;
+  --accent: #3a6600;
+  --accent-text: #3a6600;
+  --accent-weak: #e6f0d2;
+  --btn-primary-bg: #3a6600;
   --btn-primary-fg: #ffffff;
-  --focus: #5b63e6;
+  --focus: #3a6600;
   --ok: #16a34a;
   --ok-text: #13703a;
   --ok-weak: #e7f6ed;
@@ -30,10 +30,10 @@
   --critical: #dc2626;
   --critical-text: #b42323;
   --critical-weak: #fdeded;
-  --series-1: #5b63e6;
-  --series-baseline: #9a9aa5;
-  --grid: #eeeef1;
-  --axis: #d4d4da;
+  --series-1: #3a6600;
+  --series-baseline: #8a93a0;
+  --grid: #e6e9df;
+  --axis: #cdd2c4;
   --highlight: rgba(255, 255, 255, 0);
   --scrim: rgba(16, 16, 20, 0.22);
   --shadow-1: 0 1px 2px rgba(16, 16, 20, 0.04), 0 1px 1px rgba(16, 16, 20, 0.03);
@@ -44,23 +44,23 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --sidebar: #09090b;
-    --bg: #0e0e11;
-    --surface: #141418;
-    --surface-2: #1b1b20;
-    --surface-3: #24242a;
-    --border: #232329;
-    --border-strong: #303038;
-    --border-control: #6e6e7a;
-    --text: #ededf0;
-    --text-2: #b8b8c2;
-    --text-muted: #8e8e9a;
-    --accent: #7c84ff;
-    --accent-text: #a4abff;
-    --accent-weak: #1d1f3a;
-    --btn-primary-bg: #7c84ff;
-    --btn-primary-fg: #0b0b10;
-    --focus: #8f96ff;
+    --sidebar: #080a0e;
+    --bg: #0c0f14;
+    --surface: #171c24;
+    --surface-2: #1d232c;
+    --surface-3: #262d38;
+    --border: #222934;
+    --border-strong: #2a313c;
+    --border-control: #6b7684;
+    --text: #e6eae3;
+    --text-2: #b7bec6;
+    --text-muted: #8e98a6;
+    --accent: #b6f04a;
+    --accent-text: #b6f04a;
+    --accent-weak: #1e2a10;
+    --btn-primary-bg: #b6f04a;
+    --btn-primary-fg: #0c0f14;
+    --focus: #c9f77a;
     --ok: #22c55e;
     --ok-text: #4ade80;
     --ok-weak: #11251a;
@@ -73,10 +73,10 @@
     --critical: #ef4444;
     --critical-text: #f87171;
     --critical-weak: #2d1717;
-    --series-1: #7c84ff;
-    --series-baseline: #6b6b76;
-    --grid: #1f1f25;
-    --axis: #34343c;
+    --series-1: #b6f04a;
+    --series-baseline: #6b7684;
+    --grid: #1f252e;
+    --axis: #343c48;
     --highlight: rgba(255, 255, 255, 0.04);
     --scrim: rgba(0, 0, 0, 0.5);
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -86,23 +86,23 @@
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --sidebar: #09090b;
-  --bg: #0e0e11;
-  --surface: #141418;
-  --surface-2: #1b1b20;
-  --surface-3: #24242a;
-  --border: #232329;
-  --border-strong: #303038;
-  --border-control: #6e6e7a;
-  --text: #ededf0;
-  --text-2: #b8b8c2;
-  --text-muted: #8e8e9a;
-  --accent: #7c84ff;
-  --accent-text: #a4abff;
-  --accent-weak: #1d1f3a;
-  --btn-primary-bg: #7c84ff;
-  --btn-primary-fg: #0b0b10;
-  --focus: #8f96ff;
+  --sidebar: #080a0e;
+  --bg: #0c0f14;
+  --surface: #171c24;
+  --surface-2: #1d232c;
+  --surface-3: #262d38;
+  --border: #222934;
+  --border-strong: #2a313c;
+  --border-control: #6b7684;
+  --text: #e6eae3;
+  --text-2: #b7bec6;
+  --text-muted: #8e98a6;
+  --accent: #b6f04a;
+  --accent-text: #b6f04a;
+  --accent-weak: #1e2a10;
+  --btn-primary-bg: #b6f04a;
+  --btn-primary-fg: #0c0f14;
+  --focus: #c9f77a;
   --ok: #22c55e;
   --ok-text: #4ade80;
   --ok-weak: #11251a;
@@ -115,10 +115,10 @@
   --critical: #ef4444;
   --critical-text: #f87171;
   --critical-weak: #2d1717;
-  --series-1: #7c84ff;
-  --series-baseline: #6b6b76;
-  --grid: #1f1f25;
-  --axis: #34343c;
+  --series-1: #b6f04a;
+  --series-baseline: #6b7684;
+  --grid: #1f252e;
+  --axis: #343c48;
   --highlight: rgba(255, 255, 255, 0.04);
   --scrim: rgba(0, 0, 0, 0.5);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -211,11 +211,7 @@ code, .mono { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 35
 .titlebar :is(a, button, input, select) { -webkit-app-region: no-drag; }
 .titlebar .brand-name { color: var(--text); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
 .titlebar .brand-version { color: var(--text-muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
-.brand-mark {
-  width: 20px; height: 20px; border-radius: var(--r-sm); display: grid; place-items: center; flex: none;
-  background: var(--accent); color: var(--btn-primary-fg);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), var(--shadow-1);
-}
+.brand-mark { width: 20px; height: 20px; flex: none; }
 .shell { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); flex: 1; min-height: 0; }
 .sidebar {
   background: var(--sidebar);
@@ -338,7 +334,7 @@ button, select, input { font: inherit; color: inherit; }
   background: var(--text-muted); transition: transform var(--dur-2) var(--ease-spring), background-color var(--dur-2);
 }
 .check input[type='checkbox']:checked { background: var(--accent); border-color: var(--accent); }
-.check input[type='checkbox']:checked::before { transform: translateX(12px); background: #ffffff; }
+.check input[type='checkbox']:checked::before { transform: translateX(12px); background: var(--btn-primary-fg); }
 .check input[type='checkbox']:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .check:has(input:disabled) { opacity: 0.5; cursor: default; }
 .check input[type='checkbox']:disabled { cursor: default; }

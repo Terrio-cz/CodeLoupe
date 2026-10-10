@@ -37,7 +37,7 @@ describe('MockApi follows the read-only contract', () => {
     const a = await get<Accounts>({ resource: 'accounts' });
     expect(a.claude.map(c => c.id)).toEqual(['default', 'b']);
     expect(a.claude.filter(c => c.isDefault)).toHaveLength(1);
-    expect(a.youtrack.find(y => y.id === 'terrio')).toMatchObject({ tokenConfigured: true, editable: true });
+    expect(a.youtrack.find(y => y.id === 'acme')).toMatchObject({ tokenConfigured: true, editable: true });
     expect(JSON.stringify(a)).not.toMatch(/"token"|secret|password/i);
     const all = await get<Overview>({ resource: 'overview', query: { range: '7d' } });
     const first = await get<Overview>({ resource: 'overview', query: { range: '7d', account: 'default' } });

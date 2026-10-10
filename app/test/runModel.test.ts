@@ -21,7 +21,7 @@ describe('runs', () => {
     const second = mock.page({ range: '30d', sort: 'weighted', cursor: first.nextCursor! });
     expect(second.items[0].id).not.toBe(first.items[0].id);
     expect(second.items[0].weighted).toBeLessThanOrEqual(first.items[49].weighted);
-    expect(mock.page({ range: '30d', role: 'terrio-tester' }).items.every(r => r.role === 'terrio-tester')).toBe(true);
+    expect(mock.page({ range: '30d', role: 'tester' }).items.every(r => r.role === 'tester')).toBe(true);
     expect(mock.page({ range: '24h' }).total).toBeLessThan(mock.page({ range: '30d' }).total);
     expect(first.roles).toContain('main');
   });

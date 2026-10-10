@@ -27,6 +27,38 @@ questions), measured, not estimated ([Benchmarks](https://github.com/Terrio-cz/C
 - **One daemon per machine** for every agent window, about 210 MB resident with two repositories indexed.
 - **MCP** over Streamable HTTP (stateless) plus the same tools on a CLI. The daemon is local-only and everything that acts for you (jobs, `run`, `edit`, releases) wants the token in its home's `daemon.token`, which only you can read; [Who may call the daemon](https://github.com/Terrio-cz/CodeLoupe/wiki/Configuration#who-may-call-the-daemon).
 
+## What it looks like
+
+Every answer is the piece of code that was asked for, with its location. Real output on this repository; a `?` marks a
+reference that might resolve elsewhere, `=` one that certainly does:
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/cli-dark.png">
+    <img alt="codeloupe symbol and usages in a terminal" src="docs/screenshots/cli-light.png" width="830">
+  </picture>
+</p>
+
+The desktop app shows what a branch changed, the tracker mirror and where the tokens go. The screenshots use the app's
+built-in sample data, not a real project:
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/app-branches-dark.png">
+    <img alt="Desktop app: a branch with its changed declarations, callers and tests" src="docs/screenshots/app-branches-light.png" width="830">
+  </picture>
+</p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/app-tasks-dark.png">
+    <img alt="Desktop app: a task from the tracker mirror" src="docs/screenshots/app-tasks-light.png" width="410">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/app-overview-dark.png">
+    <img alt="Desktop app: overview of cost, savings and the daemon" src="docs/screenshots/app-overview-light.png" width="410">
+  </picture>
+</p>
+
 ## Quick start
 
 CLI (git 2.31 or newer; JDK 25 only to build from source, a release bundle carries its own runtime):
@@ -108,7 +140,8 @@ In the repository: [docs/plan.md](docs/plan.md) (plan, decisions, measurements; 
 ## Install
 
 - **Desktop app and CLI**: an installer per OS from the [Releases](https://github.com/Terrio-cz/CodeLoupe/releases) page;
-  no release is published yet, and every CI run keeps its installers for 7 days as artifacts. The installers are unsigned
+  [v0.1.0](https://github.com/Terrio-cz/CodeLoupe/releases/tag/v0.1.0) has installers for Windows, macOS and Linux, and
+  every CI run keeps its installers for 7 days as artifacts. The installers are unsigned
   ([how to install without a warning](https://github.com/Terrio-cz/CodeLoupe/wiki/Installers-and-updates)).
 - **Daemon and CLI only**: the `codeloupe-<version>-<os>-<arch>.zip` bundle (it carries its own Java runtime).
 - **From source**: `./gradlew installDist` with JDK 25.
@@ -119,7 +152,7 @@ Issues and pull requests are welcome; read [CONTRIBUTING.md](CONTRIBUTING.md) (b
 contributions) and the [Code of Conduct](CODE_OF_CONDUCT.md), and see
 [Development](https://github.com/Terrio-cz/CodeLoupe/wiki/Development) for the layout. Report a vulnerability privately,
 as [SECURITY.md](SECURITY.md) describes. The wiki is edited as files in [`docs/wiki`](docs/wiki).
-Early: version 0.1.0, no public release yet. Roadmap and results per step: [docs/plan.md](docs/plan.md). Limits that matter
+Early: version 0.1.0. Roadmap and results per step: [docs/plan.md](docs/plan.md). Limits that matter
 (Kotlin and Java only, syntax-level resolution, no semantic search) are in
 [FAQ and troubleshooting](https://github.com/Terrio-cz/CodeLoupe/wiki/FAQ-and-troubleshooting).
 

@@ -67,32 +67,32 @@ const SHAPES: { cost: number; turns: number }[] = [
   { cost: 60_000, turns: 9 },
 ];
 
-interface WtSeed { id: string; repo: 'terrio' | 'codeloupe'; branch: string | null; task: string | null; isMain?: boolean }
+interface WtSeed { id: string; repo: 'shop' | 'codeloupe'; branch: string | null; task: string | null; isMain?: boolean }
 const WT_SEEDS: WtSeed[] = [
-  { id: 'a1f3c09e4b21', repo: 'terrio', branch: 'TER-671', task: 'TER-671' },
-  { id: 'b7e2d4410c9a', repo: 'terrio', branch: 'TER-672', task: 'TER-672' },
-  { id: 'c90d1e7f3a55', repo: 'terrio', branch: 'TER-664', task: 'TER-664' },
-  { id: 'd2c4b6a80e13', repo: 'terrio', branch: 'TER-591', task: 'TER-591' },
-  { id: 'e5a7f9c1b246', repo: 'terrio', branch: 'TER-114', task: 'TER-114' },
+  { id: 'a1f3c09e4b21', repo: 'shop', branch: 'SHOP-671', task: 'SHOP-671' },
+  { id: 'b7e2d4410c9a', repo: 'shop', branch: 'SHOP-672', task: 'SHOP-672' },
+  { id: 'c90d1e7f3a55', repo: 'shop', branch: 'SHOP-664', task: 'SHOP-664' },
+  { id: 'd2c4b6a80e13', repo: 'shop', branch: 'SHOP-591', task: 'SHOP-591' },
+  { id: 'e5a7f9c1b246', repo: 'shop', branch: 'SHOP-114', task: 'SHOP-114' },
   { id: 'f0b1c2d3e4f5', repo: 'codeloupe', branch: 'CL-43', task: 'CL-43' },
   { id: '0a9b8c7d6e5f', repo: 'codeloupe', branch: 'CL-56', task: 'CL-56' },
-  { id: '13579bdf0246', repo: 'terrio', branch: 'master', task: null, isMain: true },
+  { id: '13579bdf0246', repo: 'shop', branch: 'master', task: null, isMain: true },
   { id: '2468ace13579', repo: 'codeloupe', branch: 'main', task: null, isMain: true },
 ];
 
 const REPOS = {
-  terrio: { id: 'r-5c1e0a', name: 'TerrioImporter', main: 'C:/Users/dev/IdeaProjects/TerrioImporter', wt: 'C:/Users/dev/IdeaProjects/terrio-worktrees', base: 'origin/master' },
+  shop: { id: 'r-5c1e0a', name: 'shop-api', main: 'C:/Users/dev/IdeaProjects/shop-api', wt: 'C:/Users/dev/IdeaProjects/shop-api-worktrees', base: 'origin/master' },
   codeloupe: { id: 'r-9d4b27', name: 'CodeLoupe', main: 'C:/Users/dev/IdeaProjects/CodeLoupe', wt: 'C:/Users/dev/IdeaProjects/codeloupe-worktrees', base: 'origin/main' },
 };
 
 const TASK_SEEDS: { id: string; summary: string; state: string; priority: string; type: string }[] = [
-  { id: 'TER-671', summary: 'Scope the statistics anti-join to complete revisions', state: 'In Progress', priority: 'Major', type: 'Bug' },
-  { id: 'TER-672', summary: 'Batch geometry lookups for the parcel endpoint', state: 'In Progress', priority: 'Normal', type: 'Task' },
-  { id: 'TER-664', summary: 'Attribution block on every dataset response', state: 'In Progress', priority: 'Major', type: 'Feature' },
-  { id: 'TER-591', summary: 'Rate-limit headers for token-priced operations', state: 'Ready for testing', priority: 'Normal', type: 'Feature' },
-  { id: 'TER-114', summary: 'Importer retries for partial RÚIAN downloads', state: 'In Progress', priority: 'Minor', type: 'Bug' },
-  { id: 'TER-655', summary: 'OpenAPI examples for address search', state: 'To do', priority: 'Minor', type: 'Task' },
-  { id: 'TER-660', summary: 'Phase mode for launcher tasks', state: 'Done', priority: 'Normal', type: 'Task' },
+  { id: 'SHOP-671', summary: 'Fix order totals when a coupon expires during checkout', state: 'In Progress', priority: 'Major', type: 'Bug' },
+  { id: 'SHOP-672', summary: 'Batch stock lookups for the product list endpoint', state: 'In Progress', priority: 'Normal', type: 'Task' },
+  { id: 'SHOP-664', summary: 'Add pagination links to every list response', state: 'In Progress', priority: 'Major', type: 'Feature' },
+  { id: 'SHOP-591', summary: 'Send rate-limit headers on every API response', state: 'Ready for testing', priority: 'Normal', type: 'Feature' },
+  { id: 'SHOP-114', summary: 'Retry partial downloads in the catalog importer', state: 'In Progress', priority: 'Minor', type: 'Bug' },
+  { id: 'SHOP-655', summary: 'OpenAPI examples for product search', state: 'To do', priority: 'Minor', type: 'Task' },
+  { id: 'SHOP-660', summary: 'Run integration tests in parallel', state: 'Done', priority: 'Normal', type: 'Task' },
   { id: 'CL-43', summary: 'Electron app: window, tray, notifications, daemon management', state: 'In Progress', priority: 'Normal', type: 'Feature' },
   { id: 'CL-56', summary: 'Port CodeLoupe to Kotlin/JVM with parity to phase 1', state: 'In Progress', priority: 'Normal', type: 'Feature' },
   { id: 'CL-39', summary: 'Read-only UI API in the daemon', state: 'To do', priority: 'Normal', type: 'Feature' },
@@ -156,7 +156,7 @@ export class MockData {
 
     this.tasks = TASK_SEEDS.map((t, i) => ({
       id: t.id, project: t.id.split('-')[0], summary: t.summary, state: t.state, priority: t.priority, type: t.type,
-      assignee: 'Tadeáš G.', updatedAt: iso(now - (i + 1) * 3.7 * HOUR),
+      assignee: 'Alex M.', updatedAt: iso(now - (i + 1) * 3.7 * HOUR),
       reads: 1 + (hash(t.id) % 9),
       worktreeIds: this.worktrees.filter(w => w.taskId === t.id).map(w => w.id),
     }));
@@ -175,8 +175,8 @@ export class MockData {
     const w = this.worktrees.find(x => x.id === id);
     if (!w) return null;
     const r = rng(hash(id));
-    const pkg = w.repoName === 'CodeLoupe' ? 'cz.terrio.codeloupe' : 'cz.terrio.importer';
-    const names = ['OrderStatistics', 'RevisionRepository', 'ParcelRoutes', 'GeometryBatcher', 'AttributionBlock', 'RateLimitHeaders', 'ImportRetryPolicy', 'TokenMeter'];
+    const pkg = w.repoName === 'CodeLoupe' ? 'dev.codeloupe' : 'com.example.shop';
+    const names = ['OrderTotals', 'CouponRepository', 'ProductRoutes', 'StockBatcher', 'PageLinks', 'RateLimitHeaders', 'ImportRetryPolicy', 'RequestMeter'];
     const members = ['handle', 'find', 'load', 'apply', 'toResponse', 'compute', 'validate', 'complete'];
     const changes: WorktreeDetail['changes'] = [];
     for (let i = 0; i < w.changedDecls; i++) {
@@ -216,11 +216,11 @@ export class MockData {
     const t = this.tasks.find(x => x.id === id);
     if (!t) return null;
     const base = this.now - 3 * DAY;
-    const instance = t.project === 'CL' ? 'CL' : 'TER';
+    const instance = t.project === 'CL' ? 'CL' : 'SHOP';
     return {
       ...t,
-      url: `https://terrio.youtrack.cloud/issue/${t.id}`,
-      description: `## Context\n${t.summary}. Mock description from the YouTrack mirror.\n\n## Scope\n- Change the affected flow in one module\n- Keep source attribution on every response\n\n## Verification\nTargeted tests and an isolated stack with real calls.`,
+      url: `https://acme.youtrack.cloud/issue/${t.id}`,
+      description: `## Context\n${t.summary}. Mock description from the YouTrack mirror.\n\n## Scope\n- Change the affected flow in one module\n- Add tests for the new behaviour\n\n## Verification\nTargeted tests and an isolated stack with real calls.`,
       fields: [
         { name: 'Project', value: instance }, { name: 'Type', value: t.type ?? '—' }, { name: 'Priority', value: t.priority ?? '—' },
         { name: 'State', value: t.state }, { name: 'Assignee', value: t.assignee ?? '—' }, { name: 'Fix versions', value: instance === 'CL' ? '0.4 Desktop' : '—' },
@@ -231,10 +231,10 @@ export class MockData {
         { text: 'Docs updated where behaviour changed', checked: t.state === 'Done' },
         { text: 'Review without open findings', checked: t.state === 'Done' || t.state === 'Ready for testing' },
       ],
-      links: [{ type: 'subtask of', id: instance === 'CL' ? 'CL-7' : 'TER-162', summary: instance === 'CL' ? 'Desktop app' : 'Public data API' }],
+      links: [{ type: 'subtask of', id: instance === 'CL' ? 'CL-7' : 'SHOP-162', summary: instance === 'CL' ? 'Desktop app' : 'Storefront API' }],
       activity: [
-        { at: iso(base), author: 'Tadeáš G.', kind: 'created', text: 'created the issue' },
-        { at: iso(base + 2 * HOUR), author: 'Tadeáš G.', kind: 'state', text: 'To do → In Progress' },
+        { at: iso(base), author: 'Alex M.', kind: 'created', text: 'created the issue' },
+        { at: iso(base + 2 * HOUR), author: 'Alex M.', kind: 'state', text: 'To do → In Progress' },
         { at: iso(base + 30 * HOUR), author: 'orchestrator', kind: 'comment', text: 'Plan ready, round 1 running.' },
         { at: iso(base + 50 * HOUR), author: 'orchestrator', kind: 'field', text: 'Test Evidence: attached' },
       ],
@@ -247,28 +247,28 @@ export class MockData {
     const r = rng(7);
     const builds: IndexHealth['builds'] = [];
     for (let i = 0; i < 14; i++) {
-      const repo = i % 4 === 3 ? REPOS.codeloupe : REPOS.terrio;
+      const repo = i % 4 === 3 ? REPOS.codeloupe : REPOS.shop;
       const kind = (i % 5 === 0 ? 'full' : i % 2 ? 'layer' : 'sync') as 'full' | 'sync' | 'layer';
       const failed = i === 6;
       builds.push({
         id: `b-${1000 - i}`, repoId: repo.id, kind, startedAt: iso(this.now - (i * 2.3 + 0.2) * HOUR),
         durationMs: kind === 'full' ? 5_400 + Math.round(r() * 900) : 300 + Math.round(r() * 900),
         peakRssMb: kind === 'full' ? 540 + Math.round(r() * 80) : null,
-        files: kind === 'full' ? (repo === REPOS.terrio ? 2_211 : 64) : 1 + Math.floor(r() * 40),
+        files: kind === 'full' ? (repo === REPOS.shop ? 2_211 : 64) : 1 + Math.floor(r() * 40),
         status: failed ? 'failed' : 'ok', error: failed ? 'git cat-file exited with code 128' : null,
       });
     }
     return {
       repos: [
-        { id: REPOS.terrio.id, name: 'TerrioImporter', path: REPOS.terrio.main, baseRef: 'origin/master', baseCommit: '6ceb22e', state: 'ready',
+        { id: REPOS.shop.id, name: 'shop-api', path: REPOS.shop.main, baseRef: 'origin/master', baseCommit: '6ceb22e', state: 'ready',
           builtAt: iso(this.now - 0.2 * HOUR), buildMs: 5_400, dbBytes: 57 * 1024 * 1024, files: 2_211, decls: 44_012, refs: 361_204, errorFiles: 20, layers: 6 },
         { id: REPOS.codeloupe.id, name: 'CodeLoupe', path: REPOS.codeloupe.main, baseRef: 'origin/main', baseCommit: 'ce01954', state: 'stale',
           builtAt: iso(this.now - 7 * HOUR), buildMs: 610, dbBytes: 3 * 1024 * 1024, files: 64, decls: 1_102, refs: 9_870, errorFiles: 0, layers: 2 },
       ],
       builds,
       errorFiles: Array.from({ length: 20 }, (_, i) => ({
-        repoId: REPOS.terrio.id,
-        path: `${['app', 'domain', 'public-api', 'importers/ruian/addresses'][i % 4]}/src/main/kotlin/${['Routes', 'OpenRule', 'Mapper', 'Dsl', 'Config'][i % 5]}${i}.kt`,
+        repoId: REPOS.shop.id,
+        path: `${['app', 'domain', 'public-api', 'importers/catalog/feeds'][i % 4]}/src/main/kotlin/${['Routes', 'Handler', 'Mapper', 'Dsl', 'Config'][i % 5]}${i}.kt`,
         errors: 1 + (i % 3), firstLine: 12 + i * 9,
       })),
       budgets: { buildPeakRssMb: 600, daemonRssMb: 200 },
@@ -294,7 +294,7 @@ export class MockData {
         id: `g-${i}`, at: iso(Date.parse(u.at) + Math.floor(r() * HOUR)), tool: s.tool, shape: s.shape, fallback: s.fallback,
         reason: (['followup_read', 'followup_read', 'empty', 'candidate_manual'] as const)[Math.floor(r() * 4)],
         session: u.session, turn: 2 + Math.floor(r() * Math.max(1, u.turns - 2)),
-        target: ['OrderStatistics.handle', 'RevisionRepository', 'ParcelRoutes.kt', 'String.toSlug', 'TokenMeter.limit'][i % 5],
+        target: ['OrderTotals.handle', 'CouponRepository', 'ProductRoutes.kt', 'String.toSlug', 'RequestMeter.limit'][i % 5],
       });
     }
     const inRange = items.filter(g => Date.parse(g.at) >= from).sort((a, b) => b.at.localeCompare(a.at));
@@ -321,11 +321,11 @@ export class MockData {
       return `${d.getUTCFullYear()}-W${String(n).padStart(2, '0')}`;
     };
     const shapes: [string, string, GapReport['rows'][number]['kind'], string[]][] = [
-      ['symbol', 'symbol:qualified', 'fallback', ['OrderStatistics.handle', 'RevisionRepository.find']],
+      ['symbol', 'symbol:qualified', 'fallback', ['OrderTotals.handle', 'CouponRepository.find']],
       ['find', 'find:glob', 'fallback', ['*Repository', '*Routes']],
       ['symbol', 'symbol:overload', 'candidates', ['render', 'apply']],
-      ['outline', 'outline:path', 'fallback', ['ParcelRoutes.kt']],
-      ['find', 'find:name', 'empty', ['TokenMeter', 'RateLimit']],
+      ['outline', 'outline:path', 'fallback', ['ProductRoutes.kt']],
+      ['find', 'find:name', 'empty', ['RequestMeter', 'RateLimit']],
       ['usages', 'usages:name', 'busy', []],
       ['symbol', 'symbol:name', 'fallback', ['PriceRule']],
     ];
@@ -360,7 +360,7 @@ export class MockData {
         { id: 'b', label: 'Account B', email: 'b@example.test', configDir: 'C:/Users/dev/.claude-b', isDefault: false, implicit: false, exists: true, windows: 2, weighted7d: 6_800_000, savedPct7d: 11, lastUsedAt: iso(this.now - HOUR) },
       ],
       youtrack: [
-        { id: 'terrio', label: 'Terrio', url: 'https://terrio.youtrack.cloud', projects: ['TER', 'CL'], tokenConfigured: true, editable: true, mirror: { state: 'synced', syncedAt: iso(this.now - 2 * 60_000) } },
+        { id: 'acme', label: 'Acme', url: 'https://acme.youtrack.cloud', projects: ['SHOP', 'CL'], tokenConfigured: true, editable: true, mirror: { state: 'synced', syncedAt: iso(this.now - 2 * 60_000) } },
         { id: 'legacy', label: 'legacy', url: 'https://legacy.youtrack.cloud', projects: ['LEG'], tokenConfigured: false, editable: false, mirror: { state: 'error', syncedAt: null } },
       ],
     };
@@ -369,7 +369,7 @@ export class MockData {
   environment(): Environment {
     const k = (name: string, scope: Environment['keys'][number]['scope'], scopeRef: string | null, source: Environment['keys'][number]['source'], consumers: string[], usedH: number | null, updatedD: number): Environment['keys'][number] =>
       ({
-        name, scope, scopeRef, source, sourceRef: source === 'file' ? 'C:/Users/dev/IdeaProjects/TerrioImporter/.env' : null, consumers, reads: consumers.length * 7,
+        name, scope, scopeRef, source, sourceRef: source === 'file' ? 'C:/Users/dev/IdeaProjects/shop-api/.env' : null, consumers, reads: consumers.length * 7,
         lastUsedAt: usedH === null ? null : iso(this.now - usedH * HOUR), createdAt: iso(this.now - (updatedD + 3) * DAY), updatedAt: iso(this.now - updatedD * DAY),
         ageDays: updatedD, rotationDue: updatedD >= ROTATION_DAYS,
       });
@@ -378,10 +378,10 @@ export class MockData {
       rotationDays: ROTATION_DAYS,
       keys: [
         k('YOUTRACK_TOKEN', 'global', null, 'store', ['youtrack MCP', 'codeloupe mirror'], 0.05, 9),
-        k('TERRIO_API_KEY', 'repo', 'TerrioImporter', 'file', ['run/terrio.mjs api'], 20, 14),
+        k('SHOP_API_KEY', 'repo', 'shop-api', 'file', ['scripts/dev.mjs api'], 20, 14),
         k('GITHUB_TOKEN', 'global', null, 'store', ['gh'], 3, 120),
-        k('POSTGRES_PASSWORD', 'repo', 'TerrioImporter', 'file', ['docker compose'], 1, 95),
-        k('MOBBIN_API_KEY', 'workspace', 'terrio', 'store', [], null, 2),
+        k('POSTGRES_PASSWORD', 'repo', 'shop-api', 'file', ['docker compose'], 1, 95),
+        k('PAYMENTS_API_KEY', 'workspace', 'shop', 'store', [], null, 2),
       ],
     };
   }
@@ -392,10 +392,10 @@ export class MockData {
     const all = [
       e(0.05, 'YOUTRACK_TOKEN', 'global', null, 'read', 'youtrack MCP'),
       e(0.4, 'YOUTRACK_TOKEN', 'global', null, 'read', 'codeloupe mirror'),
-      e(1, 'POSTGRES_PASSWORD', 'repo', 'TerrioImporter', 'read', 'docker compose'),
+      e(1, 'POSTGRES_PASSWORD', 'repo', 'shop-api', 'read', 'docker compose'),
       e(3, 'GITHUB_TOKEN', 'global', null, 'read', 'gh'),
-      e(20, 'TERRIO_API_KEY', 'repo', 'TerrioImporter', 'read', 'run/terrio.mjs api'),
-      e(48, 'MOBBIN_API_KEY', 'workspace', 'terrio', 'created', 'app'),
+      e(20, 'SHOP_API_KEY', 'repo', 'shop-api', 'read', 'scripts/dev.mjs api'),
+      e(48, 'PAYMENTS_API_KEY', 'workspace', 'shop', 'created', 'app'),
       e(216, 'YOUTRACK_TOKEN', 'global', null, 'rotated', 'app'),
     ];
     return { events: all.filter(x => name === null || x.name === name).slice(0, limit) };
@@ -405,10 +405,10 @@ export class MockData {
     return {
       port: 47391, home: 'C:/Users/dev/AppData/Local/codeloupe', configFile: 'C:/Users/dev/AppData/Local/codeloupe/config.json', defaultRoot: null,
       repos: [
-        { id: REPOS.terrio.id, path: REPOS.terrio.main, baseRef: 'origin/master' },
+        { id: REPOS.shop.id, path: REPOS.shop.main, baseRef: 'origin/master' },
         { id: REPOS.codeloupe.id, path: REPOS.codeloupe.main, baseRef: 'origin/main' },
       ],
-      youtrack: [{ url: 'https://terrio.youtrack.cloud', projects: ['TER', 'CL'], tokenConfigured: true, pollSec: 180 }],
+      youtrack: [{ url: 'https://acme.youtrack.cloud', projects: ['SHOP', 'CL'], tokenConfigured: true, pollSec: 180 }],
       budgets: { dailyWeighted: 25_000_000, daemonRssMb: 200, buildPeakRssMb: 600, p95Ms: 1000, queueWaitMs: 30_000, busyRate: 0.1 },
     };
   }

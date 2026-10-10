@@ -11,33 +11,33 @@ const RUN_BUDGET = 4_000_000;
 
 const ROLES: { role: string; cost: number; turns: number; share: number }[] = [
   { role: 'main', cost: 1_100_000, turns: 55, share: 0.58 },
-  { role: 'terrio-coder', cost: 920_000, turns: 55, share: 0.54 },
-  { role: 'terrio-reviewer', cost: 1_000_000, turns: 52, share: 0.62 },
-  { role: 'terrio-tester', cost: 390_000, turns: 14, share: 0.4 },
-  { role: 'terrio-planner', cost: 260_000, turns: 24, share: 0.5 },
-  { role: 'terrio-context', cost: 60_000, turns: 9, share: 0.35 },
+  { role: 'coder', cost: 920_000, turns: 55, share: 0.54 },
+  { role: 'reviewer', cost: 1_000_000, turns: 52, share: 0.62 },
+  { role: 'tester', cost: 390_000, turns: 14, share: 0.4 },
+  { role: 'planner', cost: 260_000, turns: 24, share: 0.5 },
+  { role: 'context', cost: 60_000, turns: 9, share: 0.35 },
   { role: 'codeloupe-coder', cost: 2_300_000, turns: 74, share: 0.66 },
 ];
 
 const TITLES = [
-  'Implement TER-{n} from the verified plan in the task worktree',
-  'Review the whole flow of TER-{n} against the acceptance criteria',
-  'Run the full test and the isolated stack for TER-{n}',
-  'Plan TER-{n}: read the issue, map the flow, list the risks',
-  'Find where the statistics anti-join is built',
-  'Fix review findings of TER-{n} in the same worktree',
+  'Implement SHOP-{n} from the verified plan in the task worktree',
+  'Review the whole flow of SHOP-{n} against the acceptance criteria',
+  'Run the full test and the isolated stack for SHOP-{n}',
+  'Plan SHOP-{n}: read the issue, map the flow, list the risks',
+  'Find where the order total is calculated',
+  'Fix review findings of SHOP-{n} in the same worktree',
 ];
 
 const TOOLS: [tool: string, category: string, summary: string][] = [
-  ['Read', 'code_read', 'src/main/kotlin/OrderStatistics.kt'],
+  ['Read', 'code_read', 'src/main/kotlin/OrderTotals.kt'],
   ['Grep', 'code_search', 'pattern "anti.?join" in domain/'],
-  ['Bash', 'build_test', 'gradlew :domain:test --tests *Statistics*'],
+  ['Bash', 'build_test', 'gradlew :domain:test --tests *OrderTotals*'],
   ['Bash', 'git', 'git diff --stat origin/master'],
-  ['Edit', 'code_edit', 'src/main/kotlin/RevisionRepository.kt'],
-  ['mcp__codeloupe__find', 'codeloupe', 'find RevisionRepository*'],
-  ['mcp__codeloupe__symbol', 'codeloupe', 'symbol OrderStatistics.handle'],
-  ['Bash', 'shell_other', 'node run/terrio.mjs docker plan'],
-  ['mcp__youtrack__yt_get_issue', 'tracker', 'issue TER-671'],
+  ['Edit', 'code_edit', 'src/main/kotlin/CouponRepository.kt'],
+  ['mcp__codeloupe__find', 'codeloupe', 'find CouponRepository*'],
+  ['mcp__codeloupe__symbol', 'codeloupe', 'symbol OrderTotals.handle'],
+  ['Bash', 'shell_other', 'node scripts/dev.mjs docker plan'],
+  ['mcp__youtrack__yt_get_issue', 'tracker', 'issue SHOP-671'],
 ];
 
 export class MockRuns {
@@ -55,8 +55,8 @@ export class MockRuns {
       const calls = Math.max(2, Math.round(turns * (1.2 + r() * 1.6)));
       return {
         id: String(1000 + i), file: `agent-${(i * 7919 + 13).toString(16).padStart(8, '0')}`, session: `s-${(i * 104729 + 7).toString(36)}`,
-        project: shape.role.startsWith('codeloupe') ? 'codeloupe' : 'terrio', kind: shape.role === 'main' ? 'session' : 'subagent', role: shape.role,
-        ter: shape.role.startsWith('codeloupe') ? null : `TER-${n}`, model: i % 5 === 0 ? 'claude-opus' : 'claude-sonnet',
+        project: shape.role.startsWith('codeloupe') ? 'codeloupe' : 'shop', kind: shape.role === 'main' ? 'session' : 'subagent', role: shape.role,
+        ter: shape.role.startsWith('codeloupe') ? null : `SHOP-${n}`, model: i % 5 === 0 ? 'claude-opus' : 'claude-sonnet',
         title: TITLES[i % TITLES.length].replace('{n}', String(n)),
         startedAt: new Date(started).toISOString(), endedAt: new Date(started + durationSec * 1000).toISOString(), durationSec, turns,
         weighted, peakContext: Math.round(60_000 + r() * 140_000), toolResultShare: Math.min(0.9, shape.share + (r() - 0.5) * 0.2),

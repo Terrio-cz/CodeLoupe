@@ -11,7 +11,7 @@ Before/after: [design-revamp/](design-revamp/).
 **A calm, dense developer tool, dark first, with an equally careful light mode.** Content sits on an
 "inset panel" (Linear, Plain, Railway): the window and sidebar take the darkest tone, the work area is a rounded panel
 with a subtle border, and cards on it are one step lighter. Hierarchy comes from typography, shades of grey and spacing, not colour.
-The only accent is indigo; status colours appear only in states (a pill with a dot and a word).
+The only accent is the brand Phosphor (Moss on light), see [brand/README.md](brand/README.md); status colours appear only in states (a pill with a dot and a word).
 
 Motion explains what happened (the screen changed, data arrived, a panel opened) and never holds the user up: entrances
 ≤ 260 ms (chart 700 ms), interactions ≤ 180 ms, only loading runs in a loop. `prefers-reduced-motion` turns off all
@@ -43,17 +43,17 @@ All in `app/src/renderer/src/styles.css` as CSS variables on `:root`; dark mode 
 
 | Token | Light | Dark | Purpose |
 |---|---|---|---|
-| `--sidebar` | `#f1f1f4` | `#09090b` | window and sidebar |
-| `--bg` | `#fcfcfd` | `#0e0e11` | inset panel |
-| `--surface` | `#ffffff` | `#141418` | cards, tables, drawer |
-| `--surface-2` | `#f4f4f6` | `#1b1b20` | hover, tracks, skeleton |
-| `--surface-3` | `#ebebef` | `#24242a` | pressed, active segment |
-| `--border` / `--border-strong` | `#e7e7eb` / `#d7d7dd` | `#232329` / `#303038` | hairline / card hover |
-| `--border-control` | `#84848f` | `#6e6e7a` | input and switch border (≥ 3:1) |
-| `--text` · `--text-2` · `--text-muted` | `#101014` · `#464651` · `#5f5f6b` | `#ededf0` · `#b8b8c2` · `#8e8e9a` | ≥ 4.5:1 on every surface |
-| `--accent` · `--accent-text` · `--accent-weak` | `#5b63e6` · `#4650d4` · `#eef0fe` | `#7c84ff` · `#a4abff` · `#1d1f3a` | indigo |
+| `--sidebar` | `#e9ece4` | `#080a0e` | window and sidebar |
+| `--bg` | `#f3f5ef` | `#0c0f14` | inset panel |
+| `--surface` | `#ffffff` | `#171c24` | cards, tables, drawer |
+| `--surface-2` | `#edf0e8` | `#1d232c` | hover, tracks, skeleton |
+| `--surface-3` | `#e3e7dc` | `#262d38` | pressed, active segment |
+| `--border` / `--border-strong` | `#e1e5da` / `#d0d5c8` | `#222934` / `#2a313c` | hairline / card hover |
+| `--border-control` | `#7b8374` | `#6b7684` | input and switch border (≥ 3:1) |
+| `--text` · `--text-2` · `--text-muted` | `#0c0f14` · `#3c4450` · `#566070` | `#e6eae3` · `#b7bec6` · `#8e98a6` | ≥ 4.5:1 on every surface |
+| `--accent` · `--accent-text` · `--accent-weak` | `#3a6600` · `#3a6600` · `#e6f0d2` | `#b6f04a` · `#b6f04a` · `#1e2a10` | Moss on light, Phosphor on dark |
 | `--ok` / `--warning` / `--serious` / `--critical` (+ `-text`, `-weak`) | green / amber / orange / red | the same, lighter text | states only, always with a dot and a word |
-| `--series-1` · `--series-baseline` | `#5b63e6` · `#9a9aa5` | `#7c84ff` · `#6b6b76` | chart: actual / baseline |
+| `--series-1` · `--series-baseline` | `#3a6600` · `#8a93a0` | `#b6f04a` · `#6b7684` | chart: actual / baseline |
 
 **Typography**: system font (`Segoe UI Variable` on Windows), mono `Cascadia Mono`. Scale 11 · 12 ·
 13 (base) · 14 · 16 · 20 · 26 px; headings 600, numbers `tabular-nums` with negative letter spacing. Column

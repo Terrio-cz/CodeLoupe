@@ -8,7 +8,7 @@ const mock = new MockWorkspaces(Date.parse('2026-10-08T12:00:00Z'));
 const registry: WorkspaceList = mock.workspaces(false);
 const plan: ReconcilePlan = mock.reconcile();
 const repoPath = registry.repos[0].repo;
-const ter664 = registry.repos[0].workspaces.find(w => w.name === 'TER-664')!;
+const ter664 = registry.repos[0].workspaces.find(w => w.name === 'SHOP-664')!;
 const confirmKeys = plan.entries.filter(e => e.verdict === 'confirm').map(e => e.key);
 
 function setup(answer = true, runActions: { key: string; outcome: string }[] | null = null) {
@@ -31,8 +31,8 @@ describe('release', () => {
     const { actions, posts, asked } = setup();
     const r = await actions.release({ repo: repoPath, path: ter664.path });
     expect(r.ok).toBe(true);
-    expect(asked[0].message).toContain('TER-664');
-    expect(asked[0].detail).toContain('ter-664_pgdata');
+    expect(asked[0].message).toContain('SHOP-664');
+    expect(asked[0].detail).toContain('shop-664_pgdata');
     expect(posts).toEqual([{ path: '/workspaces/release', body: { target: ter664.path, repo: repoPath } }]);
   });
 
@@ -45,7 +45,7 @@ describe('release', () => {
   it.each([
     ['the main worktree', () => ({ repo: repoPath, path: repoPath })],
     ['an orphan directory', () => ({ repo: repoPath, path: registry.repos[0].workspaces.find(w => w.role === 'directory')!.path })],
-    ['a path the daemon does not know', () => ({ repo: repoPath, path: 'C:/elsewhere/TER-1' })],
+    ['a path the daemon does not know', () => ({ repo: repoPath, path: 'C:/elsewhere/SHOP-1' })],
     ['a request without a path', () => ({ repo: repoPath })],
     ['something that is no request', () => null],
   ])('refuses %s without asking or calling the daemon', async (_name, input) => {

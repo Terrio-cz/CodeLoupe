@@ -8,8 +8,8 @@ import type { TitleBarOverlay } from 'electron';
 export const TITLEBAR_HEIGHT = 36;
 
 const TOKENS = {
-  light: { sidebar: '#f1f1f4', text2: '#464651' },
-  dark: { sidebar: '#09090b', text2: '#b8b8c2' },
+  light: { sidebar: '#e9ece4', text2: '#3c4450' },
+  dark: { sidebar: '#080a0e', text2: '#b7bec6' },
 } as const;
 
 /** Shown before the page paints, so a new window never flashes another colour. */
