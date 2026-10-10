@@ -77,7 +77,7 @@ Same run:
 
 | | CodeLoupe | GitNexus |
 |---|---:|---:|
-| Tool definitions in the agent's context (`tools/list`) | 14 tools, 4,223 tokens | 17 tools, 22,140 tokens |
+| Tool definitions in the agent's context (`tools/list`) | 14 tools, 4,223 tokens (3,429 after trimming the descriptions, [Agent runs](#agent-runs)) | 17 tools, 22,140 tokens |
 | First index, Exposed / CodeLoupe | 7.3 s / 2.7 s | 128 s / 68 s |
 | Peak memory while indexing, Exposed | 517 MB | 2,583 MB |
 | Memory after the queries | 206 MB daemon, both repositories | 3,325 MB MCP server after 82 queries (114 MB at start) |
@@ -184,28 +184,43 @@ First-turn context, medians of 3-5 replicates per role and variant on the same f
 | Session-start payload of the main session (27 sessions before, 5 after) | first turn, thousand tokens | 74.6 | 64.5 |
 
 The roles still carry CodeLoupe's tool definitions: 1.5 (coder), 1.4 (tester), 2.2 (reviewer) and 2.5 (planner) thousand
-tokens at the start of every run, 0.65 % of total agent cost in the period measured. Moving the project rules out of the
+tokens at the start of every run, 0.65 % of total agent cost in the period measured. Shortening the descriptions of the nine
+code and document tools they use (7,931 to 5,656 characters of JSON; the default catalog is still 14 tools, 13,329 to 10,837
+characters) took 424, 339, 558 and 633 tokens off the first turn (3 runs per cell, spread under 10 tokens), about 0.48 % of cost.
+Re-running the two fixed reviews 6 times each per variant, the known findings were the same (4 of 4 and 6 of 6 in all 12 runs),
+cost was within the replicate spread (mean 1.27 against 1.23 USD), and 14 calls to the nine tools returned byte-equal answers.
+Moving the project rules out of the
 shared instructions file into the agent bodies did not cost any rule: 54 of 54 rule questions answered correctly in both
 variants, no policy slip. Removing the tools that were dropped from the roles (two code-graph servers, the database client and three tracker
 reads) was safe too: none of the 16 runs that had them back called one.
 
-### Waiting for long commands (CL-88)
+### Waiting for long commands (CL-88, CL-185)
 
 Turns whose only call is waiting (`sleep`, a status poll, `job wait`) were 9.1 % of all agent cost in 2,651 live runs.
-The controlled task: a coder agent compiles three clean clones one after another, read-only. A: before jobs (long commands in the
-background, polled with `sleep` every few minutes), B: `job start` then `job wait` through the daemon. Two command lengths, 3 replicates each, 12 runs, sums over the replicates.
+The controlled task: a coder agent compiles three clean clones one after another, read-only. A: before jobs (long commands in
+the background, polled with `sleep` every few minutes). B: `job start` then `job wait` through the daemon. C: one call,
+`job start --wait`, which starts the job and blocks until it ends (CL-185). Two command lengths, 3 replicates each, 18 runs,
+sums over the replicates.
 
-| Command length | | Waiting turns (per run) | Waiting units of total | Cost per run USD | Wall (s) |
-|---|---|---:|---:|---:|---:|
-| about 3 min | A | 8 (2.7) | 28.2 of 87.7 thousand = 32.2 % | 0.058 | 549 |
-| about 3 min | B | 12 (4.0) | 28.3 of 137.3 thousand = 20.6 % | 0.092 | 552 |
-| 4-5 min | A | 14 (4.7) | 47.3 of 118.6 thousand = 39.9 % | 0.079 | 816 |
-| 4-5 min | B | 12 (4.0) | 27.5 of 101.6 thousand = 27.1 % | 0.068 | 810 |
+| Command length | | Model calls per run | Waiting turns | Waiting units of total | Units per run (thousand) | Cost per run USD | Wall (s) |
+|---|---|---:|---:|---:|---:|---:|---:|
+| about 3 min | A | 6.7 | 8 | 28.2 of 87.7 thousand = 32.2 % | 29.2 | 0.058 | 549 |
+| about 3 min | B | 12.0 | 12 | 28.3 of 137.3 thousand = 20.6 % | 45.8 | 0.092 | 552 |
+| about 3 min | C | 4.0 | 0 | 0 of 38.3 thousand = 0 % | 12.8 | 0.026 | 567 |
+| 4-6 min | A | 11.7 | 14 | 47.3 of 118.6 thousand = 39.9 % | 39.5 | 0.079 | 816 |
+| 4-6 min | B | 10.3 | 12 | 27.5 of 101.6 thousand = 27.1 % | 33.9 | 0.068 | 810 |
+| 4-6 min | C | 4.0 | 0 | 0 of 70.1 thousand = 0 % | 23.4 | 0.047 | 1,020 |
 
-Waiting units per run, B against A: 1.00 at 3 minutes and 0.58 at 4-5 minutes. Applied to the live 9.1 % that is about 5.3 %,
-not the target of 1 %. The runs showed why: a headless `claude -p` waits in the foreground, so every long command costs one
-waiting turn however it is waited for, and in five of six B runs the agent wrote its first `job start` with a doubled
-command prefix and paid for a second start and a second wait.
+B first looked like a failure: waiting units per run against A were 1.00 at 3 minutes and 0.58 at 4-5 minutes, which on the live
+9.1 % is about 5.3 %, not the target of 1 %. The runs showed why. A headless `claude -p` waits in the foreground, so every long
+command costs one waiting turn however it is waited for, and in five of six B runs the agent wrote its first `job start` with a
+doubled command prefix and paid for a second start and a second wait. C fixes both: `job start --wait` is one call, and a leading
+`node run/terrio.mjs` is dropped with a one-line note instead of an error. In all 6 C runs no turn was only waiting, all 18 starts
+were correct, and a run took 4 model calls (3 blocking compiles and the report) against 10-15. **Waiting did not become free**: the
+blocking call is still one model call per long command, which the experiment counts as work, so 0 waiting turns is a floor of one
+call, not zero cost. The cost differences between the variants also carry the 15-40 % replicate spread (the three long C runs cost
+0.056, 0.056 and 0.029 USD). Not covered: commands over about 9 minutes (one more call), waiting for a free build slot, and
+sessions that are not headless.
 
 ### Dropping two tool servers (CL-47)
 
@@ -259,7 +274,7 @@ Old and new build alternated on the same machine, medians.
   as many issues as before (16.6 and 18.3 `issue` calls per run against 14.0 and 16.7 API reads), because its instructions
   tell it to read each candidate. Tracker reads are still 10.1 % (automatic) and 13.9 % (epic) of a run's cost.
 - **A trimmed prompt can lose a check** (reviewer, above), and a session-start map cost more than it saved.
-- **Waiting is still a model call.** The per-command floor is one call, not zero.
+- **Waiting is still a model call.** The per-command floor is one call, not zero (CL-185).
 - Small samples: 3-5 replicates, a single workspace and a single set of tasks, two runs at a time on a busy machine (wall time
   is indicative), and the replicate-to-replicate variance of 15-40 % noted above. Findings are counted against the known
   findings of the real reviews, not graded independently, and the agents' answers are not scored for quality beyond that.
