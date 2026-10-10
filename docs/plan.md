@@ -505,6 +505,42 @@ bez `context pack`, `suggest live` nehlásil žádné pracující okno (živé w
 nezkoušela), hooky vypnuté jako v CL-23, wall orientační. Čtení issue „6,5× na issue“ ze živého provozu se v jednom běhu neobjeví (opakování vzniká mezi agenty a koly), proto se
 neměřilo. Skripty (`bench-ws`, `bench-run`, `lane`, `analyze`) vycházejí z `run/cl23-bench` a jsou přiložené ke kartě CL-182.
 
+**Opakování po úpravě těl suggesteru a planneru (CL-182, CL-183, 2026-10-10).** Příčiny z předchozího měření se opravily v tělech agentů
+(Terrio workspace, zálohy `.bak-cl182`), CodeLoupe se neměnil (CL-182b je jen tento záznam). Suggester: `dispatch_plan` jednou na začátku
+jako seznam kandidátů (`sections=["windows","waiting"]`, souhrn, priorita, klíče a důvody čekání už vrací), `issue` jen pro úkol, který dostane okno
+(`sections=["Scope","fields","links"]`, jednou na id, ne `view=full`, ne pro čekající), tělo bez výpisu backlogu přes `tasks`. Planner: bez packetu
+`task_context`, potom jeden `issue` se `sections` (nadpisy popisu z indexu briefu, `fields`, `comments`); důvod, proč planner volal `yt_get_issue` i bez
+komentářů: brief v `task_context` ukazuje jen kritéria a index nadpisů, ne text Context / Scope / API contract / Verification, a dlouhá pole (Component,
+Verification) jen velikostí, ale plán musí začínat `## Issue` s tímto textem. Stejný postup, prompt a modely jako výše (Opus, high, odlehlé kopie workspace,
+throwaway daemony 47620 a 47621, nic se nezapisuje do YouTrack, dva běhy souběžně). Varianta A je beze změny (`.bak-cl95`) a běžela ve stejné dávce jako
+tělo v1; v2 až v4 běžely o 1–2 hodiny později proti týmž A (stav workspace stejný: 9 dormantních worktrees, 3–4 volná okna). Celkem asi 75 USD.
+
+Suggester, jednotky v tis. (medián / průměr), `suggest check` PASS u všech plánů (v2 u jednoho běhu potvrzeno z transcriptu, výsledek `claude -p` byl jen závěrečná zpráva
+po zastaveném pozadí hledání):
+
+| Tělo | n (auto / epic) | Medián auto / epic | Průměr auto / epic | USD průměr | `issue` na běh | Podíl čtení trackeru auto / epic (průměr) |
+|---|---|---|---|---|---|---|
+| A, před task indexem | 5 / 3 | 726 / 588 | 701 / 592 | 2,15 | 13,4 (`yt_get_issue`) | 18,1 % / 16,0 % |
+| B0, před CL-182 (měření výše, jiné běhy) | 5 / 3 | 602 / 492 | 568 / 561 | 1,90 / 1,84 | 16,6 / 18,3 | 10,1 % / 13,9 % |
+| v1: `dispatch_plan` jednou, `issue` jen pro okna | 5 / 3 | 412 / 291 | 419 / 303 | 1,27 | 7,9 | 8,5 % / 8,0 % |
+| **v2: + nejvýš dvě volání, ne `since=none`, strop čtení** | 5 / 3 | **350 / 249** | 398 / 258 | 1,17 | 5,5 | **5,4 % / 5,7 %** |
+| v3: + `root` v prvním volání, jedno `tasks` na stavy | 5 / 3 | 366 / 310 | 392 / 294 | 1,20 | 5,8 | 6,4 % / 5,1 % |
+| v4: + další kandidáti přes `dispatch_plan query=` | 5 / 3 | 427 / 348 | 458 / 326 | 1,38 | 6,3 | 7,4 % / 5,8 % |
+
+Nejlepší naměřené je **v2** (zůstává živé, tělo 7 992 znaků): medián B / A 48 % (auto), 42 % (epic), souhrnně 8 proti 8 běhům 309 proti 629 tis.
+(49 %), přesný permutační test p = 0,003; všechna čtyři těla jsou pod 80 % (nejhorší v4 59 %). Rozptyl mezi běhy téže varianty je pořád velký
+(v4: 198–657 tis.), proto rozdíly v2 / v3 / v4 jsou v rámci šumu a v3, v4 nezlepšily nic. Podíl čtení trackeru v2: 5,4 % (auto), 5,7 % (epic),
+souhrnně 5,5 % (vážený cenou 5,8 %, medián běhů 5,0 %), tedy **o 0,4–0,7 procentního bodu nad cílem 5 %**. Zbytek je skoro celý `tasks`
+(v2 auto 4,9 % ceny, 8 volání na běh: stavy dormantních úkolů a výpisy dalších kandidátů; `issue` už jen 0,6 % a `dispatch_plan` 0,3 %). Věty
+v tělech v3 a v4 proti `tasks` (jedno volání, `limit` ≤ 40, další kandidáti přes `dispatch_plan query=`) agenti nedodrželi, `tasks` zůstalo na 7–9
+voláních; zbývá nápad dát `dispatch_plan` do waiting řádků stav úkolu (dormantní `Ready for testing`), aby `tasks` na stavy odpadlo (změna CodeLoupe).
+
+Planner (3 běhy na úkol a variantu, tělo planneru jedno, bez dalších iterací): `yt_get_issue` + `yt_comments` + `yt_related` na běh **TER-321 2,3 → 0,
+TER-62 2,0 → 0** (A → B; v B 6 z 6 běhů nulové), `issue` přes CodeLoupe 1,3 a 3,3 na běh. Plány B citují rozhodnutí z komentářů ve všech 6 bězích (nálezy
+kola 1 jako kritéria 13–16 u TER-321; nálezy kol 1–4 a větev Codex u TER-62, „29 komentářů přečteno“). Cena planneru se nesnížila: medián jednotek
+TER-321 393 → 403 tis. (+3 %), TER-62 332 → 419 tis. (+26 %), USD průměr 1,43 → 1,58 a 1,19 → 1,45, podíl čtení trackeru 3,1 → 4,0 % a 9,4 → 9,7 %
+(`comments` TER-62 má 21 tis. znaků, proti `yt_comments` 26 tis.). Kritérium CL-183 se týká počtu volání, ne ceny.
+
 ### 8.5 Živé porovnání
 
 2 týdny po nasazení `codeloupe metrics compare baseline.json after.json`; týdenní report mezer.
