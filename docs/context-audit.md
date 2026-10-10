@@ -165,3 +165,110 @@ node tools/context-audit.mjs --since 2026-09-23 --until 2026-10-07 --out audit.j
 Výstup: podíl startovního kontextu, rozpad podle zdroje a role, využití nástrojů a scénáře úspor.
 Baseline tohoto auditu: start 18,26 %, MCP schémata 5,35 %, CLAUDE.md 3,50 %, kalibrace 3,16 znaku/token.
 Po zavedení karet stačí spustit se stejnými parametry na novém období a porovnat `bySource` a `byRole`.
+
+## Řízená měření CL-75, CL-76, CL-177 (2026-10-10)
+
+Místo „sedm dní pozorování“ stejný úkol ve dvou variantách, ≥ 3 opakování, výsledek za hodiny. Jen počty z transcriptů
+(`tools/context-experiment.mjs`: startovní kontext S = input + cache read + cache write prvního tahu, znaky zdrojů před
+prvním tahem, tahy, volání nástrojů); obsah promptů ani výsledků se nikam nekopíruje.
+
+**Metoda.** Odlehlé kopie workspace Terrio (nikdy živý), jedna na variantu; `claude -p --agent <role>` jako fázový běh
+launcheru, stejný model a effort, stejný pevný prompt a stejné odlehlé klony repozitáře (TER-321 jako v CL-23; planner na základu,
+reviewer a tester na špičce, coder v čerstvém klonu s malým krokem z plánu), vlastní démon CodeLoupe na odděleném portu, YouTrack jen
+ke čtení, zápisové nástroje odepřené. Varianty:
+
+| Varianta | Co se liší od B (dnešek) |
+|---|---|
+| B | dnešní workspace; `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` jako v launcheru |
+| A75 | role mají zpět MCP nástroje, které CL-57 odebral (GitNexus, IDEA, DataGrip, `yt_related`/`yt_comments`/`yt_activity`) |
+| A76 | `omitClaudeMd` odstraněno, CLAUDE.md workspace před CL-58 (18,2 tis. znaků z transcriptu), env proměnná nenastavena |
+| A0 / A1 | B bez všech MCP nástrojů / B bez nástrojů CodeLoupe (rozklad schémat) |
+
+Omezení: z frontmatter před CL-57 nezůstala záloha, A75 je rekonstrukce z tabulky využití nástrojů tohoto auditu (počty nástrojů
+a jejich velikost sedí, tokeny jsou 70–86 % hodnot auditu); těla agentů jsou v A i B dnešní, takže rozdíl měří jen nástroje, resp.
+CLAUDE.md. Bash-volání `gitnexus` ve všech během: 0.
+
+### CL-75: výčty MCP nástrojů
+
+Medián S prvního tahu (rozsah), fázové běhy, shodný prompt; opakování: coder a tester 5, reviewer a planner 3 na variantu.
+
+| Role | B (dnes) | A75 (před CL-57) | rozdíl A75 − B | práh CL-75 |
+|---|---:|---:|---:|---:|
+| coder | **11 003** (10 999–11 184) | 18 446 (16 500–18 451) | −7,4 tis. | ≤ 18 tis. |
+| reviewer | **10 628** (10 627–10 631) | 25 042 (25 037–25 042) | −14,4 tis. | ≤ 17 tis. |
+| tester | **9 970** (9 967–10 156) | 17 265 (17 259–17 448) | −7,3 tis. | ≤ 12 tis. |
+| planner | 12 091 (12 091–12 094) | 26 362 (22 870–26 364) | −14,3 tis. | – |
+
+Potvrzují to skutečné fázové běhy po změně (`context-audit.mjs --since 2026-10-09T18:00Z`, 1–3 běhy na roli): coder 10,6, reviewer
+9,7–9,8, tester 10,1, planner 11,0 tis.
+
+Schémata MCP v B (B − A0, jednorázové běhy bez nástrojů, 3 opakování): coder 1,74, tester 1,62, reviewer 2,40, planner 3,87 tis. tokenů;
+z toho **CodeLoupe** 1,50 / 1,38 / 2,16 / 2,52 tis., zbytek (YouTrack, u planneru i DataGrip) 0,24 / 0,25 / 0,24 / 1,35 tis. Přepočet na
+populaci běhů z CL-31 (podíl role z ceny × tokeny / S role):
+
+| `bySource.mcpSchemas` (% celkové ceny) | CL-31 odhad auditu | změřeno |
+|---|---:|---:|
+| před CL-57 | 5,27 | ≈ 4,3 |
+| po CL-57, bez CodeLoupe | 0,40 | **0,15** |
+| po CL-57 včetně nástrojů CodeLoupe (CL-46) | – | **0,80** (CodeLoupe 0,65) |
+| úspora CL-57 | 4,66 | **3,5** |
+
+Audit přeceňoval schémata: JSON nástrojů má v transcriptu ≈ 5,0 znaku na token, ne 3,16 (u coderu je skutečný rozdíl A75 − B 7,4 tis. tokenů, analyticky 11,9 tis.).
+Odhad 0,40 % nepočítal nástroje CodeLoupe (v `context-audit.mjs` se http server přeskakuje). Práh 0,7 % splňuje to, co CL-57 nechal
+(0,15 %), součet i s CodeLoupe ho přesahuje o 0,10 pp; zúžení schémat CodeLoupe u rolí je v CL-184.
+
+Tahy a nástroje: v 16 během A75 nezavolala žádná role žádný z odebraných nástrojů (GitNexus, IDEA, DataGrip: 0 volání) a B nepřesunulo
+dotazy do `run/terrio.mjs gitnexus` (0 Bash-volání). Tahy (průměr B / A75 / A76): coder 4,4 / 4,0 / 4,4; reviewer 13,3 / 11,7 / 15,3;
+tester 5,8 / 4,8 / 5,2; planner 17,3 / 23,3 / 17,3. Rozptyl uvnitř stejné výbavy (B proti A76) je ±1–2 tahy, tester B +1,0 proti A75 je
+v něm; planner A75 má o 6 tahů víc než B. Žádný nárůst tahů nejde přičíst odebraným nástrojům.
+
+### CL-76: CLAUDE.md mimo subagenty a fázové běhy
+
+| Měření | B | A76 | rozdíl |
+|---|---:|---:|---:|
+| `instructions` tokeny, fázové běhy (coder, tester, reviewer, planner; 16 běhů na variantu) | **0** | 6 961 | −6,96 tis. |
+| S fázového běhu (coder / reviewer / tester / planner) | 11,0 / 10,6 / 10,0 / 12,1 tis. | 20,3 / 19,9 / 19,3 / 21,4 tis. | −9,3 tis. u všech čtyř |
+| `instructions`, subagent z hlavní session (coder, reviewer-opus; 3 + 3 běhy na variantu) | **0** | 6 961 | S 10,15 / 10,64 tis. proti 19,46 / 19,95 tis. |
+
+`CLAUDE_CODE_DISABLE_CLAUDE_MDS` ruší i text auto-memory v system promptu: pokles S je o ≈ 2,3 tis. tokenů větší než samotné
+`instructions` (9,3 proti 7,0 tis.). Hlavní session si CLAUDE.md ponechává (8,5 tis. znaků workspace + globální; ≈ 12,6 tis. znaků místo ≈ 22).
+Projekce na populaci CL-31: `bySource.claudeMd` 3,50 % → **≈ 0,4 %** (main 0,61 → 0,35, general-purpose 0,03, subagenti 0); úspora subagentů
+2,0 % (jen `instructions`) až 2,7 % (s textem auto-memory) celkové ceny, tj. na spodní hranici odhadu #2.
+
+Regrese pravidel: šest otázek na pravidla přesunutá z CLAUDE.md do těl (plan-gating → limity využití, trailer a AI attribution v commitu,
+tajné hodnoty z `.env`, zájmeno ve 3. osobě, `terrio-postgres:5432` a frontend checkout, věta o ceníku) pro coder, reviewer-opus a planner,
+3 opakování, B i A76: **54 / 54 odpovědí správně v obou variantách**, žádné „on/ona“, žádný AI trailer, žádný návrh omezení funkce podle plánu.
+
+### CL-177: payload hlavní session
+
+Hlavní session je desktopová aplikace, kterou `claude -p` nereprodukuje (bez Browser pane, `ccd_*`, konektorů, pluginů z účtu), proto dvě řady.
+
+Čerstvé desktopové sessions (`run/startpayload.mjs`, první tah; B = 5 sessions z 2026-10-09 (UTC 17:25–17:26 a 23:26–23:32), tři spuštěné jednorázovými
+úlohami plánovače, před = 27 sessions 2026-10-07 → 10-09 17:22):
+
+| | Před CL-59 (27) | Po CL-59 (5) | rozdíl |
+|---|---:|---:|---:|
+| S, medián (rozsah) | 74 559 (70 264–77 130) | **64 477** (61 464–64 548) | −10,1 tis. |
+| listing skills, znaky | 30 393 | 14 166 | −16 227 |
+| MCP instrukce, znaky | 8 160 | 6 839 | −1 321 |
+| názvy deferred nástrojů, znaky | 7 630 | 7 955 | +325 |
+
+Skills + MCP instrukce + deferred: 46 183 → 28 960 znaků (−5,45 tis. tokenů při 3,16 znaku/token); při podílu main sessions 6,13 % ceny a
+S 79,5 tis. to je **−0,42 pp** (zbývá 0,67 pp z CL-31 základu 1,09 pp). Práh 0,5 pp chybí o 0,08 pp; vypnutí Computer use a Claude in Chrome
+v aplikaci (6,1 tis. znaků instrukcí) přidá ≈ 0,15 pp, tj. 0,57 pp.
+
+`claude -p` v kopii workspace s nastavením před CL-59 (M0) a dnešním (M1), 5 běhů na variantu, S 46 636 → 44 401 (−2,2 tis.; listing
+14 135 → 13 419 znaků, MCP instrukce 0, protože CLI v tomto prostředí konektory z účtu nenačetlo): potvrzuje směr, ne velikost.
+
+### Verdikt kritérií
+
+| Karta | Kritérium | Výsledek |
+|---|---|---|
+| CL-75 | `bySource.mcpSchemas` ≤ 0,7 % | to, co CL-57 nechal, 0,15 % (splněno); včetně CodeLoupe 0,80 % (o 0,10 pp víc, CL-184) |
+| CL-75 | medián S coder ≤ 18k, reviewer ≤ 17k, tester ≤ 12k | 11,0 / 10,6 / 10,0 tis., splněno |
+| CL-75 | bez nárůstu tahů | žádné volání odebraných nástrojů v 16 běhech A75, tahy B ≤ A75 + šum, splněno |
+| CL-76 | `claudeMd` ≤ 0,5 %; medián subagenta 0 | ≈ 0,4 %; 0 ve 34 / 34 běhech B, splněno |
+| CL-76 | regrese pravidel | 54 / 54, splněno |
+| CL-177 | medián S main ≤ 65k | 64,5 tis. (n = 5), splněno s rezervou 0,5 tis. |
+| CL-177 | skills + mcpInstr + deferred ≥ 0,5 pp | 0,42 pp, chybí 0,08 pp |
+| CL-177 | MCP instrukce ≤ 2k znaků | 6 839; vyžaduje přepínače aplikace (vlastník) |
