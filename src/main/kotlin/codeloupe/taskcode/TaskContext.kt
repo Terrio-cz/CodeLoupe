@@ -48,11 +48,20 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
             "open-criteria" to openCriteria(context, mirror.store),
             "touch" to touch(facts, failure),
             "declarations" to declarations(root, paths),
-            "callers" to callers.render(root, paths),
+            "callers" to optional { callers.render(root, paths) },
             "prior" to prior(facts, canonical, paths, mirror.store),
-            "norms" to norms(facts, paths),
+            "norms" to optional { norms(facts, paths) },
         )
         return Doc.of("context:$canonical", pieces.filter { it.second.isNotBlank() }.map { (handle, text) -> Triple(handle, handle, "## $handle\n$text") })
+    }
+
+    /** The extra parts of the pack are a help, not the answer: one that fails (an unreadable file, a hostile document) is left out. */
+    private suspend fun optional(part: suspend () -> String): String = try {
+        part()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        ""
     }
 
     private fun linked(c: IssueContext): String {

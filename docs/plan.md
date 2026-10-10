@@ -604,6 +604,73 @@ Kritérium „podíl čtení trackeru ≤ 5 %“ **zůstává nesplněné** (5,9
 `dispatch_plan` 0,3 %. Nejde o chybějící údaj, ale o to,
 že suggester chce vlastní výběr nad celým backlogem (typ, priorita, oblast), který `dispatch_plan` neumí. Cena (medián 67 % proti A, 1. kritérium) zůstává splněna. Dál se neiterovalo.
 
+**Planner s balíčkem `task_context` a krátkým tělem (CL-190, 2026-10-10).** Planner je největší položka toku (123 z asi 420 mil. vážených jednotek od 2026-10-01,
+medián 46 tahů, peak kontext 167 tis. tokenů, 921 tis. jednotek na běh). Hypotéza: tahy planneru jdou na zjišťování toho, co může předat připravený balíček, a méně tahů
+znamená méně čtení cache. Řízený pokus (Opus, effort high, 3 uzavřené úkoly TER-321, TER-62, TER-324 z CL-23 / CL-180 ve stejných odlehlých klonech těsně před landem,
+bez context packetu, hooky vypnuté, tracker čte stejný YouTrack, nic se nezapisuje, scratch kopie workspace, throwaway daemony 47622–47625, dva běhy souběžně, A a B vždy
+zároveň). Celkem 37 běhů, 42,9 USD (z toho 2 zkušební a 2 vyřazené běhy 4,0 USD, rozbor 33 platných).
+
+*Kam jde cena planneru.* U A (9 běhů) je z 425 tis. jednotek průměrně 35 % zápis cache (148), 29 % čtení cache (124) a 36 % výstup (153: myšlení a plán, 31 tis. tokenů
+na běh, z toho 11 tis. myšlení); výsledky nástrojů jsou jen 20–30 %. Balíček tedy ušetří, jen když odstraní tahy, ne když jen přeskupí čtení.
+
+*Co se změnilo v CodeLoupe.* `task_context` nese nové sekce za stávajícími: `description` (sekce popisu bez checklistu, po 1 500 znacích, celkem 5 000, s odkazem na zbytek),
+`comments` (celé vlákno do 5 000 znaků: krátké komentáře celé, dlouhé se dělí o zbytek a krájí se uprostřed, začátek a závěr zůstanou, takže rozhodnutí z dlouhého vlákna
+(TER-62 má 29 komentářů, 21 tis. znaků) nevypadnou), `callers` (soubory, produkční první, pak testy, které jistě odkazují na top-level deklarace dotčených souborů; jen `exact`),
+`norms` (rejstřík sekcí `AGENTS.md` s řádky, bullety, které jmenují modul nebo soubor úkolu, podle vah modul 3 / složky 2 / dvojice slov jména 2, slova v víc než třetině
+bulletů se nepočítají, a dokumenty `docs/*.md`, které jmenují dotčené soubory). Strop odpovědi nástroje 26 tis. znaků (jinak by 20tisícový strop `doc` uřízl `norms` a `prior`
+u velkého úkolu). Volitelné části (`callers`, `norms`) při chybě odpadnou, balíček zůstane. Katalog zůstává 14 nástrojů; mění se jen text popisu a `sections`
+u `task_context` (výpis sekcí), `ToolListStabilityTest` zelený. Testy: `PackTextTest` (popis, komentáře, normy, dokumenty), `TaskCodeTest` (balíček na fixture, nečitelný `AGENTS.md`).
+Velikost balíčku na třech úkolech 16,0 / 20,5 / 18,6 tis. znaků (dřív 10,4 / 11,7 / 14,0).
+
+*Varianty.* A = živé tělo planneru před pokusem (`.bak-cl189`), daemon z `main` (starý balíček). B = nové tělo (7 974 znaků: tah 1 `task_context` s `since=none` + brain + git v jedné dávce,
+„balíček je surovina plánu“, nic z něj znovu nečíst, tahy 2–4 po dávkách jen na to, co plán mění a balíček nemá, tah 5 `git overlap` + minulé nálezy, potom psát; rozpočet 8 tahů;
+chybějící fakt = `? unknown` s krokem, který jej vyřeší, ne další kolo hledání) + nový daemon z větve. C = staré tělo + nový daemon (jen balíček). D = živé tělo (B + věta pro starý daemon,
+7 986 znaků) + nový daemon. E = živé tělo + starý daemon (tělo nasazené dřív než daemon).
+
+| Var. | n | Jednotky tis.: medián (min–max) | Průměr | USD průměr | Tahy (medián, `num_turns`) | Výstup tis. tokenů | Zápis cache tis. tokenů | Čtení cache tis. tokenů | Wall s |
+|---|---|---|---|---|---|---|---|---|---|
+| A, tělo před, starý balíček | 9 | 433 (255–506) | 425 | 1,45 | 38 | 31,0 | 74 | 1 309 | 304 |
+| **B, nové tělo, nový balíček** | 9 | **235 (198–259)** | 231 | 0,87 | 17 | 21,4 | 47 | 250 | 210 |
+| C, staré tělo, nový balíček | 9 | 398 (268–511) | 386 | 1,34 | 34 | 33,0 | 66 | 956 | 344 |
+| D, živé tělo, nový balíček | 3 | 251 (179–281) | 237 | 0,89 | 16 | 20,0 | 49 | 223 | 228 |
+| E, živé tělo, starý balíček | 3 | 285 (236–345) | 289 | 1,08 | 29 | 24,7 | 58 | 391 | 261 |
+
+Po úkolech, jednotky tis. (medián tří běhů) A → B: TER-321 504 → 246 (49 %), TER-62 433 → 245 (57 %), TER-324 360 → 208 (58 %). **Medián B / A 54 %, průměr 54 %**, přesný
+permutační test (9 proti 9, jednostranný) p = 0,0014; jediný překryv rozsahů je nejlevnější A (255) a nejdražší B (259). C / A 92 % (medián), D / A 58 %, E / A 66 %.
+Kritérium „medián B ≤ 75 % A“ je splněno.
+
+Kvalita plánu (kontrolní seznam podle CL-23: známé nálezy reálných kol — TER-321 4, TER-62 6, TER-324 0; rozhodnutí reálného plánu z poznámek brainu — 7, 6, 7; soubory reálného
+řešení podle diffu — 16, 15, 11; počet řádků `premortem` a různých čoček; vzorce nad textem plánu, formát čísel sjednocen, ruční kontrola dvou dvojic):
+
+| Var. | Nálezy | Rozhodnutí | Soubory | Řádky premortem | Různé čočky | Znaků plánu | `? unknown` na plán |
+|---|---|---|---|---|---|---|---|
+| A | 0,90 (27/30) | 0,98 | 0,77 | 18,1 | 10,3 | 26,0 tis. | 0,0 |
+| B | 0,90 (27/30) | 0,98 | 0,72 | 16,4 | 11,1 | 22,6 tis. | 2,6 |
+| C | 0,93 | 1,00 | 0,75 | 16,6 | – | 25,6 tis. | 0,2 |
+| D / E | 1,00 / 1,00 | 1,00 / 0,95 | 0,81 / 0,76 | 16,3 / 16,3 | – | 20,8 / 24,9 tis. | 2,0 / 2,3 |
+
+Nálezy a rozhodnutí jsou u B stejné jako u A (shodně chybí třetí nález TER-321: dvojice `Public-Change`, v bench packetu není brain). Rozdíl je v pokrytí souborů (0,77 → 0,72) a v počtu
+řádků premortem (−9 %), soustředěný na TER-324 (soubory 0,97 → 0,82: B vynechal čtyřřádkové změny `User.kt`, `Organization.kt` a `docs/local-stack.md`; premortem 16,3 → 14,0), u TER-321
+a TER-62 stejné (0,75 / 0,75 a 0,64 / 0,62). B píše víc `? unknown` (2,6 na plán, např. sloupce projekce TER-63, existující typ provenance), tedy místo dohledávání nechá krok, který fakt
+ověří. Při devíti běhech na variantu je to „nehorší v rozptylu“, ne „prokazatelně stejné“.
+
+*Kam jde úspora (medián A → B).* Tahy 38 → 17, čtení cache 1,31 → 0,25 mil. tokenů (−81 %), zápis cache 74 → 47 tis., výstup 31 → 21 tis. (myšlení 11,5 → 7,7 tis.). Čtení kódu shellem
+(`rg`, `sed`, `cat`) 17,6 → 7,7 volání a 60 → 44 kB na běh, `Read` 3,3 → 1,1, ostatní volání CodeLoupe 13,1 → 7,2, balíček 1 volání (18 kB) místo 1,7 volání (12 kB). Podíl C (jen balíček)
+je malý: staré tělo dál volá `issue` (1,8 volání na běh, jako A; B 0,8) a čte `AGENTS.md` (1,1 čtení; A 2,2, B 0,4), takže ušetří 8 %, a zbytek (46 procentních bodů) dělá text těla („začni z balíčku, rozpočet 8 tahů, dávky, nehledat dál“),
+shodně s CL-180: adopci a chování určuje tělo agenta. Balíček dělá zastavení bezpečným (rozhodnutí z komentářů, rozsah dotčeného kódu, řádky norem jsou po ruce).
+
+*Nasazení.* Živé `terrio-planner.md` je upraveno (záloha `.bak-cl189`, tělo 7 986 znaků, `validate` zelený). Nový balíček dostane až daemon po vydání; do té doby nese tělo větu „balíček bez `description`
+a `comments`: jedno `issue` se `sections`“ a varianta E (tělo + starý daemon) ukázala 66 % A. Dva běhy D (62 a 324) padly na „Could not initialize class“ — při testech jsem nechal Gradle přepsat jar
+pod běžícím daemonem — a agent spadl na `issue` / `yt_*` (272 a 211 tis., zpráva o pádu je z části důkaz funkčnosti zálohy); vyřazeny a znovu změřeny (251 / 281 / 179 tis. platné běhy).
+
+*Nález mimo plán, kartu CL-192.* První `task_context` nového agenta v kořeni, který už jiný agent četl, vrací „unchanged since your read“ (klíč paměti je kořen, ne agent): oba bench
+(před spuštěním jsem daemon zahřál) i živé okno, které planner spouští, tím ztratí tah; tělo planneru proto žádá `since=none`.
+
+*Omezení.* 3 úkoly × 3 běhy (D, E po 3), kontrolní seznam je vzorcový (nálezy a rozhodnutí z poznámek brainu, rozhodnutí v textu plánu hledaná vzorci), bez packetu (živý planner dostává
+`context:` s issue a komentáři, takže část toho, co balíček nabízí, už má; živý medián 46 tahů je přesto vyšší než 17–38 v pokusu), uzavřené úkoly mají v komentářích i nálezy pozdějších kol
+(stejně A i B), wall orientační (dva běhy souběžně, při jednom z nich běžel Gradle), jedna iterace (druhá nebyla potřeba), rozpočet 42,9 USD proti plánovaným asi 40.
+Skripty a data: `%TEMP%\terrio-bench2\cl189` (`bench-ws`, `bench-run`, `lane`, `analyze`, `judge`, `trace`, `summ`; přiložené ke kartě CL-190).
+
 ### 8.5 Živé porovnání
 
 2 týdny po nasazení `codeloupe metrics compare baseline.json after.json`; týdenní report mezer.
