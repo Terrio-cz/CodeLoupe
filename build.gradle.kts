@@ -85,10 +85,7 @@ tasks.startScripts {
 
 apply(from = "gradle/bundle.gradle.kts")
 
-// The tests leave their temporary directories behind (120,000 of them once filled a 930 GB disk): they work in one directory of this
-// run's own, removed afterwards even when a test fails. The path stays short for Windows.
-val testScratch = File(System.getProperty("java.io.tmpdir"), "cl-test-${ProcessHandle.current().pid()}")
-val cleanTestScratch = tasks.register("cleanTestScratch") { doLast { testScratch.deleteRecursively() } }
+apply(from = "gradle/test-scratch.gradle.kts")
 
 tasks.test {
     // AotTrainingTest runs the installed jars.
@@ -99,9 +96,6 @@ tasks.test {
     maxParallelForks = (findProperty("testForks") as String?)?.toInt() ?: (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     systemProperty("codeloupe.projectDir", projectDir.absolutePath)
-    systemProperty("java.io.tmpdir", testScratch.absolutePath)
-    doFirst { testScratch.mkdirs() }
-    finalizedBy(cleanTestScratch)
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }
 
