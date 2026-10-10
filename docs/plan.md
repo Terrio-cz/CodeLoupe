@@ -456,6 +456,55 @@ varianty je přitom 15–40 %; část nákladu jde na to, že reviewer víc ově
 (wall je orientační), YouTrack issue obsahuje kritéria „found: round 1“, takže TER-321 a TER-62 reviewer částečně ověřuje
 známá kritéria. Navazuje kontrola adopce nástroje v reviewerovi (CL-180); `Public-Change` v těle je opraveno (CL-179).
 
+**Řízené srovnání dispečera, planneru a čtení issues (CL-92, CL-95, CL-30, 2026-10-10).** Měření „sledovat 7+ dní“ nahradil
+řízený pokus: stejný prompt a stav, dvě varianty, víc opakování, výsledek za hodiny. 28 běhů `claude -p --agent` (Opus, effort high,
+stejný model a prompt, dva běhy souběžně, A a B vždy zároveň), celkem 47,65 USD. Varianta A = těla `terrio-suggester` a
+`terrio-planner` před task indexem (zálohy `.bak-cl95`: `yt_epics`/`yt_search`/`yt_get_issue`/`yt_related`, bez nástrojů CodeLoupe;
+v `.mcp.json` jen youtrack) v odlehlé kopii workspace (bez claimů a logů brainu, takže 4 volná okna; živý workspace se nesahá);
+varianta B = dnešní těla a nástroje s oddělenými daemony (suggester: index skutečného repozitáře + zrcadlo TER, planner: odlehlé klony
+z CL-23 + zrcadlo TER; tracker čte stejný YouTrack, zápisové nástroje `update`/`edit` a všechny `yt_*` zápisy odepřené). Suggester píše
+jen svůj plán do kopie a plán projde `suggest check` (16 z 16 běhů PASS). Dvě zadání suggesteru: `spec: auto, count: 3` (5 běhů na
+variantu) a `spec: epic TER-162, count: 2` (3 běhy); planner: TER-321 a TER-62 z CL-23 (3 běhy na úkol a variantu). Metriky: vážené
+jednotky (vstup 1, zápis cache 1,25/2, čtení cache 0,1, výstup 5), USD z `claude`, tahy, počty volání z transcriptů a podíl ceny
+výsledků nástrojů metodou `run/codemetrics.mjs` (výsledek se jednou zapíše do cache a čte se v každém dalším tahu). Varianta A
+reprodukuje živé číslo: podíl YouTrack MCP na ceně suggesteru 16,3 % (auto) a 18,7 % (epic) proti 20,2 % ve 117 živých bězích.
+
+| Běh | Var. | n | Jednotky tis.: medián (min–max) | Průměr | USD průměr | Tahy (medián) | Wall s (průměr) |
+|---|---|---|---|---|---|---|---|
+| suggester auto | A | 5 | 718 (362–1 138) | 769 | 2,49 | 34 | 425 |
+| suggester auto | B | 5 | 602 (387–702) | 568 | 1,90 | 30 | 350 |
+| suggester epic | A | 3 | 448 (425–546) | 473 | 1,60 | 27 | 247 |
+| suggester epic | B | 3 | 492 (481–712) | 561 | 1,84 | 32 | 312 |
+| planner TER-321 | A / B | 3 / 3 | 364 (320–385) / 381 (367–405) | 357 / 384 | 1,28 / 1,38 | 16 / 19 | 298 / 318 |
+| planner TER-62 | A / B | 3 / 3 | 349 (337–374) / 332 (330–388) | 353 / 350 | 1,27 / 1,20 | 15 / 24 | 276 / 250 |
+
+| Běh | Var. | Volání YouTrack MCP na běh | z toho `yt_get_issue` | Volání CodeLoupe na běh | z toho `issue` | Podíl YouTrack MCP na ceně | Podíl čtení trackeru celkem (YouTrack MCP + `issue`, `tasks`, `task_context`, `dispatch_plan`) |
+|---|---|---|---|---|---|---|---|
+| suggester auto | A | 39,2 | 14,0 | 0 | 0 | 16,3 % | 16,3 % |
+| suggester auto | B | 0,2 | 0 | 29,6 | 16,6 | 0,0 % | 10,1 % |
+| suggester epic | A | 29,0 | 16,7 | 0 | 0 | 18,7 % | 18,7 % |
+| suggester epic | B | 0,3 | 0 | 26,3 | 18,3 | 0,0 % | 13,9 % |
+| planner (6 běhů) | A | 2,5 | 1,7 | 0 | 0 | 6,4 % | 6,4 % |
+| planner (6 běhů) | B | 1,3 | 1,0 | 3,7 | 0 | 4,4 % | 7,4 % |
+
+Rozdělení ceny suggesteru B podle nástroje (auto / epic): `issue` 5,6 / 8,6 %, `tasks` 3,5 / 2,4 %, `dispatch_plan` 1,2 / 2,8 %,
+`task_code` 1,2 / 0,3 %; A: `yt_get_issue` 7,9 / 12,4 %, `yt_related` 4,5 / 3,0 %, `yt_search` 3,7 / 2,1 %.
+
+**Co z toho plyne.** (1) *Volání YouTrack zmizela*: suggester 39 → 0,2 (auto) a 29 → 0,3 (epic) na běh, `yt_get_issue` 120 → 0 v 8 bězích
+suggesteru, u planneru 10 → 6 v 6 bězích; zbylých 6 je jedno `yt_get_issue` na běh (3× s komentáři u TER-321, 3× bez nich u TER-62,
+dvakrát pak `yt_comments`), protože `task_context` ukazuje jen počet komentářů; proč TER-62 volá i bez komentářů, transkript neříká
+(CL-183). Čtení jednoho issue je poloviční (`issue` 2,3–2,8 tis. znaků proti 4,4 tis.). (2) *Cena suggesteru neklesla
+prokazatelně*: auto −16 % medián (−26 % průměr), epic +10 % medián (+19 % průměr), souhrnně 8 proti 8 běhům medián 575 → 551 tis.
+(−4 %), průměr 658 → 566 tis. (−14 %), Mann-Whitney p = 0,31 / 0,40 / 0,80; rozptyl mezi opakováním téže varianty (362–1 138 tis.) je
+větší než rozdíl. Důvod: B čte stejně issues jako A (16,6 a 18,3 `issue` na běh proti 14,0 a 16,7 `yt_get_issue`, 13–23 různých id,
+část dvakrát), protože tělo říká „`issue` jednou na kandidáta“, i když `dispatch_plan` kandidáty a klíče už vrátil; čtení trackeru
+tak i přes CodeLoupe stojí 10,1 % (auto) a 13,9 % (epic) ceny (CL-182). (3) *Planner beze změny ceny*: medián 357 → 374 tis. (+5 %),
+USD 1,27 → 1,29, p = 0,48, shodně s CL-23. (4) Omezení: 3–5 opakování, jedna sada úkolů, plány hodnotí jen `suggest check` (nesrovnáno,
+které úkoly vybrala varianta; B vrátil v zadání epic 1 okno ze 2 žádaných, A 1–2), planner je v odlehlých klonech bez živých oken a
+bez `context pack`, `suggest live` nehlásil žádné pracující okno (živé worktrees jen dormantní, takže kolize s běžícím oknem se
+nezkoušela), hooky vypnuté jako v CL-23, wall orientační. Čtení issue „6,5× na issue“ ze živého provozu se v jednom běhu neobjeví (opakování vzniká mezi agenty a koly), proto se
+neměřilo. Skripty (`bench-ws`, `bench-run`, `lane`, `analyze`) vycházejí z `run/cl23-bench` a jsou přiložené ke kartě CL-182.
+
 ### 8.5 Živé porovnání
 
 2 týdny po nasazení `codeloupe metrics compare baseline.json after.json`; týdenní report mezer.
