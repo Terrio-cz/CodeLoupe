@@ -747,7 +747,37 @@ Dále `symbol path:1` (5×): řádek před první deklarací (balíček, importy
 Stejné transcripty, nový detektor: 365 → 196 mezer (9,3 %). Řízené běhy planneru (7 běhů na variantu): starý daemon 15 mezer v 78 voláních (19,2 %; nový detektor 11, 14,1 %), daemon s opravami 8 v 91 (8,8 %); zbylých 8 je 5 záporných odpovědí na jména, která úkol teprve zavádí
 (`location_search`, `LocationSearch*`, `AccountInput`) a 3 náhodné shody tokenu (`website`, `description`, `json`). Cíl 7 % se nesplnil (8,8 %), a protože zbytek nepochází z daemona, kritérium se přepisuje; metrika sama je karta CL-198.
 
-Skripty a data: `%TEMP%\terrio-bench2\cl189` (`bench-ws`, `bench-run`, `lane`, `analyze`, `judge`, `trace`, `summ`; přiložené ke kartě CL-190).
+*Věta o každém souboru v těle planneru (CL-197, 2026-10-10).* Řízený běh planneru (Opus, effort high, klony těsně před landem, bez packetu, tracker čte stejný YouTrack a nic do něj nepíše, throwaway daemon z `main` na 47682 se sekcí `cochange`, dva běhy souběžně; před každým během se agentovi zapomněla čtení kořene jako hookem `SubagentStart`). Tři těla: L = živé tělo z CL-190, S = L + věta v odrážce o přístupu („vypiš každý soubor, který změna zasáhne, i jednořádkové úpravy a model a dokumenty, které jmenuje `cochange`“; aby tělo zůstalo do 8 000 znaků, odpadla věta „Never a >20k-char file whole“, návod `rg -n '^## '` a „the other agents“ → „others“), O = staré tělo před CL-190 (`.bak-cl189`). Tři úkoly: TER-324 (11 souborů, dvě čtyřřádkové úpravy modelu `User.kt`, `Organization.kt` a `docs/local-stack.md`), TER-176 (5 souborů mimo testy: jednořádkový `AccountModule.kt`, `StaffService.kt`, `importer-architecture.md`) a TER-575 (5 souborů: jednořádkový `PostgisColumnType.kt`, `current-db-diagram.md`, `TourismQueryRepository.kt`). TER-176 a TER-575 vybral skript (`cand.mjs`) mezi uzavřenými úkoly s 4–9 soubory tak, že aspoň dva malé soubory text úkolu nejmenuje. Šestnáct nových běhů (S a O po 2 na úkol, L po 2 na TER-176 a TER-575) a pro L na TER-324 pět běhů z CL-194 (stejné tělo, daemon se `cochange`); celkem 20,35 USD i se suggesterem níže.
+
+| Úkol | Tělo | n | Soubory řešení | Z toho malé | Řádky premortem | Jednotky tis. (medián) | USD průměr |
+|---|---|---|---|---|---|---|---|
+| TER-324 | L | 5 (z CL-194) | 47/55 = 0,85 (po bězích 11, 8, 9, 11, 8) | 9/15 | 13,0 | 234 | 0,82 |
+| TER-324 | **S** | 2 | **21/22 = 0,95** (11, 10) | **6/6** | 11,0 | 221 | 0,81 |
+| TER-324 | O | 2 | 19/22 = 0,86 (9, 10) | 3/6 | 12,0 | 263 | 0,94 |
+| TER-176 | L / S / O | 2 | 10/10 u všech | 6/6 u všech | 11,5 / 12,5 / 13,5 | 187 / 168 / 234 | 0,70 / 0,64 / 0,83 |
+| TER-575 | L / S / O | 2 | 10/10 u všech | 6/6 u všech | 10,5 / 11,0 / 11,5 | 181 / 158 / 252 | 0,67 / 0,58 / 0,89 |
+| všechny | L (n = 9) | | 67/75 = 0,89 | 21/27 | 12,1 | 200 | 0,76 |
+| všechny | **S (n = 6)** | | **41/42 = 0,98** | **18/18** | 11,5 | **173** | 0,68 |
+| všechny | O (n = 6) | | 39/42 = 0,93 | 15/18 | 12,3 | 240 | 0,88 |
+
+TER-176 a TER-575 rozlišit nedokážou: balíček jim jmenuje malé soubory sám (`cochange`: `AccountModule.kt`, `current-db-diagram.md`), takže všechna tři těla je uvedla ve všech 12 bězích. Rozlišuje jen TER-324, kde `User.kt` a `Organization.kt` balíček jmenuje jen jako tip a planner je vynechává vlastním rozhodnutím: S je neminulo ani jednou (6/6 malých souborů, 10 a 11 z 11), L je vynechalo ve 3 z 5 bězích (9/15). Rozdíl **není statisticky prokázán** (S proti L na TER-324: dva běhy proti pěti, jednostranný permutační test p ≈ 0,29; stejně pro malé soubory), je ale ve směru, který vysvětluje mechanismus, a S nebylo na žádném úkolu horší než L ani O. Starý O na TER-324 tentokrát 0,86 (dříve 0,97 v CL-190, n = 2 proti 3), takže „ztráta oproti starému tělu“ je v rozptylu; rozhodnutí o větě to nemění. Řádky premortem jsou 11,5 proti 12,1 (L) a 12,3 (O), tedy −5 % v rozsahu 10–16 řádků na plán: šum. Cena: medián jednotek S / O 72 % (173 / 240 tis.; po úkolech 84 %, 72 %, 63 %), průměr jednotek 73 %, průměr USD 77 %; S / L 87 %. Kritérium „cena ≤ 75 % starého těla“ platí v jednotkách (metrika celého dokumentu), v USD je 77 %.
+
+*Nasazení (planner).* `terrio-planner.md` je živé s větou (záloha `.bak-cl197`, tělo 7 998 znaků). Omezení: dva běhy na buňku u nových úkolů, uzavřené úkoly mají v kritériích později přidané řádky `(found: …)`, které soubory někdy jmenují (proto výběr úkolů skriptem), L na TER-324 jsou běhy z jiného dne s daemonem z větve před sloučením (kód balíčku totožný).
+
+*Suggester: `dispatch_plan query=` místo `tasks` (CL-188, 2026-10-10).* `dispatch_plan` bere filtry přes `query=` už teď (`DispatchQuery`: typ, priorita, komponenta, stav; všechny otevřené listové úkoly, které sedí), CodeLoupe se tedy neměnil a katalog nástrojů zůstal bajtově stejný. Změnilo se tělo `terrio-suggester.md` (záloha `.bak-cl188`, tělo 7 542 znaků): z `tools:` odpadl `mcp__codeloupe__tasks`, filtry zadání (oblast, komponenta, typ, priorita, stav) jdou do prvního volání `dispatch_plan query=`, „bez `tasks`“ je řečeno výslovně a při chybějícím nástroji se padá na `yt_search`. Měření: `spec: auto`, `count: 3`, Opus high, odlehlá kopie workspace, throwaway daemon z `main` na 47681, skutečný stav workspace jen ke čtení, před každým během zapomenutá čtení kořene; v6 = nové tělo (5 běhů), v5 = tělo před úpravou (2 běhy téhož dne).
+
+| Tělo | n | Medián tis. | Průměr tis. | USD průměr | `tasks` na běh | `issue` na běh | Podíl čtení trackeru: průměr (min–max) | `suggest check` |
+|---|---|---|---|---|---|---|---|---|
+| A, před task indexem (CL-182c, jiný den) | 5 | 718 | 769 | 2,49 | – | 14,0 (`yt_get_issue`) | 16,3 % | |
+| v5, před touto úpravou (CL-182c, jiný den) | 5 | 481 | 487 | 1,62 | 4,2 | 7,0 | 5,9 % (4,1–8,2) | 5/5 |
+| v5, dnes | 2 | 325 | 325 | 1,13 | 0 | 5,5 | 5,3 % (3,8–6,8) | 2/2 |
+| **v6, `query=`, bez nástroje `tasks`** | 5 | **302** | 342 | 1,20 | **0** | 4,8 | **4,0 % (3,3–5,4)** | **5/5** |
+
+`tasks` na běh 4,2 → 0 (u v6 zaručeně: nástroj chybí; v5 dnes `tasks` také nevolalo ani jednou, takže příčina dřívějších 4,2 volání byla ve stavu workspace a náhodě, ne jen v těle). Podíl čtení trackeru 4,0 % (medián běhů 3,7 %; `issue` 2,7 %, `yt_search` 0,8 %, `dispatch_plan` 0,6 %), pod 5 %; jeden běh z pěti je nad (5,4 %). Cena: stav workspace se mezi dny změnil (v5 dnes 325 tis. proti 481 tis. v CL-182c), proto stojí za poměr téhož dne: v6 / v5 = 93 % (302 / 325 tis., rozdíl v šumu, v5 jen dva běhy), a spolu s v5 / A = 67 % z CL-182c vychází v6 / A asi 62 %; proti starému A z jiného dne je to 42 %. Staré tělo A se nepouštělo znovu (rozpočet). Všech 7 plánů projde `suggest check`.
+
+*Nasazení (suggester).* `terrio-suggester.md` živé (v6, `.bak-cl188`). Omezení: v5 má jen dva běhy; stav workspace (volná okna, dormantní worktrees) se měnil, takže absolutní tisíce jednotek se mezi dny nesrovnávají. Rozpočet obou karet 20,35 USD za 23 běhů (z 25), bez další iterace.
+
+Skripty a data: `%TEMP%\terrio-bench2\cl189` (`bench-ws`, `bench-run`, `lane`, `analyze`, `judge`, `trace`, `summ`; přiložené ke kartě CL-190), `%TEMP%\cl197` (`setup`, `mkvariants`, `cand`, `bench-run`, `lane`, `judge`, `analyze`; přiložené ke kartám CL-197 a CL-188).
 
 ### 8.5 Živé porovnání
 
