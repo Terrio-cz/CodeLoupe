@@ -711,6 +711,14 @@ pod běžícím daemonem — a agent spadl na `issue` / `yt_*` (272 a 211 tis., 
 *Omezení.* 3 úkoly × 3 běhy (D, E po 3), kontrolní seznam je vzorcový (nálezy a rozhodnutí z poznámek brainu, rozhodnutí v textu plánu hledaná vzorci), bez packetu (živý planner dostává
 `context:` s issue a komentáři, takže část toho, co balíček nabízí, už má; živý medián 46 tahů je přesto vyšší než 17–38 v pokusu), uzavřené úkoly mají v komentářích i nálezy pozdějších kol
 (stejně A i B), wall orientační (dva běhy souběžně, při jednom z nich běžel Gradle), jedna iterace (druhá nebyla potřeba), rozpočet 42,9 USD proti plánovaným asi 40.
+*Oprava CL-192 (2026-10-10): nový agent v kořeni.* Transport je bezstavové HTTP a podagent sdílí s oknem MCP spojení i kořen, takže daemon agenta od agenta nerozliší; klientská hlavička
+relace nic nepřidá. Rozhodnuto proto zapomenout čtení v okamžiku, kdy nový agent vzniká: hooky pluginu `SessionStart` (už byl) a nově `SubagentStart` pošlou daemonu `cwd` a ten
+smaže paměť `issue`, `task_context`, `doc` a `dispatch_plan` pro kořen, složku v něm i složku nad ním (`Sessions.near`). První čtení nového agenta je celé; okno, které četlo před ním,
+dostane jednou celou odpověď a pak zase jednořádkové. Bezpečný směr chyby: nejhůř se zbytečně pošle text znovu, nikdy se nepřizná „unchanged“ k textu, který agent nečetl. Zbývá případ dvou
+podagentů, kteří začnou před prvním čtením kteréhokoli z nich a čtou stejný kořen (druhý dostane řádek; `since=none` ho opraví), a instalace bez hooků (`CODELOUPE_HOOKS=off`).
+Ověřeno skutečným `hook.sh` proti throwaway daemonu: čtení – opakování (řádek) – `SubagentStart` – první čtení podagenta (celé) – jeho opakování (řádek); testy `SessionsTest`,
+`DocTest`, `IssueReadTest`, `HooksTest`.
+
 *Pokrytí souborů balíčkem a plánem (CL-194, 2026-10-10).* Skriptová kontrola bez modelu (`node tools/pack-coverage.mjs`: stejný klon těsně před landem, počet souborů skutečného řešení, které balíček jmenuje): `task_context` nese novou sekci `cochange`
 (soubory, které dřívější úkoly na stejném kódu měnily spolu s ním a úkol je zatím nejmenuje; ukázkou jsou úpravy modelu a dokumentace, které krátká změna schová; úkoly, které změnily aspoň dva dotčené soubory najednou, vážou víc než průchod rušným souborem)
 a v `callers` u členů, které text úkolu jmenuje, soubory, které je volají (route volá metodu služby, ne třídu). TER-324: balíček jmenuje 5 z 11 souborů řešení před změnou a 7 z 11 po ní (z 8 už existujících souborů 5 → 7: přibyly `CurrentUserRoutes` a `docs/local-stack.md`);

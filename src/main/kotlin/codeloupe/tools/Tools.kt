@@ -19,9 +19,8 @@ object Tools {
     fun named(name: String): Tool? = ALL.firstOrNull { it.name == name }
 
     /** The daemon's catalog: the code tools, the tracker tools when a tracker is configured, and task_code (history alone without one) and doc (text files). */
-    fun catalog(trackers: Trackers, jobs: JobRunner? = null, secrets: SecretAccess? = null, home: Path? = null): List<Tool> {
-        // The document reader's memory is shared: `doc` and `task_context` tell a caller the same "you already have this".
-        val docs = DocMemory()
+    fun catalog(trackers: Trackers, jobs: JobRunner? = null, secrets: SecretAccess? = null, home: Path? = null, docs: DocMemory = DocMemory()): List<Tool> {
+        // The document reader's memory [docs] is shared: `doc` and `task_context` tell a caller the same "you already have this".
         val tracked = if (trackers.configured) listOf(IssueTool(trackers), TaskContextTool(trackers, docs), DispatchPlanTool(trackers, docs), TasksTool(trackers), SimilarTool(trackers), UpdateTool(trackers)) else emptyList()
         val handles = { handle: String -> jobs?.get(handle.removePrefix("job:"))?.log?.let { Path.of(it) } }
         return ALL + tracked + TaskCodeTool(trackers) + DocTool(docs, DocFiles(DocFiles.defaultRoots(), listOfNotNull(home)), handles) + listOfNotNull(jobs?.let { RunTool(it) }, secrets?.let { EnvTool(it) })

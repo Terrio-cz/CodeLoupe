@@ -4,6 +4,7 @@ import codeloupe.CodeLoupe
 import codeloupe.JsonFormat
 import codeloupe.config.Config
 import codeloupe.config.PortPolicy
+import codeloupe.doc.DocMemory
 import codeloupe.docker.DockerApi
 import codeloupe.docker.InstallId
 import codeloupe.docker.ResourceKind
@@ -55,6 +56,7 @@ import codeloupe.tracker.Trackers
 import codeloupe.uiapi.UiApi
 import codeloupe.uiapi.uiApiRoutes
 import codeloupe.tools.EditTool
+import codeloupe.tools.Sessions
 import codeloupe.tools.Tool
 import codeloupe.tools.ToolArgs
 import codeloupe.tools.Tools
@@ -132,7 +134,8 @@ class Daemon private constructor(
     private val secrets = SecretAccess(config.home, preset = secretStore, rotationDays = config.secrets.rotationDays)
     private val trackerSettings = TrackerSettingsLoader.load(config.home, store = { secrets.store })
     private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
-    private val baseTools = Tools.catalog(trackers, jobs, secrets, config.home)
+    private val docs = DocMemory()
+    private val baseTools = Tools.catalog(trackers, jobs, secrets, config.home, docs)
     private val writeGate = WriteGate(config.write, config.home.resolve("write-gate.json")) { since ->
         val setup = MetricsSetup(config)
         MetricsCollector(setup.categorizer()).runs(setup.projectDirs(emptyList()), since, null)
@@ -164,7 +167,7 @@ class Daemon private constructor(
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = { trackers.touch(); history.sample() })
     private val mcp = McpTools(runner, ::tools, JobTool(jobs))
     private val toolListFingerprint = mcp.fingerprint()
-    private val hooks = Hooks.create(config, registry, scope, runner::callsOn) { trackers.projects() }
+    private val hooks = Hooks.create(config, registry, scope, runner::callsOn, forgetReads = ::forgetReads) { trackers.projects() }
     private val mutatingTools = (baseTools + editTool).filter { it.mutating }.map { it.name }.toSet()
     private lateinit var daemonToken: DaemonToken
     private lateinit var guard: RequestGuard
@@ -218,6 +221,12 @@ class Daemon private constructor(
         scope.launch { runCatching { reconciler.run("release", auto = reconcileConfig.auto) } }
         // The verdict comes from transcripts: worked out once the daemon has settled, and only when the cached one is old.
         if (writeGate.stale()) scope.launch(Dispatchers.IO) { delay(GATE_DELAY_MS); runCatching { writeGate.refresh() } }
+    }
+
+    /** A new agent starts in [path]: what other agents of that worktree read is not in its context, so nothing is answered as already read. */
+    private fun forgetReads(path: String) {
+        docs.forget { Sessions.near(it, path) }
+        trackers.reader.forget { Sessions.near(it, path) }
     }
 
     private fun log(message: String) = log.append("${IsoTime.now()} $message")

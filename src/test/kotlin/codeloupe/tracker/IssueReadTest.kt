@@ -5,6 +5,7 @@ import codeloupe.tracker.mirror.MirrorStore
 import codeloupe.tracker.read.IssueReader
 import codeloupe.tracker.read.Parts
 import codeloupe.tracker.read.ReadMemory
+import codeloupe.tools.Sessions
 import codeloupe.tracker.youtrack.YouTrackAdapter
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
@@ -56,6 +57,16 @@ class IssueReadTest {
         )
         assertTrue(brief.lines().last().startsWith("no comments · updated 2026-"), brief)
         assertFalse("SQLite mirror behind" in brief)
+    }
+
+    @Test
+    fun `reads forgotten for a worktree are whole again, the others stay short lines`() {
+        read("CL-26", session = "c:/repo")
+        read("CL-26", session = "c:/other")
+        reader.forget { Sessions.near(it, "C:/repo/") }
+        assertFalse(read("CL-26", session = "c:/repo").contains("unchanged"))
+        assertTrue(read("CL-26", session = "c:/repo").startsWith("CL-26 unchanged since"))
+        assertTrue(read("CL-26", session = "c:/other").startsWith("CL-26 unchanged since"))
     }
 
     @Test
