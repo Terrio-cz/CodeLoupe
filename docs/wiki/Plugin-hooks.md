@@ -45,6 +45,11 @@ Modes, in `<home>/config.json` (read on every call, no restart):
 - `redirect`: a command that plainly concerns source files (a `*.kt` glob, `--type kotlin`, a source file as target) is refused the first time with the equivalent call; the same command again runs. Other commands are only advised.
 - `off`: no steering. `"hooks": { "enabled": false }` (or `"hooks": false`) turns off every hook of the plugin at once, and so does `CODELOUPE_HOOKS=off` in the environment of Claude Code.
 
+Measured on a reviewer agent run headless (CL-180, 4-6 runs per mode, [Agent runs](Benchmarks#agent-runs)): in `advise` the hook spoke 6-8 times
+per run and the agent made 0 CodeLoupe calls in 6 of 6 runs; in `redirect` 4 of 4 runs used the tools (5.3 calls per run), with the
+needed tools in the agent's `tools:` list. `advise` stays the default because `redirect` turns a first `rg` into a refusal; an agent
+that should use the tools needs `redirect`, or a routing table in its own instructions ([Your own agents](Claude-Code-integration#your-own-agents-subagents-with-a-tools-list)).
+
 `codeloupe metrics hooks --since 2026-10-01` counts the advice from `<home>/hooks.jsonl` (kind, suggested tool, session prefix, no
 command text) and how many were followed by a CodeLoupe code call on the same worktree within 180 s of the advice (`calls.jsonl`);
 `/status` has `hooks` (calls, advised, denied, why the rest was left alone, median and p95 ms of the decision).

@@ -541,6 +541,54 @@ kola 1 jako kritéria 13–16 u TER-321; nálezy kol 1–4 a větev Codex u TER-
 TER-321 393 → 403 tis. (+3 %), TER-62 332 → 419 tis. (+26 %), USD průměr 1,43 → 1,58 a 1,19 → 1,45, podíl čtení trackeru 3,1 → 4,0 % a 9,4 → 9,7 %
 (`comments` TER-62 má 21 tis. znaků, proti `yt_comments` 26 tis.). Kritérium CL-183 se týká počtu volání, ne ceny.
 
+**Proč agenti nevolají CodeLoupe a co s tím (CL-180, 2026-10-10).** Řízený pokus po jednom faktoru v odlehlých kopiích workspace
+(živý workspace se nesahal), 9 variant, 74 běhů `claude -p --agent` (Opus, effort high, dva běhy souběžně), 90,41 USD. Reviewer běžel na čtyřech
+uzavřených kolech se známým výsledkem (TER-321 4 nálezy a TER-62 6 nálezů z CL-23, k tomu 1. kolo reálné recenze TER-637 se 3 a TER-559
+se 3 nálezy; klony ze stejného bare repozitáře, packet jako v CL-23), planner na TER-321, TER-62 a TER-324. Daemon na odděleném home
+a portu (47661; varianta s `redirect` 47662), `CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH=600` jako v živém workspace. Počty jsou z transkriptů
+(`analyze.mjs`), nálezy se porovnávají se známými vzorem na textu zprávy a vzorek se kontroloval ručně.
+
+*Příčina.* (H1, vyvráceno) Nástroje nejsou odložené: `init` event i první tah agenta mají `mcp__codeloupe__*` ze seznamu `tools:` a v 97
+transkriptech (CL-23 B i tento pokus) není jediné volání `ToolSearch`. (H4, vyvráceno) Popisy nástrojů nejsou překážka: stejné popisy
+dávají 0,2 nebo 6,0 volání na běh podle toho, co říká tělo agenta; model sahá po `cd <wt> && rg …` ze zvyku (reviewer s dnešním tělem, V0 a V1,
+12 běhů: 13,4 shellových `rg` příkazů na Kotlin text nebo identifikátor, 2,2 `sed -n` ze zdrojáku a 1,3 `Read` celého `.kt` na běh).
+(H2, potvrzeno částečně) Těla před CL-60 neměla nástroje CodeLoupe vůbec (A = 0 volání z konstrukce), zkrácené tělo je zmiňuje v jedné
+odrážce uprostřed a končí „`rg -n` pro nekotlinový text“, v seznamu `tools:` chybí `grep`, tedy nástroj, který odpovídá na většinu
+textových hledání. (H3, potvrzeno) Steering hook pluginu v živém workspace vůbec neběží (plugin není nainstalovaný, v `settings.json`
+je jen guard), a ve scratch kopii v režimu `advise` (výchozí) radil 6–8krát na běh a model jej 6 z 6 běhů ignoroval; režim `redirect`
+(první `rg` na zdrojáky se odmítne s ekvivalentním voláním) vedl k použití ve 4 ze 4 běhů.
+
+*Pokus (reviewer; volání CodeLoupe na běh = průměr, v závorce běhy s aspoň jedním; jednotky tis. = medián / průměr).*
+
+| Var. | Změna oproti dnešku | n | Volání CL | `rg`+Grep na běh | Čteno kB (Read + hledání) | Jednotky | USD | Nálezy |
+|---|---|---|---|---|---|---|---|---|
+| V0 | dnešní těla (kontrola) | 10 | 0,2 (1/10) | 7,7 | 130 | 333 / 322 | 1,14 | 100 % |
+| V1 | + steering hooky pluginu, `advise` | 6 | 0,0 (0/6) | 8,0 | 130 | 350 / 338 | 1,20 | 100 % |
+| V4 | + nástroj `grep` v `tools:` | 4 | 0,0 (0/4) | 10,3 | 136 | 373 / 366 | 1,27 | 100 % |
+| V5 | + tabulka „co čím“ bez `grep` | 4 | 2,8 (3/4) | 8,5 | 137 | 329 / 359 | 1,27 | 100 % |
+| V2 | + tabulka + `grep` | 6 | 5,5 (5/6) | 5,8 | 117 | 314 / 315 | 1,12 | 100 % |
+| V3 | + hooky `advise` + tabulka + `grep` | 6 | 6,8 (5/6) | 5,0 | 116 | 332 / 323 | 1,15 | 100 % |
+| V6 | + hooky `redirect` + `grep`, bez tabulky | 4 | 5,3 (4/4) | 6,0 | 112 | 318 / 320 | 1,14 | 100 % |
+| V7 | zkrácená tabulka („`rg -n` pro zbytek“) | 6 | 1,5 (3/6) | 7,2 | 124 | 305 / 316 | 1,13 | 100 % |
+| **V8** | **konečné znění (tabulka + `grep`, „`rg -n` jen pro nekotlinové soubory“)** | **10** | **6,0 (9/10)** | **5,6** | **120** | **323 / 331** | **1,17** | **100 %** |
+
+Planner (3 běhy na variantu, TER-321, TER-62, TER-324), volání CL na běh / jednotky tis. medián / USD: V0 2,3 / 445 / 1,40;
+V1 2,7 / 363 / 1,45; V2 4,3 / 399 / 1,31; V3 7,7 / 349 / 1,31; V7 1,3 / 429 / 1,38; V8 13,0 / 475 / 1,47.
+
+*Co z toho plyne.* (1) *Adopci mění text těla, ne dostupnost.* Nástroj v seznamu sám nic (V4: 0 z 4 běhů), pokyny „použij nástroj místo
+`rg`“ s tabulkou co čím a s nástrojem `grep` ano (V2, V8: 5,5 a 6,0 volání, 9 z 10 běhů, aspoň 3 volání v 8 z 10); zkrácení věty
+o `rg` (V7) adopci vrátilo na 1,5, takže formulace „`rg` jen pro nekotlinové soubory“ je podstatná. Hooky v režimu `advise` nepomáhají
+(V1, V3 bez rozdílu proti V2), `redirect` ano (V6), s `grep` v seznamu. (2) *Cena se nemění*: V0 → V8 medián
+333 → 323 tis. jednotek, průměr 322 → 331 (+3 %), USD 1,14 → 1,17, rozpětí jedné varianty 229–483 tis.; čtení kódu −8 % (130 → 120 kB).
+Důvod: z 149 kB výsledků nástrojů na běh reviewera je 79 kB (53 %) hotový review packet, který agent čte celý, a 25 kB (17 %) další
+`Read`; shell a `rg` jsou 28 kB (19 %), a jen tu část CodeLoupe nahrazuje. U planneru V8 (13 volání, čtení 97 → 63 kB) vyšla cena
+o 5 % výš (475 proti 445 tis., 3 běhy, v rámci šumu). Kritérium „nálezy nejsou horší“ platí: ve všech 56 bězích reviewera
+jsou přítomny všechny známé nálezy (shoda vzorem a ruční kontrola vzorku; reviewer navíc u TER-559 našel
+skutečnou závadu `DATABASE_TIMEOUT` místo `DATABASE_UNREACHABLE`, opravenou v dalším kole). (3) *Omezení*: 4–10 běhů na variantu, planner
+jen 3, dva běhy souběžně (wall orientační), čtyři úkoly, jeden workspace, hodnocení nálezů vzorem, V8 planner běžel s tělem
+před zkrácením na 8 000 znaků. Živé úpravy (`.bak-cl180`): `terrio-reviewer` a `terrio-reviewer-opus` (tabulka v odrážce Code, `grep`
+v `tools:`, těla 7 973 znaků), planner viz CL-180.
+
 ### 8.5 Živé porovnání
 
 2 týdny po nasazení `codeloupe metrics compare baseline.json after.json`; týdenní report mezer.

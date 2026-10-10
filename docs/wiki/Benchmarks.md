@@ -264,12 +264,28 @@ Old and new build alternated on the same machine, medians.
 | Parallel workspace scan (CL-144), 76 workspaces | four routes at once, s, three series | 2.52 / 1.30 / 1.23 | 0.68 / 1.09 / 0.64 |
 | Overlay refresh after an edit (CL-149) | edit with 8 other overlays, ms, three series | 160 / 146 / 171 | 67 / 73 / 75 |
 
+### Why agents barely called the tool, and the fix (CL-180)
+
+One factor at a time, 74 headless runs (Opus, high effort, 90 USD), a reviewer on four closed tasks with known findings and a planner on
+three, in scratch copies of the workspace. The tools were not deferred (they are in the first turn's list, and none of 97 transcripts calls
+`ToolSearch`), and their descriptions are not the barrier (the same descriptions give 0.2 or 6.0 calls per run depending on the agent's
+body). The agent kept to `cd <worktree> && rg …` (13 shell `rg` calls per run), because its body mentioned CodeLoupe in one bullet, its
+`tools:` list lacked `grep`, and the plugin's steering hook, which is not even installed in that workspace, only advises: in `advise`
+mode it spoke 6-8 times per run and 0 of 6 runs followed it. A routing table in the body ("call X before `rg`, `sed`, `cat`, a whole
+`Read`"; `rg` only for non-Kotlin files) plus `grep` in `tools:` took the reviewer from **0.2 to 6.0 CodeLoupe calls per run (9 of 10
+runs)** and the planner from 2.3 to 13.0; the hook in `redirect` mode did the same (5.3, 4 of 4 runs), `grep` in `tools:` alone nothing
+(0 of 4), a softer wording 1.5. **Cost did not move** (median 333 to 323 thousand weighted units, mean 322 to 331, ranges of one
+variant 229-483), and findings stayed complete in all 56 reviewer runs: 53 % of a review run's tool results is the prepared review
+packet, read whole, which no search replaces. So the tool now gets used, but the saving measured earlier still belongs to the shorter
+prompts. Method, table and limits (4-10 runs per variant, the planner only 3, findings matched by pattern): docs/plan.md § 8.4;
+how to set up your own agents: [Claude Code integration](Claude-Code-integration#your-own-agents-subagents-with-a-tools-list).
+
 ### What did not work, and what the numbers do not show
 
-- **Agents barely call CodeLoupe (CL-180).** 1 call in 7 reviewer runs, 10 in 5 planner runs, 0 in 40 sessions of the map
-  experiment, and the roles' grep habit survives a tool that is connected. Until that changes, runs with and without the tool
-  differ in what the prompts say, not in what the tool answers. Why (the packet already holds the diff, the `rg` habit,
-  tool descriptions, prompt wording) is still open (CL-180).
+- **Agents barely called CodeLoupe (CL-180, fixed in the agent instructions).** 1 call in 7 reviewer runs, 10 in 5 planner runs, 0 in 40
+  sessions of the map experiment: the bodies named the tools in a bullet, `grep` was not in `tools:` and the hook only advised.
+  With a routing table and `grep` the reviewer makes 6.0 calls per run, without any change in cost (above). Runs before 2026-10-10
+  with and without the tool still differ mostly in what the prompts say.
 - **The suggester's cost did not fall (CL-182).** The local task index removed the tracker API calls, but the agent still reads
   as many issues as before (16.6 and 18.3 `issue` calls per run against 14.0 and 16.7 API reads), because its instructions
   tell it to read each candidate. Tracker reads are still 10.1 % (automatic) and 13.9 % (epic) of a run's cost.

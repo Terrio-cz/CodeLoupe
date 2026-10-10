@@ -36,6 +36,31 @@ configuration. Without the helper (`claude mcp add ... --header "x-codeloupe: 1"
 needs the token, unless `api.strict` is `false` (then only `run`, `env`, `edit` and `job` do); see [Who may call the daemon](Configuration#who-may-call-the-daemon).
 The plugin's `.mcp.json` has the helper (`hooks/mcp-headers.sh`), so a plugin install or update needs no extra step.
 
+## Your own agents (subagents with a `tools:` list)
+
+A connected server is not enough for an agent you define yourself. In a controlled run of a reviewer agent that had the tools in its
+`tools:` list and one bullet about them in its body, **0.2 CodeLoupe calls per run** came out (1 run of 10); it kept to
+`cd <worktree> && rg …`. Adding `grep` to `tools:` alone changed nothing (0 of 4 runs); a short routing table in the body together with
+`grep` in `tools:` did (6.0 calls per run, 9 of 10 runs; 2.8 with the table but no `grep`).
+
+- List what you want it to use in `tools:`, `mcp__codeloupe__grep` included: it answers the text, string, SQL and regex searches that make up
+  most of an agent's `rg` calls, and is the tool most often forgotten.
+- Put the routing table in the body, imperative, and say what `rg` is left for:
+
+  > Code: call `mcp__codeloupe__*` (`root` = the worktree) before `rg`, `sed`, `cat` or a whole `Read`: a symbol → `symbol` / `context`;
+  > users → `usages`, callers → `calls`; what the branch changed → `changes`; members of a file → `outline`, always before a `Read` of a `.kt`
+  > over 200 lines; a text, string, SQL or regex → `grep`; a name → `find`. `Read` offset/limit only for lines they did not show,
+  > `rg -n` only for non-Kotlin files.
+
+  A softer last sentence ("`Read` and `rg -n` for the rest") brought the calls back to 1.5 per run.
+- The plugin's steering hook ([Plugin hooks](Plugin-hooks)) is not a substitute: in `advise` mode (the default) it spoke 6-8 times per run
+  and the agent did not follow it once; in `redirect` mode the first `rg` over source is refused with the equivalent call, and 4 of 4 runs
+  used the tools. The hook belongs to the plugin, so it does not run for an agent in a workspace where the plugin is not installed.
+
+What this buys is adoption, not tokens: the same runs cost the same (median 333 against 323 thousand weighted units, findings unchanged),
+because more than half of the tool results of a review run is the review packet the agent reads whole; CodeLoupe only replaces the searches
+and range reads around it. Numbers, method and limits: [Benchmarks, Agent runs](Benchmarks#agent-runs).
+
 ## From the desktop app
 
 Settings → *Claude Code* shows whether `claude` is found and what is connected, and the
