@@ -7,11 +7,12 @@
 //   node tools/temp-entries.mjs check <file> [--max 20]
 import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // What the toolchain keeps in the temp folder on its own (the Kotlin compiler daemon and its logs, the SQLite driver's library, hsperfdata,
 // PowerShell's probe files): not the tests' doing, and it does not grow with the suite.
-const TOOLCHAIN = /^(kotlin-|sqlite-.*sqlitejdbc|hsperfdata_|__PSScriptPolicyTest|\.org\.chromium|gradle-)/;
+const TOOLCHAIN = /^(.*[\\/])?(kotlin-|sqlite-.*sqlitejdbc|hsperfdata_|__PSScriptPolicyTest|\.org\.chromium|gradle-)/;
 
 /** Names in [after] that were not in [before] and are not the toolchain's. */
 export function newEntries(before, after) {
@@ -19,8 +20,15 @@ export function newEntries(before, after) {
   return after.filter((name) => !known.has(name) && !TOOLCHAIN.test(name)).sort();
 }
 
-function listTemp(dir = os.tmpdir()) {
-  return fs.readdirSync(dir);
+// The folders a test run may use: the system temp folder and, outside Windows, /tmp (the tests' scratch directory lives there, where a
+// Unix domain socket path stays short enough on macOS). TEMP_ENTRIES_DIRS replaces the list (the tests of this script).
+function tempDirs() {
+  if (process.env.TEMP_ENTRIES_DIRS) return process.env.TEMP_ENTRIES_DIRS.split(path.delimiter);
+  return [...new Set([os.tmpdir(), ...(process.platform === 'win32' ? [] : ['/tmp'])])];
+}
+
+function listTemp() {
+  return tempDirs().flatMap((dir) => fs.readdirSync(dir).map((name) => path.join(dir, name)));
 }
 
 function main(argv) {
@@ -36,7 +44,7 @@ function main(argv) {
   const maxAt = rest.indexOf('--max');
   const max = maxAt >= 0 ? Number(rest[maxAt + 1]) : 20;
   const added = newEntries(JSON.parse(fs.readFileSync(file, 'utf8')), listTemp());
-  console.log(`${added.length} new entries in ${os.tmpdir()} (limit ${max})`);
+  console.log(`${added.length} new entries in ${tempDirs().join(', ')} (limit ${max})`);
   if (added.length > max) {
     console.log(added.slice(0, 50).join('\n'));
     return 1;

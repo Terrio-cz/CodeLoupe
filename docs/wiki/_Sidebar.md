@@ -15,6 +15,7 @@
 * [Hooks and token savings](Hooks-and-token-savings)
 * [Plugin hooks](Plugin-hooks)
 * [Metrics and savings](Metrics-and-savings)
+* [Knowledge store](Knowledge-store)
 * [Desktop app](Desktop-app)
 
 **How it works**

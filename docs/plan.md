@@ -1142,6 +1142,47 @@ případný další pokus patří jen k planneru (jediná role s dobrým výsled
 **Vedlejší nálezy.** (a) Testy nechávaly dočasné adresáře v `%TEMP%`: 120 tisíc položek zaplnilo disk 931 GB na 0 a shodilo plný `gradlew test`; po úklidu uvolněno ≈ 280 GB. Opravu mezitím dodala CL-208 (moje verze byla nahrazena při merge).
 (b) `SessionStartDaemonTest` „no caller lines“ padá lokálně na Windows i na čistém `origin/main` (CI na Linuxu zelené): řádek `^ 17-19 [Big] …` z výstupu `changes` začíná šesti mezerami; nesouvisí s touto kartou.
 
+### 8.11 Výsledek CL-203 — znalostní úložiště s kotvami v kódu (2026-10-11)
+
+Stavba strany CodeLoupe; řízené A/B retra a stewarda a napojení na živé Terrio přijdou později. Rozhodnutí z 8.6 (strop na
+tokenech ≈ 0,1 %, hodnota je kvalita) se nemění: úložiště se staví pro kvalitu faktů, ne pro úsporu.
+
+- **Návrh.** Balíček `codeloupe.know`, vlastní SQLite `know.db` v domově daemona (otevírá se líně při prvním použití, není v
+  `events.db`). Fakt: id (`k17`), scope (`repo`, `area:x`, `file:x`, `symbol:x`, `task:x`), kind (decision, pattern, blocker,
+  environment, other), text na jeden řádek, zdroj (task, run), `verifiedAtCommit`, `supersedes`, `related`, kotvy, stav
+  (active, stale, superseded). Hledání je FTS5 s BM25 (slova textu, scope, kind a task, stemování jako `find mode=search`),
+  filtr scope a kind, nejvýše N řádků s id. Zápis: fakt stejného scope s téměř shodnými kmeny (Jaccard ≥ 0,85 a stejná čísla,
+  tedy TER-167 a TER-168 jsou dva fakty) aktualizuje starší fakt.
+- **Kotvy a zastaralost.** Kotva je soubor, deklarace, nebo obojí. Při zápisu a `verify` se z indexu uloží otisk podpisu a těla
+  deklarace (u souboru všech jeho deklarací) a commit checkoutu; při každém zobrazení se kotva přečte znovu přes index s overlayem
+  worktree, takže se počítá i necommitnutá změna. Příznaky: `signature changed`, `body changed`, `declaration gone`,
+  `file gone`. Otisk místo čtení deklarace z `verifiedAtCommit`: je stejně přesný, nepotřebuje druhý parse a nezávisí na tom,
+  že commit je ještě v historii. Soubor mimo index (Markdown, YAML) se hledá na disku, i ve složce bez gitu; nečitelný
+  checkout stav nemění. Fakt bez otisku (import) kontroluje jen existenci cíle. Typ se otiskuje i s členy, proto fakt o třídě
+  zastará při každé změně v ní (kotvit se má člen).
+- **Rozhraní.** `GET /know/search`, `POST /know` (jeden fakt nebo `facts`), `GET /know/{id}`, `GET /know/stale`,
+  `POST /know/{id}/verify`, vše za tokenem daemona; CLI `codeloupe know search|put|show|stale|verify|import`. Seznam nástrojů
+  MCP ani kroky `batch` se nezměnily (MCP nástroj `know` je pozdější karta za volbou). Wiki: `Knowledge-store`.
+- **Import `brain/facts`** (14 souborů, jen čtení; `codeloupe know import … --root TerrioImporter --root workspace`, 27 s včetně
+  kontroly kotev): 1 095 neprázdných řádků, **1 059 faktů**, 35 řádků přeskočeno (nadpisy, standardní věta, `@` a `%`) a 1 zalomený řádek připojen k faktu nad ním.
+  **Duplicity: 0 přesných, 2 téměř shodné** (obě v `review-patterns`, sloučeny; stejný počet 2 vyjde, když se všech 14 souborů
+  vloží do jednoho scope, tedy mezi soubory žádná). Karta 8.6 uvádí 3 při trigramové shodě ≥ 0,6; kmenová metrika je přísnější a
+  nalezla ty, které jsou skutečně týž fakt. **Cesty:** 103 faktů cituje cestu; **10 z nich (9,7 %) cituje soubor, který není v
+  TerrioImporter ani ve workspace** (db 1, env-blockers 3, repo-notes 2, workflow 4; karta 8.6 měla 12 ze 102). Proti samotnému
+  TerrioImporter by jich bylo 72, protože většina citovaných cest je ve workspace (`run/`, `mcp/`, `brain/`): dvě kořenová
+  repozitáře jsou nutná, kotva nese vlastní `root`.
+- **Nalezení.** 30 otázek sestavených z faktů skutečných souborů (parafráze, 5 řádků, bez filtru, nad 1 059 fakty): **25 z 30
+  = 83 %** má správný fakt mezi 5 řádky (na 1. místě 18, na 2. 5, na 4. 2). Míjí je otázky, kde fakt otázku sdílí jen jedním slovem
+  („read-only query against the shared database“ proti „read-only recipe: docker exec …“). Sada otázek není v repozitáři (cituje
+  interní fakty), leží v předávací složce karty. Test v repozitáři má 44 vymyšlených faktů a 39 otázek a hlídá ≥ 80 %.
+- **Zastaralost na skutečné změně.** Test `KnowStaleTest` dělá skutečné git změny ve fixture repozitáři: změna těla (necommitnutá
+  přes overlay i commitnutá na hlavní větvi), změna podpisu, přidaná a odebraná deklarace, smazaný soubor, návrat k ověřenému
+  stavu a `verify`. Ruční běh přes CLI na dočasném repozitáři: `put` s kotvou, commit změny těla, `know stale` ukáže `STALE: body
+  changed`, `verify` příznak smaže.
+- **Kritéria karty.** Splněno: hit rate ≥ 80 % (83 % na 30 otázkách), detekce zastaralosti s příznakem v hledání, import 14
+  souborů s počty duplicit a mrtvých cest, rozhodnutí o úspoře (no-go na tokeny, bez změny). **Otevřeno:** řízené A/B retra a
+  stewarda (−40 % ceny při stejných zachovaných lekcích) a jejich zápis a čtení přes úložiště, tedy napojení na Terrio a MCP nástroj.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
@@ -1410,6 +1451,16 @@ rozhoduje launcher.
   ho ohlásil `lost` se zachovaným logem (daemon je sám v job objectu s KILL_ON_JOB_CLOSE, každý job má navíc vlastní
   vnořený pro cancel); po pádu bez job objectu (ne-Windows) přeživší ukončí podle pid + času startu.
   `codeloupe stop` s běžícími joby odmítne (`--force`).
+- **Historie jobů (CL-209)**: dokončený job zůstává v `jobs.db` (i s logem) aspoň **7 dní** a dokud je mezi 500 nejnovějšími; strop 20 000.
+  Úklid běží při otevření databáze a každých 100 zápisů; běžící a čekající job se nemaže nikdy. Záznam, který tato verze nepřečte (novější
+  verze), se ve výpisu přeskočí, ne selže celý. Test: JVM, která zapíše joby a skončí `halt` bez zavření databáze (jako `taskkill /F`),
+  a čtení z druhého procesu; restart démona nad stejným domovem; záznam ve formátu 0.1.0. *Proč zmizely joby z 9. 10. po výměně 0.1.0 → 0.1.1
+  (nález 10. 10.)*: kód démona `jobs.db` nikdy nemaže (`JobStore` jen vkládá a čistí podle stáří) a formát záznamu se od CL-84 nezměnil. `jobs.db`
+  v domovu aplikace má hlavní soubor 4096 B (jen hlavička) a WAL o 7 rámcích: schéma a jediný job z 10. 10. 21:15; hlavní soubor psán v 21:07:35,
+  tedy databáze byla **založena znovu** při startu 0.1.1 (tehdy `PRAGMA journal_mode=WAL` zapíše prázdnou stránku do nového souboru), přitom
+  `jobs/` drží šest logů z 9. 10. (18:16–21:16) a `daemon.log` jejich „started/done“. Soubory `jobs.db*` tedy někdo odstranil mezi posledním jobem
+  0.1.0 (21:16 9. 10.) a startem 0.1.1, `events.db` ve stejném domově zůstal. Kdo, z dat nejde zjistit (`daemon.log` o tom mlčí); démon teď při startu
+  napíše `jobs: N records kept` a varování, když je v `jobs/` víc logů než záznamů.
 - **Sloty**: `slots` v `config.json` (Terrio `gradle-test` ×2, `vps-test`), nekonfigurovaný slot = 1. Ověřeno: dva
   `gradle-test` obsazené, třetí job čekal v daemonu (`/status` `jobs.slots.waiting`) a spustil se po uvolnění; čekání
   je suspendovaná korutina (semafor FIFO), ne smyčka.

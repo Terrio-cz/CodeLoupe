@@ -5,11 +5,22 @@ import codeloupe.platform.Sqlite
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.Connection
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
 
-/** `<home>/jobs.db`: every job's record. Keeps the newest [KEEP] jobs; older ones go with their logs. */
-class JobStore(file: Path) : AutoCloseable {
+/**
+ * `<home>/jobs.db`: every job's record. A finished job stays for at least [RETAIN] (7 days) and for as long as it is among the newest
+ * [keep]; older ones go with their logs. [HARD_CAP] bounds the table whatever the age. A record this version cannot read is skipped
+ * in listings, never a failure of the whole list.
+ */
+class JobStore(file: Path, private val clock: Clock = Clock.systemUTC(), private val keep: Int = KEEP) : AutoCloseable {
     private val db: Connection = Sqlite.open(file, SCHEMA)
     private var writes = 0
+
+    init {
+        prune()
+    }
 
     @Synchronized
     fun put(job: JobRecord) {
@@ -33,37 +44,52 @@ class JobStore(file: Path) : AutoCloseable {
     @Synchronized
     fun recent(limit: Int): List<JobRecord> = db.prepareStatement("SELECT record FROM jobs ORDER BY rowid DESC LIMIT ?").use { s ->
         s.setInt(1, limit)
-        s.executeQuery().use { r -> buildList { while (r.next()) add(decode(r.getString(1))) } }
+        s.executeQuery().use { r -> buildList { while (r.next()) decodeOrNull(r.getString(1))?.let(::add) } }
     }
 
     /** Jobs a previous daemon left queued or running. */
     @Synchronized
     fun unfinished(): List<JobRecord> = db.createStatement().use { s ->
         s.executeQuery("SELECT record FROM jobs WHERE status IN ('queued', 'running') ORDER BY rowid").use { r ->
-            buildList { while (r.next()) add(decode(r.getString(1))) }
+            buildList { while (r.next()) decodeOrNull(r.getString(1))?.let(::add) }
         }
     }
 
     @Synchronized
+    fun count(): Long = db.createStatement().use { s -> s.executeQuery("SELECT count(*) FROM jobs").use { it.next(); it.getLong(1) } }
+
+    @Synchronized
     override fun close() = db.close()
 
+    private class Row(val rowid: Long, val id: String, val record: JobRecord?)
+
+    @Synchronized
     private fun prune() {
-        val old = db.createStatement().use { s ->
-            s.executeQuery("SELECT id, record FROM jobs WHERE rowid <= (SELECT MAX(rowid) FROM jobs) - $KEEP AND status NOT IN ('queued', 'running')").use { r ->
-                buildList { while (r.next()) add(r.getString(1) to decode(r.getString(2)).log) }
-            }
+        val newest = db.createStatement().use { s -> s.executeQuery("SELECT MAX(rowid) FROM jobs").use { r -> r.next(); r.getLong(1).takeIf { !r.wasNull() } } } ?: return
+        val cutoff = clock.instant().minus(RETAIN)
+        val beyondKeep = db.prepareStatement("SELECT rowid, id, record FROM jobs WHERE rowid <= ? AND status NOT IN ('queued', 'running')").use { s ->
+            s.setLong(1, newest - keep)
+            s.executeQuery().use { r -> buildList { while (r.next()) add(Row(r.getLong(1), r.getString(2), decodeOrNull(r.getString(3)))) } }
         }
-        for ((id, log) in old) {
-            runCatching { Files.deleteIfExists(Path.of(log)) }
-            db.prepareStatement("DELETE FROM jobs WHERE id = ?").use { it.setString(1, id); it.executeUpdate() }
+        for (row in beyondKeep) {
+            val last = row.record?.let { it.endedAt ?: it.createdAt }?.let { runCatching { Instant.parse(it) }.getOrNull() }
+            // A record this version cannot read may be a newer one's: it stays until the cap.
+            val expired = row.rowid <= newest - HARD_CAP || (row.record != null && (last == null || last.isBefore(cutoff)))
+            if (!expired) continue
+            row.record?.let { record -> runCatching { Files.deleteIfExists(Path.of(record.log)) } }
+            db.prepareStatement("DELETE FROM jobs WHERE id = ?").use { it.setString(1, row.id); it.executeUpdate() }
         }
     }
 
     private fun decode(text: String) = JsonFormat.json.decodeFromString(JobRecord.serializer(), text)
 
-    private companion object {
+    private fun decodeOrNull(text: String): JobRecord? = runCatching { decode(text) }.getOrNull()
+
+    companion object {
         const val KEEP = 500
+        const val HARD_CAP = 20_000
         const val PRUNE_EVERY = 100
-        val SCHEMA = listOf("CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, record TEXT NOT NULL)")
+        val RETAIN: Duration = Duration.ofDays(7)
+        private val SCHEMA = listOf("CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, record TEXT NOT NULL)")
     }
 }

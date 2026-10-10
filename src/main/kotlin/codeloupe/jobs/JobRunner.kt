@@ -130,6 +130,7 @@ class JobRunner(
 
     /** A previous daemon's queued and running jobs are lost: their processes (if any survived) end, their logs stay. */
     fun recover() {
+        checkHistory()
         for (record in store.unfinished().filter { !active.containsKey(it.id) }) {
             record.pid?.let { pid ->
                 ProcessHandle.of(pid)
@@ -138,6 +139,17 @@ class JobRunner(
             }
             lose(record, "daemon restarted")
         }
+    }
+
+    /**
+     * Says in the log how many records the daemon found. Logs of jobs are removed together with their records, so more logs than records
+     * means the records were removed from outside (the file replaced or deleted while the daemon was down).
+     */
+    private fun checkHistory() {
+        val records = store.count()
+        val logFiles = runCatching { Files.list(logs).use { files -> files.filter { it.fileName.toString().endsWith(".log") }.count() } }.getOrDefault(0L)
+        log("jobs: $records records kept")
+        if (logFiles > records) log("jobs: $logFiles job logs lie in $logs but jobs.db holds $records records: the others were removed outside the daemon")
     }
 
     /** The daemon is stopping: what still runs is killed and lost, with its log kept. */
