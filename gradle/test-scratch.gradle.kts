@@ -24,10 +24,8 @@ val scratchRoot: File = File("/tmp").takeIf { !System.getProperty("os.name").sta
 val testScratch: File = File(scratchRoot, "cl-test-${ProcessHandle.current().pid()}")
 
 // What the test helpers made before the scratch directory existed, and a scratch directory of a build that was killed.
-val staleName = Regex(
-    "cl-test-\\d+|outside\\d+\\.kt|" +
-        "codeloupe-(repo|write-home|java-tools|home|proc|gate|parity|kotlinc|javac|wt|case|write-clone|probe)-.*"
-)
+// TestRepos.tmpDir("x") makes codeloupe-x-<long number>; only directories match that (the daemon's own temp files are files).
+val staleName = Regex("cl-test-\\d+|outside\\d+\\.kt|codeloupe-.+-\\d{6,}")
 val staleAfter: Duration = Duration.ofHours(24)
 
 /** Removes [root] and everything under it, clearing the read-only flag git sets on object files. Returns what is left. */
@@ -76,7 +74,7 @@ val cleanStaleTemp = tasks.register("cleanStaleTemp") {
     doLast {
         val cutoff = Instant.now().minus(staleAfter).toEpochMilli()
         val old = listOf(tempRoot, scratchRoot).distinct().flatMap { root ->
-            root.listFiles { f -> staleName.matches(f.name) && f.lastModified() < cutoff }.orEmpty().toList()
+            root.listFiles { f -> staleName.matches(f.name) && (f.isDirectory || f.name.startsWith("outside")) && f.lastModified() < cutoff }.orEmpty().toList()
         }
         old.forEach { removeTree(it.toPath()) }
         if (old.isNotEmpty()) logger.lifecycle("Removed ${old.size} stale test directories from $tempRoot")
