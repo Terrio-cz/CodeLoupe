@@ -1703,7 +1703,33 @@ delších než jeden krok (A měl při 4–5 min 3–7 čekacích tahů, B poř�
 první `job start` napsal s dvojitou předponou (`job start -- node run/terrio.mjs gradle …`, `unknown group "node"`) a ztratil tím jedno volání i jedno čekání;
 tělo `terrio-coder` říká `job start -- <command>` a „command“ čte jako celý příkaz. Co v pokusu **nejde ověřit**: probuzení notifikací z `job wait`
 na pozadí (v `-p` se úlohy na pozadí na konci tahu ztrácejí), čekání na volný slot (`gradle-test`; tělo coderu zakazuje čekat, takže A ani B neprobíhají) a reálná délka 10–30 min.
-Zbytek je karta CL-185: `job start --wait` v `terrio.mjs` (jeden tah na příkaz), shovívavý `job start` a znovuspuštění stejného pokusu.
+Zbytek byla karta CL-185 (výsledek níže).
+
+**CL-185 — `job start --wait` a shovívavý `job start`, stejný pokus znovu (2026-10-10).** Změna v `run/jobs.mjs` workspace Terria: `job start --wait [--max s] [--slot x] -- <příkaz>`
+spustí job a v témže volání čeká (long poll daemonu, nejvýš 540 s kvůli limitu volání nástroje; po něm exit 3 a `job wait <id>`), vypíše jen zprávu a skončí kódem jobu;
+úvodní `node run/terrio.mjs` (i `terrio.mjs` samotné, s cestou) před příkazem se zahodí s jednořádkovou poznámkou místo `unknown group "node"`. CodeLoupe CLI už `job start --wait` měl, bylo
+potřeba jen volání ve workspace. Varianta C = dnešní workspace s touto změnou a s jednou větou v těle `terrio-coder` (`job start --wait -- gradle compile --worktree TER-<n>`, nikdy ne
+znovu `node run/terrio.mjs` za `--`) v odlehlé kopii; stejný úkol, stejné klony, stejný daemon-typ jako A/B (vlastní home a port 47645), `claude -p`, nejvýš 2 běhy naráz. Šest běhů, součty za 3 opakování:
+
+| Délka | Var. | Volání modelu na běh | Čekací tahy | Čekací jednotky z celku | Jednotky na běh (tis.) | Cena běhu USD | Wall (s) |
+|---|---|---|---|---|---|---|---|
+| krátká (~3 min) | A | 6,7 | 8 | 28,2 z 87,7 tis. = 32,2 % | 29,2 | 0,058 | 549 |
+| krátká | B | 12,0 | 12 | 28,3 z 137,3 tis. = 20,6 % | 45,8 | 0,092 | 552 |
+| krátká | **C** | **4,0** | **0** | **0 z 38,3 tis. = 0 %** | **12,8** | **0,026** | 567 |
+| dlouhá (4–6 min) | A | 11,7 | 14 | 47,3 z 118,6 tis. = 39,9 % | 39,5 | 0,079 | 816 |
+| dlouhá | B | 10,3 | 12 | 27,5 z 101,6 tis. = 27,1 % | 33,9 | 0,068 | 810 |
+| dlouhá | **C** | **4,0** | **0** | **0 z 70,1 tis. = 0 %** | **23,4** | **0,047** | 1 020 |
+
+- **Kritérium čekacích tahů**: v 6 ze 6 běhů C žádný tah, jehož jediné volání je `sleep`, `job wait|status` nebo `brain status`; poměr čekacích jednotek C proti A je 0 (cíl ≤ 0,11), tj. z 9,1 % ze živého provozu
+  zbývá ≈ 0 % *čekacích* tahů. Poctivě: čekání se nezrušilo, přesunulo se do jednoho volání, které job spustí a zablokuje; to je jedno volání modelu na dlouhý příkaz (tři za běh, 4 volání celkem proti 10–15 u A a B)
+  a pokus ho počítá jako práci, ne jako čekání. Je to dolní mez (nikdy ne nula). Cena běhu klesla proti B o 72 % (krátká) a 31 % (dlouhá), proti A o 55 % a 41 %; rozptyl mezi opakováním je velký (dlouhá: 28,0 / 27,8 / 14,3 tis.,
+  podle toho, kolik z kontextu se četlo z cache), takže poměr mezi cenami je řádový, ne přesný.
+- **Druhý `job start` kvůli špatnému prvnímu**: 0 z 18 startů (B měl 5 ze 6 běhů); tělo říká „nikdy `node run/terrio.mjs` za `--`“. Tolerantní `job start` se v pokusu neuplatnil (agent předponu nenapsal), ověřen je samotestem
+  (`mcp/test/cljob-test.mjs`, 33 tvrzení, i s `start --wait` proti falešnému launcheru) a živým voláním `job start --wait -- node run/terrio.mjs help` (poznámka + běh).
+- Délky: kompilace trvaly 3 min 5 s až 5 min 44 s (dlouhá varianta při dvou souběžných bězích), všechny pod limitem 540 s, takže ani jednou nebylo potřeba `job wait`.
+- **Neověřeno**: příkaz delší než 9 min (exit 3 a jedno `job wait` navíc, popsáno v nápovědě), čekání na slot `gradle-test`, `claude` v hlavní session (pokus je headless `-p`).
+- **Zbývá schválení uživatele**: těla agentů `terrio-coder`, `terrio-coder-high`, `terrio-tester` a skilly `terrio-deliver`, `terrio-docker` ještě říkají `job start -- …` + `job wait`; změna jedné věty na řádek je v příloze karty
+  (`cl185-agent-body-patch.md`). Do té doby získají agenti jen tolerantní `job start`, ne jeden tah na příkaz.
 
 **CL-74 — uvolnění workspace.** Šest cyklů (3 s `reconcile.auto: false` jako v živém configu, 3 s `true`) na scratch repozitáři s vlastními názvy `s74-*`, daemon s adopcí podle jména a pravidlem `protect`.
 V každém cyklu 6 worktrees a 6 stacků po čtyřech zdrojích (kontejner, síť, volume, image): jeden stack označený přes `ws up`, jeden jen adoptovaný jménem, jeden adoptovaný, ale chráněný,
