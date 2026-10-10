@@ -169,6 +169,17 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
      * a scan over a large repository keeps no more than one file's text.
      */
     fun scanContent(literal: String?, module: String?, test: Boolean?, each: (path: String, content: String) -> Unit) {
+        val (extra, params) = contentScope(literal, module, test)
+        stream(contentSql("f.path, f.content", extra), params) { each(it.getString(1), it.getString(2)) }
+    }
+
+    /** How many files with content a [module] and [test] option leave to search (overlay copies masking base ones). */
+    fun countContentFiles(module: String?, test: Boolean?): Int {
+        val (extra, params) = contentScope(null, module, test)
+        return query(contentSql("f.path", extra), params) { 1 }.size
+    }
+
+    private fun contentScope(literal: String?, module: String?, test: Boolean?): Pair<String, Map<String, Any?>> {
         val conds = ArrayList<String>()
         val params = HashMap<String, Any?>()
         if (literal != null) {
@@ -176,20 +187,21 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
             params["lit"] = literal
         }
         if (!module.isNullOrEmpty()) {
-            conds += "(f.module = :module OR f.module LIKE :modulePrefix ESCAPE '\\')"
-            params["module"] = module
-            params["modulePrefix"] = Like.escape(module) + "/%"
+            conds += ModuleScope.sql()
+            params += ModuleScope.params(module)
         }
         if (test == true) conds += "f.source_set LIKE '%test%'"
         if (test == false) conds += "f.source_set NOT LIKE '%test%'"
-        val extra = conds.joinToString("") { " AND $it" }
-        val select = "SELECT f.path, f.content FROM {db}.files f WHERE f.deleted = 0 AND f.content IS NOT NULL$extra"
-        val sql = if (overlay) {
-            select.replace("{db}", "ov") + " UNION ALL " + select.replace("{db}", "main") + " AND f.path NOT IN (SELECT path FROM ov.files)"
+        return conds.joinToString("") { " AND $it" } to params
+    }
+
+    private fun contentSql(columns: String, extra: String): String {
+        val select = "$columns FROM {db}.files f WHERE f.deleted = 0 AND f.content IS NOT NULL$extra"
+        return if (overlay) {
+            "SELECT " + select.replace("{db}", "ov") + " UNION ALL SELECT " + select.replace("{db}", "main") + " AND f.path NOT IN (SELECT path FROM ov.files)"
         } else {
-            select.replace("{db}", "main")
+            "SELECT " + select.replace("{db}", "main")
         }
-        stream(sql, params) { each(it.getString(1), it.getString(2)) }
     }
 
     /**

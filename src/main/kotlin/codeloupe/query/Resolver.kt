@@ -34,11 +34,18 @@ internal object Resolver {
         return view.filesBySuffix(if (p.startsWith("/")) p else "/$p").singleOrNull()
     }
 
+    /** The file of a `path:line` locator, or null for any other query. */
+    fun locatorFile(query: String): String? = AT_LINE.matchEntire(query)?.groupValues?.get(1)
+
+    /**
+     * The innermost declaration whose lines hold [line]; for a line outside every declaration (the package header and imports, a
+     * comment between members) the first declaration after it, else the last one before it.
+     */
     private fun innermostAt(view: View, file: String, line: Int): List<DeclRow> {
         val path = resolvePath(view, file) ?: return emptyList()
-        return view.decls(
-            "f.path = :path AND d.start_line <= :line AND d.end_line >= :line", mapOf("path" to path, "line" to line),
-            "ORDER BY (end_line - start_line) ASC LIMIT 1",
-        )
+        val params = mapOf("path" to path, "line" to line)
+        return view.decls("f.path = :path AND d.start_line <= :line AND d.end_line >= :line", params, "ORDER BY (end_line - start_line) ASC LIMIT 1")
+            .ifEmpty { view.decls("f.path = :path AND d.local = 0 AND d.start_line > :line", params, "ORDER BY start_line ASC, (end_line - start_line) DESC LIMIT 1") }
+            .ifEmpty { view.decls("f.path = :path AND d.local = 0 AND d.end_line < :line", params, "ORDER BY end_line DESC, (end_line - start_line) DESC LIMIT 1") }
     }
 }

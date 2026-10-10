@@ -47,6 +47,16 @@ class QueryTest {
     }
 
     @Test
+    fun `a file-line locator outside every declaration names the next declaration, and a missing file says so`() {
+        val header = symbol("shop/Constructs.kt:1")
+        assertFalse(header.startsWith("no declaration"), "the package header resolves to the first declaration of the file: $header")
+        assertEquals(symbol("shop/Constructs.kt:1"), symbol("shop/Constructs.kt:2"))
+        assertContains(symbol("shop/Constructs.kt:9999"), "hash=", message = "past the end: the last declaration")
+        val missing = symbol("shop/NotYet.kt:1")
+        assertTrue(missing.startsWith("no declaration \"shop/NotYet.kt:1\"\nno indexed file \"shop/NotYet.kt\" (to be created"), missing)
+    }
+
+    @Test
     fun `symbol - body with KDoc, overload selection, file-line, ambiguity`() {
         assertContains(symbol("total"), Regex("hash=[0-9a-f]{10}\n/\\*\\*\n \\* Computes the total\\.\n \\*/\nfun total"))
         assertTrue(symbol("OrderService.handle").startsWith("2 declarations match"))

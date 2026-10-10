@@ -17,6 +17,7 @@ class TaskFilter private constructor(val where: String, val args: List<Any?>, va
             val conditions = ArrayList<String>()
             val args = ArrayList<Any?>()
             var order = DEFAULT_ORDER
+            var namedIds = false
             var rest = query.orEmpty()
             for (m in TERM.findAll(rest).toList()) {
                 // `https://…` in free text is a word, not a field.
@@ -31,6 +32,7 @@ class TaskFilter private constructor(val where: String, val args: List<Any?>, va
                         else -> DEFAULT_ORDER
                     }
                 } else {
+                    if (key.equals("id", ignoreCase = true) || key.equals("issue", ignoreCase = true)) namedIds = true
                     condition(key, values, args)?.let(conditions::add)
                 }
                 rest = rest.replace(m.value, " ")
@@ -43,7 +45,16 @@ class TaskFilter private constructor(val where: String, val args: List<Any?>, va
                     else -> throw IllegalArgumentException("unknown $word; use #unresolved or #resolved")
                 }
             }
-            val text = words.filterNot { it.startsWith("#") }.map { it.replace("\"", "") }.filter { it.isNotEmpty() }
+            var text = words.filterNot { it.startsWith("#") }.map { it.replace("\"", "") }.filter { it.isNotEmpty() }
+            // `issue id: TER-5` is YouTrack's spelling: the word before the key is not a search word.
+            if (namedIds) text = text.filterNot { it.equals("issue", ignoreCase = true) }
+            // A list of issue ids (`TER-94 TER-477`, `issue id: TER-94, TER-477`) names those issues; as full text it would match none.
+            val ids = text.map { it.trimEnd(',') }.filter { it.isNotEmpty() }
+            if (ids.any { ID.matches(it) } && ids.all { ID.matches(it) || it.equals("issue", ignoreCase = true) || it.equals("id", ignoreCase = true) }) {
+                val named = ids.filter { ID.matches(it) }.distinct()
+                conditions += named.joinToString(" OR ", "(", ")") { args += it; "i.id = upper(?)" }
+                text = emptyList()
+            }
             return TaskFilter(conditions.ifEmpty { listOf("1 = 1") }.joinToString(" AND "), args, text.takeIf { it.isNotEmpty() }?.joinToString(" ") { "\"$it\"*" }, order)
         }
 
@@ -74,7 +85,7 @@ class TaskFilter private constructor(val where: String, val args: List<Any?>, va
                     "i.id IN (WITH RECURSIVE d(id) AS (SELECT id FROM issues WHERE parent = coalesce((SELECT id FROM issues WHERE id = ?), upper(?)) " +
                         "UNION SELECT x.id FROM issues x JOIN d ON x.parent = d.id) SELECT id FROM d)"
                 }
-                "id", "issue" -> clause { args += it; "i.id = ?" }
+                "id", "issue" -> clause { args += it; "i.id = upper(?)" }
                 else -> clause {
                     args += key
                     args += it.replace("!", "!!").replace("%", "!%").replace("_", "!_")

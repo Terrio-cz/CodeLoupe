@@ -22,6 +22,7 @@ object GrepQuery {
 
     // Hits kept for ordering; the ones past this are counted only, so a pattern matching everything stays cheap.
     private const val KEPT = 5000
+    private const val MODULES_SHOWN = 12
 
     fun run(view: View, args: Args): String {
         val pattern = args.pattern.orEmpty()
@@ -48,7 +49,7 @@ object GrepQuery {
             }
             if (hits.isNotEmpty()) byPath[path] = hits
         }
-        if (total == 0) return "no match for \"$pattern\" in the indexed source (Kotlin and Java files)"
+        if (total == 0) return empty(view, pattern, args)
         val paths = byPath.keys.sortedWith(PathOrder)
         val out = StringBuilder("grep \"$pattern\": $total hit${if (total == 1) "" else "s"} in ${paths.size} file${if (paths.size == 1) "" else "s"}")
         var shown = 0
@@ -71,6 +72,21 @@ object GrepQuery {
         val rest = total - shown
         if (rest > 0) out.append("\n… +$rest more hits (narrow with module/test, a longer pattern, or raise limit)")
         return out.toString()
+    }
+
+    /** Says what was searched, so that a `module` or `test` that left nothing to search is not read as "the text is not there". */
+    private fun empty(view: View, pattern: String, args: Args): String {
+        val where = listOfNotNull(
+            args.module?.takeIf { it.isNotEmpty() }?.let { "module or directory \"$it\"" },
+            args.test?.let { if (it) "test sources" else "main sources (test=false)" },
+        )
+        if (where.isEmpty()) return "no match for \"$pattern\" in the indexed source (Kotlin and Java files)"
+        val files = view.countContentFiles(args.module, args.test)
+        if (files == 0) {
+            val modules = view.modules().filter { it.isNotEmpty() }.sorted()
+            return "no indexed file in ${where.joinToString(" and ")}; modules: ${modules.take(MODULES_SHOWN).joinToString(", ")}${if (modules.size > MODULES_SHOWN) ", …" else ""}"
+        }
+        return "no match for \"$pattern\" in the $files indexed files of ${where.joinToString(" and ")}"
     }
 
     /** The innermost non-local declaration whose lines hold [line]. */

@@ -27,6 +27,16 @@ class TasksTest {
     private fun list(query: String) = TaskList.matching(store, TaskFilter.parse(query)).map { it.id }
 
     @Test
+    fun `a list of issue ids names those issues in any of the spellings agents write it`() {
+        assertEquals(listOf("CL-26", "CL-29"), list("CL-26 CL-29 sort: id"))
+        assertEquals(listOf("CL-26", "CL-29"), list("issue id: CL-26, CL-29 sort: id"))
+        assertEquals(listOf("CL-26", "CL-29"), list("id: CL-26, CL-29 sort: id"), "upper")
+        assertEquals(listOf("CL-26", "CL-29"), list("id: cl-26, cl-29 sort: id"), "lower")
+        assertTrue(list("CL-26 CL-29 #resolved").isEmpty(), "the ids and the other filters both apply")
+        assertTrue(list("CL-26 nonexistentword").isEmpty(), "an id among other words stays full text")
+    }
+
+    @Test
     fun `filters combine fields, states, negation, epics and full text`() {
         assertEquals(listOf("CL-16", "CL-17", "CL-56"), list("#resolved sort: id"))
         assertEquals(listOf("CL-26", "CL-29"), list("epic: CL-4 state: {In Progress} sort: id"))

@@ -11,9 +11,8 @@ internal class DeclFilter private constructor(val sql: String, val params: Map<S
                 params["kind"] = kind
             }
             if (!module.isNullOrEmpty()) {
-                conds += "(f.module = :module OR f.module LIKE :modulePrefix ESCAPE '\\')"
-                params["module"] = module
-                params["modulePrefix"] = Like.escape(module) + "/%"
+                conds += ModuleScope.sql()
+                params += ModuleScope.params(module)
             }
             if (test == true) conds += "f.source_set LIKE '%test%'"
             if (test == false) conds += "f.source_set NOT LIKE '%test%'"

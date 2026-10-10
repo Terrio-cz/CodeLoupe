@@ -16,6 +16,7 @@ internal object Members {
 
     /** Declarations whose name contains the queried name, for "did you mean". */
     fun suggest(view: View, query: String): String {
+        Resolver.locatorFile(query)?.let { file -> return if (Resolver.resolvePath(view, file) == null) "\nno indexed file \"$file\" (to be created, or not in this worktree)" else "" }
         val name = QueryName.parse(query).name
         if (name.isEmpty()) return ""
         val rows = view.decls("d.name LIKE :like ESCAPE '\\' AND d.local = 0", mapOf("like" to "%${Like.escape(name)}%"), "LIMIT 8")

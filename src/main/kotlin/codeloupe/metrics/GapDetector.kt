@@ -8,6 +8,10 @@ import java.time.temporal.IsoFields
 /**
  * Finds the gaps of CodeLoupe calls in one run: a call followed within [WINDOW] assistant turns by a code read, search or
  * shell search that names the same symbol or file; a call answered empty, busy, or with candidates only.
+ *
+ * Two things are not fallbacks: a read of a line range (`Read` with offset or limit, `sed -n 10,40p`), which is how the lines an
+ * `outline`, `find` or `symbol` answer pointed at are read, and anything after a tracker call (`issue`, `tasks`, a task id as the
+ * subject of `task_code`), whose id is no word of code.
  */
 object GapDetector {
     private const val WINDOW = 2
@@ -18,6 +22,9 @@ object GapDetector {
     private val SUBJECT_ARGS = listOf("name", "q", "target", "pattern", "query", "id")
     private val LEADING_CD = Regex("""^cd\s+\S+\s*(&&|;)\s*""")
     private val SHELL_PROGRAMS = setOf("rg", "grep", "sed", "cat")
+    private val TRACKER_TOOLS = setOf("issue", "tasks", "task_context", "dispatch_plan", "similar", "update")
+    private val TASK_ID = Regex("\\b[A-Za-z][A-Za-z0-9_]*-\\d+\\b")
+    private val LINE_RANGE = Regex("""\bsed\s+-n\s+'?\d+,\d+p""")
 
     fun detect(run: Run): List<Gap> = locate(run).map { it.gap }
 
@@ -27,7 +34,7 @@ object GapDetector {
         return calls.flatMap { call ->
             val (tool, subject) = identify(call) ?: return@flatMap emptyList()
             val shape = "$tool:${shape(subject)}"
-            val token = token(subject)
+            val token = token(tool, subject)
             fun at(kind: String, fallback: String? = null) = LocatedGap(Gap(week, tool, shape, kind, token), call.seq, call.turn, fallback)
             buildList {
                 if (call.head.startsWith("busy:")) add(at("busy"))
@@ -48,7 +55,10 @@ object GapDetector {
     }
 
     private fun follows(call: ToolCall, next: ToolCall, token: String): Boolean =
-        next.seq > call.seq && next.turn <= call.turn + WINDOW && next.category in FALLBACK && mentions(next, token)
+        next.seq > call.seq && next.turn <= call.turn + WINDOW && next.category in FALLBACK && !isRange(next) && mentions(next, token)
+
+    private fun isRange(call: ToolCall): Boolean =
+        call.partial || LINE_RANGE.containsMatchIn((call.input["command"] as? JsonPrimitive)?.content.orEmpty())
 
     private fun mentions(call: ToolCall, token: String): Boolean {
         val text = call.input.values.joinToString("\n") { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content.orEmpty() }
@@ -78,8 +88,8 @@ object GapDetector {
     }
 
     /** What a fallback search would contain: a file's name, or the last identifier of a symbol. */
-    private fun token(subject: String?): String? {
-        if (subject == null) return null
+    private fun token(tool: String, subject: String?): String? {
+        if (subject == null || tool in TRACKER_TOOLS || (tool == "task_code" && TASK_ID.containsMatchIn(subject))) return null
         if (subject.contains('/') || subject.endsWith(".kt") || subject.endsWith(".java")) return subject.substringAfterLast('/').substringBefore(':')
         return Regex("[A-Za-z_][A-Za-z0-9_]*").findAll(subject.substringBefore('(')).map { it.value }.lastOrNull()?.takeIf { it.length > 2 }
     }

@@ -58,6 +58,23 @@ class GrepQueryTest {
     }
 
     @Test
+    fun `module also takes a directory or a file name prefix of the paths`() = View(BASE).use { view ->
+        assertContains(grep(view, "\"audit\"", module = "src/main/kotlin/com/example/shop"), "grep \"\"audit\"\": 1 hit in 1 file")
+        assertContains(grep(view, "\"audit\"", module = "src/main/kotlin/com/example/shop/"), "1 hit in 1 file")
+        assertContains(grep(view, "\"audit\"", module = "src/main/kotlin/com/example/shop/Constructs"), "1 hit in 1 file")
+        assertTrue(grep(view, "\"audit\"", module = "src/main/kotlin/com/example/sho").startsWith("no indexed file"), "a prefix ends at a path separator")
+    }
+
+    @Test
+    fun `an empty answer says when a module or test option left nothing to search`() = View(BASE).use { view ->
+        val none = grep(view, "\"audit\"", module = "nowhere/src/main")
+        assertTrue(none.startsWith("no indexed file in module or directory \"nowhere/src/main\"; modules: "), none)
+        val narrowed = GrepQuery.run(view, GrepQuery.Args("no-such-literal", module = "big", test = false))
+        assertTrue(Regex("no match for \"no-such-literal\" in the \\d+ indexed files of module or directory \"big\" and main sources \\(test=false\\)").matches(narrowed), narrowed)
+        assertEquals("no match for \"no-such-literal\" in the indexed source (Kotlin and Java files)", grep(view, "no-such-literal"))
+    }
+
+    @Test
     fun `a worktree edit is searched instead of the base copy`() {
         val dir = TestRepos.tmpDir("grep-overlay")
         val overlay = dir.resolve("overlay.db")

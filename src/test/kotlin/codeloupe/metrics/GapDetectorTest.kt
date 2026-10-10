@@ -2,6 +2,8 @@ package codeloupe.metrics
 
 import codeloupe.TestRepos
 import codeloupe.metrics.TranscriptBuilder.Companion.args
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -58,6 +60,35 @@ class GapDetectorTest {
             result("d", "...")
         }
         assertEquals(listOf("outline:path:fallback:Order.kt"), GapDetector.detect(run).map { "${it.shape}:${it.kind}:${it.token}" })
+    }
+
+    @Test
+    fun `reading the lines an answer pointed at is the way the answer is used, not a fallback`() {
+        val gaps = GapDetector.detect(
+            run {
+                turn(tools = arrayOf(Triple("a", "mcp__codeloupe__outline", args("target" to "src/main/Order.kt"))))
+                result("a", "src/main/Order.kt (200 lines)\n10-40 fun handle()")
+                turn(tools = arrayOf(Triple("b", "Read", JsonObject(mapOf("file_path" to JsonPrimitive("src/main/Order.kt"), "offset" to JsonPrimitive(10), "limit" to JsonPrimitive(30))))))
+                result("b", "...")
+                turn(tools = arrayOf(Triple("c", "Bash", args("command" to "sed -n '10,40p' src/main/Order.kt"))))
+                result("c", "...")
+            },
+        )
+        assertEquals(emptyList(), gaps)
+    }
+
+    @Test
+    fun `a task id is no word of code, so reads that mention it after a tracker call are not fallbacks`() {
+        val gaps = GapDetector.detect(
+            run {
+                turn(tools = arrayOf(Triple("a", "mcp__codeloupe__issue", args("id" to "TER-324")), Triple("b", "mcp__codeloupe__task_code", args("query" to "TER-324"))))
+                result("a", "TER-324 [Done] ...")
+                result("b", "TER-324 Done ...")
+                turn(tools = arrayOf(Triple("c", "Bash", args("command" to "cat brain/tasks/TER-324.md"))))
+                result("c", "...")
+            },
+        )
+        assertEquals(emptyList(), gaps)
     }
 
     @Test
