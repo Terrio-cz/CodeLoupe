@@ -1065,6 +1065,38 @@ nezavádí.** Tester bench nemá (v `terrio-bench-cl190` ani `terrio-bench2` nen
 horní mez z přepisů (text 17 % výstupu = 4 % ceny, vyprávění 3 % textu) leží hluboko pod šumem 9 běhů, proto se neměřil a kritérium je přepsáno
 na tento důkaz. Rozpočet `claude -p`: 3,2 USD z 12.
 
+### 8.9 Přepočet řízených pokusů s opraveným výstupem (CL-206c, 2026-10-10)
+
+CL-206 opravil počítání výstupu v parserech přepisů (výstup zprávy = maximum `output_tokens` přes její řádky, dřív první řádka; váhy beze změny: vstup 1, zápis cache 1,25 / 2, čtení cache 0,1,
+výstup 5). Otázka: změní to některý dřívější A/B pokus, který vážené jednotky počítal starým pravidlem? **Ne, žádný poměr ani závěr se nemění.** Přepočet nad původními přepisy
+(`~/.claude/projects/*terrio-bench*`, `*cl194*`, `*cl197*`, `*cl201*`, 597 přepisů, soubory výsledků `claude -p` se spárovaly podle `session_id`; žádný adresář ani výsledek nechyběl), bez nových běhů:
+pro každé `message.id` maximum přes řádky, jinak stejné skripty a výběry běhů jako v původních tabulkách (vyřazené běhy stejné).
+
+*Proč se nic nemění.* (1) V těchto přepisech (Claude Code 2.1.295, 2.1.288) má **každá řádka téže zprávy stejné `output_tokens`**: 7 626 zpráv v 597 přepisech, 0 s různými hodnotami, takže
+„první řádka“ a „maximum“ dávají totéž. Chyba z CL-206 se týká jen přepisů podagentů; běhy `claude -p --agent` jsou hlavní session a v žádném z těchto pokusů nevznikl adresář `subagents`
+(jen v sadách `bench-ctx` a `cl199-ttl`, mimo tento přepočet: kontrola i s podagenty dává 0,0 % u všech 3 sad). (2) Součet výstupu z přepisu se rovná `usage.output_tokens` ve výsledku CLI u 374 z 381 běhů se souborem
+výsledku; zbylých 7 nesouvisí s pravidlem maxima: 3× nese JSON jen spotřebu posledního tahu (známý jev u běhů, kde `claude -p` čekal na shellového potomka, CL-202), 4× je přepis
+pod CLI (CL-197 L-176-2 −4 % výstupu, tři běhy CL-201, nejvíc −3,1 tis. tokenů) a poměry to nemění. (3) USD je `total_cost_usd` z CLI, parser jej nikdy neovlivnil; před opravou i po ní je stejné.
+
+Všechny přepočtené tabulky reprodukují čísla v 8.4 a 8.7 na tisíc jednotek. Průměrná cena běhu (vážené jednotky v tis. / USD) a poměr B / A, platné před i po opravě:
+
+| Pokus (karta) | Varianty, n | Jednotky tis. (medián) a USD (průměr) na běh | Poměr B / A: medián / průměr jednotek | Kritérium |
+|---|---|---|---|---|
+| Planner, balíček + krátké tělo (CL-190) | A 9, B 9 | A 433 / 1,45, B 235 / 0,87 | **54 % / 54 %** (USD 60 %) | ≤ 75 % splněno |
+| Reviewer, kompaktní packet (CL-189, nasazeno CL-196) | A 12, B1 12, B2 12 | A 323 / 1,15, B1 288 / 1,00, B2 267 / 0,94 | B1 89 % / 86 %, **B2 83 % / 81 %** (USD 85 % / 82 %) | ≤ 80 % mediánu nesplněno (beze změny) |
+| Coder, tabulka + hook (CL-189) | A 15, B 15; A 9, B 9 | 80 / 0,17 → 103 / 0,21; 70 / 0,15 → 81 / 0,16 | 129 % / 125 %; 115 % / 112 % | ≤ 85 % nesplněno (beze změny) |
+| Suggester, těla v1 až v4 (CL-182, CL-183) | A 5+3, každé B 5+3 | A 726 / 588 (auto / epic) → v2 350 / 249; USD 2,28 / 1,95 → 1,34 / 0,87 | v1 64 % / 57 %, **v2 49 % / 52 %**, v3 54 % / 54 %, v4 62 % / 62 % | pod 80 % všechna, podíl trackeru 5,4 % (beze změny) |
+| Suggester B0 proti A (CL-92, CL-95) | A 5+3, B 5+3 | A 718 / 448 → B0 602 / 492; USD 2,49 / 1,60 → 1,90 / 1,84 | 96 % / 86 % (souhrnně 8 proti 8) | bez prokazatelné úspory (beze změny) |
+| Suggester v5 → v6, `query=` (CL-182c, CL-188) | v5 5 (a 2 dnes), v6 5 | v5 481 / 1,62 (dnes 325 / 1,13), v6 302 / 1,20 | v6 / v5 dnes 93 % / 105 %, v6 / A 42 % / 44 % | podíl trackeru ≤ 5 % splněn (4,0 %) |
+| Reviewer a planner, první běh (CL-23) | A, B po 5 úkolech | reviewer 1 628 → 1 352 (USD 5,83 → 4,89); planner 1 814 → 1 828 (6,55 → 6,39) | reviewer 83 %, planner 101 % | beze změny |
+| Reviewer, oprava těla (CL-179) | B v2, 2 + 2 běhy | TER-321 391 / 271, TER-62 488 / 371 (USD 1,39 / 0,98; 1,59 / 1,27) | – | nálezy 4/4 a 6/6 (beze změny) |
+| Planner, věta o souborech (CL-197) | L 9, S 6, O 6 | L 200 / 0,76, S 173 / 0,68, O 239 / 0,88 | **S / O 72 % / 73 %** (USD 76 % / 77 %), S / L 87 % / 90 % | ≤ 75 % starého těla splněno |
+| Sonnet a effort (CL-202) | reviewer RC 12, V3 8, V4 8; planner B+D 12, V1 9 | RC 267 / 0,94, V3 156 / 0,31, V4 168 / 0,64; B+D 240 / 0,87, V1 184 / 0,36 | V3 58 % / 60 %, V4 63 % / 66 %; V1 76 % / 78 % | USD ≤ 60 %: V3 32 %, V4 64 % (68 % průměr), V1 40 % (beze změny) |
+
+Rozdíl součtu výstupu (maximum − první řádka) je ve všech skupinách **0 tokenů**, takže pole „starý“ a „opravený“ se shodují v každé buňce, nejen po zaokrouhlení. Úsporu planneru (CL-190) a navazující
+závěry CL-197 a CL-202 tedy nemění ani absolutní cena běhu, ani poměr, a nesplněná kritéria (reviewer 83 %, coder 129 % a 115 %, cena Sonnetu u kvality) zůstávají nesplněná. Hodnoty „před“ a „po“
+opravě jsou totožné i pro USD. Skripty (`scan`, `idx`, `groups`, `final`; počty jen z přepisů a výsledků CLI, žádný obsah) jsou přiložené ke kartě CL-206.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
