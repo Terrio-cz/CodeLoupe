@@ -7,14 +7,21 @@ import java.time.temporal.IsoFields
 
 /**
  * Finds the gaps of CodeLoupe calls in one run: a call followed within [WINDOW] assistant turns by a code read, search or
- * shell search that names the same symbol or file; a call answered empty, busy, or with candidates only.
+ * shell search that names the same symbol or file; a call answered busy, or with candidates only; an empty answer that the
+ * agent then looked for elsewhere.
  *
  * Two things are not fallbacks: a read of a line range (`Read` with offset or limit, `sed -n 10,40p`), which is how the lines an
  * `outline`, `find` or `symbol` answer pointed at are read, and anything after a tracker call (`issue`, `tasks`, a task id as the
  * subject of `task_code`), whose id is no word of code.
+ *
+ * Two things are not gaps (CL-198, [GapRule.CURRENT]): an empty answer the agent accepted (a correct negative for a name the task
+ * has yet to create, reported as `settled`), and a later search or read for a word too common to mean the same thing (`json`,
+ * `description`) unless it reads a code file the answer itself named. [GapRule.LEGACY] counts both, the way the series began.
  */
 object GapDetector {
     private const val WINDOW = 2
+    private const val SETTLED = "settled"
+    private const val MIN_DISTINCTIVE = 5
     private val FALLBACK = setOf("code_read", "code_search", "code_search_shell")
     private val EMPTY = Regex("^(no declaration|no match|no type|no indexed file|no issue|no tasks|no ready tasks)")
     private val CANDIDATES_ONLY = Regex("\\n0 exact, [1-9]\\d* candidate")
@@ -25,10 +32,22 @@ object GapDetector {
     private val TRACKER_TOOLS = setOf("issue", "tasks", "task_context", "dispatch_plan", "similar", "update")
     private val TASK_ID = Regex("\\b[A-Za-z][A-Za-z0-9_]*-\\d+\\b")
     private val LINE_RANGE = Regex("""\bsed\s+-n\s+'?\d+,\d+p""")
+    private val FILE_NAME = Regex("""[A-Za-z0-9_\-]+\.[A-Za-z][A-Za-z0-9]{0,5}""")
 
-    fun detect(run: Run): List<Gap> = locate(run).map { it.gap }
+    /** Words that turn up in any document, so a search for one after a CodeLoupe call says nothing about what the call was asked. */
+    private val COMMON_WORDS = setOf(
+        "description", "website", "content", "contents", "message", "messages", "status", "result", "results", "string", "number", "value", "values",
+        "request", "response", "default", "option", "options", "error", "errors", "title", "label", "config", "settings", "version", "example", "examples",
+    )
 
-    fun locate(run: Run): List<LocatedGap> {
+    fun detect(run: Run, rule: GapRule = GapRule.CURRENT): List<Gap> = locate(run, rule).map { it.gap }
+
+    fun locate(run: Run, rule: GapRule = GapRule.CURRENT): List<LocatedGap> = analyse(run, rule).filter { it.gap.kind != SETTLED }
+
+    /** The empty answers the agent accepted: correct negatives, not gaps. */
+    fun settled(run: Run): List<LocatedGap> = analyse(run, GapRule.CURRENT).filter { it.gap.kind == SETTLED }
+
+    private fun analyse(run: Run, rule: GapRule): List<LocatedGap> {
         val week = week(run.start)
         val calls = run.tools.filter { it.category == "codeloupe" }
         return calls.flatMap { call ->
@@ -37,10 +56,10 @@ object GapDetector {
             val token = token(tool, subject)
             fun at(kind: String, fallback: String? = null) = LocatedGap(Gap(week, tool, shape, kind, token), call.seq, call.turn, fallback)
             buildList {
+                val next = token?.let { t -> run.tools.firstOrNull { follows(call, it, t, subject, rule) } }
                 if (call.head.startsWith("busy:")) add(at("busy"))
-                if (EMPTY.containsMatchIn(call.head)) add(at("empty"))
+                if (EMPTY.containsMatchIn(call.head)) add(at(if (rule == GapRule.LEGACY || next != null) "empty" else SETTLED))
                 if (CANDIDATES_ONLY.containsMatchIn(call.head)) add(at("candidates"))
-                val next = token?.let { t -> run.tools.firstOrNull { follows(call, it, t) } }
                 if (next != null) add(at("fallback", fallbackOf(next)))
             }
         }
@@ -54,8 +73,18 @@ object GapDetector {
             .let { if (it in SHELL_PROGRAMS) it else "other" }
     }
 
-    private fun follows(call: ToolCall, next: ToolCall, token: String): Boolean =
-        next.seq > call.seq && next.turn <= call.turn + WINDOW && next.category in FALLBACK && !isRange(next) && mentions(next, token)
+    private fun follows(call: ToolCall, next: ToolCall, token: String, subject: String?, rule: GapRule): Boolean =
+        next.seq > call.seq && next.turn <= call.turn + WINDOW && next.category in FALLBACK && !isRange(next) && mentions(next, token) &&
+            (rule == GapRule.LEGACY || !isCommon(token) || readsNamedFile(call, next, subject))
+
+    private fun isCommon(token: String) = token.length < MIN_DISTINCTIVE || token.lowercase() in COMMON_WORDS
+
+    /** A code read of a file the answer (or the question) names: the one case where a common word still means the same thing. */
+    private fun readsNamedFile(call: ToolCall, next: ToolCall, subject: String?): Boolean {
+        if (next.category != "code_read") return false
+        val named = FILE_NAME.findAll(call.head + "\n" + subject.orEmpty()).map { it.value }.toSet()
+        return named.any { mentions(next, it) }
+    }
 
     private fun isRange(call: ToolCall): Boolean =
         call.partial || LINE_RANGE.containsMatchIn((call.input["command"] as? JsonPrimitive)?.content.orEmpty())

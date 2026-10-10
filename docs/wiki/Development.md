@@ -15,6 +15,11 @@ Always run a development daemon with a throwaway `CODELOUPE_HOME` and a port of 
 touches the daemon you use; the scripts below do that themselves. CI ([ci.yml](https://github.com/Terrio-cz/CodeLoupe/blob/main/.github/workflows/ci.yml)) runs the same checks on three
 operating systems; see [Packaging and releasing](Packaging-and-releasing).
 
+The test run keeps its temporary files (throwaway repositories, daemon homes, compiler output; child processes get the same `TEMP`/`TMPDIR`) in one directory,
+`cl-test-<pid>` in the system temp folder, and removes it when the run ends, also after a failed test and also the read-only files git writes on Windows
+(`gradle/test-scratch.gradle.kts`). A directory a killed build left behind is swept by the next run once it is a day old, together with the leftovers of the
+older helpers. CI counts the entries of the temp folder before and after the suite and fails above 20 new ones (`tools/temp-entries.mjs`).
+
 ## Operating systems
 
 The Kotlin suite runs on Windows, macOS and Linux in CI. A test that needs one OS (or a tool, or a privilege) states it with

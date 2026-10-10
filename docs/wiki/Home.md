@@ -36,7 +36,9 @@ short version, a landing page and the download, is the
 |---|---|
 | [Daemon and index](Daemon-and-index) | one daemon per machine, what the index holds, memory and latency |
 | [Worktrees and overlays](Worktrees-and-overlays) | one base index, an overlay per worktree, no watchers |
-| [Benchmarks](Benchmarks) | answer size against grep and whole-file reads, cost of having the tool, controlled runs of real agents |
+| [Benchmarks](Benchmarks) | answer size against grep, whole-file reads and GitNexus, cost of having the tool |
+| [Agent runs](Agent-runs) | short read: what an agent run costs, what made it cheaper and what did not, with takeaways for your own agent flow |
+| [Agent run details](Agent-run-details) | every controlled experiment on real agents, with tables, method and limits |
 | [Comparison](Comparison) | against GitNexus and an IDE's MCP server |
 
 ## Install and contribute

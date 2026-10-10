@@ -747,6 +747,20 @@ Dále `symbol path:1` (5×): řádek před první deklarací (balíček, importy
 Stejné transcripty, nový detektor: 365 → 196 mezer (9,3 %). Řízené běhy planneru (7 běhů na variantu): starý daemon 15 mezer v 78 voláních (19,2 %; nový detektor 11, 14,1 %), daemon s opravami 8 v 91 (8,8 %); zbylých 8 je 5 záporných odpovědí na jména, která úkol teprve zavádí
 (`location_search`, `LocationSearch*`, `AccountInput`) a 3 náhodné shody tokenu (`website`, `description`, `json`). Cíl 7 % se nesplnil (8,8 %), a protože zbytek nepochází z daemona, kritérium se přepisuje; metrika sama je karta CL-198.
 
+*Pravidlo mezer CL-198 (2026-10-10).* `metrics gaps` počítá jako mezeru prázdnou odpověď jen tehdy, když agent pak hledal totéž jinde (fallback); prázdné odpovědi, které přijal (záporná odpověď na jméno,
+které úkol teprve zavádí), vypíše zvlášť jako „settled negatives“. Fallback na běžné slovo (`description`, `website`, `json`, ...) nebo kratší než 5 znaků se počítá jen při čtení kódového souboru, který odpověď CodeLoupe
+sama jmenuje (v prvních 200 znacích odpovědi nebo v dotazu). `--all` dává staré počty (každá prázdná odpověď je mezera, každé pozdější hledání téhož slova fallback), takže řada zůstává srovnatelná.
+Přepočet řízených běhů CL-194 (`codeloupe metrics gaps --since 2026-10-01 --dir <transcripty cl194-ws-P|Q>`, 7 běhů na variantu):
+
+| Varianta (daemon) | Volání | Mezery staré pravidlo (`--all`) | Mezery nové pravidlo | z toho settled negatives |
+|---|---|---|---|---|
+| P (starý daemon) | 78 | 11 (14,1 %) | 5 (6,4 %) | 6 |
+| Q (daemon s opravami CL-191) | 91 | 8 (8,8 %) | 0 (0 %) | 5 |
+| celkem | 169 | 19 (11,2 %) | 5 (3,0 %) | 11 |
+
+Q: 5 prázdných odpovědí (`location_search`, `LocationSearch*`, `AccountInput` ×2, `querySet`) je teď settled, 3 náhodné shody (`website`, `description`, `json`) odpadly. Cíl 7 % platí pro nové pravidlo (Q 0 %, P 6,4 %);
+stará čísla zůstávají v `--all`. Uložené mezery v `transcripts.db` (obrazovka Gaps) se přepočtou při dalším čtení transcriptu; `GapReport` nese `settled` a `legacy`.
+
 *Věta o každém souboru v těle planneru (CL-197, 2026-10-10).* Řízený běh planneru (Opus, effort high, klony těsně před landem, bez packetu, tracker čte stejný YouTrack a nic do něj nepíše, throwaway daemon z `main` na 47682 se sekcí `cochange`, dva běhy souběžně; před každým během se agentovi zapomněla čtení kořene jako hookem `SubagentStart`). Tři těla: L = živé tělo z CL-190, S = L + věta v odrážce o přístupu („vypiš každý soubor, který změna zasáhne, i jednořádkové úpravy a model a dokumenty, které jmenuje `cochange`“; aby tělo zůstalo do 8 000 znaků, odpadla věta „Never a >20k-char file whole“, návod `rg -n '^## '` a „the other agents“ → „others“), O = staré tělo před CL-190 (`.bak-cl189`). Tři úkoly: TER-324 (11 souborů, dvě čtyřřádkové úpravy modelu `User.kt`, `Organization.kt` a `docs/local-stack.md`), TER-176 (5 souborů mimo testy: jednořádkový `AccountModule.kt`, `StaffService.kt`, `importer-architecture.md`) a TER-575 (5 souborů: jednořádkový `PostgisColumnType.kt`, `current-db-diagram.md`, `TourismQueryRepository.kt`). TER-176 a TER-575 vybral skript (`cand.mjs`) mezi uzavřenými úkoly s 4–9 soubory tak, že aspoň dva malé soubory text úkolu nejmenuje. Šestnáct nových běhů (S a O po 2 na úkol, L po 2 na TER-176 a TER-575) a pro L na TER-324 pět běhů z CL-194 (stejné tělo, daemon se `cochange`); celkem 20,35 USD i se suggesterem níže.
 
 | Úkol | Tělo | n | Soubory řešení | Z toho malé | Řádky premortem | Jednotky tis. (medián) | USD průměr |
