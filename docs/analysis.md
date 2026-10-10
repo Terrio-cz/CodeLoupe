@@ -11,8 +11,13 @@ Stav 2026-10-07. Data: transcripty Claude Code workspace Terrio 2026-09-23 → 1
 |---|---|
 | Výsledky nástrojů (vše, co agent přečte z nástrojů) | ~23 % |
 | Startovní kontext (system prompt, schémata nástrojů, CLAUDE.md, tělo agenta, zadání) čtený každým tahem | ~15 % (tester 23 %, planner 18 %, main 18 %) |
-| Output (text, tool inputs, thinking) | ~7 % |
+| Output (text, tool inputs, thinking) | ~7 % (po opravě CL-206 **15,7 %**, viz níže) |
 | Zbytek: růst konverzace (vlastní zprávy, payloady Edit/Write, reporty subagentů) a cache writes | ~55 % |
+
+**Oprava CL-206 (2026-10-10):** výstup se bral z první řádky zprávy a byl podhodnocen 2,1×. Se skutečným výstupem
+je celková cena období o 11 % vyšší (2,14 → 2,38 mld.), výstup tvoří 15,7 % místo 6,8 %, výsledky nástrojů 21,6 % místo 23,9 %
+a podíly ostatních složek (startovní kontext, zbytek) jsou o ~10 % nižší, než tabulka uvádí. Tabulka je ponechána jako
+původní měření; přepočet po rolích je v [plan.md](plan.md) § 1 a § 8.
 
 Startovní kontext mediánem: main 79k, reviewer 36k, planner 39k, coder 30k, tester 23k tokenů.
 **Cena roste s počtem tahů × velikostí kontextu** — každý ušetřený tah ušetří ~10 % kontextu (reviewer

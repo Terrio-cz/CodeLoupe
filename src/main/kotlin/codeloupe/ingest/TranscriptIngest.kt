@@ -82,10 +82,15 @@ class TranscriptIngest(
     private fun run() {
         try {
             val known = files ?: writer.loadFiles().also { files = it }
-            if (db.meta(CATEGORIES) != categorizer.fingerprint) {
+            // Runs read by an older parser hold the first-line output of each message: they are read again, without announcing their gaps as new.
+            val reparse = db.meta(PARSER) != PARSER_VERSION
+            if (reparse || db.meta(CATEGORIES) != categorizer.fingerprint) {
                 db.clear()
                 known.clear()
-                db.transaction { db.setMeta(it, CATEGORIES, categorizer.fingerprint) }
+                db.transaction {
+                    db.setMeta(it, CATEGORIES, categorizer.fingerprint)
+                    db.setMeta(it, PARSER, PARSER_VERSION)
+                }
             }
             val todo = TranscriptScanner.scan(dirs()).filter { f -> known[f.key].let { it == null || it.size != f.size || it.mtime != f.mtime } }.sortedByDescending { it.mtime }
             status = IngestStatus(true, 0, todo.size, status.at)
@@ -101,7 +106,7 @@ class TranscriptIngest(
                     }
                 }
             }
-            val quiet = db.meta(BASELINE) == null
+            val quiet = reparse || db.meta(BASELINE) == null
             if (quiet) db.transaction { db.setMeta(it, BASELINE, IsoTime.now()) }
             runCatching { watch.check(quiet) }.onFailure { log("budgets: ${it.message}") }
             if (!quiet) gaps.announce(added)
@@ -170,6 +175,10 @@ class TranscriptIngest(
 
         private companion object {
         const val BASELINE = "baseline"
+        const val PARSER = "parser"
+
+        /** Bumped when [TranscriptParser] counts differently, so the runs already stored are read again (2: output is the final count of a message, CL-206). */
+        const val PARSER_VERSION = "2"
         const val CATEGORIES = "categories"
         const val META_GRACE_MS = 60_000L
         const val BATCH_FILES = 50

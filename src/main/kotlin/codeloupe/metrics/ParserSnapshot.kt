@@ -15,8 +15,8 @@ data class ParserSnapshot(
     val peak: Long,
     val firstPrompt: String,
     val emitted: Int,
-    /** Hashes of the assistant message ids counted so far: one message appears on several lines. */
-    val seen: List<Long>,
+    /** Hashes of the assistant message ids counted so far, with the output tokens counted for each: one message appears on several lines. */
+    val seen: Map<Long, Long>,
     val pending: List<Call>,
     /** Absent from snapshots written before starting contexts were measured. */
     val startCtx: StartTracker.State? = null,

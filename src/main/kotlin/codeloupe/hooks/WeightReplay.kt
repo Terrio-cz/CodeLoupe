@@ -51,7 +51,7 @@ class WeightReplay(private val warnAt: List<Int> = listOf(100_000, 150_000), pri
         Files.newBufferedReader(file.path).use { reader -> reader.lineSequence().filter { it.isNotEmpty() }.forEach(parser::feed) }
         val (results, usages) = parser.drain()
         if (parser.turns == 0) return null
-        return Run(parser.turns, usages.map { it.usage.context() }, results.map { Triple(it.turn, it.name, it.chars) })
+        return Run(parser.turns, usages.filter { !it.continuation }.map { it.usage.context() }, results.map { Triple(it.turn, it.name, it.chars) })
     }
 
     // The share the heaviest results held at [turn], by the same ranking the live hook uses.
