@@ -91,8 +91,15 @@ class Know(
         }
         return (draft.anchors + implied).map { ref ->
             val at = ref.root ?: root ?: throw IllegalArgumentException("an anchor needs a checkout: send root, or start the daemon with a default root")
-            Anchor(at, ref.path?.let(CitedPaths::clean), ref.symbol)
+            Anchor(at, ref.path?.let(::relative), ref.symbol)
         }.distinct()
+    }
+
+    // An anchor names something inside its checkout: a path that leaves it would probe the rest of the disk.
+    private fun relative(path: String): String {
+        val clean = CitedPaths.clean(path)
+        require(clean.isNotEmpty() && !clean.startsWith("/") && ':' !in clean && clean.split('/').none { it == ".." }) { "an anchor path is relative to its checkout: $path" }
+        return clean
     }
 
     // Reads the anchors of [facts] and stores a changed status; unreachable checkouts leave the status as it is.

@@ -141,6 +141,16 @@ class KnowStoreTest {
     }
 
     @Test
+    fun `an anchor path that leaves its checkout is refused`() {
+        for (path in listOf("../secret.txt", "a/../../b.kt", "/etc/passwd", "C:/Windows/win.ini")) {
+            assertContains(
+                assertFailsWith<IllegalArgumentException> { runBlocking { know.put(FactDraft("repo", "a fact", root = "/work", anchors = listOf(AnchorRef(path = path)))) } }.message!!,
+                "relative to its checkout",
+            )
+        }
+    }
+
+    @Test
     fun `an anchor without any checkout is refused`() {
         assertContains(
             assertFailsWith<IllegalArgumentException> { runBlocking { know.put(FactDraft("repo", "a fact", anchors = listOf(AnchorRef(path = "a/b.kt")))) } }.message!!,
