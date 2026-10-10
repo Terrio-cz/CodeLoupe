@@ -1111,6 +1111,37 @@ Rozdíl součtu výstupu (maximum − první řádka) je ve všech skupinách **
 závěry CL-197 a CL-202 tedy nemění ani absolutní cena běhu, ani poměr, a nesplněná kritéria (reviewer 83 %, coder 129 % a 115 %, cena Sonnetu u kvality) zůstávají nesplněná. Hodnoty „před“ a „po“
 opravě jsou totožné i pro USD. Skripty (`scan`, `idx`, `groups`, `final`; počty jen z přepisů a výsledků CLI, žádný obsah) jsou přiložené ke kartě CL-206.
 
+### 8.10 Nástroj `batch`: více nezávislých čtení v jednom tahu (CL-205, 2026-10-10)
+
+**Co se postavilo.** `batch` (MCP i `/api/batch`): `calls` = `[{tool, args}]`, nejvýš 8 čtecích volání (`find`, `grep`, `outline`, `symbol`, `context`, `usages`, `calls`,
+`hierarchy`, `changes`, `doc`, `issue`, `task_context`, `task_code`), odpovědi v pořadí s popiskem `[n] nástroj cíl`, chyba nebo odmítnutí zůstane ve své části
+(`(failed)`), každá část se ořízne na svůj díl 48 000 znaků (min. 4 000). Zapisující a procesní nástroje, neznámý nástroj i vnořený `batch` se odmítnou. Volba
+`tools.batch` v `config.json`, **výchozí vypnuto**: výchozí katalog zůstává beze změny (`ToolListStabilityTest` zelený), zapnutí přidá **772 znaků = 7,1 % seznamu**
+(10 862 → 11 634; ≈ 155 tokenů při 5 znacích na token, ≈ 240 při 3,2). Čtení souboru s offsetem a limitem nástroj nemá (v katalogu žádné není; `doc` section=`L120-160` pokrývá textové soubory).
+Druhá páka (b): řádek v `SKILL.md` a věta v session-start nápovědě „nezávislá čtení v jedné zprávě“. Testy: `BatchToolTest` (pořadí, chyba v části, odmítnutí, plochý tvar, oříznutí, cena v seznamu, config) + test stability.
+
+**A/B** (`%TEMP%	errio-bench-cl205`, kopie workspace, vlastní daemony z větve na 47740/47741, nic do YouTrack). A = živé tělo agenta, B = tělo + `mcp__codeloupe__batch` v `tools:` + jedna věta
+(coder, reviewer-opus, planner; těla v B o 48, 92 a 115 znaků delší, tedy by se při nasazení musela zkrátit o stejně). 3 opakování na úkol a variantu, 2 `claude -p` souběžně, 36 běhů, **22,43 USD**.
+Coder Sonnet medium (light, TER-670/545/536, test známého řešení), reviewer Opus high (TER-321, TER-62), planner Opus high (TER-321).
+
+| Role | n/var. | jednotky tis. A → B | USD A → B | tahy/běh | použil `batch` | kvalita |
+|---|---:|---|---|---|---|---|
+| coder | 9 | 762 → 802 (+5 %) | 1,52 → 1,60 | 12,4 → 13,0 | **0 z 9** | test známého řešení 9/9 → 7/9 (TER-545: 2 běhy selhaly na jedné aserci) |
+| reviewer | 6 | 1 789 → 1 948 (+9 %) | 6,33 → 6,84 | 11,3 → 12,3 | 6 z 6 (3,2 volání po 5,0 částech) | známé nálezy 30/30 → 30/30 |
+| planner | 3 | 897 → 734 (−18 %) | 3,36 → 2,78 | 10,3 → 8,3 | 3 z 3 (5,3 volání po 6,6 částech) | soubory skutečného řešení 50 % → 54 % |
+
+Po buňkách (medián B / medián A, jednotky): coder 536 93 %, 545 92 %, 670 132 %; planner 85 %; reviewer 321 98 %, 62 116 %. **Sdruženě** (každý běh dělený mediánem A své buňky): medián B **0,97**, průměr 1,05
+(cíl: medián ≤ 0,90). Celkem USD A 11,21, B 11,22. Podíl paralelních čtecích tahů 34 % (A) → 31 % (B), sériových čtecích tahů hned po čtecím 81 → 99.
+
+**Rozhodnutí: nepřijato, živá těla se nemění.** Kritérium (medián ≤ 90 %, kvalita ne horší) nesplněno: medián 0,97, a kvalita codera na TER-545 je 1/3 proti 3/3 (selhání jedné aserce nad
+implementačním detailem, coder `batch` nikdy nevolal, takže jde o rozptyl, ne o vliv nástroje, ale „ne horší“ to nedokládá). Vysvětlení nulového přínosu: (1) těla už nezávislá čtení paralelizují (planner 93 % čtecích tahů paralelních
+už v A, takže `batch` jen mění několik paralelních volání za jedno, ušetřil 2 tahy z 10); (2) reviewer `batch` použil, ale dál posílal jednotlivá čtení po něm a jeho tahů přibylo; (3) Sonnet jako coder
+nástroj ignoroval i s větou v těle. Strop 7,3 % z § 8.6 tedy zůstává horní mez, kterou tahle páka nedosáhla: realitu určuje chování modelu, ne dostupnost nástroje. Nástroj zůstává v produktu jako volba (`tools.batch`);
+případný další pokus patří jen k planneru (jediná role s dobrým výsledkem, −18 %, n = 3, jedna úloha), ne ke coderovi.
+
+**Vedlejší nálezy.** (a) Testy nechávaly dočasné adresáře v `%TEMP%`: 120 tisíc položek zaplnilo disk 931 GB na 0 a shodilo plný `gradlew test`; po úklidu uvolněno ≈ 280 GB. Opravu mezitím dodala CL-208 (moje verze byla nahrazena při merge).
+(b) `SessionStartDaemonTest` „no caller lines“ padá lokálně na Windows i na čistém `origin/main` (CI na Linuxu zelené): řádek `^ 17-19 [Big] …` z výstupu `changes` začíná šesti mezerami; nesouvisí s touto kartou.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |

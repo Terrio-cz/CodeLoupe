@@ -6,7 +6,7 @@ What does a coding-agent run cost, and which changes make it cheaper without mak
 
 - **Reading code is only 13-19 % of a run's cost.** Cache reads (the model re-reading its growing conversation on every turn) are 54 % of the bill.
 - **What saved money:** fewer turns (a task pack and a turn budget took the planner to 54 % of its cost), a shorter and stable prompt start, a compact review packet, rewritten dispatcher instructions.
-- **What did not:** search tools alone (agents calling the code index 6 times per run cost the same), a hook that redirects the coder's searches (129 %), a cheaper model (a third of the cost, but findings missed), a warm session pool.
+- **What did not:** search tools alone (agents calling the code index 6 times per run cost the same), a hook that redirects the coder's searches (129 %), a batch tool for several reads in one call (no change in cost: the coder never used it), a cheaper model (a third of the cost, but findings missed), a warm session pool.
 - **Bottom line:** about 16-22 % of the flow's cost from the changes of the last days, about 22-30 % with the earlier prompt trimming (an estimate, see [Bottom line](#bottom-line)).
 
 ## What to take away for your own agent flow
@@ -62,7 +62,7 @@ What does a coding-agent run cost, and which changes make it cheaper without mak
 | Repository map at session start | All | +6.6 % (mean) | n/a | Rejected |
 | Prompt table plus a hook that redirects shell searches | Coder | +29 % and +15 % | 15 of 15; 6 of 9 | Rejected |
 | A warm session pool | All | -0.1 % at best, +31 % at worst (simulation) | n/a | Rejected |
-| Batch tool: several reads in one call | All | n/a (being measured) | being measured | Running |
+| Batch tool: several reads in one call | Coder, reviewer, planner | +0 % (USD 11.22 against 11.21 over 18 pairs; reviewer +9 %, planner -18 %, coder +5 %) | known findings and files equal; coder 1 of 3 against 3 of 3 on one task | Rejected |
 
 ## What did not work
 
