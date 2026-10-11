@@ -158,7 +158,11 @@ const jarVersion = root => { try { return /^codeloupe-(.+)\.jar$/.exec(fs.readdi
 const sha256 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const installerHash = new Map([oldInstaller, newInstaller, badInstaller].filter(Boolean).map(f => [f, sha256(f)]));
 /** Whether the installation on disk is this installer's build: the daemon bundle's version, or (an AppImage) the file itself. */
-const isInstalled = (installer, version) => (resources ? jarVersion(path.join(resources, 'codeloupe')) === version : sha256(appBin) === installerHash.get(installer));
+// The updater swaps the AppImage in place, so for a moment there is no file: that is "not yet", not a failure (it failed a run once with ENOENT).
+const isInstalled = (installer, version) => {
+  if (resources) return jarVersion(path.join(resources, 'codeloupe')) === version;
+  try { return sha256(appBin) === installerHash.get(installer); } catch (e) { if (e.code === 'ENOENT') return false; throw e; }
+};
 /** Windows: the installer the app started is still working, in the updater's cache directory. */
 const installerRunning = () => platform === 'win32' && processLines(dirs.local).length > 0;
 
