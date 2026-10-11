@@ -30,12 +30,20 @@ class KnowStore(file: Path) : AutoCloseable {
     @Synchronized
     fun get(id: String): Fact? = parseId(id)?.let(::get)
 
-    /** The best [limit] facts for [match] (see [FtsMatch]) that [filter] lets through, best first. */
+    /**
+     * The best [limit] facts for [match] (see [FtsMatch]) that [filter] lets through, best first; without a match the most recently
+     * updated ones, which only makes sense with an anchor in the filter.
+     */
     @Synchronized
-    fun search(match: String, filter: KnowFilter, limit: Int): List<Fact> {
-        val where = StringBuilder("facts_fts MATCH ?")
-        val params = ArrayList<Any>().apply { add(match) }
+    fun search(match: String?, filter: KnowFilter, limit: Int): List<Fact> {
+        val where = StringBuilder(if (match == null) "1 = 1" else "facts_fts MATCH ?")
+        val params = ArrayList<Any>()
+        match?.let { params += it }
         if (!filter.includeSuperseded) where.append(" AND f.status != 'superseded'")
+        filter.anchor?.let {
+            where.append(" AND f.anchors LIKE ? ESCAPE '\\'")
+            params += AnchorMatch.prefilter(it)
+        }
         if (filter.scopes.isNotEmpty()) {
             where.append(" AND (").append(filter.scopes.joinToString(" OR ") { if (it.target.isEmpty()) "f.scope = ?" else "(f.scope = ? AND f.target = ?)" }).append(')')
             filter.scopes.forEach {
@@ -48,7 +56,11 @@ class KnowStore(file: Path) : AutoCloseable {
             filter.kinds.forEach { params += it.word }
         }
         params += limit
-        val sql = "SELECT f.* FROM facts_fts JOIN facts f ON f.id = facts_fts.rowid WHERE $where ORDER BY bm25(facts_fts, 1.0, 0.3), f.id LIMIT ?"
+        val sql = if (match == null) {
+            "SELECT f.* FROM facts f WHERE $where ORDER BY f.updated_at DESC, f.id DESC LIMIT ?"
+        } else {
+            "SELECT f.* FROM facts_fts JOIN facts f ON f.id = facts_fts.rowid WHERE $where ORDER BY bm25(facts_fts, 1.0, 0.3), f.id LIMIT ?"
+        }
         return query(sql, params) { fact(it) }
     }
 

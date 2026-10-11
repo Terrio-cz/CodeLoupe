@@ -25,6 +25,26 @@ class AnchorChecker(private val index: IndexReader) {
         return out
     }
 
+    /**
+     * Anchors, not fingerprinted, for the names of [names] that the index of [root] resolves: a file name held by exactly one file, a class
+     * declared somewhere. Nothing for a checkout that cannot be read.
+     */
+    suspend fun named(root: String, names: NamedCode): List<Anchor> {
+        if (names.isEmpty) return emptyList()
+        return try {
+            index.read(root) { view ->
+                val files = names.files.mapNotNull { name ->
+                    view.filesBySuffix(name).filter { it == name || it.endsWith("/$name") }.distinct().singleOrNull()?.let { Anchor(root, it) }
+                }
+                files + names.classes.map { Anchor(root, symbol = it) }.filter { AnchorProbe.read(view, it).symbolFound }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     /** [anchor] with the digests of [reading]; unchanged when the target is not there to fingerprint. */
     fun fingerprint(anchor: Anchor, reading: AnchorReading): Anchor =
         if (reading.reachable && reading.fileFound && reading.symbolFound && reading.sig != null) anchor.copy(sig = reading.sig, body = reading.body) else anchor

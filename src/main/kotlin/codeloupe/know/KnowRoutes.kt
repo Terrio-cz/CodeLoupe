@@ -17,16 +17,17 @@ import kotlinx.serialization.json.put
 
 /**
  * The knowledge store, behind the daemon token like every route that is not a read-only code query.
- * `GET /know/search?q=&scope=&kind=&limit=&all=1`: the best facts as compact lines. `POST /know`: one [FactDraft], or `{"facts": [...]}`.
+ * `GET /know/search?q=&anchor=&scope=&kind=&limit=&all=1`: the best facts as compact lines. `POST /know`: one [FactDraft], or `{"facts": [...]}`.
  * `GET /know/{id}`: one fact. `GET /know/stale`: reads every anchor and answers the facts that went stale. `POST /know/{id}/verify`: the fact holds now.
  */
 fun Route.knowRoutes(know: Know) {
     get("/know/search") {
         val q = call.parameters["q"].orEmpty()
-        if (q.isBlank()) return@get call.fail(HttpStatusCode.BadRequest, "send ?q=<question or words>")
+        val anchor = call.parameters["anchor"]
+        if (q.isBlank() && anchor.isNullOrBlank()) return@get call.fail(HttpStatusCode.BadRequest, "send ?q=<question or words> or ?anchor=<file or class>")
         call.answering {
             val limit = call.parameters["limit"]?.toIntOrNull() ?: Know.DEFAULT_LIMIT
-            val hits = know.search(q, call.parameters["scope"], call.parameters["kind"], limit, call.parameters["all"] == "1")
+            val hits = know.search(q, call.parameters["scope"], call.parameters["kind"], limit, call.parameters["all"] == "1", anchor)
             call.respond(HttpStatusCode.OK, JsonFormat.json.encodeToString(KnowHits.serializer(), KnowHits(hits)))
         }
     }

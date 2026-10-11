@@ -34,6 +34,8 @@ class Know(
                 anchors = fingerprinted
             }
         }
+        // A file or class the text names without a directory is anchored where the index finds it, for existence only: a mention is not a claim about its code.
+        if (root != null) anchors = anchors + checker.named(root, NamedCode.of(text)).filter { named -> anchors.none { it.place == named.place } }
         val stamp = now()
         val fact = Fact(
             id = "", scope = scope.kind, target = scope.target, kind = FactKind.parse(draft.kind), text = text, source = FactSource(draft.task, draft.run),
@@ -47,11 +49,27 @@ class Know(
 
     fun get(id: String): Fact? = store.get(id)
 
-    /** The best [limit] facts for [question], each as a compact line; anchored ones are read first, so a stale fact says so. */
-    suspend fun search(question: String, scope: String? = null, kind: String? = null, limit: Int = DEFAULT_LIMIT, includeSuperseded: Boolean = false): List<KnowHit> {
-        val match = FtsMatch.of(question) ?: return emptyList()
-        val filter = KnowFilter(ScopeRef.parseAll(scope), kind.orEmpty().split(',').filter { it.isNotBlank() }.map(FactKind::parse), includeSuperseded)
-        return check(store.search(match, filter, limit.coerceIn(1, MAX_LIMIT))).first.map { KnowHit(it, FactLine.of(it)) }
+    /**
+     * The best [limit] facts for [question], each as a compact line; anchored ones are read first, so a stale fact says so. With an [anchor]
+     * (`Foo.kt`, `src/Foo.kt`, `Foo`, `Foo.parse`, `src/Foo.kt#Foo.parse`) only the facts anchored to that code; the question may then be left out,
+     * and the most recently updated facts come first.
+     */
+    suspend fun search(
+        question: String = "",
+        scope: String? = null,
+        kind: String? = null,
+        limit: Int = DEFAULT_LIMIT,
+        includeSuperseded: Boolean = false,
+        anchor: String? = null,
+    ): List<KnowHit> {
+        val query = anchor?.takeIf { it.isNotBlank() }?.let { AnchorRef.parse(it) }
+        val match = FtsMatch.of(question)
+        if (match == null && query == null) return emptyList()
+        val filter = KnowFilter(ScopeRef.parseAll(scope), kind.orEmpty().split(',').filter { it.isNotBlank() }.map(FactKind::parse), includeSuperseded, query)
+        val cap = limit.coerceIn(1, MAX_LIMIT)
+        val found = store.search(match, filter, if (query == null) cap else ANCHOR_SCAN)
+        val picked = if (query == null) found else found.filter { fact -> fact.anchors.any { AnchorMatch.matches(it, query) } }.take(cap)
+        return check(picked).first.map { KnowHit(it, FactLine.of(it)) }
     }
 
     /** Reads the anchors of every fact that has one, stores what changed, and answers the stale ones. */
@@ -123,5 +141,8 @@ class Know(
     companion object {
         const val DEFAULT_LIMIT = 5
         const val MAX_LIMIT = 30
+
+        // Facts an anchor search narrows down in SQL before its exact check; it takes the limit only afterwards.
+        private const val ANCHOR_SCAN = 2000
     }
 }
