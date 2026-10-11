@@ -1209,7 +1209,61 @@ tokenech ≈ 0,1 %, hodnota je kvalita) se nemění: úložiště se staví pro 
   changed`, `verify` příznak smaže.
 - **Kritéria karty.** Splněno: hit rate ≥ 80 % (83 % na 30 otázkách), detekce zastaralosti s příznakem v hledání, import 14
   souborů s počty duplicit a mrtvých cest, rozhodnutí o úspoře (no-go na tokeny, bez změny). **Otevřeno:** řízené A/B retra a
-  stewarda (−40 % ceny při stejných zachovaných lekcích) a jejich zápis a čtení přes úložiště, tedy napojení na Terrio a MCP nástroj.
+  stewarda (−40 % ceny při stejných zachovaných lekcích) a jejich zápis a čtení přes úložiště, tedy napojení na Terrio a MCP nástroj. Změřeno v 8.11a: retro −7 %, steward +9 %, packy ±1 %, nepřijato.
+
+### 8.11a Řízené A/B znalostního úložiště v toku Terria (CL-203, CL-218, 2026-10-11)
+
+**Otázka a očekávání předem.** Přinese úložiště z 8.11 v toku Terria úsporu tokenů, nebo méně chyb? Strop na tokenech je malý (retro + steward 0,98 % ceny Terria, čtení facts asi 2,3 USD za 4,4 dne, 8.6), takže víc než úsporu se čekalo od kvality: dřívější nálezy ukázané u kódu, který se mění, a fakta, která při změně kódu zastarají s příznakem.
+
+**Živá integrace čeká na daemon.** `codeloupe know --help` v instalovaném balíku (daemon 0.1.1 na 47391, stejně CLI v `~/.codeloupe-live`) příkaz `know` nemá. Měřilo se proto na daemonech z `main` (znalostní úložiště z 0a647a8, vlastní `CODELOUPE_HOME` v `%TEMP%`, porty 47860-47879, po měření zastavené); živý workspace, `.mcp.json`, agenti, `run/context.mjs` i živý daemon se nezměnily, takže není co obnovovat z `.bak-cl203`. Hotová sada změn pro Terrio (`run/knowfacts.mjs` a sekce v `run/context.mjs`, `brain/knowfact.mjs` = zápis přes úložiště s dedupe a hledání, s ústupem na md, těla retro a stewarda, dva testy o 22 a 8 kontrolách) leží mimo workspace v `codeloupe-handoff/cl218-kit`; nezapíná se, protože gate neprošel (níže).
+
+**Import** (bod 1): `know import brain/facts/*.md --root TerrioImporter --root workspace`, scope `area:<soubor>`, ne `repo:TerrioImporter` (téma zůstává pro vygenerovaný pohled a filtr; mezisouborové duplicity byly v 8.11 nulové). 14 souborů, 1 060 řádků, **1 058 faktů** (2 sloučeny), 43 s; 104 faktů cituje cestu (anchor), 11 z nich soubor, který tam není. md soubory zůstaly beze změny. Kotvu má jen asi každý desátý fakt, ostatní jmenují soubor nebo třídu jen v textu; hledání „k změněným souborům“ proto bere fakta, jejichž kotva nebo text jmenuje soubor (název s příponou, cestu, nebo třídu jako celé slovo).
+
+**Provedení.** Kopie workspace ve `%TEMP%` (živý workspace se za běhů nedotkl; přístup k němu a k `IdeaProjects` byl zakázán v `--settings`, zápisy do YouTrack také), 2 `claude -p` souběžně, A a B vždy zároveň, strany lane se střídají, token launcheru z úložiště tajemství. Celkem **87 běhů (84 měřených), 22,86 USD** z 25 (retro 18 + 3 pilotní, steward 40, planner a reviewer 26); jeden běh stewarda CLI zaseklo (11 min bez výstupu), byl ukončen a spuštěn znovu. Vzorky replik: retro 3 × 3, steward 2 × 10, packy 2-3 repliky v 5 buňkách (26 běhů z 36 zadaných; zbytek by přesáhl rozpočet, reviewer na TER-324 se nepouštěl, nemá známé nálezy).
+
+**B1 retro** (Haiku; A = živé tělo, B = tělo z kitu: `knowfact.mjs search` místo `rg`/`Read` souborů facts a `knowfact.mjs <téma> …` místo `brain.mjs fact`). Vstup = skutečný noční retro 2026-10-06 (přepis jeho promptu: 15 úkolů); 10 z nich (TER-114, 180, 198, 266, 354, 472, 62, 653, 657, 89), poznámky `brain/tasks` a fakta ve stavu z začátku toho běhu (22 pozdějších řádků odstraněno, včetně 7 řádků, které retro tehdy napsalo), jednou naráz (3 repliky) a dvakrát po pěti úkolech (3 repliky každá):
+
+| Buňka (n repl. A / B) | USD medián A → B | Poměr B / A |
+|---|---|---:|
+| 10 úkolů naráz (3 / 3) | 0,0159 → 0,0094 | 0,59 |
+| úkoly 1-5 (3 / 3) | 0,0113 → 0,0122 | 1,08 |
+| úkoly 6-10 (3 / 3) | 0,0107 → 0,0098 | 0,92 |
+| **všechny buňky (9 / 9)** | **0,0113 → 0,0106** | **0,93** (bootstrap 95 %: 0,68-1,14) |
+
+První buňka vypadala jako −41 %, což by kritérium splnilo; s dalšími šesti běhy to bylo šum (rozptyl běh od běhu je v A 0,010-0,028 USD). Výsledky nástrojů související s fakty 27 → 21 tis. znaků na běh (45 % → 44 % všech výsledků nástrojů), tahů 9,2 → 8,7, volání týkajících se facts 3,9 → 3,1 na běh; B hledá dávkami `search`, A čte soubory přes `rg` a `cat`, odpovědi stojí zhruba stejně. Kvalita: kontrolní seznam = 30 témat poznatků (sjednocení všech 18 běhů, tři z nich jsou ve skutečném retru; témata jsou regulární výrazy podle řádku, psal jsem je po prohlédnutí obou variant, není to slepé): **témat na běh A 5,6, B 5,3 (0,96)**, řádků 6,9 / 6,4; ze tří témat skutečného retra 1,3 / 1,1 na běh. Napsaných řádků téměř shodných s existujícími fakty (Jaccard ≥ 0,5) 0 / 0, řádků opakujících téma téhož běhu 1,2 / 1,1 na běh, jeden zjevný duplikát existujícího faktu (A, ruční kontrola nejbližších shod), zastaralých faktů 0 / 0 (jeden nález cesty v B je cesta workspace, kterou kopie nemá). Dedupe úložiště (`merged`) nezasáhl ani jednou: retro píše nové poznatky.
+
+**B1 steward** (Sonnet, medium, režim triage; A = živé tělo, B = tělo s větou „hledej dřívější nálezy přes `knowfact.mjs search`“, jinak shodné, 7 981 znaků, limit 8 000). 10 uzavřených úkolů, vždy jedno kolo, jeho zprávy reviewera a testera, plán, poznámky úkolu oříznuté na čas triage a fakta ve stavu 2026-10-05 23:00; kód se četl z aktuálního klonu (worktrees těch úkolů už nejsou), `yt_create_issue` a ostatní zápisy zakázány. 2 repliky na případ a variantu = 20 / 20 běhů:
+
+| | A | B |
+|---|---|---|
+| USD medián | 0,0615 | 0,0667 (poměr **1,09**, bootstrap 0,82-1,41) |
+| tahů na běh | 5,5 | 5,8 |
+| volání `search` | – | **0 z 20 běhů** |
+| kritéria zaznamenané triage nalezená znovu (shoda ≥ 40 % významných slov) | 72 z 96 (75 %) | 61 z 96 (64 %) |
+| `kind` shodný se zaznamenaným | 18 z 20 | 16 z 20 |
+
+Steward žádná fakta nečte ani nepíše (`brain` čtení jsou poznámky úkolu), takže nemá co ušetřit; věta v těle nic nezměnila (agenti nástroj, který nemusí, nevolají, jako v 8.4), rozdíly jsou šum a drobná přeformulace těla (zkrácené příklady kvůli limitu 8 000 znaků). Nepřijato.
+
+**B2 packy s dřívějšími nálezy** (CL-218). `run/context.mjs` s novou sekcí „Dřívější nálezy k tomuto kódu“ (nejvýš 5 faktů, zdroj `(TER-n)`, `STALE: důvod`, jaké soubory jmenují; tichá, když daemon `know` nemá, neběží, nebo nic nenajde; dotaz je HTTP `GET /know/search` po jednom souboru nebo třídě a výsledek se filtruje na ty, které soubor jmenují) pro planner pack (soubory a třídy, které jmenuje issue) a pro review packet (soubory větve). A = stejný kód s `TERRIO_NO_KNOW=1`, B = sekce ze zásobníku faktů starších než základní commit úkolu (nikdy jeho vlastní; fakta bez časové značky vypuštěna, aby nic nepřesvědčovalo z budoucna). Planner (Opus, high) na TER-321, 324, 637 a reviewer (`terrio-reviewer-opus`, Opus, medium) na TER-321, 637: úkoly dřívějších benchmarků s fakty o jejich souborech (před stavbou 9, 9 a 4 starší fakta jmenující soubory úkolu). Planner A čte stejná fakta sám (`rg` v `brain/facts`, 1,3 volání na běh), B je čte také (1,0), sekce je tedy přídavek, ne náhrada.
+
+| Buňka (n A / B) | Jednotky tis. (medián) A → B | Poměr B / A (jednotky / USD) |
+|---|---|---:|
+| planner TER-321 (3 / 3) | 268 → 241 | 90 % / 92 % |
+| planner TER-324 (2 / 2) | 179 → 184 | 103 % / 104 % |
+| planner TER-637 (3 / 3) | 260 → 248 | 96 % / 96 % |
+| reviewer TER-321 (3 / 3) | 161 → 159 | 99 % / 99 % |
+| reviewer TER-637 (2 / 2) | 141 → 164 | 117 % / 116 % |
+
+Sdruženě (každý běh dělený mediánem A své buňky, 13 / 13): medián B **0,99** jednotek (bootstrap 0,90-1,15), USD 0,99; součet USD **9,85 → 10,05** (+2 %). Planner 0,93 (0,85-1,15), reviewer 1,06 (0,94-1,30). Kvalita: planner známé nálezy A 18/21, **B 20/21** (rozdíl je jedna položka, věta pro `Public-Change`, kterou žádný ukázaný fakt nezmiňuje), rozhodnutí 35/35 obojí, soubory skutečného řešení 87 % → 84 %; reviewer známé nálezy 18/18 obojí (stropový efekt: issue je uvádí). **Citoval ukázaný fakt:** planner B v 5 z 8 běhů (např. fakt o bráně před routingem jako řádek premortem, fakt o zastaralém `docs/backend-requirements.md` s příznakem STALE jako rozhodnutí), reviewer B v 0 z 5. **Vyhnul se nějaký běh známé chybě?** Ne tak, abychom to doložili: každý fakt, který B planner použil, četl i A planner z `brain/facts` (rozhodnutí u TER-321 21/21 v obou variantách, i o dekódovaném prvním segmentu cesty) a výsledek plánu se nezměnil; jediný rozdíl v nálezech nesouvisí s ukázanými fakty. Kola na úkol se z jednoho kola na běh měřit nedají (reviewer našel stejné nálezy).
+
+**Rozhodnutí.**
+- **Retro: nepřijato.** Medián 0,93 (cíl ≤ 0,90, kritérium karty −40 %), kvalita zhruba stejná (0,96 témat), tedy bez úspory, která by za změnu stála: celé retro je 0,48 % ceny Terria (15,6 USD), i −41 % by bylo 0,2 %.
+- **Steward: nepřijato.** Žádná fakta nečte ani nepíše; věta v těle se nevolá, +9 %.
+- **Packy s dřívějšími nálezy: nepřijato.** Formálně splněno „kvalita ne horší a medián ≤ 100 %“ (0,99), ale cíl (méně chyb a kol) se neukázal a karta CL-218 žádá medián ≤ 90 %. Planner sekci použil a stála ho −7 % (nejisté), reviewer ji nepoužil vůbec a +6 %. Hodnota je v příznaku STALE a zdroji u faktu, což zatím nikdo neměřitelně nepotřeboval, protože planner stejná fakta dohledá sám.
+- **Živý workspace se nemění** (nic k obnovení z `.bak-cl203`), kit zůstává připravený. Úložiště zůstává v CodeLoupe jako funkce (8.11); rozhodnutí z 8.6 o tokenech (strop ≈ 0,1 %, no-go) se potvrzuje měřením.
+- Co by to změnilo: daemonová volba `know search --anchor <soubor>` (dnes se kotva čte jen u faktů s cestou; dohledávání podle textu je obejití) a tělo plannera, které sekci používá místo vlastního čtení facts; obojí má smysl až poté, co jiný důvod vyžádá úložiště v živém toku.
+
+**Omezení.** 2-3 repliky na buňku, 10 z 36 zadaných běhů B2 vynecháno kvůli rozpočtu; úkoly dřívějších benchmarků jsou uzavřené (issue obsahuje nálezy pozdějších kol, takže reviewer a planner část „známých nálezů“ čtou z issue); fakta bez časové značky (451 z 1 076) se v B2 nepoužila, v živém toku by byla k dispozici; retro kontrolní seznam je z výstupů obou variant; kód steward čte z dnešního klonu. Skripty měření (`%TEMP%\cl218`) nejsou publikované.
 
 ### 8.12 Ocas ceny coderu a testeru: go/no-go pro run governor (CL-214, 2026-10-11)
 

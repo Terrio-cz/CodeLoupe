@@ -1,4 +1,4 @@
-*Last updated: 2026-10-10.*
+*Last updated: 2026-10-11.*
 
 What does a coding-agent run cost, and which changes make it cheaper without making it worse? Controlled experiments on the author's own multi-agent flow (planner, coder, reviewer, tester and dispatcher on a Kotlin backend). Method and tables: [Agent run details](Agent-run-details).
 
@@ -6,7 +6,7 @@ What does a coding-agent run cost, and which changes make it cheaper without mak
 
 - **Reading code is only 13-19 % of a run's cost.** Cache reads (the model re-reading its growing conversation on every turn) are 54 % of the bill.
 - **What saved money:** fewer turns (a task pack and a turn budget took the planner to 54 % of its cost), a shorter and stable prompt start, a compact review packet, rewritten dispatcher instructions.
-- **What did not:** search tools alone (agents calling the code index 6 times per run cost the same), a hook that redirects the coder's searches (129 %), a batch tool for several reads in one call (no change in cost, also when only the planner gets it: it used the tool in every run and made fewer turns, not a cheaper run), a cheaper model (a third of the cost, but findings missed), a warm session pool.
+- **What did not:** search tools alone (agents calling the code index 6 times per run cost the same), a hook that redirects the coder's searches (129 %), a batch tool for several reads in one call (no change in cost, also when only the planner gets it: it used the tool in every run and made fewer turns, not a cheaper run), a cheaper model (a third of the cost, but findings missed), a warm session pool, a knowledge store for the facts the agents keep (cost within the noise, no mistake avoided that the agents did not avoid anyway).
 - **Bottom line:** about 16-22 % of the flow's cost from the changes of the last days, about 22-30 % with the earlier prompt trimming (an estimate, see [Bottom line](#bottom-line)).
 
 ## What to take away for your own agent flow
@@ -58,6 +58,9 @@ What does a coding-agent run cost, and which changes make it cheaper without mak
 | Smaller model (Sonnet) instead of the larger (Opus) | Planner | -59 % (USD 0.36 against 0.87) | fewer risks and files | Rejected |
 | A cap on large tool results | All | -1 to -4 % at most (estimate) | information lost | Rejected |
 | Terse-output rule | Coder | -16 % (median; inside the spread) | 8 of 9 against 9 of 9 | Rejected |
+| Facts in a knowledge store instead of Markdown files | Nightly summary agent | -7 % (USD 0.0106 against 0.0113; the first three replicates looked like -41 %) | 5.3 against 5.6 lessons per run, no duplicates or stale facts | Rejected |
+| One search sentence for earlier findings | Judge between stages | +9 % (USD 0.0667 against 0.0615); the search was never used | recorded criteria found again 64 % against 75 % (noise) | Rejected |
+| Earlier findings in the pack and packet | Planner, reviewer | planner -7 %, reviewer +6 % (units), 0.99 pooled | known findings 38 of 39 against 36 of 39; no run avoided a mistake the other did not | Rejected |
 | A shorter reviewer prompt | Reviewer | -3 % (USD 1.07 against 1.10); +19 % repaired (1.31) | lost a known finding (3 of 4) until repaired | Rejected |
 | Repository map at session start | All | +6.6 % (mean) | n/a | Rejected |
 | Prompt table plus a hook that redirects shell searches | Coder | +29 % and +15 % | 15 of 15; 6 of 9 | Rejected |

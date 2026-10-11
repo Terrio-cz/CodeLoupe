@@ -104,4 +104,4 @@ All behind the daemon token (`x-codeloupe-token`), like every route that is not 
 
 ## Measured
 
-The numbers, and what they mean for the cost of agents, are in `docs/plan.md` (section 8.11).
+The numbers, and what they mean for the cost of agents, are in `docs/plan.md` (section 8.11). How the store did inside a real agent flow (the nightly summary agent, the judge between stages, earlier findings in the planner's and reviewer's input) is on [Agent run details](Agent-run-details): no saving beyond the noise and no avoided mistake, so it was not switched on there.
