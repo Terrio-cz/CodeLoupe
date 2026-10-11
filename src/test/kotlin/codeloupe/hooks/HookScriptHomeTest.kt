@@ -56,7 +56,7 @@ class HookScriptHomeTest {
             environment().keys.removeAll { it.startsWith("CODELOUPE_") || it == "XDG_CACHE_HOME" }
             environment()["HOME"] = home.toString()
         }.start()
-        process.outputStream.use { it.write("""{"hook_event_name":"PreToolUse","tool_name":"Bash"}""".toByteArray()) }
+        process.feed("""{"hook_event_name":"PreToolUse","tool_name":"Bash"}""")
         val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
         assertTrue(process.waitFor(30, TimeUnit.SECONDS))
         assertEquals(0, process.exitValue())

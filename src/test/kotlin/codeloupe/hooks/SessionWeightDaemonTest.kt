@@ -74,7 +74,7 @@ class SessionWeightDaemonTest {
         fun run(event: String): String {
             val input = """{"hook_event_name":"$event","session_id":"script-session","transcript_path":"${own.path.toString().replace("\\", "/")}"}"""
             val process = ProcessBuilder(bash!!, script).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment()["CODELOUPE_PORT"] = port.toString(); environment()["CODELOUPE_HOME"] = config.home.toString() }.start()
-            process.outputStream.use { it.write(input.toByteArray()) }
+            process.feed(input)
             val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
             process.waitFor(30, TimeUnit.SECONDS)
             assertEquals(0, process.exitValue())

@@ -64,7 +64,7 @@ class HookScriptAuthTest {
             environment()["CODELOUPE_HOME"] = home.toString()
             environment()["CODELOUPE_BIN"] = "/nonexistent/codeloupe"
         }.start()
-        process.outputStream.use { it.write(stdin.toByteArray()) }
+        process.feed(stdin)
         val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
         assertTrue(process.waitFor(30, TimeUnit.SECONDS))
         assertEquals(0, process.exitValue())

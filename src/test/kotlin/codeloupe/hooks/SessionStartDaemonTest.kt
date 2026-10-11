@@ -89,7 +89,8 @@ class SessionStartDaemonTest {
         assertContains(text, "Orient with outline")
         val budget = 1_200
         assertTrue(text.length <= budget * SessionContext.CHARS_PER_TOKEN, "${text.length} chars for $budget tokens")
-        assertFalse(text.lines().any { it.startsWith("      ") }, "no caller lines")
+        // The `was:` line under a changed declaration sits at the same depth as a caller line and appears once the index has seen the edit.
+        assertFalse(text.lines().any { it.startsWith("      ") && !it.trimStart().startsWith("was:") }, "no caller lines in:\n$text")
         assertEquals(1L, daemon.status().hooks.sessions)
     }
 
@@ -143,7 +144,7 @@ class SessionStartDaemonTest {
         val script = Path.of(System.getProperty("codeloupe.projectDir"), "plugin", "hooks", "start-daemon.sh").toString().replace("\\", "/")
         fun run(env: Map<String, String>): String {
             val process = ProcessBuilder(bash!!, script).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment().putAll(env) }.start()
-            process.outputStream.use { it.write(start(repo).toByteArray()) }
+            process.feed(start(repo))
             val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
             assertTrue(process.waitFor(30, TimeUnit.SECONDS))
             assertEquals(0, process.exitValue())

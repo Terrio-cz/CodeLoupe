@@ -38,7 +38,7 @@ class HookScriptWaitTest {
         val file = Path.of(System.getProperty("codeloupe.projectDir"), "plugin", "hooks", "hook.sh").toString().replace("\\", "/")
         val started = System.nanoTime()
         val process = ProcessBuilder(bash, file).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment()["CODELOUPE_PORT"] = port.toString(); environment()["CODELOUPE_HOME"] = TestRepos.tmpDir("hook-home").toString() }.start()
-        process.outputStream.use { it.write(body.toByteArray()) }
+        process.feed(body)
         val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
         assertTrue(process.waitFor(30, TimeUnit.SECONDS))
         assertEquals(0, process.exitValue())
