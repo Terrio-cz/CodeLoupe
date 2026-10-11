@@ -8,14 +8,22 @@ import kotlinx.serialization.json.JsonPrimitive
  * `PreToolUse` hook that points shell searches and whole-file reads at CodeLoupe ([SteerConfig]); `sessionStart` is the
  * `SessionStart` hook that adds the repository map and the state of the worktree ([SessionStartConfig]). Read again on every
  * hook call, so a change needs no daemon restart. `weight` is the `UserPromptSubmit`/`Stop` hook that tells the user when a session
- * carries too much ([WeightConfig]).
+ * carries too much ([WeightConfig]); `postEdit` is the `PostToolUse` check of a file just edited ([PostEditConfig]).
  */
 data class HooksConfig(
     val enabled: Boolean = true,
     val steer: SteerConfig = SteerConfig(),
     val sessionStart: SessionStartConfig = SessionStartConfig(),
     val weight: WeightConfig = WeightConfig(),
+    val postEdit: PostEditConfig = PostEditConfig(),
 ) {
+    /**
+     * The `PostToolUse` hook after `Edit`, `Write` and `MultiEdit` of a Kotlin or Java file: parse the file and, for Kotlin, check the names against
+     * the index; at most [maxLines] lines (the header included) and nothing when the file is clean. Off until the controlled coder runs adopt
+     * it (docs/plan.md, CL-217). The answer must come within [timeoutMs] or the hook says nothing.
+     */
+    data class PostEditConfig(val enabled: Boolean = false, val maxLines: Int = 5, val timeoutMs: Int = 300)
+
     /**
      * One advisory line the first time the context of a session reaches each of the [warnAt] sizes (tokens), naming the [top]
      * tool results that weigh most. It never blocks; after `/compact` the sizes count again.
@@ -54,6 +62,8 @@ data class HooksConfig(
             val startDefault = SessionStartConfig()
             val weight = section["weight"] as? JsonObject
             val weightDefault = WeightConfig()
+            val postEdit = section["postEdit"] as? JsonObject
+            val postEditDefault = PostEditConfig()
             return HooksConfig(
                 enabled = (section["enabled"] as? JsonPrimitive)?.content != "false",
                 steer = SteerConfig(
@@ -73,6 +83,11 @@ data class HooksConfig(
                     enabled = (weight?.get("enabled") as? JsonPrimitive)?.content != "false",
                     warnAt = (weight?.get("warnAt") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { n -> n > 0 } }?.sorted()?.distinct()?.takeIf { it.isNotEmpty() } ?: weightDefault.warnAt,
                     top = number(weight, "top")?.coerceIn(1, 10) ?: weightDefault.top,
+                ),
+                postEdit = PostEditConfig(
+                    enabled = (postEdit?.get("enabled") as? JsonPrimitive)?.content == "true",
+                    maxLines = number(postEdit, "maxLines")?.coerceIn(2, 20) ?: postEditDefault.maxLines,
+                    timeoutMs = number(postEdit, "timeoutMs")?.coerceIn(50, 2_000) ?: postEditDefault.timeoutMs,
                 ),
             )
         }

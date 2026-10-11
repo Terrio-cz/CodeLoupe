@@ -12,8 +12,10 @@ data class HookStats(
     val sessions: Long = 0,
     /** Sessions told that they carry too much. */
     val warnings: Long = 0,
-    /** Calls left alone, by the reason: `off`, `ignored`, `no-context`, `below-size`, `not-a-search`, `other-files`, `not-indexed`, `small`, `repeat`, `capped`, `error`. */
+    /** Calls left alone, by the reason: `off`, `ignored`, `no-context`, `clean`, `timeout`, `below-size`, `not-a-search`, `other-files`, `not-indexed`, `small`, `repeat`, `capped`, `error`. */
     val passed: Map<String, Long> = emptyMap(),
     val medianMs: Double = 0.0,
     val p95Ms: Double = 0.0,
+    /** Edited files the post-edit check had something to say about. */
+    val diagnosed: Long = 0,
 )

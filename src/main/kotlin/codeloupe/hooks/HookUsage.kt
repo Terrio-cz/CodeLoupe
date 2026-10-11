@@ -30,7 +30,7 @@ class HookUsage(private val home: Path) {
 
     fun since(since: Instant?): Result {
         val records = lines(home.resolve("hooks.jsonl")).mapNotNull { runCatching { JsonFormat.json.decodeFromString(HookRecord.serializer(), it) }.getOrNull() }
-            .filter { since == null || stamp(it.t) >= since }
+            .filter { it.hook == "steer" && (since == null || stamp(it.t) >= since) }
         val calls = lines(home.resolve("calls.jsonl")).mapNotNull { runCatching { JsonFormat.json.decodeFromString(CallRecord.serializer(), it) }.getOrNull() }
             .filter { (it.via == "mcp" || it.via == "api") && it.tool in CODE_TOOLS }.map { stamp(it.t) to it.root }
         val rows = records.groupBy { "${it.why} -> ${it.suggested}" }.map { (kind, same) ->

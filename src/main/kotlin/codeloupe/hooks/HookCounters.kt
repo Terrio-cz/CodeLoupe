@@ -7,6 +7,7 @@ class HookCounters {
     private var denied = 0L
     private var sessions = 0L
     private var warnings = 0L
+    private var diagnosed = 0L
     private val passed = sortedMapOf<String, Long>()
     private val micros = ArrayDeque<Long>()
 
@@ -23,6 +24,9 @@ class HookCounters {
     fun warned(nanos: Long) = record(nanos) { warnings++ }
 
     @Synchronized
+    fun diagnosed(nanos: Long) = record(nanos) { diagnosed++ }
+
+    @Synchronized
     fun passed(reason: String, nanos: Long) = record(nanos) { passed.merge(reason, 1L, Long::plus) }
 
     private fun record(nanos: Long, count: () -> Unit) {
@@ -36,7 +40,7 @@ class HookCounters {
     fun snapshot(): HookStats {
         val sorted = micros.sorted()
         fun at(share: Double) = if (sorted.isEmpty()) 0.0 else sorted[minOf(sorted.size - 1, (sorted.size * share).toInt())] / 1_000.0
-        return HookStats(calls, advised, denied, sessions, warnings, passed.toMap(), at(0.5), at(0.95))
+        return HookStats(calls, advised, denied, sessions, warnings, passed.toMap(), at(0.5), at(0.95), diagnosed)
     }
 
     private companion object {

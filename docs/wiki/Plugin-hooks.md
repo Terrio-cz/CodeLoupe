@@ -1,4 +1,4 @@
-The plugin registers three hooks: `SessionStart` starts the daemon ([Hooks and token savings](Hooks-and-token-savings#the-sessionstart-hook)), `PreToolUse` steers searches and whole-file reads, described here, and `SubagentStart` makes the daemon forget what the worktree was read as (below).
+The plugin registers these hooks: `SessionStart` starts the daemon ([Hooks and token savings](Hooks-and-token-savings#the-sessionstart-hook)), `PreToolUse` steers searches and whole-file reads, described here, `SubagentStart` makes the daemon forget what the worktree was read as (below), and `PostToolUse` checks a file just edited ([Post-edit check](#post-edit-check)).
 
 Agents still reach for `rg`, `grep`, `cat` and whole-file reads. A hook runs outside the model and costs no tokens, so the
 plugin points those calls at the CodeLoupe call that answers them. All hooks go through one script (`plugin/hooks/hook.sh`:
@@ -38,7 +38,8 @@ Modes, in `<home>/config.json` (read on every call, no restart):
 ```json
 { "hooks": { "enabled": true, "steer": { "mode": "advise", "minLines": 150, "maxPerSession": 40, "giveUpAfter": 4 },
              "sessionStart": { "enabled": true, "map": false, "budget": 1200, "changes": true, "changesLimit": 12 },
-             "weight": { "enabled": true, "warnAt": [150000, 300000], "top": 3 } } }
+             "weight": { "enabled": true, "warnAt": [150000, 300000], "top": 3 },
+             "postEdit": { "enabled": false, "maxLines": 5, "timeoutMs": 300 } } }
 ```
 
 - `advise` (default): the command runs and the model reads the equivalent call next to its result (`additionalContext`; permissions are not touched).
@@ -99,3 +100,22 @@ leave the transcript. `GET /session-weight?path=<transcript>.jsonl` gives the sa
 `weight.enabled: false` turns this hook off alone. `codeloupe metrics weight --since 2026-10-01 [--longest 20]` replays the longest sessions of old
 transcripts through the verdict and prints at which turn each would have been warned.
 
+
+## Post-edit check
+
+`PostToolUse` on `Edit`, `Write` and `MultiEdit` of a `.kt` or `.java` file the daemon has indexed. The edited file is read from disk and parsed; what
+the parser and the index say about it comes back as context next to the tool result, in at most `maxLines` lines (default 5, header included), or
+nothing when the file is clean. It is the parser and the index, not a compiler, and every answer says so. It is **off** (`"postEdit": {"enabled": true}` turns it on) until the controlled coder runs
+adopt it (`docs/plan.md`, CL-217). It never starts a build, a repository the daemon has not indexed gets nothing, and a check that takes longer than `timeoutMs` says nothing (the first parse after
+the parse worker was idle takes longer). The same findings are told once per session.
+
+| Finding | Example line |
+|---|---|
+| syntax error (Kotlin and Java), with line and column | `12:5 syntax error: Expecting ')'` |
+| a name nothing declares (Kotlin; an unqualified call or type that no file declares, imports or mentions) | 40:9 unknown function `fetchOrderByIdd`: nothing in the index declares it and the file does not import it |
+| a name declared only in another package, not imported | 7:20 `Money` is not imported: it is declared as com.example.shop.Money (Money.kt:5) |
+| wrong number of arguments for a function of the index (Kotlin) | 31:12 `total` called with 3 argument(s), but it takes 1 to 2 (Orders.kt:4) |
+
+A syntax error is told alone: names in a file that does not parse are noise. It stays silent where it cannot be sure: a file with a star import of a package the index does not know,
+a name inside a class with supertypes outside the index or inside an extension function, names Kotlin and the JDK provide, qualified calls unless the receiver is written as the type that declares the function.
+Measured on the project's own sources and on another Kotlin backend (3,300 files), clean files got an answer in 0-0.1 % of cases; see `docs/plan.md` (CL-217) for the figures.

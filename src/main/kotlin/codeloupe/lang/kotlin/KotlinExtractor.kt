@@ -5,6 +5,7 @@ import codeloupe.lang.FileFacts
 import codeloupe.lang.ImportFact
 import codeloupe.lang.JsText
 import codeloupe.lang.RefFact
+import codeloupe.lang.SyntaxProblem
 import codeloupe.lang.TypeSpec
 import codeloupe.platform.Sha1
 import org.jetbrains.kotlin.com.intellij.psi.PsiComment
@@ -49,6 +50,7 @@ internal class KotlinExtractor(private val source: Source) {
     private val decls = ArrayList<DeclFact>()
     private val refs = ArrayList<RefFact>()
     private var errors = 0
+    private val problems = ArrayList<SyntaxProblem>()
 
     /** Enclosing declarations, innermost last. */
     private val stack = ArrayList<Int>()
@@ -58,11 +60,11 @@ internal class KotlinExtractor(private val source: Source) {
 
     fun extract(file: KtFile): FileFacts {
         walk(file)
-        return FileFacts(packageName, imports, decls, refs, errors)
+        return FileFacts(packageName, imports, decls, refs, errors, problems)
     }
 
     private fun walk(element: PsiElement) {
-        if (element is PsiErrorElement) errors++
+        if (element is PsiErrorElement) problem(element)
         when (element) {
             is PsiComment -> Unit
             is KtPackageDirective -> packageName = element.packageNameExpression?.let { JsText.squash(source.of(it)) } ?: ""
@@ -96,6 +98,13 @@ internal class KotlinExtractor(private val source: Source) {
             is KtClassLiteralExpression -> walkClassLiteral(element)
             else -> walkChildren(element)
         }
+    }
+
+    private fun problem(error: PsiErrorElement) {
+        errors++
+        if (problems.size >= SyntaxProblem.MAX_KEPT) return
+        val offset = error.textRange.startOffset
+        problems += SyntaxProblem(source.lines.line(offset), source.lines.column(offset) + 1, error.errorDescription)
     }
 
     private fun walkChildren(element: PsiElement) {

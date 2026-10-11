@@ -5,8 +5,11 @@ import codeloupe.config.Config
 import codeloupe.config.ConfigLoader
 import codeloupe.config.HooksConfig
 import codeloupe.daemon.AppendLog
+import codeloupe.hooks.check.PostEditCheck
+import codeloupe.hooks.check.PostEditOutcome
 import codeloupe.platform.IsoTime
 import codeloupe.repo.Registry
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -27,6 +30,7 @@ class Hooks(
     private val weights: SessionWeights? = null,
     private val warned: WarnedLevels? = null,
     private val forgetReads: (String) -> Unit = {},
+    private val postEdit: PostEditCheck? = null,
 ) {
     private class Session {
         var given = 0
@@ -37,6 +41,8 @@ class Hooks(
     private val repeats = RepeatGuard()
     private val counters = HookCounters()
     private val decided = RepeatGuard(capacity = 500, ttlMs = 60_000)
+    private val checked = RepeatGuard(capacity = 500, ttlMs = 60_000)
+    private val reported = RepeatGuard(capacity = 500)
     private val sessions = object : LinkedHashMap<String, Session>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<String, Session>) = size > MAX_SESSIONS
     }
@@ -54,6 +60,7 @@ class Hooks(
     suspend fun reply(json: JsonObject): JsonObject? {
         val input = HookInput(json)
         if (input.event == "SessionStart" || input.event == "SubagentStart") input.cwd?.let { cwd -> runCatching { forgetReads(cwd) } }
+        if (input.event == "PostToolUse") return diagnose(input)
         if (input.event != "SessionStart") return handle(json)
         val started = System.nanoTime()
         val settings = runCatching(config).getOrDefault(HooksConfig())
@@ -72,6 +79,38 @@ class Hooks(
             )
         }
         return HookOutput.context("SessionStart", text)
+    }
+
+    // A file the agent just wrote: what the parser and the index say about it, told once per session, or nothing at all.
+    private suspend fun diagnose(input: HookInput): JsonObject? {
+        val started = System.nanoTime()
+        val settings = runCatching(config).getOrDefault(HooksConfig())
+        val check = postEdit?.takeIf { settings.enabled && settings.postEdit.enabled } ?: return pass("off", started)
+        if (input.tool !in EDIT_TOOLS) return pass("ignored", started)
+        if (input.toolUseId != null && !checked.firstTime(input.toolUseId!!)) return pass("repeat", started)
+        val outcome = try {
+            withTimeoutOrNull(settings.postEdit.timeoutMs.toLong()) { check.check(input, settings.postEdit) } ?: return pass("timeout", started)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return pass("error", started)
+        }
+        val report = when (outcome) {
+            is PostEditOutcome.Silent -> return pass(outcome.reason, started)
+            is PostEditOutcome.Report -> outcome
+        }
+        if (!reported.firstTime("${input.session}|${report.text}")) return pass("repeat", started)
+        val nanos = System.nanoTime() - started
+        counters.diagnosed(nanos)
+        runCatching {
+            log(
+                JsonFormat.json.encodeToString(
+                    HookRecord.serializer(),
+                    HookRecord(IsoTime.now(), "post-edit", input.tool, "reported", "${report.kind} ${report.count}", "", input.session.take(8), input.cwd?.let { cwd -> runCatching { rootOf(cwd) }.getOrNull() }, nanos / 1_000 / 1000.0),
+                ),
+            )
+        }
+        return HookOutput.context("PostToolUse", report.text)
     }
 
     fun handle(json: JsonObject): JsonObject? {
@@ -166,6 +205,7 @@ class Hooks(
 
     companion object {
         private const val MAX_SESSIONS = 1_000
+        private val EDIT_TOOLS = setOf("Edit", "Write", "MultiEdit")
 
         private fun directoryOf(path: String): String = java.nio.file.Path.of(path).let { if (java.nio.file.Files.isDirectory(it)) it else it.parent ?: it }.toString()
 
@@ -176,7 +216,7 @@ class Hooks(
             return Hooks(
                 Steering(IndexedSources(registry, windows), paths), { ConfigLoader.hooks(config.home) },
                 AppendLog(config.home.resolve("hooks.jsonl"))::append, { path -> runCatching { registry.locate(directoryOf(path)).worktree }.getOrNull() }, callsOn,
-                SessionContext(registry, projects), SessionWeights(scope), WarnedLevels(config.home.resolve("weight-warned.txt")), forgetReads,
+                SessionContext(registry, projects), SessionWeights(scope), WarnedLevels(config.home.resolve("weight-warned.txt")), forgetReads, PostEditCheck(registry, paths),
             )
         }
     }
