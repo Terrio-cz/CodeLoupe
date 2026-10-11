@@ -93,12 +93,11 @@ tasks.test {
     // AotTrainingTest runs the installed jars.
     dependsOn(tasks.installDist)
     useJUnitPlatform()
-    // Test classes run in parallel JVMs (CL-195). A CI runner does nothing else, so it uses every core (4 on a hosted runner);
-    // a developer machine, often busy with agent windows, at most two. Every test works in its own temporary directory and on a
-    // free port. -PtestForks=N overrides.
-    val cpus = Runtime.getRuntime().availableProcessors()
-    val ci = System.getenv("CI") == "true"
-    maxParallelForks = (findProperty("testForks") as String?)?.toInt() ?: if (ci) cpus.coerceIn(1, 4) else (cpus / 2).coerceIn(1, 2)
+    // Test classes run in parallel JVMs (CL-195): two on a 4 vCPU runner, never more, so a machine with many agent windows
+    // is not flooded, and timing-sensitive tests (IngestScaleTest, SessionStartDaemonTest) are not starved on a runner: with four
+    // forks on four cores they failed on one run in three. Every test works in its own temporary directory and on a free port.
+    // -PtestForks=N overrides.
+    maxParallelForks = (findProperty("testForks") as String?)?.toInt() ?: (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     systemProperty("codeloupe.projectDir", projectDir.absolutePath)
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
