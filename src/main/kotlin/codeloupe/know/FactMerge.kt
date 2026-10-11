@@ -17,10 +17,9 @@ object FactMerge {
 
     // An anchor of the same place replaces the older one when it carries a fingerprint; one without keeps the fingerprint there is.
     private fun anchors(old: List<Anchor>, incoming: List<Anchor>): List<Anchor> {
-        fun key(a: Anchor) = Triple(a.root, a.path, a.symbol)
-        val before = old.associateBy(::key)
-        val kept = incoming.map { new -> if (new.fingerprinted) new else before[key(new)] ?: new }
-        val replaced = kept.map(::key).toSet()
-        return old.filter { key(it) !in replaced } + kept
+        val before = old.associateBy { it.place }
+        val kept = incoming.map { new -> if (new.fingerprinted) new else before[new.place] ?: new }
+        val replaced = kept.map { it.place }.toSet()
+        return old.filter { it.place !in replaced } + kept
     }
 }
