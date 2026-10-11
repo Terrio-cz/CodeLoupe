@@ -4,7 +4,7 @@ when a question arrives. This page is the model in the head; the numbers are mea
 ## One daemon per machine
 
 - **Started on demand**, by the first CLI call, `codeloupe start`, the Claude Code plugin's session hook or the desktop
-  app. A second start finds the running daemon and does nothing. `codeloupe stop` ends it and writes `<home>/stopped` so
+  app. A second start finds the running daemon and does nothing; starts on one home go one at a time (`<home>/daemon.lock`), so two CLIs that find no daemon cannot damage each other's token or databases. `codeloupe stop` ends it and writes `<home>/stopped` so
   that the desktop app does not start it again; `codeloupe start` removes the marker. `stop` refuses while jobs run
   (`--force` ends them).
 - **Stateless MCP over HTTP** (Streamable HTTP) on `127.0.0.1:47391`, plus the same tools on the CLI. A restart of the

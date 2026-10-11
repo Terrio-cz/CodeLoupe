@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -20,6 +22,25 @@ class OwnerOnlyTest {
         OwnerOnly.write(file, "two")
         assertEquals("two", Files.readString(file))
         assertEquals(listOf("token"), Files.list(file.parent).use { s -> s.map { it.fileName.toString() }.toList() }, "no temporary file stays")
+    }
+
+    @Test
+    fun `of several creators of one file exactly one wins and its text stays`() {
+        val dir = TestRepos.tmpDir("owner-only-create")
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            repeat(300) { round ->
+                val file = dir.resolve("round$round").resolve("token")
+                val barrier = CyclicBarrier(2)
+                val creators = (1..2).map { who -> pool.submit<Boolean> { barrier.await(); OwnerOnly.create(file, "creator $who") } }
+                val won = creators.map { it.get() }
+                assertEquals(1, won.count { it }, "round $round: $won")
+                assertEquals("creator ${won.indexOf(true) + 1}", Files.readString(file), "round $round: the file holds the winner's text")
+                assertEquals(listOf("token"), Files.list(file.parent).use { s -> s.map { it.fileName.toString() }.toList() }, "no temporary file stays")
+            }
+        } finally {
+            pool.shutdownNow()
+        }
     }
 
     @Test

@@ -21,11 +21,14 @@ import java.time.Duration
 import java.util.UUID
 
 /** CLI side: reach the daemon, starting it when it is not running. */
-class DaemonClient(private val config: Config) {
+class DaemonClient(private val config: Config, private val launcher: (() -> Unit)? = null) {
     private val http = LocalHttp("http://127.0.0.1:${config.port}")
 
     /** The daemon's token, once the daemon on our port has shown that it holds it: it is never sent to anything that has not. */
     private var token: String? = null
+
+    /** True once this client started the daemon process, as opposed to finding it running: the first answers of a new daemon get a second try. */
+    private var startedHere = false
 
     /** The daemon's `/status` JSON, or null when nothing (or something else) answers. */
     fun status(timeoutMs: Long = 800): JsonObject? = runCatching {
@@ -51,16 +54,21 @@ class DaemonClient(private val config: Config) {
         status()?.let { return named(it) }
         PortPolicy.refusal(config)?.let { throw IllegalStateException(it) }
         Files.createDirectories(config.home)
-        // Its own home as working directory: the daemon outlives the CLI and must not hold the user's directory.
-        val args = listOf("daemon", "--detached", "--home", config.home.toString(), "--port", config.port.toString()) +
-            config.defaultRoot?.let { listOf("--root", it) }.orEmpty()
-        val jvm = DaemonJvm.args(parsesHere = config.parseWorkerIdleSeconds <= 0) + AotCaches.fromProperty()?.daemonFlags().orEmpty()
-        DetachedStart.start(JavaProcess.command(MAIN_CLASS, jvm, args), config.home)
+        (launcher ?: ::launch)()
+        startedHere = true
         repeat(80) {
             Thread.sleep(100)
             status(300)?.let { return named(it) }
         }
         throw IllegalStateException("daemon did not start on 127.0.0.1:${config.port}; see ${config.home.resolve("daemon.log")}")
+    }
+
+    private fun launch() {
+        // Its own home as working directory: the daemon outlives the CLI and must not hold the user's directory.
+        val args = listOf("daemon", "--detached", "--home", config.home.toString(), "--port", config.port.toString()) +
+            config.defaultRoot?.let { listOf("--root", it) }.orEmpty()
+        val jvm = DaemonJvm.args(parsesHere = config.parseWorkerIdleSeconds <= 0) + AotCaches.fromProperty()?.daemonFlags().orEmpty()
+        DetachedStart.start(JavaProcess.command(MAIN_CLASS, jvm, args), config.home)
     }
 
     /**
@@ -100,10 +108,38 @@ class DaemonClient(private val config: Config) {
 
     fun call(tool: String, args: JsonObject): ToolOutcome {
         ensureDaemon()
-        val body = http.request("POST", "/api/$tool", args.toString(), headers()).body
-        val json = JsonFormat.json.parseToJsonElement(body).jsonObject
+        val reply = exchange("POST", "/api/$tool", args.toString(), bodyRequired = true)
+        if (reply.body.isEmpty()) throw IllegalStateException(emptyAnswer(reply))
+        val json = JsonFormat.json.parseToJsonElement(reply.body).jsonObject
         return json["text"]?.let { JsonFormat.json.decodeFromJsonElement(ToolOutcome.serializer(), json) }
-            ?: ToolOutcome(false, json["error"]?.jsonPrimitive?.content ?: body)
+            ?: ToolOutcome(false, json["error"]?.jsonPrimitive?.content ?: reply.body)
+    }
+
+    /**
+     * One request to the daemon that [ensureDaemon] has just vouched for. An answer without a body where one is due (an error status always;
+     * any status when [bodyRequired]) from a daemon this client started is asked for once more after the daemon is checked again: it may
+     * have answered while still settling, and `status()` fetches the token again. The reply of the second try is returned as it is.
+     */
+    private fun exchange(method: String, path: String, body: String? = null, readTimeoutMs: Int = 0, bodyRequired: Boolean = false): LocalHttp.Reply {
+        val reply = http.request(method, path, body, headers(), readTimeoutMs = readTimeoutMs)
+        if (reply.body.isNotEmpty() || !(bodyRequired || reply.status >= 400) || !startedHere) return reply
+        startedHere = false
+        ensureDaemon()
+        return http.request(method, path, body, headers(), readTimeoutMs = readTimeoutMs)
+    }
+
+    /**
+     * Why an answer has no body. A 401 is the usual reason: the JDK keeps no body of it for a request sent as a stream, so the daemon's own
+     * words are gone, and the cause is a token in `daemon.token` that is not the one the daemon holds.
+     */
+    private fun emptyAnswer(reply: LocalHttp.Reply): String {
+        val where = "the daemon on 127.0.0.1:${config.port}"
+        return when (reply.status) {
+            401 -> "$where refused the request (HTTP 401, no body): the token in ${config.home.resolve(DaemonToken.FILE)} is not the one it holds, or it needs one; " +
+                "end that daemon (codeloupe stop, or its process) and run the call again"
+            403 -> "$where refused the request (HTTP 403, no body)"
+            else -> "$where answered HTTP ${reply.status} with an empty body: it closed the connection before it had sent the answer; see ${config.home.resolve("daemon.log")}"
+        }
     }
 
     /**
@@ -112,9 +148,10 @@ class DaemonClient(private val config: Config) {
      */
     fun send(method: String, path: String, body: JsonObject? = null, timeout: Duration? = Duration.ofSeconds(60)): Pair<Int, JsonObject> {
         ensureDaemon()
-        val response = http.request(method, path, body?.toString(), headers(), readTimeoutMs = timeout?.toMillis()?.toInt() ?: 0)
+        val response = exchange(method, path, body?.toString(), timeout?.toMillis()?.toInt() ?: 0)
+        val text = if (response.body.isEmpty() && response.status >= 400) emptyAnswer(response) else response.body
         val json = runCatching { JsonFormat.json.parseToJsonElement(response.body).jsonObject }.getOrNull()
-            ?: JsonObject(mapOf("error" to JsonPrimitive(response.body.take(300))))
+            ?: JsonObject(mapOf("error" to JsonPrimitive(text.take(300))))
         return response.status to json
     }
 
@@ -125,7 +162,8 @@ class DaemonClient(private val config: Config) {
             http.request("POST", "/shutdown${if (force) "?force=1" else ""}", headers = headers())
         }.getOrNull()
         if (response?.status == 409 || response?.status == 401) {
-            throw IllegalStateException(runCatching { JsonFormat.json.parseToJsonElement(response.body).jsonObject["error"]?.jsonPrimitive?.content }.getOrNull() ?: "daemon has jobs")
+            val said = runCatching { JsonFormat.json.parseToJsonElement(response.body).jsonObject["error"]?.jsonPrimitive?.content }.getOrNull()
+            throw IllegalStateException(said ?: if (response.body.isEmpty()) emptyAnswer(response) else "daemon has jobs")
         }
         repeat(50) {
             if (status(200) == null) return true

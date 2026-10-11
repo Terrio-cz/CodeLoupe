@@ -61,8 +61,10 @@ class DaemonToken private constructor(private val file: Path, private var value:
             val fresh = ByteArray(32).also { SecureRandom().nextBytes(it) }.toHexString()
             val created = runCatching { OwnerOnly.create(file, line(fresh)) }.getOrDefault(false)
             if (!created) read(home)?.let { return DaemonToken(file, it) }
-            if (!created) OwnerOnly.write(file, line(fresh))
-            return DaemonToken(file, fresh)
+            if (created) return DaemonToken(file, fresh)
+            // The file is there but unusable: replaced, and whichever daemon replaced it last has written the token that stays.
+            OwnerOnly.write(file, line(fresh))
+            return DaemonToken(file, read(home) ?: fresh)
         }
 
         /** The token in [home], for a client; null when there is none yet or the file is unusable. */

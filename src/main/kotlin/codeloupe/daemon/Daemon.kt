@@ -366,12 +366,12 @@ class Daemon private constructor(
         private const val EDIT_OFF = "edit is not on offer: write.mode is off, or auto with the gate closed (codeloupe metrics gaps shows why); set write.mode to on in config.json to use it"
 
         /**
-         * Binds 127.0.0.1:<port>; fails with a BindException while another daemon holds the port, and with an
+         * Binds 127.0.0.1:<port> (one start at a time per home, [StartLock]); fails with a BindException while another daemon holds the port, and with an
          * IllegalStateException when a non-default home asks for the default home's port ([PortPolicy]).
          */
         fun start(config: Config, exitOnShutdown: Boolean = false, webhookBackoffMs: List<Long> = Webhooks.BACKOFF_MS, secretStore: SecretStore? = null): Daemon {
             PortPolicy.refusal(config)?.let { throw IllegalStateException(it) }
-            return Daemon(config, exitOnShutdown, webhookBackoffMs, secretStore).apply { start() }
+            return StartLock.held(config.home, config.port) { Daemon(config, exitOnShutdown, webhookBackoffMs, secretStore).apply { start() } }
         }
     }
 }

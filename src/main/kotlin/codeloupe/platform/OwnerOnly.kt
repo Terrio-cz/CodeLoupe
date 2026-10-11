@@ -49,13 +49,33 @@ object OwnerOnly {
         val temp = Files.createTempFile(file.parent, file.fileName.toString(), ".tmp", *attributes(fileMode))
         try {
             Files.writeString(temp, text)
-            Files.move(temp, file)
-            return true
-        } catch (_: java.nio.file.FileAlreadyExistsException) {
-            return false
+            return putInPlace(temp, file)
         } finally {
             Files.deleteIfExists(temp)
         }
+    }
+
+    /**
+     * A hard link fails, in one step, when the name is taken. `Files.move` without REPLACE_EXISTING looks first and renames after on
+     * Linux and macOS, so two processes that create the same file together can both pass the look and the second silently replaces
+     * the first (two daemons ended up with two tokens, one of them not in the file). A file system without links keeps the move.
+     */
+    private fun putInPlace(temp: Path, file: Path): Boolean = try {
+        Files.createLink(file, temp)
+        true
+    } catch (_: java.nio.file.FileAlreadyExistsException) {
+        false
+    } catch (_: java.io.IOException) {
+        moveInPlace(temp, file)
+    } catch (_: UnsupportedOperationException) {
+        moveInPlace(temp, file)
+    }
+
+    private fun moveInPlace(temp: Path, file: Path): Boolean = try {
+        Files.move(temp, file)
+        true
+    } catch (_: java.nio.file.FileAlreadyExistsException) {
+        false
     }
 
     private val MARKERS = listOf("daemon.json", "daemon.token", "config.json", "jobs.db", "events.db", "daemon.log", "secrets")
