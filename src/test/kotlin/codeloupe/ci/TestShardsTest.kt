@@ -27,5 +27,6 @@ class TestShardsTest {
         assertEquals(slow.size, shares.size, "slowTests has ${slow.size} classes, slowShare ${shares.size} shares")
         assertEquals(slow.size, slow.toSet().size, "a class is listed twice: $slow")
         assertTrue(shares.all { it == 0 || it == 1 }, "$shares")
+        assertEquals(setOf(0, 1), shares.toSet(), "both shares need a slow class")
     }
 }

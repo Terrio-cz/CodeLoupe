@@ -8,7 +8,7 @@ test('documentation alone is not code and does not touch the update test', () =>
 
 test('Kotlin, tests and the plugin are code, but the update test is skipped for them', () => {
   assert.deepEqual(classify(['docs/ci.md', 'src/test/kotlin/A.kt', 'app/test/x.test.ts', 'plugin/hooks/h.sh']), { code: true, update: false });
-  assert.deepEqual(classify(['src/main/kotlin/codeloupe/A.kt', 'src/main/resources/x.json', 'tools/release-notes.mjs', 'tools/feed-check.test.mjs']), { code: true, update: false });
+  assert.deepEqual(classify(['src/main/kotlin/codeloupe/A.kt', 'src/main/resources/x.json', 'tools/release-notes.mjs', 'tools/feed-check.test.mjs', 'gradle/test-shards.gradle.kts']), { code: true, update: false });
 });
 
 test('the app, the build, the workflows and the updater scripts change both', () => {

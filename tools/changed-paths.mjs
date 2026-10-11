@@ -19,7 +19,8 @@ const ZERO = /^0+$/;
 const DOCS = [/^docs\//, /\.md$/i, /^LICENSE(\.[a-z]+)?$/, /^\.github\/ISSUE_TEMPLATE\//];
 // Scripts the update test runs or imports (tools/update-test.mjs); every other script in tools/ is not part of it.
 const UPDATER_TOOLS = 'update-test|feed-check|break-bundle|no-java-env|daemon-token';
-const UPDATE_INERT = [/^plugin\//, /^src\//, /^app\/test\//, new RegExp(`^tools/(?!(${UPDATER_TOOLS})\\.mjs$)`)];
+// gradle/test-*.gradle.kts only pick which tests run and where they keep their files.
+const UPDATE_INERT = [/^plugin\//, /^src\//, /^app\/test\//, /^gradle\/test-[\w-]+\.gradle\.kts$/, new RegExp(`^tools/(?!(${UPDATER_TOOLS})\\.mjs$)`)];
 
 const matches = (file, patterns) => patterns.some(p => p.test(file));
 

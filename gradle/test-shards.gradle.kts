@@ -4,7 +4,7 @@
 // A class belongs to a share by its name alone, so every class runs in exactly one share and nothing needs listing when a test
 // is added. The slowest classes are placed by hand, alternately, because a hash would put several of them in one share: the
 // share that gets them runs minutes longer than the other. The list is only about balance; a class that is renamed or missing
-// from it still runs, in the share its name hashes to. Timings: run 38143926495, Windows.
+// from it still runs, in the share its name hashes to. Timings: runs 38143926495 and 38157965120, Windows.
 
 val slowTests = listOf(
     "codeloupe.overlay.OverlayTest", "codeloupe.hooks.PostEditSampleTest", "codeloupe.write.WriteFuzzTest", "codeloupe.changes.ChangesTest",
@@ -12,8 +12,9 @@ val slowTests = listOf(
     "codeloupe.changes.TestSelectionTest", "codeloupe.write.WriteServiceTest", "codeloupe.taskcode.DispatchTest", "codeloupe.jobs.JobsTest",
     "codeloupe.index.ParseWorkerTest", "codeloupe.daemon.DaemonAuthTest", "codeloupe.know.KnowAnchorSearchTest",
 )
-// Longest first, each to the share that has the least so far (computed for two shares from the timings above).
-val slowShare = listOf(0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0)
+// Longest first, each to the share that has the least so far, then WriteFuzzTest and WriteServiceTest swapped: the write tests come
+// last in the scan order, and a share that ends with the longer one waits for it alone (run 38157965120: shares of 210 s and 339 s).
+val slowShare = listOf(0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0)
 
 tasks.withType<Test>().configureEach {
     val shard = (findProperty("testShard") as String?)?.split("/")?.map { it.trim().toInt() }
