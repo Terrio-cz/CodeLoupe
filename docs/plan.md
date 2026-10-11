@@ -159,7 +159,7 @@ CLI `codeloupe …` ──HTTP (spustí daemon, když neběží)─────�
   (`auth.withoutToken`). Volba tokenu místo
   kontroly vlastníka spojení (Windows `GetExtendedTcpTable`, Linux `/proc/net/tcp`, macOS `lsof`): jeden mechanismus pro tři systémy,
   žádný nativní kód ani závod o PID/port, a MCP klient ho dostane přes `headersHelper` (`codeloupe mcp-headers`, v pluginu
-  `hooks/mcp-headers.sh`), takže tajemství není v konfiguraci Claude Code.
+  `hooks/mcp-headers.cmd` → `mcp-headers.sh`; CL-228: pod `cmd.exe` na Windows je holé `bash` WSL launcher), takže tajemství není v konfiguraci Claude Code.
 - Totožnost daemonu: klient pošle `x-codeloupe-nonce` na `GET /status`, daemon odpoví `x-codeloupe-proof` = SHA-256 z
   `codeloupe-proof:<token>:<nonce>`; token se pošle jen tomu, kdo důkaz dal (CLI, aplikace, `hook.sh`). CLI navíc odmítne daemon, kterého
   `daemon.json` nejmenuje. `hook.sh` předává token přes `curl -H @soubor`, ne na příkazové řádce (vidí ji ostatní uživatelé).

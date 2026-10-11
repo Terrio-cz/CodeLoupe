@@ -3,7 +3,8 @@
 # among them once the daemon has proved it holds it; a daemon from before the token existed gets the plain header it still accepts.
 # Never fails: the worst case is the plain header, with which the read-only tools work and the others say what they need.
 
-. "${BASH_SOURCE[0]%/*}/daemon-auth.sh"
+here=${BASH_SOURCE[0]//\\//} # mcp-headers.cmd passes a Windows path, whose backslashes `%/*` would not see
+. "${here%/*}/daemon-auth.sh"
 codeloupe_dir
 port="${CODELOUPE_PORT:-47391}"
 

@@ -82,7 +82,7 @@ What you see after an update:
 - **An old daemon still running** has no token file; the new CLI, app and hook send only `x-codeloupe`, as before. Restart it (`codeloupe stop`,
   then `codeloupe start`) to get the token.
 - **An old MCP entry** (`--header "x-codeloupe: 1"` only) is answered *this needs the daemon token ...*. Run `codeloupe mcp-config` and add the entry it prints; its `headersHelper` (`codeloupe mcp-headers`) gives Claude Code the token
-  on every connection, without writing it into Claude Code's configuration. The plugin does the same with `hooks/mcp-headers.sh`
+  on every connection, without writing it into Claude Code's configuration. The plugin does the same with `hooks/mcp-headers.cmd` (it runs `mcp-headers.sh`)
   once the plugin is updated from the marketplace.
 - **An old desktop app** against a new daemon gets 401 on its screens; update the app together with the CLI (the installers do).
 - **An old `hook.sh`** against a new daemon sends no token and is refused (401): update the plugin, or set `api.strict` to `false`.

@@ -34,7 +34,13 @@ claude mcp add-json --scope user codeloupe '{"type":"http","url":"http://127.0.0
 `x-codeloupe` header and, once the daemon has proved it holds `<home>/daemon.token`, the token, so the secret never sits in Claude Code's
 configuration. Without the helper (`claude mcp add ... --header "x-codeloupe: 1"`, the entry older versions made) every tool says that it
 needs the token, unless `api.strict` is `false` (then only `run`, `env`, `edit` and `job` do); see [Who may call the daemon](Configuration#who-may-call-the-daemon).
-The plugin's `.mcp.json` has the helper (`hooks/mcp-headers.sh`), so a plugin install or update needs no extra step.
+The plugin's `.mcp.json` has the helper (`hooks/mcp-headers.cmd`, which runs `hooks/mcp-headers.sh`), so a plugin install or update needs no
+extra step. Claude Code runs a `headersHelper` through the platform shell (`cmd.exe` on Windows), unlike the hooks, which it runs under Git
+Bash; a bare `bash` there can be the WSL launcher in `System32`, which cannot read a Windows path and leaves the client without the token
+(*Dynamic Client Registration rejected (HTTP 401)*). So the entry is `sh "<plugin>/hooks/mcp-headers.cmd" || "<plugin>/hooks/mcp-headers.cmd"`:
+`sh` (macOS, Linux) starts the bash script; on Windows, which has no `sh`, `cmd.exe` runs the same file, which looks for Git Bash
+(`CLAUDE_CODE_GIT_BASH_PATH`, `Program Files\Git`, the `git` on the `PATH`) and never runs a bare `bash`. Without Git Bash it prints the
+plain `x-codeloupe` header, so the read-only tools still work.
 
 ## Your own agents (subagents with a `tools:` list)
 
