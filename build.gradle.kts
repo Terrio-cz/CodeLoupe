@@ -87,6 +87,8 @@ apply(from = "gradle/bundle.gradle.kts")
 
 apply(from = "gradle/test-scratch.gradle.kts")
 
+apply(from = "gradle/test-shards.gradle.kts")
+
 tasks.test {
     // AotTrainingTest runs the installed jars.
     dependsOn(tasks.installDist)
