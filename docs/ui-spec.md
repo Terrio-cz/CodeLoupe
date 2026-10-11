@@ -13,6 +13,9 @@ CL-54 (Environment), API daemonu CL-39 (§ 9 je jeho kontrakt).
   volání, mezery, čtení issue přes mirror, index. Časová osa běhu (CL-42) proto není. Obrazovka Runs (§ 3.3) je jen rozbor
   nákladů hotových běhů z transkriptů (kolik stály a kde), ne sledování toho, co agent právě dělá. Je tu od CL-40
   (2026-10-08) nad API z CL-62 a odebere se jedním řádkem v `screenList.ts`.
+- **Výjimka Brain** (uživatel 2026-10-11, CL-232): pipeline je generická napříč workspacy a každý workspace má vlastní sdílenou
+  paměť (brain). Prohlížeč brainu patří do aplikace, takže pravidlo „ukazuje jen to, co CodeLoupe měří o sobě“ platí s touto
+  jedinou výjimkou: obrazovka Brain (§ 3.6a) jen čte, co vrací CLI brainu daemonu, nic nezapisuje.
 - **Hustý developer-tool styl** (Browserbase, Mintlify, Vercel, Linear): levý sidebar, tabulky s 32px řádky,
   postranní detail panely, žádné ilustrace; jediný gradient je výplň plochy pod čarou grafu. Čísla tabulková
   (`tabular-nums`). Vizuální směr a pohyb: [design-revamp.md](design-revamp.md).
@@ -56,6 +59,7 @@ CL-54 (Environment), API daemonu CL-39 (§ 9 je jeho kontrakt).
 | `#/tasks` · `#/tasks/:id` | Tasks | celá stránka s panelem vlastností vpravo | `tasks`, `tasks/{id}` |
 | `#/index` | Index | — | `index` |
 | `#/gaps` | Gaps | řádek se rozbalí | `gaps` |
+| `#/brain` · `#/brain/<workspaceId>?topic=<téma>` | Brain (CL-232) | strom témat vlevo, obsah vpravo | `brain`, `brain/{id}/topic`, `brain/{id}/search` |
 | `#/environment` | Environment (CL-54) | — | `environment` |
 | `#/accounts` | Accounts (CL-63, plán) | — | `accounts` |
 | `#/settings` | Settings | — | `settings` + lokální nastavení aplikace (IPC) |
@@ -301,6 +305,32 @@ Gaps                                        [Tool ▾] [Reason ▾] [24h|7d|30d]
   Vychází z ingestu transkriptů (`gaps.report`, CL-62; před prvním ingestem ze souboru `<home>/gaps-report.json`, který
   zapíše `codeloupe metrics gaps --out`). Rozsah 24h/7d/30d filtruje týdny, které do něj zasahují, filtry nástroje a druhu
   řádky reportu. Tabulka jednotlivých výskytů z ingestu se ukáže, když v ní něco je.
+
+### 3.6a Brain (CL-232)
+
+Sdílená paměť workspace (`<workspace>/brain/`): která témata existují, kolik mají záznamů, obsah tématu, hledání. Obrazovka je
+ve skupině Index, klávesa `g m`.
+
+```
+Brain                          [terrio ▾] [🔍 Search the brain] [ ] Include past task findings [ ] Only in db      ⟳
+┌ Topics   23 topics · 612 entries · 88 KB ┐ ┌ db ─────────────────────────────────────────── 81 entries ┐
+│ ▸ changelog                           7  │ │ database facts: schemas, tables, PostGIS, queries            │
+│ ▸ db                                 81  │ │ +  shared DB is PostgreSQL 17 …                  2026-09-23 │
+│   review-patterns                   190  │ │ !  an in-query SET can lift read-only …          2026-09-25 │
+│     api-contract-openapi             26  │ │ …                                                           │
+└──────────────────────────────────────────┘ └──────────────────────────────────────────────────────────────┘
+```
+
+- **Workspace** (select): každý workspace, který má `brain/brain.mjs`: repozitáře z `workspaces.repos` a adresáře z
+  `workspaces.brains` v `config.json`. Jeden workspace → select je jen jmenovka; žádný → prázdný stav s návodem.
+- **Strom témat**: témata se zanořují podle `/`; u každého řádku počet záznamů (rodič ukazuje součet i s podtématy), v hlavičce
+  součty témat, záznamů a bajtů. Skupina, která je jen rodičem podtémat, nemá vlastní obsah. Vybrané téma je v hashi (`?topic=`).
+- **Téma**: záznamy v pořadí souboru, značka (`+ ! = x`) a datum (poznámka na konci řádku) tlumeně. Téma čte daemon ze souboru
+  `brain/facts/<téma>.md` (jen čtení; až bude `brain.mjs show <téma> --json`, nahradí to).
+- **Hledání**: pole nad stromem, jeden dotaz na pauzu v psaní; výsledky nahrazují obsah tématu. „Include past task findings“
+  přidá nálezy z minulých úkolů (`--tasks`), „Only in <téma>“ zúží hledání na vybrané téma. Zásah z tématu vede na téma, zásah z úkolu na Tasks.
+- **Chyby**: workspace, jehož CLI selhalo, se v seznamu ukáže s důvodem — `node` chybí (`node_missing`), CLI neodpovědělo do 20 s
+  (`timeout`), jiná chyba (`failed`, první řádek stderr). Ostatní workspacy tím nejsou dotčené.
 
 ### 3.7 Environment (CL-54)
 
@@ -947,6 +977,24 @@ průchod, nástroj, tvar dotazu a druh mezery („3× fallback for find:name“)
 První průchod (historie) žádnou událost nevysílá, jen si zapamatuje, co už je přes rozpočet. Stejné události jdou do
 webhooků (`budget.breach`, `gap.new`).
 
+### 9.15a `GET /ui-api/v1/brain…` (CL-232; jen čtení)
+```ts
+interface BrainView { workspaces: { id: string; name: string; root: string; entries: number; bytes: number;
+  topics: { topic: string; entries: number; bytes: number; about: string }[];
+  errorCode?: 'node_missing' | 'timeout' | 'failed' | null; error?: string | null }[] }          // GET brain
+interface BrainTopicView { workspaceId: string; topic: string; bytes: number;
+  entries: { mark?: string | null; text: string; stamp?: string | null }[] }                      // GET brain/{id}/topic?name=
+interface BrainSearchView { workspaceId: string; terms: string[]; more: number;
+  hits: { where: string; topic?: string | null; task?: string | null; line?: number | null; text: string; hits: number }[] }
+                                                              // GET brain/{id}/search?q=&topic=&tasks=1&limit=
+```
+- Workspace je `id` (12 hex SHA-1 normalizované cesty) z registru daemonu (`workspaces.repos` a `workspaces.brains`, jen s `brain/brain.mjs`);
+  cestu z požadavku daemon nikdy nebere, neznámé `id` je `404`.
+- `brain` spustí v každém workspace `node brain/brain.mjs index --json` (cwd = kořen workspace, argumenty jako pole, bez shellu, limit 20 s);
+  starší CLI bez `--json`, které tiskne řádky `téma  počet  popis`, se přečte také (bez bajtů). Selhání jednoho workspace je v jeho `error*`, ne chyba odpovědi.
+- `search` předá termy (max 8, bez úvodních `-`), `--in <téma>`, `--tasks` a `--limit` (výchozí 50, max 200) jako samostatné argumenty; selhání CLI je `503 unavailable`.
+- `topic`: jméno tématu jsou segmenty `[A-Za-z0-9._-]` oddělené `/` (bez `..`), jinak `400`; chybějící soubor `404`; soubor nad 2 MB se neukáže.
+
 ### 9.16 Mapování obrazovka → endpoint
 
 | Obrazovka | Endpointy |
@@ -958,6 +1006,7 @@ webhooků (`budget.breach`, `gap.new`).
 | Index | `index` |
 | Runs, záložka Commands (CL-220) | `runs`, `runs/{id}`, `commands` |
 | Gaps | `gaps` |
+| Brain (CL-232) | `brain`, `brain/{id}/topic`, `brain/{id}/search` |
 | Environment | `environment` |
 | Accounts (CL-63) | `accounts` |
 | Settings | `settings`, `/status` |

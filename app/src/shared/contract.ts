@@ -382,6 +382,19 @@ export interface Accounts {
   }[];
 }
 
+// Brain (CL-232): the shared-memory topics of each workspace that has a brain, from the brain CLI.
+export interface BrainTopic { topic: string; entries: number; bytes: number; about: string }
+export interface BrainWorkspace {
+  id: string; name: string; root: string; topics: BrainTopic[]; entries: number; bytes: number;
+  /** Set when the index could not be read; `topics` is then empty. */
+  errorCode?: 'node_missing' | 'timeout' | 'failed' | null; error?: string | null;
+}
+export interface BrainView { workspaces: BrainWorkspace[] }
+export interface BrainEntry { mark?: string | null; text: string; stamp?: string | null }
+export interface BrainTopicView { workspaceId: string; topic: string; bytes: number; entries: BrainEntry[] }
+export interface BrainHit { where: string; topic?: string | null; task?: string | null; line?: number | null; text: string; hits: number }
+export interface BrainSearchView { workspaceId: string; terms: string[]; hits: BrainHit[]; more: number }
+
 /** Resource name → response type, for the typed client in the renderer. */
 export interface ResourceMap {
   nav: Nav;
@@ -401,6 +414,9 @@ export interface ResourceMap {
   commands: CommandsView;
   'runs/:id': RunDetail;
   'runs/:id/steps': StepPage;
+  brain: BrainView;
+  'brain/:id/topic': BrainTopicView;
+  'brain/:id/search': BrainSearchView;
   'status/history': ResourceSample[];
   workspaces: WorkspaceList;
   resources: ResourceReport;

@@ -41,6 +41,9 @@ const SPECS: Record<Resource, ResourceSpec> = {
   commands: ui('commands', ['since', 'role', 'top', 'sort']),
   'runs/:id': ui('runs/:id'),
   'runs/:id/steps': ui('runs/:id/steps', ['sort', 'limit', 'cursor']),
+  brain: ui('brain'),
+  'brain/:id/topic': ui('brain/:id/topic', ['name']),
+  'brain/:id/search': ui('brain/:id/search', ['q', 'topic', 'tasks', 'limit']),
   'status/history': daemon('/status/history'),
   workspaces: daemon('/workspaces', ['repo', 'size']),
   resources: daemon('/resources', ['stats']),
@@ -60,6 +63,7 @@ const MAX_VALUE = 200;
 
 /** How long the daemon may take: a reading that walks files (`size`) or asks Docker for each container (`stats`) takes seconds on a big repository. */
 export function timeoutMs(req: ApiRequest): number {
+  if (req.resource === 'brain' || req.resource === 'brain/:id/search') return 25_000;   // the daemon waits up to 20 s for node and brain.mjs
   return req.query?.size || req.query?.stats ? 120_000 : 5_000;
 }
 

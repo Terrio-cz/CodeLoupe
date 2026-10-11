@@ -44,6 +44,7 @@ class UiApi(
     private val settings = SettingsViews(config, catalog, trackers, trackerPollSec)
     private val environment = EnvironmentViews(secrets, config.secrets.rotationDays)
     private val accountViews = AccountViews(transcripts.accounts, transcripts, trackers, secrets, callLog)
+    private val brainViews = BrainViews(config.workspaces)
 
     suspend fun nav(gapsSince: String?): Nav {
         val since = gapsSince?.let { runCatching { Instant.parse(it) }.getOrNull() ?: throw UiApiException.badRequest("gapsSince must be an ISO instant") }
@@ -99,6 +100,12 @@ class UiApi(
         val max = limit?.let { it.toIntOrNull()?.takeIf { n -> n in 1..MAX_EVENTS } ?: throw UiApiException.badRequest("limit must be 1..$MAX_EVENTS") } ?: DEFAULT_EVENTS
         return feed.view(from, max)
     }
+
+    suspend fun brain(): BrainView = brainViews.list()
+
+    fun brainTopic(id: String, topic: String?): BrainTopicView = brainViews.topic(id, topic)
+
+    suspend fun brainSearch(id: String, q: String?, topics: List<String>, tasks: Boolean, limit: String?): BrainSearchView = brainViews.search(id, q, topics, tasks, limit)
 
     override fun close() = transcripts.close()
 

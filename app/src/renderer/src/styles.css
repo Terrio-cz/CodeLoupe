@@ -737,3 +737,24 @@ table.data.import-table td { vertical-align: top; height: auto; padding-top: 8px
 }
 .onboarding pre.mono { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); padding: 10px 12px; border-radius: var(--r-md); max-height: 320px; overflow: auto; box-shadow: inset 0 0 0 1px var(--border); }
 .onboarding pre.warn { box-shadow: inset 3px 0 0 var(--warning), inset 0 0 0 1px var(--border); }
+
+/* Brain: topic tree beside the entries or search results. */
+.brain-layout { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 2.4fr); gap: var(--s-4); align-items: start; }
+.brain-tree { list-style: none; margin: 0; padding: 6px 8px; }
+.brain-tree a, .brain-tree .group { display: flex; align-items: center; gap: var(--s-2); min-height: 28px; padding: 2px 8px; border-radius: 6px; color: var(--text); text-decoration: none; }
+.brain-tree .group { color: var(--text-muted); }
+.brain-tree a:hover { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+.brain-tree a[aria-current='true'] { background: var(--accent-weak); color: var(--accent-text); }
+.brain-tree a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.brain-tree .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brain-tree .count { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: var(--fs-sm); }
+.brain-about { margin: 0; padding: 10px 16px 0; font-size: var(--fs-sm); }
+.brain-entries { list-style: none; margin: 0; padding: 4px 0; }
+.brain-entries li { display: flex; gap: var(--s-2); align-items: baseline; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.brain-entries li:last-child { border-bottom: 0; }
+.brain-entries .text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.brain-entries .stamp { font-size: var(--fs-sm); white-space: nowrap; }
+.brain-entries .where { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brain-entries .mark { width: 1.2em; font-family: var(--mono); color: var(--text-muted); }
+.brain-entries .mark-warn { color: var(--serious-text); }
+@media (max-width: 900px) { .brain-layout { grid-template-columns: minmax(0, 1fr); } }
