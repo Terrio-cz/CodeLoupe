@@ -93,6 +93,7 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
                 "cw1h INTEGER NOT NULL, cache_read INTEGER NOT NULL, output INTEGER NOT NULL, cost INTEGER NOT NULL, peak INTEGER NOT NULL, " +
                 "tool_calls INTEGER NOT NULL DEFAULT 0, tool_errors INTEGER NOT NULL DEFAULT 0, tool_ms INTEGER NOT NULL DEFAULT 0, " +
                 "result_attr INTEGER NOT NULL DEFAULT 0, share INTEGER NOT NULL DEFAULT 0)",
+            "CREATE INDEX IF NOT EXISTS files_session ON files(session)",
             "CREATE INDEX IF NOT EXISTS runs_start ON runs(start_ms)",
             "CREATE INDEX IF NOT EXISTS runs_cost ON runs(cost)",
             "CREATE INDEX IF NOT EXISTS runs_turns ON runs(turns)",
@@ -118,6 +119,7 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
             "CREATE TABLE IF NOT EXISTS usage_snapshots (path TEXT NOT NULL, at_ms INTEGER NOT NULL, kind TEXT NOT NULL, scope TEXT NOT NULL, grp TEXT, percent REAL, resets_ms INTEGER, " +
                 "severity TEXT, active INTEGER, session TEXT NOT NULL, account TEXT, identity TEXT, PRIMARY KEY (path, at_ms, kind, scope)) WITHOUT ROWID",
             "CREATE INDEX IF NOT EXISTS usage_snapshots_at ON usage_snapshots(at_ms)",
+            "CREATE INDEX IF NOT EXISTS usage_snapshots_session ON usage_snapshots(session)",
             "CREATE INDEX IF NOT EXISTS usage_snapshots_series ON usage_snapshots(account, kind, scope, at_ms)",
             // One row per day or run that went over a budget: the event for it is sent once.
             "CREATE TABLE IF NOT EXISTS breaches (key TEXT PRIMARY KEY, at TEXT NOT NULL)",

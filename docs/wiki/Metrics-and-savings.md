@@ -32,6 +32,7 @@ ones), `defaultCategories` (false = only yours), `prices` (see Money) and `inges
 
 `codeloupe metrics limits [--since 30d] [--until] [--account <id>|unknown] [--latest] [--max n] [--format jsonl|csv|json]` exports the `/usage` reports of agent sessions from the transcript database
 (5-hour, weekly and weekly-per-model percent, reset time, severity, session, account), so a limit calibration can be re-run without reading the transcripts. See [In the desktop app](Desktop-app#accounts).
+Two logins sharing `~/.claude` show up as `identity-<fingerprint>` accounts (the plugin's session-start hook stamps each session with its login); `--account identity-<fingerprint>` and `--latest` take them like any account, and `unknown` leaves them out.
 
 ## Which commands agents use
 

@@ -14,10 +14,12 @@ import java.nio.file.Path
 data class AccountsFile(val version: Int = 1, val claude: List<Claude> = emptyList(), val youtrack: List<Youtrack> = emptyList()) {
     /**
      * One Claude Code account: its config directory (`CLAUDE_CONFIG_DIR`), the name shown for it, and optionally the name of the secret
-     * that holds its long-lived token (CL-210); the launcher of unattended runs reads that secret, CodeLoupe never does.
+     * that holds its long-lived token (CL-210); the launcher of unattended runs reads that secret, CodeLoupe never does. [identity] is the
+     * fingerprint of the account uuid (as `identity-<fingerprint>` in the limits export): the sessions that carry it belong to this account
+     * even when it shares its config directory with another login (CL-226).
      */
     @Serializable
-    data class Claude(val id: String, val label: String, val configDir: String, val tokenSecret: String? = null)
+    data class Claude(val id: String, val label: String, val configDir: String, val tokenSecret: String? = null, val identity: String? = null)
 
     @Serializable
     data class Youtrack(val id: String, val label: String? = null, val url: String, val projects: List<String> = emptyList(), val token: String)

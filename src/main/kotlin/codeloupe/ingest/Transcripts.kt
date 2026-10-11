@@ -1,6 +1,7 @@
 package codeloupe.ingest
 
 import codeloupe.accounts.Accounts
+import codeloupe.accounts.SessionIdentities
 import codeloupe.commands.CommandAnalyzer
 import codeloupe.commands.CommandSource
 import codeloupe.config.Config
@@ -32,6 +33,7 @@ class Transcripts(
     val ingest = TranscriptIngest(
         { projectDirs(config, accounts) }, db, MetricsSetup(config).categorizer(),
         BudgetWatch(db, queries, config.budgets, emit), GapAnnouncer(emit), scope, log, config.metrics.ingestTtlMs, accounts = accounts::claude,
+        identities = SessionIdentities(config.home.resolve(SessionIdentities.FILE)),
     )
 
     suspend fun fresh() = ingest.refresh(waitMs)

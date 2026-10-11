@@ -903,11 +903,12 @@ interface LimitSnapshot {
   at: Iso; kind: 'session' | 'weekly_all' | 'weekly_scoped' | string; group: string | null; scope: string | null;   // scope = model u weekly_scoped
   percent: number | null; resetsAt: Iso | null; severity: string | null; active: boolean | null;
   session: string;              // session Claude Code, která spustila /usage
-  account: string | null;       // účet, jehož config dir drží transcript; null = nelze určit (nikdy odhad)
-  identity: string | null;      // otisk uuid účtu, který transcript sám uvádí (jen některá sezení); jinak null
+  account: string | null;       // účet sezení: pojmenovaný v accounts.json podle identity, jinak účet, jehož config dir drží transcript, jinak `identity-<otisk>`; null = nelze určit (nikdy odhad)
+  identity: string | null;      // otisk uuid účtu (12 hex): z hooku SessionStart (`<home>/session-identities.jsonl`) nebo z řádků, kterými transcript účet sám uvádí; jinak null
 }
 ```
-`account=unknown` = snapshoty bez určeného účtu. Řádky žijí v `usage_snapshots` (`transcripts.db`), nemaže je `clear()` ani smazání transcriptu.
+Sdílí-li dva loginy `~/.claude`, `account` je `identity-<otisk>` (i pro implicitní `default`), dokud otisk nepojmenuje `"identity"` u položky `claude` v `accounts.json`; `account=identity-<otisk>` a `latest` s tím pracují jako s kterýmkoli účtem.
+`account=unknown` = snapshoty bez určeného účtu a bez identity. Řádky žijí v `usage_snapshots` (`transcripts.db`), nemaže je `clear()` ani smazání transcriptu.
 
 ### 9.14 `GET /ui-api/v1/settings` (efektivní konfigurace daemonu, bez tajemství)
 ```ts

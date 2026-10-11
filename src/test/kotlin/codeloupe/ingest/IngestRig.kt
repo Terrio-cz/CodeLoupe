@@ -2,6 +2,7 @@ package codeloupe.ingest
 
 import codeloupe.TestRepos
 import codeloupe.accounts.ClaudeAccount
+import codeloupe.accounts.SessionIdentities
 import codeloupe.config.BudgetsConfig
 import codeloupe.metrics.Categorizer
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +24,7 @@ class IngestRig(
     val dbFile: Path = root.resolve("transcripts.db"),
     val project: Path = root.resolve("p"),
     accounts: List<ClaudeAccount> = emptyList(),
+    identities: SessionIdentities? = null,
 ) : AutoCloseable {
     val events = CopyOnWriteArrayList<Pair<String, JsonObject>>()
     val db = TranscriptDb(dbFile)
@@ -31,7 +33,7 @@ class IngestRig(
     val ingest = TranscriptIngest(
         { listOf(project) }, db, categorizer,
         BudgetWatch(db, queries, budgets, { type, data -> events += type to data }, ZoneOffset.UTC, Clock.fixed(now, ZoneOffset.UTC)),
-        GapAnnouncer { type, data -> events += type to data }, scope, ttlMs = 0, accounts = { accounts },
+        GapAnnouncer { type, data -> events += type to data }, scope, ttlMs = 0, accounts = { accounts }, identities = identities,
     )
 
     fun runs(sort: RunSort = RunSort.START): List<RunRecord> = queries.runs(0, null, null, sort, 0, 500).items

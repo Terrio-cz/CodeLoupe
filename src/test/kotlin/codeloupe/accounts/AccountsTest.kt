@@ -58,6 +58,14 @@ class AccountsTest {
     }
 
     @Test
+    fun `an account may name the fingerprint of its login, as printed by the export or bare, and a malformed one is ignored`() {
+        home.resolve(AccountsFile.FILE).writeText(
+            """{"version":1,"claude":[{"id":"a","label":"A","configDir":"C:/a","identity":"identity-AB12CD34EF56"},{"id":"b","label":"B","configDir":"C:/b","identity":"0123456789ab"},{"id":"c","label":"C","configDir":"C:/c","identity":"a-uuid-is-not-a-fingerprint"}],"youtrack":[]}""",
+        )
+        assertEquals(listOf("ab12cd34ef56", "0123456789ab", null), accounts.claude().map { it.identity })
+    }
+
+    @Test
     fun `a damaged file is no accounts, not a failure`() {
         home.resolve(AccountsFile.FILE).writeText("{ not json")
         assertEquals(AccountsFile(), AccountsFile.read(home))

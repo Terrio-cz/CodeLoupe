@@ -1,7 +1,9 @@
 package codeloupe.ingest
 
 import codeloupe.JsonFormat
+import codeloupe.accounts.AccountResolver
 import codeloupe.accounts.ClaudeAccount
+import codeloupe.accounts.SessionIdentities
 import codeloupe.accounts.TranscriptAccounts
 import codeloupe.metrics.Categorizer
 import codeloupe.metrics.ParserSnapshot
@@ -38,11 +40,15 @@ class TranscriptIngest(
     private val ttlMs: Long = 10_000,
     private val now: () -> Long = System::currentTimeMillis,
     private val accounts: () -> List<ClaudeAccount> = { emptyList() },
+    private val identities: SessionIdentities? = null,
 ) {
     private val writer = RunWriter(db, categorizer)
     private var files: MutableMap<String, FileState>? = null
     private var job: Job? = null
     private var attribution = TranscriptAccounts(emptyList())
+    private var resolver = AccountResolver(emptyList())
+    private var stamps: Map<String, String> = emptyMap()
+    private var attributed = AccountBackfill.Done()
     private val jobLock = Any()
     private val passLock = Any()
     @Volatile
@@ -86,7 +92,10 @@ class TranscriptIngest(
     private fun run() {
         try {
             val known = files ?: writer.loadFiles().also { files = it }
-            attribution = TranscriptAccounts(accounts())
+            val listed = accounts()
+            attribution = TranscriptAccounts(listed)
+            resolver = AccountResolver(listed)
+            stamps = identities?.all().orEmpty()
             // Runs read by an older parser hold the first-line output of each message: they are read again, without announcing their gaps as new.
             val reparse = db.meta(PARSER) != PARSER_VERSION
             if (reparse || db.meta(CATEGORIES) != categorizer.fingerprint) {
@@ -97,6 +106,7 @@ class TranscriptIngest(
                     db.setMeta(it, PARSER, PARSER_VERSION)
                 }
             }
+            attributed = AccountBackfill.run(db, stamps, resolver, attributed, log)
             val todo = TranscriptScanner.scan(dirs()).filter { f -> known[f.key].let { it == null || it.size != f.size || it.mtime != f.mtime } }.sortedByDescending { it.mtime }
             status = IngestStatus(true, 0, todo.size, status.at)
             val added = ArrayList<GapRecord>()
@@ -146,7 +156,9 @@ class TranscriptIngest(
         }
         val (results, usages) = parser.drain()
         val ter = metaTer ?: TER.find(parser.firstPrompt)?.value
-        val delta = FileDelta(f, ter, parser, results, usages, parser.drainLimits(), consumed, TailHash.at(f.path, consumed), parser.drainUsageSnapshots(), attribution.of(f.path), parser.identity)
+        // The login the hook stamped at the start of the session serves a transcript that never names its own account.
+        val identity = parser.identity ?: stamps[f.session]
+        val delta = FileDelta(f, ter, parser, results, usages, parser.drainLimits(), consumed, TailHash.at(f.path, consumed), parser.drainUsageSnapshots(), resolver.resolve(attribution.of(f.path), identity), identity)
         val added = writer.write(delta)
         known[f.key] = FileState(f.size, f.mtime, consumed, ter, JsonFormat.json.encodeToString(ParserSnapshot.serializer(), parser.snapshot()), delta.tail)
         return added

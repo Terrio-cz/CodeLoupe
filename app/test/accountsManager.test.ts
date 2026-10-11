@@ -56,20 +56,20 @@ describe('Claude accounts', () => {
     ]);
   });
 
-  it('keeps the token secret name of an account through a rename, and a retired `default` key is dropped on the next write (CL-210, CL-224)', async () => {
+  it('keeps the token secret name and the identity of an account through a rename, and a retired `default` key is dropped on the next write (CL-210, CL-224)', async () => {
     const t = setup();
     fs.writeFileSync(path.join(home, 'accounts.json'), JSON.stringify({
       version: 1,
       claude: [
         { id: 'a', label: 'A', configDir: dir('claude-a'), default: false, tokenSecret: 'CLAUDE_TOKEN_A' },
-        { id: 'b', label: 'B', configDir: dir('claude-b'), default: true },
+        { id: 'b', label: 'B', configDir: dir('claude-b'), default: true, identity: 'ab12cd34ef56' },
       ],
       youtrack: [],
     }));
     expect((await t.manager.claudeRename('a', 'Renamed')).ok).toBe(true);
     expect(readAccounts(home).claude).toEqual([
       { id: 'a', label: 'Renamed', configDir: dir('claude-a'), tokenSecret: 'CLAUDE_TOKEN_A' },
-      { id: 'b', label: 'B', configDir: dir('claude-b') },
+      { id: 'b', label: 'B', configDir: dir('claude-b'), identity: 'ab12cd34ef56' },
     ]);
     expect(fs.readFileSync(path.join(home, 'accounts.json'), 'utf8')).not.toContain('"default":');
   });

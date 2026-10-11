@@ -81,6 +81,15 @@ indexed (it never starts a build), and says nothing otherwise.
 `codeloupe metrics orientation --since 2026-10-01` counts `ls`/`find`/`tree`/`Glob` calls in the first 8 turns of sessions, with and without the
 hook's context in the transcript, to show whether the map pays for itself. `hooks.jsonl` records each start (kind, tokens, milliseconds; no text).
 
+## Account stamp
+
+The `SessionStart` and `SubagentStart` hooks also note which Claude login runs the session, so `/usage` snapshots and runs of two logins that share `~/.claude` can be told apart
+(`codeloupe metrics limits`, [In the desktop app](Desktop-app#accounts)). The daemon takes the config directory from the `transcript_path` of the hook input, reads the account
+uuid of the `.claude.json` there (`~/.claude.json` for the default directory) and appends `session id -> 12-character fingerprint of the uuid` to `<home>/session-identities.jsonl`.
+Neither the uuid nor the e-mail is written anywhere. The work is queued on a background thread, so the hook answers at once; any failure leaves the session without a stamp and
+never touches the session. It needs no `sessionStart` setting: `hooks.stampAccount` (default `true`) turns it off alone, `hooks.enabled: false` and `CODELOUPE_HOOKS=off` turn it off with every other hook.
+A subagent belongs to the session that started it and adds a stamp only for a session the daemon has not seen start.
+
 ## Session weight
 
 A long session is expensive to continue: every turn reads the whole context again. The `UserPromptSubmit` and `Stop` hooks ask the daemon
