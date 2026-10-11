@@ -21,6 +21,9 @@ codeloupe job status [id]  ·  codeloupe job cancel <id>
   hard cap), then go together. A daemon restart, a forced stop (the write-ahead log is replayed) and an update keep the list; a record
   this version cannot read is skipped, not fatal. At start the daemon logs `jobs: N records kept`, and says so when `jobs/` holds
   more logs than there are records (the records were removed from outside).
+- **What the Jobs screen shows**: only jobs the daemon runs (`GET /jobs`, the same list as `job status`). A wrapper that falls
+  back to running the command itself when the daemon does not answer (a window opened before `CODELOUPE_PORT` was set, a
+  daemon that is down) leaves no record there; such a wrapper should print that it fell back and count the fallbacks.
 - **Slots**: `--slot <name>` holds a named resource while running; a busy slot queues the job in the daemon (first come,
   first served). `config.json` `slots` sets capacities (`{ "gradle-test": 2 }`); a slot not listed holds one job.
 - **Policy**: commands run by the daemon never pass the agent host's guard hooks, so every job — follow-ups included,
