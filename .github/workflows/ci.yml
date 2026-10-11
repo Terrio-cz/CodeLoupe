@@ -92,7 +92,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+          # Three forks on the three cores of a macOS runner took 310 to 400 s, two forks 600 to 690 s. Four forks on the four cores
+          # of a Linux or Windows runner did not help (393 and 599 s against 330 to 400 and 660) and starved the timing tests.
           - os: macos-latest
+            forks: 3
           - os: windows-latest
             shard: 1
             shards: 2
@@ -100,6 +103,7 @@ jobs:
             shard: 2
             shards: 2
     env:
+      TEST_FORKS: ${{ matrix.forks }}
       TEST_SHARD: ${{ matrix.shards && format('{0}/{1}', matrix.shard, matrix.shards) || '' }}
       REPORT_SUFFIX: ${{ matrix.shard && format('-shard-{0}', matrix.shard) || '' }}
     steps:
@@ -130,7 +134,7 @@ jobs:
         if: needs.changes.outputs.code != 'false'
 
       - name: Test
-        run: ./gradlew test --console=plain --no-daemon ${TEST_SHARD:+-PtestShard=$TEST_SHARD}
+        run: ./gradlew test --console=plain --no-daemon ${TEST_FORKS:+-PtestForks=$TEST_FORKS} ${TEST_SHARD:+-PtestShard=$TEST_SHARD}
         shell: bash
         if: needs.changes.outputs.code != 'false'
 
