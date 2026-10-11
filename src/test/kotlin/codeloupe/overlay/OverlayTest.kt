@@ -101,6 +101,8 @@ class OverlayTest {
         assertContains(find(registry, feature, "Beta"), "class Beta")
         assertContains(find(registry, feature, "Alpha.one"), "fun one")
         assertNone(find(registry, feature, "Gen1"), "not on the feature branch")
+        // The heavy lane takes the job a moment after the query that found the base moved has answered.
+        waitFor("the sync is launched") { launcher.syncs.get() == 1 }
         assertEquals(1, launcher.syncs.get())
         assertTrue(queue.snapshot().heavy.running.orEmpty().startsWith("sync:"), queue.snapshot().toString())
 
