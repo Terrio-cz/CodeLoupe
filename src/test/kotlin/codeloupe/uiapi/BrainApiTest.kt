@@ -46,6 +46,7 @@ class BrainApiTest {
         workspace.resolve("brain/brain.mjs").writeText(FAKE_BRAIN)
         workspace.resolve("brain/facts/db.md").writeText("# db\nDurable facts.\n\n+ shared DB is postgres <!-- 2026-09-23 -->\n! never run DDL there\n")
         workspace.resolve("brain/facts/review-patterns/sql.md").writeText("+ use anti-join\n")
+        workspace.resolve("brain/facts/old.md").writeText("+ read from the file <!-- 2026-09-01 -->\n")
         broken.resolve("brain").createDirectories()
         broken.resolve("brain/brain.mjs").writeText("console.error('boom: index is corrupt'); process.exit(3);\n")
         daemon = Daemon.start(
@@ -88,13 +89,15 @@ class BrainApiTest {
     }
 
     @Test
-    fun `a topic is shown by id and name, with marks and stamps, and cannot leave the facts directory`() {
+    fun `a topic is shown by id and name, with marks, dates and the engine metadata, and cannot leave the facts directory`() {
         val id = workspaces().first()["id"]!!.jsonPrimitive.content
         val entries = json("/ui-api/v1/brain/$id/topic?name=db")["entries"]!!.jsonArray.map { it.jsonObject }
         assertEquals(2, entries.size)
         assertEquals("shared DB is postgres", entries[0]["text"]!!.jsonPrimitive.content)
         assertEquals("+", entries[0]["mark"]!!.jsonPrimitive.content)
         assertEquals("2026-09-23", entries[0]["stamp"]!!.jsonPrimitive.content)
+        assertEquals("f-aaaaaaaa", entries[0]["id"]!!.jsonPrimitive.content)
+        assertEquals("TER-5", entries[0]["task"]!!.jsonPrimitive.content)
         assertEquals("!", entries[1]["mark"]!!.jsonPrimitive.content)
         assertEquals(1, json("/ui-api/v1/brain/$id/topic?name=${enc("review-patterns/sql")}")["entries"]!!.jsonArray.size)
         for (name in listOf("../brain", "..%2F..%2Fsecret", "db.md/..", "/etc/passwd", "C:%2Fx", "a%5Cb")) {
@@ -102,6 +105,15 @@ class BrainApiTest {
         }
         assertEquals(404, get("/ui-api/v1/brain/$id/topic?name=nothing").statusCode())
         assertEquals(400, get("/ui-api/v1/brain/$id/topic").statusCode())
+    }
+
+    @Test
+    fun `an engine that predates show is read from the facts file, without metadata`() {
+        val id = workspaces().first()["id"]!!.jsonPrimitive.content
+        val entries = json("/ui-api/v1/brain/$id/topic?name=old")["entries"]!!.jsonArray.map { it.jsonObject }
+        assertEquals("read from the file", entries.single()["text"]!!.jsonPrimitive.content)
+        assertEquals("2026-09-01", entries.single()["stamp"]!!.jsonPrimitive.content)
+        assertTrue(entries.single()["id"] is kotlinx.serialization.json.JsonNull)
     }
 
     @Test
@@ -159,6 +171,13 @@ class BrainApiTest {
               console.log(JSON.stringify({ terms: a, hits: [
                 { where: 'facts/db.md:3', topic: 'db', line: 3, text: 'shared DB', hits: 2 },
                 { where: 'tasks/TER-5.md:40', task: 'TER-5', line: 40, text: 'finding', hits: 1 } ], more: 1 }));
+            } else if (a[0] === 'show') {
+              if (a[1] === 'old') process.exit(2);
+              if (a[1] === 'nothing') { console.error('no facts topic nothing; node brain/brain.mjs index lists them'); process.exit(1); }
+              const mk = (text, marker, id, task, at) => ({ where: 'facts/' + a[1] + '.md:1', topic: a[1], text, marker, id, kind: 'fact', task, at, anchors: [], superseded: false });
+              console.log(JSON.stringify({ topic: a[1], entries: a[1] === 'db'
+                ? [mk('+ shared DB is postgres', '+', 'f-aaaaaaaa', 'TER-5', '2026-09-23T10:00'), mk('! never run DDL there', '!', 'f-bbbbbbbb', null, '2026-09-24')]
+                : [mk('+ use anti-join', '+', 'f-cccccccc', null, null)] }));
             } else { process.exit(2); }
         """.trimIndent()
     }

@@ -19,11 +19,20 @@ internal class BrainViews(private val config: WorkspacesConfig, private val cli:
         BrainView(BrainRoot.all(config).map { root -> async { workspace(root) } }.map { it.await() })
     }
 
-    fun topic(id: String, topic: String?): BrainTopicView {
+    /**
+     * The topic with every entry's metadata, from `brain.mjs show <topic> --json` (subtopics included). An engine that predates `show` falls back to reading the
+     * facts file, which has marks and stamps but no ids or tasks.
+     */
+    suspend fun topic(id: String, topic: String?): BrainTopicView {
         val root = root(id)
         val name = topic?.takeIf { BrainTopicName.valid(it) } ?: throw UiApiException.badRequest("topic must be a topic name of the index")
-        val found = BrainFacts.read(root.path, name) ?: throw UiApiException.notFound("no topic $name in ${root.name}")
-        return BrainTopicView(id, name, found.bytes, found.entries.map { BrainTopicView.Entry(it.mark, it.text, it.stamp) })
+        return try {
+            BrainTopicParser.parse(id, name, cli.run(root.path, listOf("show", name, "--json")))
+        } catch (e: BrainException) {
+            if ("no facts topic" in e.message.orEmpty()) throw UiApiException.notFound("no topic $name in ${root.name}")
+            val found = BrainFacts.read(root.path, name) ?: throw UiApiException.notFound("no topic $name in ${root.name}")
+            BrainTopicView(id, name, found.bytes, found.entries.map { BrainTopicView.Entry(it.mark, it.text, it.stamp) })
+        }
     }
 
     suspend fun search(id: String, q: String?, topics: List<String>, tasks: Boolean, limit: String?): BrainSearchView {

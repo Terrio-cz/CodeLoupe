@@ -390,7 +390,11 @@ export interface BrainWorkspace {
   errorCode?: 'node_missing' | 'timeout' | 'failed' | null; error?: string | null;
 }
 export interface BrainView { workspaces: BrainWorkspace[] }
-export interface BrainEntry { mark?: string | null; text: string; stamp?: string | null }
+export interface BrainEntry {
+  mark?: string | null; text: string; stamp?: string | null;
+  /** From the entry metadata (`brain.mjs show --json`); absent on an older engine. */
+  id?: string | null; kind?: string | null; task?: string | null; anchors?: string[]; superseded?: boolean;
+}
 export interface BrainTopicView { workspaceId: string; topic: string; bytes: number; entries: BrainEntry[] }
 export interface BrainHit { where: string; topic?: string | null; task?: string | null; line?: number | null; text: string; hits: number }
 export interface BrainSearchView { workspaceId: string; terms: string[]; hits: BrainHit[]; more: number }

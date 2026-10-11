@@ -103,7 +103,7 @@ class UiApi(
 
     suspend fun brain(): BrainView = brainViews.list()
 
-    fun brainTopic(id: String, topic: String?): BrainTopicView = brainViews.topic(id, topic)
+    suspend fun brainTopic(id: String, topic: String?): BrainTopicView = brainViews.topic(id, topic)
 
     suspend fun brainSearch(id: String, q: String?, topics: List<String>, tasks: Boolean, limit: String?): BrainSearchView = brainViews.search(id, q, topics, tasks, limit)
 

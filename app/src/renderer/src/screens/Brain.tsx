@@ -99,7 +99,7 @@ function TopicEntries({ ws, topic }: { ws: BrainWorkspace; topic: string | null 
               <li key={i}>
                 {e.mark && <span className={`mark mark-${e.mark === '!' ? 'warn' : 'plain'}`} title={MARK_LABEL[e.mark]}><span aria-hidden="true">{e.mark}</span><span className="sr-only">{MARK_LABEL[e.mark] ?? 'entry'}</span></span>}
                 <span className="text">{e.text}</span>
-                {e.stamp && <span className="stamp muted">{e.stamp}</span>}
+                {(e.task || e.stamp) && <span className="stamp muted" title={e.id ? `${e.id}${e.anchors?.length ? ` · ${e.anchors.join(' ')}` : ''}` : undefined}>{[e.task, e.stamp].filter(Boolean).join(' · ')}</span>}
               </li>
             ))}
           </ol>
