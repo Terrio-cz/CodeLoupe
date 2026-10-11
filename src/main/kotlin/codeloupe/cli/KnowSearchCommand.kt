@@ -13,7 +13,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class KnowSearchCommand : KnowSubcommand("search") {
-    private val question by argument(help = "Words or a question").multiple(required = true)
+    private val question by argument(help = "Words or a question; may be left out with --anchor").multiple()
+    private val anchor by option("--anchor", help = "Only facts anchored to this code: Foo.kt, src/Foo.kt, Foo, Foo.parse or src/Foo.kt#Foo.parse")
     private val scope by option("--scope", help = "Only these scopes, comma-separated: repo, area:docker, file:src/Foo.kt, symbol:Foo.bar, task:TER-12; a bare `area` takes every area")
     private val kind by option("--kind", help = "Only these kinds, comma-separated: decision, pattern, blocker, environment, other")
     private val limit by option("--limit", help = "At most this many facts").int().default(Know.DEFAULT_LIMIT)
@@ -22,8 +23,8 @@ class KnowSearchCommand : KnowSubcommand("search") {
     override fun help(context: Context) = "The best facts for a question, one line each with its id; a fact whose anchored code changed says STALE."
 
     override fun run() {
-        val path = "/know/search?q=${encode(question.joinToString(" "))}&limit=$limit" +
-            scope?.let { "&scope=${encode(it)}" }.orEmpty() + kind?.let { "&kind=${encode(it)}" }.orEmpty() + if (all) "&all=1" else ""
+        val path = "/know/search?q=${encode(question.joinToString(" "))}&limit=$limit" + scope?.let { "&scope=${encode(it)}" }.orEmpty() +
+            kind?.let { "&kind=${encode(it)}" }.orEmpty() + anchor?.let { "&anchor=${encode(it)}" }.orEmpty() + if (all) "&all=1" else ""
         val hits = call("GET", path).second.getValue("hits").jsonArray
         if (hits.isEmpty()) echo("no fact matches") else hits.forEach { echo(it.jsonObject.getValue("line").jsonPrimitive.content) }
     }

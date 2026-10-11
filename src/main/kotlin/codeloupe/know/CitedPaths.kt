@@ -2,7 +2,7 @@ package codeloupe.know
 
 /** Repository paths a line of text cites (`app/src/Foo.kt:88`, `docs/plan.md`): relative, with a directory and a known extension. */
 object CitedPaths {
-    private const val EXTENSIONS = "kts|kt|java|md|mjs|json|jsonl|js|tsx|ts|ya?ml|sql|properties|gradle|ps1|sh|toml|xml|bak"
+    internal const val EXTENSIONS = "kts|kt|java|md|mjs|json|jsonl|js|tsx|ts|ya?ml|sql|properties|gradle|ps1|sh|toml|xml|bak"
     private val CITED = Regex("""(?<![\w@:/.\\-])((?:[\w.-]+/)+[\w.-]*\w\.(?:$EXTENSIONS)(?!\w))(?::\d+(?:-\d+)?)?""")
     private val EXTENSION = Regex("""\.(?:$EXTENSIONS)$""")
     private val LINE_SUFFIX = Regex(""":\d+(?:-\d+)?$""")
