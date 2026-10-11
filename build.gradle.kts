@@ -95,7 +95,7 @@ tasks.test {
     useJUnitPlatform()
     // Test classes run in parallel JVMs (CL-195): two on a 4 vCPU runner, never more, so a machine with many agent windows
     // is not flooded, and timing-sensitive tests (IngestScaleTest, SessionStartDaemonTest) are not starved on a runner: with four
-    // forks on four cores they failed on one run in three. Every test works in its own temporary directory and on a free port.
+    // forks on four cores a timing test failed on three of six runs. Every test works in its own temporary directory and on a free port.
     // -PtestForks=N overrides.
     maxParallelForks = (findProperty("testForks") as String?)?.toInt() ?: (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
     jvmArgs("--enable-native-access=ALL-UNNAMED")

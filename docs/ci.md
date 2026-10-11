@@ -67,26 +67,57 @@ then `update test (windows-latest)` at 11 minutes; the bundles take 5 to 7.5 min
   name), so those jobs start and skip their steps, which takes a runner start (about half a minute) instead of the run.
   `tools` always runs; it checks the wiki links and the workflows. Tests, the build, the workflows and the plugin count as
   code.
-- **The update test also skips tests and the plugin.** A push that only changes `src/test/`, `app/test/` or `plugin/` (besides
-  documentation) cannot change what an update does. It is not a required check, so the whole job is skipped.
+- **The update test runs only when something it exercises changed.** It installs real installers and follows the update
+  from one build to the next, so it answers to `app/` (the updater, the installer configuration), the build (`build.gradle.kts`,
+  `gradle/bundle.gradle.kts`, the workflows) and the scripts of the test itself (`tools/update-test.mjs`, `feed-check`,
+  `break-bundle`, `no-java-env`, `daemon-token`). A push that besides documentation only changes Kotlin (`src/`), `app/test/`,
+  `plugin/`, `gradle/test-*.gradle.kts` or another script in `tools/` skips it. It is not a required check, so the whole job is
+  skipped. What Kotlin can still break in an installed build (the daemon does not start) is caught by `bundle` and
+  `installer smoke`, which start the daemon of every bundle and installer; the update test builds both of its versions from
+  the same commit, so it does not compare two Kotlin versions.
+- **Windows tests on two runners.** `gradle/test-shards.gradle.kts` runs a share of the classes for `-PtestShard=1/2`; a class
+  belongs to a share by its name (the 15 slowest are placed by hand, alternately, and `TestShardsTest` fails when one of them
+  no longer exists). The first share keeps the name `test (windows-latest)` that the ruleset requires, the second is
+  `test (windows-latest, shard 2)`; **add the second to the required checks**, because a red second share fails the run but not
+  the required check. macOS is not split: macOS runners are scarce (a run that asked for a sixth at once waited six minutes
+  for a free one), so one more job there costs more than it gains.
+- **Forks per runner.** Two forks on a hosted Linux or Windows runner (4 vCPU) and three on a macOS runner (3 cores). Four
+  forks on the four cores were tried and removed: Windows 599 s against 660 s with two, Linux 393 s against 330 to 400 s, the
+  summed class time grew from 900 to 1566 s, and `IngestScaleTest`, `SessionStartDaemonTest` and `HooksDaemonTest` failed on
+  three of the six runs. Three forks on macOS took 310 to 400 s against 600 to 690 s with two.
+- **Gradle gets 2 GB** (`GRADLE_OPTS=-Dorg.gradle.jvmargs=-Xmx2g` for the whole workflow) instead of the 1 GB of
+  `gradle.properties`; the Kotlin compiler daemon inherits it.
+- **Flaky tests found on the way** (all test code): `PostEditSampleTest` read a source saved as Latin-1
+  (`BudgetsConfig.kt`); the hook script tests wrote to a script that had already exited (`Process.feed`); the session start
+  test counted the `was:` line as a caller line; `IngestScaleTest` judged one sample of a 200 ms read (now the fastest of three).
 - **Unknown means everything.** A new branch, a tag, a force push that dropped the base, a scheduled run, or a failure of the
   `changes` job itself runs every step: the answer is skipped only when it is known to be `false`.
 
-Trial run 1 (branch CL-195, run 38070132858; a new branch, so every step ran): 12 minutes, all green.
+A documentation-only push (branch CL-195, CI run 38071077346 and CodeQL run 38071077352): CI 30 s, CodeQL 10 s, both green.
+Every required job reported with its steps skipped, 7 to 14 s each; `update test`, `clipboard`, `libsecret`, `manifests` and
+`installer smoke` were skipped whole. Against 14 minutes for the same push before.
 
-| Job | Before (run 38054115886) | Now |
-|---|---|---|
-| test (windows-latest) | 868 s | 465 s |
-| test (ubuntu-latest) | 425 s | 340 s |
-| test (macos-latest) | 445 s | 479 s |
-| update test (windows-latest) | 655 s | 634 s |
-| bundle (macos-15-intel) | 437 s | 650 s |
+### Trial runs of the final setup (branch CL-195, 2026-10-11)
 
-The Windows test is 46 % shorter. The run is now bounded by `bundle (macos-15-intel)` and the installer smoke test after it
-(650 s + 84 s), not by the tests; the Intel runner varies by minutes between runs. Further gains would come from the macOS
-Intel bundle and from the update test, which is unchanged for a push that touches code.
+All green. "Kotlin only" means the update test was skipped as a whole job; seconds are the job time.
 
-Trial run 2 (same branch, a push that only changed `docs/ci.md`, CI run 38071077346 and CodeQL run 38071077352): CI 30 s,
-CodeQL 10 s, both green. Every required job reported (`tools`, `test` on three systems, `app`, `bundle`, both analyses) with
-its steps skipped, 7 to 14 s each; `update test`, `clipboard`, `libsecret`, `manifests` and `installer smoke` were skipped
-whole. Against 14 minutes for the same push before.
+| Run | Push | Update test | Wall | test windows 1 / 2 | test linux | test macOS | bundle Intel |
+|---|---|---|---|---|---|---|---|
+| 38158922783 | Kotlin and scripts | skipped | 615 s | 484 / 461 | 450 | 599 (2 forks) | 474 |
+| 38175517043 | workflow comment | 637 s | 802 s | 510 / 454 | 313 | 635 (2 forks) | 677 |
+| 38176508764 | Kotlin only | skipped | 674 s | 516 / 414 | 419 | 656 (2 forks) | 504 |
+| 38177390315 | workflow, macOS forks | 616 s | 644 s | 512 / 503 | 439 | 403 | 546 |
+| 38178234939 | Kotlin only | skipped | 668 s | 480 / 350 | 394 | 394 | 425 |
+
+Five green runs in a row; the last three are the "three in a row" of the criterion. Medians of those three: the Windows
+`test` job 512 s (before, with two forks in one job: 708 s median of five main runs, 766 s in the run that set the target),
+the second Windows share 414 s, the Linux job 419 s, the whole run 668 s (before: 752 s median of the four green main runs of 2026-10-11, 12.5
+minutes, and 14 minutes over the 23 runs of 2026-10-09 and 10). In the last run the Intel runner started 164 s after the
+push; without that wait the run took about 8.5 minutes.
+
+What is left on the critical path is not test time but the macOS Intel runner: `compileKotlin` takes 137 to 190 s there
+against about 50 s on the other systems, then the bundle, the installer and the installer smoke test follow in series (425 to
+677 s plus about 70 s), and a macOS job can wait minutes for a free runner. A run on main is therefore 9 to 11 minutes, not
+a steady 10. Ideas not taken: building the jar once and sharing it with the four `bundle` jobs (a larger change of
+`gradle/bundle.gradle.kts`), `-Xbackend-threads=0` for the Kotlin compiler, and excluding the workspace from Windows
+Defender (a change of the runner's security settings).
