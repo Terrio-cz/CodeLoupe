@@ -1363,6 +1363,52 @@ Z nálezů, které opravdu potřebovaly úsudek modelu (C + D = 60), zachytí ko
 **Rozhodnutí fáze 1: NO-GO jako úsporný projekt** (engine 0,28 % realisticky, 0,70 % jako nedosažitelná horní mez, obojí pod 1 %). Samostatný drobný úkol mimo engine: nespouštět model pro plný test land kandidáta (0,54 %, potřebuje jen
 změnu v orchestraci). Fáze 2 až 4 se přesto dokončí, jak zadala karta, protože engine je levný (0 tokenů, sekundy, deterministický) a brána ukáže, jestli má smysl jako kontrola kvality vedle testeru.
 
+#### Fáze 2: stavba (jen nové soubory ve workspace Terria, bez zásahu do agentů, planneru, `context.mjs`, `settings.json`, `.mcp.json`)
+
+| Soubor | Obsah |
+|---|---|
+| `run/apicases.mjs` | CLI `generate`, `run`, `replay`; načtení případů planneru (JSON bez YAML, nebo JSONL ve tvaru `api batch`), běh proti task stacku, návratové kódy: 0 PASS, 1 vada v kódu, 4 jen prostředí, 5 jen neznámá příčina (to je jediný případ pro model) |
+| `run/apicases-gen.mjs` | generátor z OpenAPI (rozdíl proti základnímu dokumentu: nové nebo změněné operace): happy path + `.pole exists` z required, 401 bez klíče a s neplatným klíčem, 400/422 podle schématu (chybějící povinný parametr, mimo enum/rozsah/délku, špatný typ, chybějící povinné pole těla, rozbitý JSON), 404, 406; id detailu z kolekce (`save`); seznam zdokumentovaných stavů, které kontrakt nespustí (402, 409, 429, 5xx), s důvodem |
+| `run/apicases-engine.mjs` | stav, `contains`/`lacks`, validace odpovědi proti schématu OpenAPI (`$ref`, typy, enum, rozsahy, formáty, `oneOf`/`allOf`, volitelně `strictExtra`), aserce ve stylu jq (`.a.b[*].c == 1`, `exists`, `matches`, `contains`, `is`, `\| length`), regresní diff proti předchozí odpovědi (tvar vždy, hodnoty volitelně mimo proměnlivá pole), kontrola příkladů kontraktu proti jeho schématům |
+| `run/apicases-classify.mjs` | klasifikace selhání: prostředí (BindException, Docker/Testcontainers, connection refused, timeout, zrušený běh, OOM, zámek Gradle cache, OCI runtime) × kód × neznámé; silný podpis prostředí vyhraje nad aserčním selháním ve stejném logu, slabý ne |
+| `run/apicases-evidence.mjs` | zápis bloků evidence přesně ve formátu `terrio.mjs api` (nadpis `### PASS GET /v1/x -> 200 (expect 200) -- note`, `curl` s `$TERRIO_KEY`, odpověď bez `date`/`connection`, redakce, ořez nad 20 000 znaků s logem) a parser zpět; `evidence summary` ho čte beze změny |
+| `mcp/test/apicases-test.mjs` | 21 testů na sestrojených dokumentech, lokálním HTTP serveru a zápisu evidence; zapojeno do `mcp/test/run-all.sh` (záloha `run-all.sh.bak-fm23`) |
+| `docs/scripted-cases.md` | formát případů pro planner, příkazy, kódy, evidence |
+| `run/tester-ceiling*.mjs`, `run/apicases-gate.mjs` | měření fáze 1 a brána fáze 3 |
+
+Ověřeno: 21/21 testů; generátor na skutečném dokumentu úkolu (43 operací) udělá 231 případů (happy 43, 401 bez klíče 38 a s neplatným 38, 406 40, 404 15, vstup 57; 226 ze 410 zdokumentovaných stavů se negeneruje s důvodem);
+blok z `apicases.mjs` projde `evidence summary` (počty PASS/FAIL) a `terrio.mjs yt closeout --dry-run --evidence=<soubor>` (plán obsahuje `yt_attach`). Vedlejší nález nástrojů: `yt closeout --evidence <soubor>` nejde, protože `evidence` je v `BOOLEAN_FLAGS`
+(`run/terrio.mjs`) a spolkne se jako příznak; platí jen tvar `--evidence=<soubor>` nebo výchozí cesta bez příznaku.
+
+#### Fáze 3: offline brána (bez Dockeru, bez HTTP)
+
+Deset uzavřených úkolů (stav Done, nejvíc zaznamenaných výměn: TER-561, 535, 120, 191, 210, 187, 189, 169, 208, 207). Parser přečte **14 893 z 14 967** nadpisů `### PASS|FAIL|INFO` (zbylých 74 jsou bloky `FAIL SQL`, ne HTTP).
+
+**Přehrání zaznamenaných odpovědí** (jen kontrakt, bez zaznamenaného `expect`): 3 598 výměn, tělo JSON 3 593, **v souladu s kontraktem 3 594 (99,9 %)**, 4 porušení schématu (TER-120: HTTP 400 bez JSON těla na dotaz s `q` o 1 000 znacích, kontrakt slibuje JSON),
+0 nezdokumentovaných stavů, 0 nedeklarovaných polí (zavřené schéma `strictExtra` nemá falešný poplach). Se zaznamenaným `expect` engine zopakuje zaznamenaný verdikt u 3 598 z 3 598. Zaznamenaných FAIL je 58; podle kontraktu žádný (jde o očekávání testeru proti stavu stacku, ne o porušení kontraktu).
+
+**Seedované vady** (zaznamenané odpovědi deseti úkolů, 3 mutace každého druhu na výměnu; náhodný, ale pevný seed; jen výměny, které engine bez mutace přijme; volitelné/proměnlivé pole se do „změny hodnoty“ nebere):
+
+| Třída vady | Zachyceno | Čím |
+|---|---|---|
+| špatný stav (500, 404, 401 místo 2xx; 200, 403, 500 místo chyby) | **504 / 504 (100 %)** | `expect` z kontraktu |
+| chybějící povinné pole | **585 / 585 (100 %)** | schéma odpovědi |
+| špatný typ pole | **338 / 338 (100 %)** | schéma odpovědi |
+| změněná hodnota | 585 / 585 s předchozí odpovědí, **177 / 585 (30,3 %)** jen ze schématu | regresní diff s hodnotami |
+| nedeklarované pole navíc | 585 / 585 (diff), 585 / 585 (zavřené schéma) | regresní diff, `strictExtra` |
+| chybějící volitelné pole | 546 / 549 (99,5 %) | regresní diff (nezachytí `nextCursor` a pole chybějící jen v prvním prvku seznamu) |
+
+**Historické nálezy testeru** (viz fáze 1c, 118 kritérií `(found: test)`): bez modelu, tedy stávající skript (`test run`, `openapi check`) plus engine, se zachytí **42 ze 100** reálných nálezů (**42,0 %**), samotný engine 2 z 60 nálezů, které potřebovaly úsudek (3,3 %).
+Zaznamenaných FAIL výměn bylo od 2026-10-01 646; z 393 mimo setup a mimo dokument má kontraktové očekávání 314 (**79,9 %**), 79 je doménových.
+
+**Brána:** seedované vady stavu a schématu **100 % splněno**; historické nálezy testeru **42 % proti požadovaným 90 %: NESPLNĚNO**. Brána jako celek **neprošla**.
+Důvod není slabý engine, ale povaha nálezů: polovina je doména a úsudek (dokumentace, výkon, nástroje, sémantika), dalších 34 % už chytá existující skript a 15 % jsou chyby samotného testeru. Kontraktový případ chytá to, co kontrakt vyjadřuje, a to testeru nálezy nedělá.
+
+#### Fáze 4: zapojení
+
+Brána neprošla, proto **`terrio.mjs test run --scripted` nevzniklo** a agent testeru ani planner se nezměnily; žádný běh s Dockerem ani claim (task stack se nespouštěl, sdílený stack se nedotkl). Formát případů pro planner je zdokumentován v `docs/scripted-cases.md` workspace
+(pro pozdější krok), engine a testy zůstávají nezapojené. Doporučení: **tester neodstraňovat**, engine nezapojovat; stavět jen samostatnou drobnost mimo engine (plný test land kandidáta bez modelu, 0,54 % ceny pipeline, jen změna orchestrace).
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
