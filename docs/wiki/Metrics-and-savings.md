@@ -55,7 +55,7 @@ carries an argument, and a line cut at 200 characters that is still setting the 
 
 and the same by tool category (the categories of `collect`, so the two commands can be compared), by role and by week (ISO week of the start of the
 run). The last column of the table lists the three runs that carried most of a group. Checked on the transcripts of 2026-10-01 to 2026-10-11:
-for the `terrio-coder` role the calls, result tokens and carried cost of every tool category equal those of `collect` to the unit (docs/plan.md § 8.13).
+for the `terrio-coder` role the calls, result tokens and carried cost of every tool category equal those of `collect` to the unit (docs/plan.md § 8.14).
 The daemon stores what the report needs next to each step (the size and a hash of the call's input, the group of a shell call, the answer of a `Write`) and reads
 the transcripts again once after an update that adds them.
 
