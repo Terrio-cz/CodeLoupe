@@ -21,6 +21,13 @@ class BrainRoot(val id: String, val path: Path) {
 
         fun find(config: WorkspacesConfig, id: String): BrainRoot? = all(config).firstOrNull { it.id == id }
 
+        /** The registered workspace at [path] (a workspace directory, or any directory inside it), or null. */
+        fun at(config: WorkspacesConfig, path: String): BrainRoot? {
+            val wanted = of(path) ?: return null
+            all(config).firstOrNull { it.id == wanted.id }?.let { return it }
+            return all(config).firstOrNull { wanted.path.startsWith(it.path) }
+        }
+
         private fun of(text: String): BrainRoot? = runCatching {
             val path = Path.of(text).toAbsolutePath().normalize()
             BrainRoot(Sha1.hex(PathCase.fold(path.toString().replace('\\', '/').trimEnd('/'))).take(12), path)

@@ -25,6 +25,10 @@ import codeloupe.jobs.JobRunner
 import codeloupe.jobs.JobTool
 import codeloupe.jobs.jobRoutes
 import codeloupe.know.AnchorChecker
+import codeloupe.brain.BrainCli
+import codeloupe.brain.BrainNotes
+import codeloupe.brain.BrainService
+import codeloupe.brain.brainRoutes
 import codeloupe.know.Know
 import codeloupe.know.RegistryIndex
 import codeloupe.know.knowRoutes
@@ -141,9 +145,14 @@ class Daemon private constructor(
     private val trackerSettings = TrackerSettingsLoader.load(config.home, store = { secrets.store })
     private val trackers = Trackers.open(trackerSettings, config.home, scope, ::log)
     private val docs = DocMemory()
+    private val brain = BrainService(
+        config.workspaces, registry, trackers, BrainCli(), scope,
+        engineEnv = mapOf("CODELOUPE_HOME" to config.home.toString(), "CODELOUPE_PORT" to config.port.toString()),
+        autoBackfill = System.getenv("CODELOUPE_BRAIN_BACKFILL") != "0", log = ::log,
+    )
     // `batch` is optional (config `tools.batch`): it adds to the tool list every session carries.
     private val batchTool = BatchTool({ tools() }) { tool, args -> runner.run(tool, args, "batch").let { BatchTool.Outcome(it.ok, it.text) } }
-    private val baseTools = Tools.catalog(trackers, jobs, secrets, config.home, docs) + listOfNotNull(batchTool.takeIf { config.tools.batch })
+    private val baseTools = Tools.catalog(trackers, jobs, secrets, config.home, docs, brain, BrainNotes(brain, registry)) + listOfNotNull(batchTool.takeIf { config.tools.batch })
     private val writeGate = WriteGate(config.write, config.home.resolve("write-gate.json")) { since ->
         val setup = MetricsSetup(config)
         MetricsCollector(setup.categorizer()).runs(setup.projectDirs(emptyList()), since, null)
@@ -327,6 +336,7 @@ class Daemon private constructor(
             uiApiRoutes(uiApi)
             envRoutes(secrets)
             knowRoutes(know)
+            brainRoutes(brain)
             post("/shutdown") {
                 val pending = jobs.pending()
                 if (pending > 0 && call.parameters["force"] != "1") {

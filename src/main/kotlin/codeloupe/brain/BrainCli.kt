@@ -15,11 +15,11 @@ import kotlin.concurrent.thread
  * array (never a shell line), the working directory is the workspace root, and the run ends after [timeoutMs]. The
  * brain's file format stays the CLI's business: this class never reads brain files.
  */
-class BrainCli(private val timeoutMs: Long = TIMEOUT_MS, private val node: String = "node") {
-    suspend fun run(root: Path, args: List<String>): String = withContext(Dispatchers.IO) {
+class BrainCli(private val timeoutMs: Long = TIMEOUT_MS, private val node: String = "node") : BrainEngine {
+    override suspend fun run(root: Path, args: List<String>, env: Map<String, String>): String = withContext(Dispatchers.IO) {
         val program = Executables.resolve(node, root, System.getenv(), NativeCalls.isWindows)
         val process = try {
-            ProcessBuilder(listOf(program, SCRIPT) + args).directory(root.toFile()).apply { environment()["NO_COLOR"] = "1" }.start()
+            ProcessBuilder(listOf(program, SCRIPT) + args).directory(root.toFile()).apply { environment()["NO_COLOR"] = "1"; environment().putAll(env) }.start()
         } catch (e: IOException) {
             throw BrainException(BrainException.Kind.NODE_MISSING, "node could not be started (${e.message.orEmpty().lineSequence().first()}); install Node.js or add it to the daemon's PATH")
         }
