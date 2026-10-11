@@ -16,6 +16,9 @@ import kotlinx.serialization.json.jsonPrimitive
 object DeclAnchors {
     private val NO_SIGNATURE = setOf("class", "interface", "object", "enum", "annotation", "typealias", "companion", "property", "enum_entry")
 
+    /** A name with a space (a test named in a sentence) or a backtick cannot be an anchor: an anchor is one word. */
+    fun anchorable(decl: DeclRow): Boolean = decl.fqn.none { it.isWhitespace() || it == '`' }
+
     fun of(view: View, decl: DeclRow): List<String> = listOfNotNull(
         sym(view, decl),
         "${IndexedEntry.FILE}${decl.path}",

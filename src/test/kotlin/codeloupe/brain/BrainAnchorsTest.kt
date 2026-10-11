@@ -40,6 +40,22 @@ class BrainAnchorsTest {
     }
 
     @Test
+    fun `where the text names only the type the anchor is the type, a plain word anchors nothing, and a sentence-named test is never an anchor`() {
+        world.export(emptyList())
+        val lines = world.repo.resolve(BILLING).toFile().readLines()
+        val charge = lines.indexOfFirst { "fun charge(" in it } + 1
+        val sentence = lines.indexOfFirst { "charges once per order" in it } + 1
+        val (type, word, test) = resolve(
+            LineRef(BILLING, charge, "PaymentGateway drops the currency"), LineRef(BILLING, charge, "the charge is wrong, charge it again"), LineRef(BILLING, sentence, "PaymentGateway test is vacuous"),
+        )
+        val (trusted) = resolve(LineRef(BILLING, sentence, "anything"), trusted = true)
+        assertEquals("@sym:com.example.billing.PaymentGateway", type.anchors.first(), "the line says where in the type, the text says it is about the type")
+        assertEquals(listOf("@file:$BILLING", "@mod:billing"), word.anchors, "charge is a plain word here")
+        assertEquals("@sym:com.example.billing.PaymentGateway", test.anchors.first())
+        assertEquals("@sym:com.example.billing.PaymentGateway", trusted.anchors.first(), "in the writer's worktree the sentence-named test still anchors on its type: an anchor is one word")
+    }
+
+    @Test
     fun `an elided path, a file the index does not hold and an unknown file`() {
         world.export(emptyList())
         world.repo.resolve("docs").toFile().mkdirs()

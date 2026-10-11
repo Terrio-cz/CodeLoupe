@@ -18,7 +18,7 @@ class BrainAnchors(private val registry: Registry) {
 
     private fun one(view: View, root: Path, ref: LineRef, trusted: Boolean): ResolvedRef {
         val path = pathOf(view, root, ref.file) ?: return ResolvedRef(ref.file, ref.line, emptyList())
-        val decl = DeclAnchors.enclosing(view, path, ref.line)?.takeIf { trusted || names(ref.text, it) }
+        val decl = DeclAnchors.enclosing(view, path, ref.line)?.let { anchored(view, it, ref.text, trusted) }
         val module = decl?.module?.takeIf { it.isNotEmpty() } ?: ModulePath.of(path).module
         val anchors = listOfNotNull(
             decl?.let { DeclAnchors.sym(view, it) },
@@ -26,6 +26,17 @@ class BrainAnchors(private val registry: Registry) {
             module.takeIf { it.isNotEmpty() }?.let { "${IndexedEntry.MOD}$it" },
         )
         return ResolvedRef(ref.file, ref.line, anchors)
+    }
+
+    /**
+     * The declaration a citation is anchored to. The writer's own worktree: the one at the line. Otherwise (lines drift) the one at the line only where the text
+     * names it, else the type it sits in where the text names that, else none: the file and module anchors still hold.
+     */
+    private fun anchored(view: View, decl: DeclRow, text: String?, trusted: Boolean): DeclRow? {
+        if (DeclAnchors.anchorable(decl) && (trusted || namesMember(text, decl))) return decl
+        val owner = view.decls("d.fqn = :fqn AND d.local = 0", mapOf("fqn" to decl.fqn.removeSuffix(".${decl.name}")))
+            .filter { it.kind in TYPES }.singleOrNull() ?: return null
+        return owner.takeIf { DeclAnchors.anchorable(it) && (trusted || namesType(text, it)) }
     }
 
     /** The indexed path of a cited file: exact, by its tail (`a/.../File.kt` elides directories), or, for a file the index does not hold, on disk. */
@@ -40,13 +51,28 @@ class BrainAnchors(private val registry: Registry) {
     }
 
     companion object {
-        /** Does the text name the declaration (or the type it is in)? Lines drift, a name does not. */
-        fun names(text: String?, decl: DeclRow): Boolean {
-            if (text == null) return false
-            val container = decl.container.substringAfterLast('.')
-            return listOf(decl.name, container).filter { it.length >= MIN_NAME }.any { Regex("(?<![A-Za-z0-9_])${Regex.escape(it)}(?![A-Za-z0-9_])").containsMatchIn(text) }
+        private val TYPES = setOf("class", "interface", "object", "enum", "annotation")
+
+        /**
+         * Does the text name the declaration? Lines drift, a name does not. A name counts when it reads as code and not as a word: a CamelCase or snake_case
+         * name, one written in backticks, called (`name(`) or reached (`.name`); a plain lowercase word such as "address" does not.
+         */
+        fun namesMember(text: String?, decl: DeclRow): Boolean = text != null && decl.name.length >= MIN_NAME && mentionsAsCode(text, decl.name)
+
+        /** Does the text name the type: by a CamelCase name, or as code? */
+        fun namesType(text: String?, type: DeclRow): Boolean = text != null && type.name.length >= MIN_TYPE && (HUMP.containsMatchIn(type.name) && mentions(text, type.name) || mentionsAsCode(text, type.name))
+
+        private fun mentions(text: String, name: String) = Regex("(?<![A-Za-z0-9_])" + Regex.escape(name) + "(?![A-Za-z0-9_])").containsMatchIn(text)
+
+        private fun mentionsAsCode(text: String, name: String): Boolean {
+            if (!mentions(text, name)) return false
+            if (HUMP.containsMatchIn(name) || '_' in name) return true
+            val q = Regex.escape(name)
+            return Regex("`$q`|(?<![A-Za-z0-9_])$q\\(|\\.$q(?![A-Za-z0-9_])").containsMatchIn(text)
         }
 
+        private val HUMP = Regex("[a-z0-9][A-Z]")
         private const val MIN_NAME = 4
+        private const val MIN_TYPE = 6
     }
 }

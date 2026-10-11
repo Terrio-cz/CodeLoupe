@@ -74,6 +74,12 @@ class BrainWorld {
 
                 fun tax(amount: Long): Long = amount / 5
             }
+
+            class PaymentGateway {
+                fun charge(amount: Int): Int = amount
+
+                fun `charges once per order`() = Unit
+            }
         """.trimIndent() + "\n"
 
         fun checkout() = """

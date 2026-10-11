@@ -18,7 +18,7 @@ import kotlinx.coroutines.withTimeout
  * files that call it, and the tasks whose commits changed it (the task-to-code links of the history). Bounded in files and in time; whatever
  * cannot be read becomes a note, never an error, so ranking falls back to text.
  */
-class BrainCodeContext(private val registry: Registry, private val trackers: Trackers, private val timeoutMs: Long = 10_000) {
+class BrainCodeContext(private val registry: Registry, private val trackers: Trackers, private val timeoutMs: Long = 6_000) {
     suspend fun of(codeRoot: String?, files: List<String>): CodeContext {
         if (files.isEmpty()) return CodeContext.NONE
         val root = codeRoot?.takeIf { it.isNotBlank() } ?: return CodeContext.unavailable("no code root: workspace.json has no canonicalRepo and none was given")
