@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.TestInstance
+import java.io.IOException
 import java.net.ServerSocket
 import java.net.URI
 import java.net.http.HttpClient
@@ -116,7 +117,11 @@ class HooksDaemonTest {
         val file = Path.of(System.getProperty("codeloupe.projectDir"), "plugin", "hooks", "hook.sh").toString().replace("\\", "/")
         // Without a CODELOUPE_HOME of its own the script looks in an empty folder, not in the machine's real daemon directory.
         val process = ProcessBuilder(bash, file).redirectError(ProcessBuilder.Redirect.DISCARD).apply { environment()["CODELOUPE_HOME"] = TestRepos.tmpDir("hook-home").toString(); environment().putAll(env) }.start()
-        process.outputStream.use { it.write(stdin.toByteArray()) }
+        // A script that has nothing to ask (no daemon, hooks off) exits without reading its input: the write then meets a closed pipe.
+        try {
+            process.outputStream.use { it.write(stdin.toByteArray()) }
+        } catch (_: IOException) {
+        }
         val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
         assertTrue(process.waitFor(20, TimeUnit.SECONDS), "the script finishes")
         return process.exitValue() to out
