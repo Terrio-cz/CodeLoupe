@@ -77,9 +77,10 @@ jobs:
           cp manifests/homebrew/Casks/codeloupe.rb "$tap/Casks/"
           brew style --cask local/codeloupe/codeloupe
 
-  # Windows and macOS are the slow systems (a class takes up to twice as long as on Linux), so their test classes run on two
-  # runners each (CL-195, gradle/test-shards.gradle.kts). The first keeps the name `test (windows-latest)` or `test (macos-latest)`
-  # that the ruleset on main requires; the second is `test (<os>, shard 2)`. A red second share fails the run, not the required check.
+  # Windows is the slowest system (a class takes about twice as long as on Linux), so its test classes run on two runners
+  # (CL-195, gradle/test-shards.gradle.kts). The first keeps the name `test (windows-latest)` that the ruleset on main
+  # requires; the second is `test (windows-latest, shard 2)`. A red second share fails the run, not the required check. macOS is
+  # not split: its runners are scarce (a run that asked for a sixth at once waited six minutes for a free one).
   test:
     name: test (${{ matrix.os }}${{ matrix.shard == 2 && ', shard 2' || '' }})
     needs: changes
@@ -92,11 +93,6 @@ jobs:
         include:
           - os: ubuntu-latest
           - os: macos-latest
-            shard: 1
-            shards: 2
-          - os: macos-latest
-            shard: 2
-            shards: 2
           - os: windows-latest
             shard: 1
             shards: 2
