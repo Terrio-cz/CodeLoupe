@@ -75,5 +75,6 @@ The CLI has a few more commands; they talk to the daemon but are not offered to 
 | `webhook add\|list\|remove\|deliveries` | subscriptions to the daemon's events | [Jobs and events](Jobs-and-events#events) |
 | `env set\|unset\|run\|import\|audit` | write to the secret store, run a command with secrets | [Environment and secrets](Environment-and-secrets) |
 | `metrics collect\|compare\|gaps\|boilerplate` | measure agent runs from Claude Code transcripts | [Metrics and savings](Metrics-and-savings) |
+| `conventions --module <name>\|--for <path>\|--largest <n>\|--list` | a card of a module's conventions (layout, naming, error handling, test style, libraries), counted from its sources on the disk: no daemon, no model, at most 1.5 kB per module | - |
 | `mcp-config` | print the `.mcp.json` entry for Claude Code | [Claude Code integration](Claude-Code-integration) |
 | `mcp-headers` | print the headers an MCP client sends (the daemon token among them), for the `headersHelper` of that entry | [Who may call the daemon](Configuration#who-may-call-the-daemon) |
