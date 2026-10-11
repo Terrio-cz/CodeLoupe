@@ -1209,7 +1209,61 @@ tokenech ≈ 0,1 %, hodnota je kvalita) se nemění: úložiště se staví pro 
   changed`, `verify` příznak smaže.
 - **Kritéria karty.** Splněno: hit rate ≥ 80 % (83 % na 30 otázkách), detekce zastaralosti s příznakem v hledání, import 14
   souborů s počty duplicit a mrtvých cest, rozhodnutí o úspoře (no-go na tokeny, bez změny). **Otevřeno:** řízené A/B retra a
-  stewarda (−40 % ceny při stejných zachovaných lekcích) a jejich zápis a čtení přes úložiště, tedy napojení na Terrio a MCP nástroj.
+  stewarda (−40 % ceny při stejných zachovaných lekcích) a jejich zápis a čtení přes úložiště, tedy napojení na Terrio a MCP nástroj. Změřeno v 8.11a: retro −7 %, steward +9 %, packy ±1 %, nepřijato.
+
+### 8.11a Řízené A/B znalostního úložiště v toku Terria (CL-203, CL-218, 2026-10-11)
+
+**Otázka a očekávání předem.** Přinese úložiště z 8.11 v toku Terria úsporu tokenů, nebo méně chyb? Strop na tokenech je malý (retro + steward 0,98 % ceny Terria, čtení facts asi 2,3 USD za 4,4 dne, 8.6), takže víc než úsporu se čekalo od kvality: dřívější nálezy ukázané u kódu, který se mění, a fakta, která při změně kódu zastarají s příznakem.
+
+**Živá integrace čeká na daemon.** `codeloupe know --help` v instalovaném balíku (daemon 0.1.1 na 47391, stejně CLI v `~/.codeloupe-live`) příkaz `know` nemá. Měřilo se proto na daemonech z `main` (znalostní úložiště z 0a647a8, vlastní `CODELOUPE_HOME` v `%TEMP%`, porty 47860-47879, po měření zastavené); živý workspace, `.mcp.json`, agenti, `run/context.mjs` i živý daemon se nezměnily, takže není co obnovovat z `.bak-cl203`. Hotová sada změn pro Terrio (`run/knowfacts.mjs` a sekce v `run/context.mjs`, `brain/knowfact.mjs` = zápis přes úložiště s dedupe a hledání, s ústupem na md, těla retro a stewarda, dva testy o 22 a 8 kontrolách) leží mimo workspace v `codeloupe-handoff/cl218-kit`; nezapíná se, protože gate neprošel (níže).
+
+**Import** (bod 1): `know import brain/facts/*.md --root TerrioImporter --root workspace`, scope `area:<soubor>`, ne `repo:TerrioImporter` (téma zůstává pro vygenerovaný pohled a filtr; mezisouborové duplicity byly v 8.11 nulové). 14 souborů, 1 060 řádků, **1 058 faktů** (2 sloučeny), 43 s; 104 faktů cituje cestu (anchor), 11 z nich soubor, který tam není. md soubory zůstaly beze změny. Kotvu má jen asi každý desátý fakt, ostatní jmenují soubor nebo třídu jen v textu; hledání „k změněným souborům“ proto bere fakta, jejichž kotva nebo text jmenuje soubor (název s příponou, cestu, nebo třídu jako celé slovo).
+
+**Provedení.** Kopie workspace ve `%TEMP%` (živý workspace se za běhů nedotkl; přístup k němu a k `IdeaProjects` byl zakázán v `--settings`, zápisy do YouTrack také), 2 `claude -p` souběžně, A a B vždy zároveň, strany lane se střídají, token launcheru z úložiště tajemství. Celkem **87 běhů (84 měřených), 22,86 USD** z 25 (retro 18 + 3 pilotní, steward 40, planner a reviewer 26); jeden běh stewarda CLI zaseklo (11 min bez výstupu), byl ukončen a spuštěn znovu. Vzorky replik: retro 3 × 3, steward 2 × 10, packy 2-3 repliky v 5 buňkách (26 běhů z 36 zadaných; zbytek by přesáhl rozpočet, reviewer na TER-324 se nepouštěl, nemá známé nálezy).
+
+**B1 retro** (Haiku; A = živé tělo, B = tělo z kitu: `knowfact.mjs search` místo `rg`/`Read` souborů facts a `knowfact.mjs <téma> …` místo `brain.mjs fact`). Vstup = skutečný noční retro 2026-10-06 (přepis jeho promptu: 15 úkolů); 10 z nich (TER-114, 180, 198, 266, 354, 472, 62, 653, 657, 89), poznámky `brain/tasks` a fakta ve stavu z začátku toho běhu (22 pozdějších řádků odstraněno, včetně 7 řádků, které retro tehdy napsalo), jednou naráz (3 repliky) a dvakrát po pěti úkolech (3 repliky každá):
+
+| Buňka (n repl. A / B) | USD medián A → B | Poměr B / A |
+|---|---|---:|
+| 10 úkolů naráz (3 / 3) | 0,0159 → 0,0094 | 0,59 |
+| úkoly 1-5 (3 / 3) | 0,0113 → 0,0122 | 1,08 |
+| úkoly 6-10 (3 / 3) | 0,0107 → 0,0098 | 0,92 |
+| **všechny buňky (9 / 9)** | **0,0113 → 0,0106** | **0,93** (bootstrap 95 %: 0,68-1,14) |
+
+První buňka vypadala jako −41 %, což by kritérium splnilo; s dalšími šesti běhy to bylo šum (rozptyl běh od běhu je v A 0,010-0,028 USD). Výsledky nástrojů související s fakty 27 → 21 tis. znaků na běh (45 % → 44 % všech výsledků nástrojů), tahů 9,2 → 8,7, volání týkajících se facts 3,9 → 3,1 na běh; B hledá dávkami `search`, A čte soubory přes `rg` a `cat`, odpovědi stojí zhruba stejně. Kvalita: kontrolní seznam = 30 témat poznatků (sjednocení všech 18 běhů, tři z nich jsou ve skutečném retru; témata jsou regulární výrazy podle řádku, psal jsem je po prohlédnutí obou variant, není to slepé): **témat na běh A 5,6, B 5,3 (0,96)**, řádků 6,9 / 6,4; ze tří témat skutečného retra 1,3 / 1,1 na běh. Napsaných řádků téměř shodných s existujícími fakty (Jaccard ≥ 0,5) 0 / 0, řádků opakujících téma téhož běhu 1,2 / 1,1 na běh, jeden zjevný duplikát existujícího faktu (A, ruční kontrola nejbližších shod), zastaralých faktů 0 / 0 (jeden nález cesty v B je cesta workspace, kterou kopie nemá). Dedupe úložiště (`merged`) nezasáhl ani jednou: retro píše nové poznatky.
+
+**B1 steward** (Sonnet, medium, režim triage; A = živé tělo, B = tělo s větou „hledej dřívější nálezy přes `knowfact.mjs search`“, jinak shodné, 7 981 znaků, limit 8 000). 10 uzavřených úkolů, vždy jedno kolo, jeho zprávy reviewera a testera, plán, poznámky úkolu oříznuté na čas triage a fakta ve stavu 2026-10-05 23:00; kód se četl z aktuálního klonu (worktrees těch úkolů už nejsou), `yt_create_issue` a ostatní zápisy zakázány. 2 repliky na případ a variantu = 20 / 20 běhů:
+
+| | A | B |
+|---|---|---|
+| USD medián | 0,0615 | 0,0667 (poměr **1,09**, bootstrap 0,82-1,41) |
+| tahů na běh | 5,5 | 5,8 |
+| volání `search` | – | **0 z 20 běhů** |
+| kritéria zaznamenané triage nalezená znovu (shoda ≥ 40 % významných slov) | 72 z 96 (75 %) | 61 z 96 (64 %) |
+| `kind` shodný se zaznamenaným | 18 z 20 | 16 z 20 |
+
+Steward žádná fakta nečte ani nepíše (`brain` čtení jsou poznámky úkolu), takže nemá co ušetřit; věta v těle nic nezměnila (agenti nástroj, který nemusí, nevolají, jako v 8.4), rozdíly jsou šum a drobná přeformulace těla (zkrácené příklady kvůli limitu 8 000 znaků). Nepřijato.
+
+**B2 packy s dřívějšími nálezy** (CL-218). `run/context.mjs` s novou sekcí „Dřívější nálezy k tomuto kódu“ (nejvýš 5 faktů, zdroj `(TER-n)`, `STALE: důvod`, jaké soubory jmenují; tichá, když daemon `know` nemá, neběží, nebo nic nenajde; dotaz je HTTP `GET /know/search` po jednom souboru nebo třídě a výsledek se filtruje na ty, které soubor jmenují) pro planner pack (soubory a třídy, které jmenuje issue) a pro review packet (soubory větve). A = stejný kód s `TERRIO_NO_KNOW=1`, B = sekce ze zásobníku faktů starších než základní commit úkolu (nikdy jeho vlastní; fakta bez časové značky vypuštěna, aby nic nepřesvědčovalo z budoucna). Planner (Opus, high) na TER-321, 324, 637 a reviewer (`terrio-reviewer-opus`, Opus, medium) na TER-321, 637: úkoly dřívějších benchmarků s fakty o jejich souborech (před stavbou 9, 9 a 4 starší fakta jmenující soubory úkolu). Planner A čte stejná fakta sám (`rg` v `brain/facts`, 1,3 volání na běh), B je čte také (1,0), sekce je tedy přídavek, ne náhrada.
+
+| Buňka (n A / B) | Jednotky tis. (medián) A → B | Poměr B / A (jednotky / USD) |
+|---|---|---:|
+| planner TER-321 (3 / 3) | 268 → 241 | 90 % / 92 % |
+| planner TER-324 (2 / 2) | 179 → 184 | 103 % / 104 % |
+| planner TER-637 (3 / 3) | 260 → 248 | 96 % / 96 % |
+| reviewer TER-321 (3 / 3) | 161 → 159 | 99 % / 99 % |
+| reviewer TER-637 (2 / 2) | 141 → 164 | 117 % / 116 % |
+
+Sdruženě (každý běh dělený mediánem A své buňky, 13 / 13): medián B **0,99** jednotek (bootstrap 0,90-1,15), USD 0,99; součet USD **9,85 → 10,05** (+2 %). Planner 0,93 (0,85-1,15), reviewer 1,06 (0,94-1,30). Kvalita: planner známé nálezy A 18/21, **B 20/21** (rozdíl je jedna položka, věta pro `Public-Change`, kterou žádný ukázaný fakt nezmiňuje), rozhodnutí 35/35 obojí, soubory skutečného řešení 87 % → 84 %; reviewer známé nálezy 18/18 obojí (stropový efekt: issue je uvádí). **Citoval ukázaný fakt:** planner B v 5 z 8 běhů (např. fakt o bráně před routingem jako řádek premortem, fakt o zastaralém `docs/backend-requirements.md` s příznakem STALE jako rozhodnutí), reviewer B v 0 z 5. **Vyhnul se nějaký běh známé chybě?** Ne tak, abychom to doložili: každý fakt, který B planner použil, četl i A planner z `brain/facts` (rozhodnutí u TER-321 21/21 v obou variantách, i o dekódovaném prvním segmentu cesty) a výsledek plánu se nezměnil; jediný rozdíl v nálezech nesouvisí s ukázanými fakty. Kola na úkol se z jednoho kola na běh měřit nedají (reviewer našel stejné nálezy).
+
+**Rozhodnutí.**
+- **Retro: nepřijato.** Medián 0,93 (cíl ≤ 0,90, kritérium karty −40 %), kvalita zhruba stejná (0,96 témat), tedy bez úspory, která by za změnu stála: celé retro je 0,48 % ceny Terria (15,6 USD), i −41 % by bylo 0,2 %.
+- **Steward: nepřijato.** Žádná fakta nečte ani nepíše; věta v těle se nevolá, +9 %.
+- **Packy s dřívějšími nálezy: nepřijato.** Formálně splněno „kvalita ne horší a medián ≤ 100 %“ (0,99), ale cíl (méně chyb a kol) se neukázal a karta CL-218 žádá medián ≤ 90 %. Planner sekci použil a stála ho −7 % (nejisté), reviewer ji nepoužil vůbec a +6 %. Hodnota je v příznaku STALE a zdroji u faktu, což zatím nikdo neměřitelně nepotřeboval, protože planner stejná fakta dohledá sám.
+- **Živý workspace se nemění** (nic k obnovení z `.bak-cl203`), kit zůstává připravený. Úložiště zůstává v CodeLoupe jako funkce (8.11); rozhodnutí z 8.6 o tokenech (strop ≈ 0,1 %, no-go) se potvrzuje měřením.
+- Co by to změnilo: daemonová volba `know search --anchor <soubor>` (dnes se kotva čte jen u faktů s cestou; dohledávání podle textu je obejití) a tělo plannera, které sekci používá místo vlastního čtení facts; obojí má smysl až poté, co jiný důvod vyžádá úložiště v živém toku.
+
+**Omezení.** 2-3 repliky na buňku, 10 z 36 zadaných běhů B2 vynecháno kvůli rozpočtu; úkoly dřívějších benchmarků jsou uzavřené (issue obsahuje nálezy pozdějších kol, takže reviewer a planner část „známých nálezů“ čtou z issue); fakta bez časové značky (451 z 1 076) se v B2 nepoužila, v živém toku by byla k dispozici; retro kontrolní seznam je z výstupů obou variant; kód steward čte z dnešního klonu. Skripty měření (`%TEMP%\cl218`) nejsou publikované.
 
 ### 8.12 Ocas ceny coderu a testeru: go/no-go pro run governor (CL-214, 2026-10-11)
 
@@ -1362,6 +1416,52 @@ Z nálezů, které opravdu potřebovaly úsudek modelu (C + D = 60), zachytí ko
 
 **Rozhodnutí fáze 1: NO-GO jako úsporný projekt** (engine 0,28 % realisticky, 0,70 % jako nedosažitelná horní mez, obojí pod 1 %). Samostatný drobný úkol mimo engine: nespouštět model pro plný test land kandidáta (0,54 %, potřebuje jen
 změnu v orchestraci). Fáze 2 až 4 se přesto dokončí, jak zadala karta, protože engine je levný (0 tokenů, sekundy, deterministický) a brána ukáže, jestli má smysl jako kontrola kvality vedle testeru.
+
+#### Fáze 2: stavba (jen nové soubory ve workspace Terria, bez zásahu do agentů, planneru, `context.mjs`, `settings.json`, `.mcp.json`)
+
+| Soubor | Obsah |
+|---|---|
+| `run/apicases.mjs` | CLI `generate`, `run`, `replay`; načtení případů planneru (JSON bez YAML, nebo JSONL ve tvaru `api batch`), běh proti task stacku, návratové kódy: 0 PASS, 1 vada v kódu, 4 jen prostředí, 5 jen neznámá příčina (to je jediný případ pro model) |
+| `run/apicases-gen.mjs` | generátor z OpenAPI (rozdíl proti základnímu dokumentu: nové nebo změněné operace): happy path + `.pole exists` z required, 401 bez klíče a s neplatným klíčem, 400/422 podle schématu (chybějící povinný parametr, mimo enum/rozsah/délku, špatný typ, chybějící povinné pole těla, rozbitý JSON), 404, 406; id detailu z kolekce (`save`); seznam zdokumentovaných stavů, které kontrakt nespustí (402, 409, 429, 5xx), s důvodem |
+| `run/apicases-engine.mjs` | stav, `contains`/`lacks`, validace odpovědi proti schématu OpenAPI (`$ref`, typy, enum, rozsahy, formáty, `oneOf`/`allOf`, volitelně `strictExtra`), aserce ve stylu jq (`.a.b[*].c == 1`, `exists`, `matches`, `contains`, `is`, `\| length`), regresní diff proti předchozí odpovědi (tvar vždy, hodnoty volitelně mimo proměnlivá pole), kontrola příkladů kontraktu proti jeho schématům |
+| `run/apicases-classify.mjs` | klasifikace selhání: prostředí (BindException, Docker/Testcontainers, connection refused, timeout, zrušený běh, OOM, zámek Gradle cache, OCI runtime) × kód × neznámé; silný podpis prostředí vyhraje nad aserčním selháním ve stejném logu, slabý ne |
+| `run/apicases-evidence.mjs` | zápis bloků evidence přesně ve formátu `terrio.mjs api` (nadpis `### PASS GET /v1/x -> 200 (expect 200) -- note`, `curl` s `$TERRIO_KEY`, odpověď bez `date`/`connection`, redakce, ořez nad 20 000 znaků s logem) a parser zpět; `evidence summary` ho čte beze změny |
+| `mcp/test/apicases-test.mjs` | 21 testů na sestrojených dokumentech, lokálním HTTP serveru a zápisu evidence; zapojeno do `mcp/test/run-all.sh` (záloha `run-all.sh.bak-fm23`) |
+| `docs/scripted-cases.md` | formát případů pro planner, příkazy, kódy, evidence |
+| `run/tester-ceiling*.mjs`, `run/apicases-gate.mjs` | měření fáze 1 a brána fáze 3 |
+
+Ověřeno: 21/21 testů; generátor na skutečném dokumentu úkolu (43 operací) udělá 231 případů (happy 43, 401 bez klíče 38 a s neplatným 38, 406 40, 404 15, vstup 57; 226 ze 410 zdokumentovaných stavů se negeneruje s důvodem);
+blok z `apicases.mjs` projde `evidence summary` (počty PASS/FAIL) a `terrio.mjs yt closeout --dry-run --evidence=<soubor>` (plán obsahuje `yt_attach`). Vedlejší nález nástrojů: `yt closeout --evidence <soubor>` nejde, protože `evidence` je v `BOOLEAN_FLAGS`
+(`run/terrio.mjs`) a spolkne se jako příznak; platí jen tvar `--evidence=<soubor>` nebo výchozí cesta bez příznaku.
+
+#### Fáze 3: offline brána (bez Dockeru, bez HTTP)
+
+Deset uzavřených úkolů (stav Done, nejvíc zaznamenaných výměn: TER-561, 535, 120, 191, 210, 187, 189, 169, 208, 207). Parser přečte **14 893 z 14 967** nadpisů `### PASS|FAIL|INFO` (zbylých 74 jsou bloky `FAIL SQL`, ne HTTP).
+
+**Přehrání zaznamenaných odpovědí** (jen kontrakt, bez zaznamenaného `expect`): 3 598 výměn, tělo JSON 3 593, **v souladu s kontraktem 3 594 (99,9 %)**, 4 porušení schématu (TER-120: HTTP 400 bez JSON těla na dotaz s `q` o 1 000 znacích, kontrakt slibuje JSON),
+0 nezdokumentovaných stavů, 0 nedeklarovaných polí (zavřené schéma `strictExtra` nemá falešný poplach). Se zaznamenaným `expect` engine zopakuje zaznamenaný verdikt u 3 598 z 3 598. Zaznamenaných FAIL je 58; podle kontraktu žádný (jde o očekávání testeru proti stavu stacku, ne o porušení kontraktu).
+
+**Seedované vady** (zaznamenané odpovědi deseti úkolů, 3 mutace každého druhu na výměnu; náhodný, ale pevný seed; jen výměny, které engine bez mutace přijme; volitelné/proměnlivé pole se do „změny hodnoty“ nebere):
+
+| Třída vady | Zachyceno | Čím |
+|---|---|---|
+| špatný stav (500, 404, 401 místo 2xx; 200, 403, 500 místo chyby) | **504 / 504 (100 %)** | `expect` z kontraktu |
+| chybějící povinné pole | **585 / 585 (100 %)** | schéma odpovědi |
+| špatný typ pole | **338 / 338 (100 %)** | schéma odpovědi |
+| změněná hodnota | 585 / 585 s předchozí odpovědí, **177 / 585 (30,3 %)** jen ze schématu | regresní diff s hodnotami |
+| nedeklarované pole navíc | 585 / 585 (diff), 585 / 585 (zavřené schéma) | regresní diff, `strictExtra` |
+| chybějící volitelné pole | 546 / 549 (99,5 %) | regresní diff (nezachytí `nextCursor` a pole chybějící jen v prvním prvku seznamu) |
+
+**Historické nálezy testeru** (viz fáze 1c, 118 kritérií `(found: test)`): bez modelu, tedy stávající skript (`test run`, `openapi check`) plus engine, se zachytí **42 ze 100** reálných nálezů (**42,0 %**), samotný engine 2 z 60 nálezů, které potřebovaly úsudek (3,3 %).
+Zaznamenaných FAIL výměn bylo od 2026-10-01 646; z 393 mimo setup a mimo dokument má kontraktové očekávání 314 (**79,9 %**), 79 je doménových.
+
+**Brána:** seedované vady stavu a schématu **100 % splněno**; historické nálezy testeru **42 % proti požadovaným 90 %: NESPLNĚNO**. Brána jako celek **neprošla**.
+Důvod není slabý engine, ale povaha nálezů: polovina je doména a úsudek (dokumentace, výkon, nástroje, sémantika), dalších 34 % už chytá existující skript a 15 % jsou chyby samotného testeru. Kontraktový případ chytá to, co kontrakt vyjadřuje, a to testeru nálezy nedělá.
+
+#### Fáze 4: zapojení
+
+Brána neprošla, proto **`terrio.mjs test run --scripted` nevzniklo** a agent testeru ani planner se nezměnily; žádný běh s Dockerem ani claim (task stack se nespouštěl, sdílený stack se nedotkl). Formát případů pro planner je zdokumentován v `docs/scripted-cases.md` workspace
+(pro pozdější krok), engine a testy zůstávají nezapojené. Doporučení: **tester neodstraňovat**, engine nezapojovat; stavět jen samostatnou drobnost mimo engine (plný test land kandidáta bez modelu, 0,54 % ceny pipeline, jen změna orchestrace).
 
 ### 8.14 `metrics commands`: které příkazy agenti používají a kolik stojí (CL-220, 2026-10-11)
 

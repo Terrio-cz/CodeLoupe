@@ -1,4 +1,4 @@
-*Last updated: 2026-10-10.*
+*Last updated: 2026-10-11.*
 
 This page holds the evidence behind [Agent runs](Agent-runs): how the numbers were made, then every experiment with its table and its limits. The short page has the takeaways, the bottom line and one overview table of all changes.
 
@@ -15,6 +15,8 @@ This page holds the evidence behind [Agent runs](Agent-runs): how the numbers we
 | Reviewer | Reads the finished change and reports findings against the task and the repository's rules. |
 | Tester | Builds the change, runs the tests and exercises the service. |
 | Dispatcher | Picks which open tasks to start next, so that no two of them edit the same code. |
+| Nightly summary agent | Reads the day's closed tasks and writes down the lessons that would have saved time, as one-line facts. |
+| Judge between stages | Turns the reviewer's and tester's reports of a round into criteria and a fix plan for the coder. |
 
 **Tasks.** The reviewer and planner experiments replay closed changes of the author's backend service, at the commit just before each one landed. They are called task A to E here and differ in size and kind. For the reviewer, the real review of the task gives a list of known findings, so a run can be checked for what it missed.
 
@@ -372,6 +374,31 @@ Reading a whole large source file is the biggest class (reviewer 2.6 % of its co
 Result over several reset sizes and cache lifetimes: the two smallest roles (a bookkeeping agent and the tester) gain 3-15 %; the larger ones lose from 0 to +39 %. In total the best policy is -0.1 %, and 200 thousand tokens of reset with a 60-minute cache is +6.5 %, 600 thousand +31 %.
 
 A pool is not built. What it would have bought is the same as a stable prefix, without the sessions.
+
+### Facts in a knowledge store instead of Markdown files
+
+*What was tried:* the author's flow keeps what its agents learned (about 1,060 one-line facts in 14 Markdown files) in files that agents read and append to. The daemon's [knowledge store](Knowledge-store) holds the same facts with a search, near-duplicate merging on write, the code each fact is about and a STALE mark when that code changed. It was put into the flow in three places, each its own experiment, on scratch copies of the workspace with daemons built from the current code (the installed daemon does not have the store yet, so nothing in the live workspace changed). Before the runs the expectation was written down: the ceiling on tokens is small (the two agents that keep knowledge are 1 % of the flow's cost), so a gain, if any, would be in fewer mistakes, not in cost.
+
+1. **The nightly summary agent** (smallest model) searches and writes facts through the store instead of reading and searching the Markdown files. Input: a real night's closed tasks and the facts as they were that evening, the 10 tasks once at a time and as two groups of five; 3 replicates each, 9 per variant.
+2. **The judge between stages** (Sonnet, medium) gets one sentence telling it to look for earlier findings with the same search. Input: the recorded review and test reports of one round of each of 10 closed tasks, 2 replicates, 20 per variant.
+3. **Earlier findings in the planner's pack and the reviewer's packet:** a section with up to five facts that name the files of the change (the files the issue names, for the planner), each with its source and its STALE mark, silent when there is none. Planner (Opus, high) on three tasks (A, C, E of the table above), reviewer (Opus, medium) on two (A, C), facts older than the task, 2-3 replicates, 13 per variant.
+
+| Experiment | Weighted units or USD, median, today -> with the store | Ratio | Quality |
+|---|---|---:|---|
+| Nightly summary agent | USD 0.0113 -> 0.0106 | **93 %** (rough 95 % interval 68-114 %) | 5.6 -> 5.3 lessons per run (96 %); no duplicate of an existing fact written by either; no stale fact |
+| Judge between stages | USD 0.0615 -> 0.0667 | **109 %** (82-141 %) | recorded criteria found again 75 % -> 64 % (noise: replicates of one case differ more than that); the search was used in 0 of 20 runs |
+| Planner with earlier findings in the pack | units 268 -> 241 (task A), 179 -> 184 (E), 260 -> 248 (C) | **93 %** (85-115 %) | known findings 18 of 21 -> 20 of 21, decisions 35 of 35 both, the real solution's files 87 % -> 84 % |
+| Reviewer with earlier findings in the packet | units 161 -> 159 (A), 141 -> 164 (C) | **106 %** (94-130 %) | known findings 18 of 18 both |
+
+Pooled over the pack runs (each run divided by the median of its task's runs without the section): median 0.99, USD 9.85 -> 10.05 for 13 runs per variant.
+
+- **The first result of the summary agent was a mirage.** With the first three replicates per variant (all 10 tasks in one run) the cost was 59 % of today's, which would have met the 40 % saving that was hoped for. The next six replicates per variant were about equal (108 % and 92 %), and the pooled 93 % is inside the spread of single runs (0.010-0.028 USD). Three replicates were not enough.
+- **Why the search does not save more:** the agent still reads the notes of every task, which is most of its input; the search replaces 3.9 file reads and greps per run by 3.1 search calls, and their answers are about the same size (facts-related output 27 -> 21 thousand characters per run).
+- **The judge reads no facts at all today,** so there is nothing for the store to replace. A sentence in its instructions was not acted on in any run, as with the code index earlier: an agent calls an extra tool only when it has to.
+- **The planner used the section** (it cited a shown fact in 5 of 8 runs: a rule about gates that run before routing became a line of its risk list, a fact flagged STALE because its file is gone became a decision), **the reviewer never did** (0 of 5). No run avoided a mistake that the same agent without the section did not also avoid: the planner without it finds the same facts itself by searching the fact files (1.3 searches per run against 1.0), and the reviewer finds all known findings either way, because the issue lists them.
+- **What is not shown:** fewer review rounds. A run is one review of one version, so the number of rounds per task cannot be read from it.
+- **Limits:** 2-3 replicates per cell, 26 of 36 planned pack runs (the budget), closed tasks whose issue already holds the later findings, only the facts with a time stamp used for the packs (451 of 1,076 have none), the lesson list for the summary agent made by hand after seeing both variants' output, and the judge replayed against today's code because the tasks' working copies are gone. One judge run hung and was repeated.
+- **Result:** not adopted in any of the three places; nothing in the live agents or packs changed. The store stays a product feature. Only about one fact in ten carries a file anchor (104 of 1,058), the rest names a file or class only in its text, so a lookup by changed file has to match text as well.
 
 ### Ideas dropped before they were built
 
