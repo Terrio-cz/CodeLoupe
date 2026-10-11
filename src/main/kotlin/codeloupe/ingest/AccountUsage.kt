@@ -2,15 +2,14 @@ package codeloupe.ingest
 
 import java.nio.file.Path
 
-/** What one Claude account used: the runs whose transcript lies under its config directory's `projects` folder. */
+/** What one Claude account used: the runs of its [RunScope]. */
 class AccountUsage(private val queries: RunQueries) {
     data class Totals(val weighted: Long, val lastUsedMs: Long?)
 
     /** Weighted tokens from [sinceMs] on (by hour bucket, like the Overview) and the end of the newest run, ever. */
-    fun totals(projects: Path, sinceMs: Long): Totals {
-        val prefix = prefix(projects)
-        val weighted = Math.round(queries.hours(Math.floorDiv(sinceMs, RunWriter.HOUR_MS), Long.MAX_VALUE, prefix).values.sum())
-        return Totals(weighted, queries.lastEndMs(prefix))
+    fun totals(scope: RunScope, sinceMs: Long): Totals {
+        val weighted = Math.round(queries.hours(Math.floorDiv(sinceMs, RunWriter.HOUR_MS), Long.MAX_VALUE, scope).values.sum())
+        return Totals(weighted, queries.lastEndMs(scope))
     }
 
     companion object {

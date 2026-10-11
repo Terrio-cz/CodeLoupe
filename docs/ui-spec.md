@@ -480,6 +480,7 @@ Accounts
   CLI `env set YOUTRACK_TOKEN_<ID>` na stdin, `env unset` při odebrání. Daemon `accounts.json` jen čte.
 - „Windows“ účtu = pracovní složky, které za posledních 15 min volaly CodeLoupe a mají u účtu transcript složku (`ProjectDirName`:
   každý nealfanumerický znak cesty → `-`); složka v obou účtech patří tomu, kdo v ní psal naposledy. Úspora zatím 0 jako v Overview.
+- Desktopová instance (CL-231): položka `claude` v `accounts.json` smí nést `desktopDir` — user-data adresář instance Claude Desktop, která je k účtu přihlášená (skutečná cesta; MSIX přesměrovává `%APPDATA%`, např. `…\Packages\Claude_<id>\LocalCache\Roaming\Claude-ucet2`). Ingest z `<desktopDir>/claude-code-sessions/**/local_*.json` čte jen `cliSessionId` (začátek souboru; titul, prompt ani token nikdy; soubor se čte znovu jen při změně velikosti či času) a sezení, které instance uvádí, patří jejímu účtu. Pořadí: desktopDir > identity (§ 9.13b) > vlastní config dir > unknown; sezení, které žádná instance neuvádí, funguje jako dosud, sezení dvou instancí patří novějšímu souboru. Nový `local_*.json` nebo změna `accounts.json` přeúčtuje už uložené řádky (`files`, `usage_snapshots`) při dalším průchodu; řádek se nebere zpět, když adresář přestane být uveden. Jakmile má `desktopDir` aspoň jeden účet, počítá se Cost 7d, Savings, Last used, Windows i filtr Overview z řádků uložených k sezením účtu, ne z adresáře `projects` (sdílený config dir by oběma účtům dal totéž). Pole `email` u položky `claude` (e-mail loginu) má v tabulce přednost před e-mailem z profilu config dir, který je u účtů sdílejících adresář stejný. Formulář účtů obě pole při přepisu souboru zachová.
 - API: `GET /ui-api/v1/accounts` (§ 9.13a) — jen metadata, nikdy tokeny.
 
 ### 3.10 Úvodní průvodce (CL-119)
@@ -907,6 +908,7 @@ interface LimitSnapshot {
   identity: string | null;      // otisk uuid účtu (12 hex): z hooku SessionStart (`<home>/session-identities.jsonl`) nebo z řádků, kterými transcript účet sám uvádí; jinak null
 }
 ```
+Sezení, které uvádí `desktopDir` některého účtu (§ 3.9), patří tomu účtu před identity i před adresářem transcriptu; `export metrics limits --account a|b` s tím pracuje jako s kterýmkoli účtem.
 Sdílí-li dva loginy `~/.claude`, `account` je `identity-<otisk>` (i pro implicitní `default`), dokud otisk nepojmenuje `"identity"` u položky `claude` v `accounts.json`; `account=identity-<otisk>` a `latest` s tím pracují jako s kterýmkoli účtem.
 `account=unknown` = snapshoty bez určeného účtu a bez identity. Řádky žijí v `usage_snapshots` (`transcripts.db`), nemaže je `clear()` ani smazání transcriptu.
 

@@ -56,7 +56,7 @@ class UiApi(
 
     suspend fun overview(range: String?, account: String? = null): Overview {
         val filter = account?.let { id ->
-            AccountFilter(id, accountViews.transcriptPrefix(id) ?: throw UiApiException.badRequest("unknown account $id"), accountViews.rootsOf(id))
+            AccountFilter(id, accountViews.scopeOf(id) ?: throw UiApiException.badRequest("unknown account $id"), accountViews.rootsOf(id))
         }
         return overview.overview(range ?: "7d", filter)
     }

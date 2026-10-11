@@ -12,6 +12,10 @@ export interface ClaudeEntry {
   tokenSecret?: string;
   /** Fingerprint of the account uuid (`identity-<fingerprint>` in the limits export); written by hand, the app only keeps it. */
   identity?: string;
+  /** User-data directory of the Claude Desktop instance signed in as this account (a real path, a packaged app redirects `%APPDATA%`); written by hand, the app only keeps it (CL-231). */
+  desktopDir?: string;
+  /** E-mail of the account's login, for accounts that share a config directory; written by hand, the app only keeps it (CL-231). */
+  email?: string;
 }
 
 export interface YoutrackEntry {
@@ -42,7 +46,12 @@ export function readAccounts(home: string): AccountsData {
     if (isObject(c) && text(c.id) && text(c.label) && text(c.configDir)) {
       const tokenSecret = text(c.tokenSecret);
       const identity = text(c.identity);
-      claude.push({ id: c.id as string, label: c.label as string, configDir: c.configDir as string, ...(tokenSecret ? { tokenSecret } : {}), ...(identity ? { identity } : {}) });
+      const desktopDir = text(c.desktopDir);
+      const email = text(c.email);
+      claude.push({
+        id: c.id as string, label: c.label as string, configDir: c.configDir as string,
+        ...(tokenSecret ? { tokenSecret } : {}), ...(identity ? { identity } : {}), ...(desktopDir ? { desktopDir } : {}), ...(email ? { email } : {}),
+      });
     }
   }
   const youtrack: YoutrackEntry[] = [];

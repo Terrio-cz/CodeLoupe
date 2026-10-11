@@ -74,6 +74,21 @@ describe('Claude accounts', () => {
     expect(fs.readFileSync(path.join(home, 'accounts.json'), 'utf8')).not.toContain('"default":');
   });
 
+  it('keeps the desktop directory and the e-mail of an account through a rename (CL-231)', async () => {
+    const t = setup();
+    const desktopDir = dir('Claude-ucet2');
+    fs.writeFileSync(path.join(home, 'accounts.json'), JSON.stringify({
+      version: 1,
+      claude: [{ id: 'a', label: 'A', configDir: dir('claude-a'), desktopDir, email: 'a@example.test' }, { id: 'b', label: 'B', configDir: dir('claude-b') }],
+      youtrack: [],
+    }));
+    expect((await t.manager.claudeRename('a', 'Renamed')).ok).toBe(true);
+    expect(readAccounts(home).claude).toEqual([
+      { id: 'a', label: 'Renamed', configDir: dir('claude-a'), desktopDir, email: 'a@example.test' },
+      { id: 'b', label: 'B', configDir: dir('claude-b') },
+    ]);
+  });
+
   it('refuses a relative path, a missing directory without create, a file, a duplicate and the implicit default again', async () => {
     const t = setup();
     expect((await t.manager.claudeAdd({ label: 'x', configDir: 'relative/dir', create: true })).ok).toBe(false);

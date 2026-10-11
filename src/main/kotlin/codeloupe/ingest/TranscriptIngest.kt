@@ -3,6 +3,7 @@ package codeloupe.ingest
 import codeloupe.JsonFormat
 import codeloupe.accounts.AccountResolver
 import codeloupe.accounts.ClaudeAccount
+import codeloupe.accounts.DesktopSessions
 import codeloupe.accounts.SessionIdentities
 import codeloupe.accounts.TranscriptAccounts
 import codeloupe.metrics.Categorizer
@@ -41,6 +42,7 @@ class TranscriptIngest(
     private val now: () -> Long = System::currentTimeMillis,
     private val accounts: () -> List<ClaudeAccount> = { emptyList() },
     private val identities: SessionIdentities? = null,
+    private val desktop: DesktopSessions = DesktopSessions(),
 ) {
     private val writer = RunWriter(db, categorizer)
     private var files: MutableMap<String, FileState>? = null
@@ -94,7 +96,7 @@ class TranscriptIngest(
             val known = files ?: writer.loadFiles().also { files = it }
             val listed = accounts()
             attribution = TranscriptAccounts(listed)
-            resolver = AccountResolver(listed)
+            resolver = AccountResolver(listed, desktop = desktop.sessions(listed))
             stamps = identities?.all().orEmpty()
             // Runs read by an older parser hold the first-line output of each message: they are read again, without announcing their gaps as new.
             val reparse = db.meta(PARSER) != PARSER_VERSION
@@ -158,7 +160,7 @@ class TranscriptIngest(
         val ter = metaTer ?: TER.find(parser.firstPrompt)?.value
         // The login the hook stamped at the start of the session serves a transcript that never names its own account.
         val identity = parser.identity ?: stamps[f.session]
-        val delta = FileDelta(f, ter, parser, results, usages, parser.drainLimits(), consumed, TailHash.at(f.path, consumed), parser.drainUsageSnapshots(), resolver.resolve(attribution.of(f.path), identity), identity)
+        val delta = FileDelta(f, ter, parser, results, usages, parser.drainLimits(), consumed, TailHash.at(f.path, consumed), parser.drainUsageSnapshots(), resolver.resolve(attribution.of(f.path), identity, f.session), identity)
         val added = writer.write(delta)
         known[f.key] = FileState(f.size, f.mtime, consumed, ter, JsonFormat.json.encodeToString(ParserSnapshot.serializer(), parser.snapshot()), delta.tail)
         return added

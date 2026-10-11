@@ -17,7 +17,13 @@ class Accounts(
     fun claude(): List<ClaudeAccount> {
         val listed = file().claude
         if (listed.isEmpty()) return listOf(ClaudeAccount(DEFAULT_ID, DEFAULT_LABEL, userHome.resolve(".claude"), implicit = true))
-        return listed.map { ClaudeAccount(it.id, it.label, Path.of(it.configDir), implicit = false, tokenSecret = it.tokenSecret?.takeIf(String::isNotBlank), identity = it.identity?.let(AccountIdentity::parse)) }
+        return listed.map {
+            ClaudeAccount(
+                it.id, it.label, Path.of(it.configDir), implicit = false, tokenSecret = it.tokenSecret?.takeIf(String::isNotBlank), identity = it.identity?.let(AccountIdentity::parse),
+                email = it.email?.trim()?.takeIf { e -> '@' in e },
+                desktopDir = it.desktopDir?.takeIf(String::isNotBlank)?.let { dir -> runCatching { Path.of(dir.trim()) }.getOrNull() },
+            )
+        }
     }
 
     fun youtrack(): List<AccountsFile.Youtrack> = file().youtrack
