@@ -1,4 +1,4 @@
-package codeloupe.commands
+package codeloupe.metrics
 
 /**
  * A shell command reduced to the group its calls fall in: the program, its subcommand, the flags (sorted, values dropped) and

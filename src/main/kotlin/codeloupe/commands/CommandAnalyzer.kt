@@ -37,7 +37,7 @@ class CommandAnalyzer(private val source: CommandSource, private val prices: Pri
             val normalizer = CommandNormalizer()
             val seen = HashSet<String>()
             for (step in source.steps(run.id)) {
-                val label = normalizer.of(step.tool, step.summary)
+                val label = normalizer.of(step.tool, step.summary, step.head, step.error, step.command)
                 val carried = CommandCost.carried(step.chars, run.turns - step.turn)
                 val stepMoney = perWeighted?.times(carried) ?: 0.0
                 val sent = step.inputChars ?: step.summary.length.toLong()

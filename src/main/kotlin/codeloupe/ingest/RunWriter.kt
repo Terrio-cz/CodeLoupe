@@ -4,9 +4,11 @@ import codeloupe.JsonFormat
 import codeloupe.events.Scrubber
 import codeloupe.metrics.Categorizer
 import codeloupe.metrics.GapDetector
+import codeloupe.metrics.InputSize
 import codeloupe.metrics.LimitHit
 import codeloupe.metrics.LocatedGap
 import codeloupe.metrics.Run
+import codeloupe.metrics.ShellCommand
 import codeloupe.metrics.ToolCall
 import codeloupe.metrics.ToolResult
 import codeloupe.metrics.TranscriptParser
@@ -82,7 +84,7 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
     }
 
     private fun insertSteps(c: Connection, runId: Long, results: List<ToolResult>) {
-        c.prepareStatement("INSERT OR REPLACE INTO steps(run_id, seq, turn, at_ms, name, category, summary, chars, ms, err, error, input, head, in_chars, in_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").use { s ->
+        c.prepareStatement("INSERT OR REPLACE INTO steps(run_id, seq, turn, at_ms, name, category, summary, chars, ms, err, error, input, head, in_chars, in_hash, cmd) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").use { s ->
             for (r in results) {
                 val category = categorizer.categorize(r.name, r.input)
                 val forGaps = category in GAP_INPUT
@@ -92,16 +94,17 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
                 r.atMs?.let { s.setLong(4, it) } ?: s.setNull(4, java.sql.Types.INTEGER)
                 s.setString(5, r.name)
                 s.setString(6, category)
-                s.setString(7, StepText.summary(r.input))
+                val summary = StepText.summary(r.input)
+                s.setString(7, summary)
                 s.setInt(8, r.chars)
                 s.setLong(9, r.ms)
                 s.setInt(10, if (r.err) 1 else 0)
                 s.setString(11, r.errText?.let { StepText.clean(it, ERROR_CHARS) })
                 s.setString(12, if (forGaps) Scrubber.json(r.input.plain()).toString() else null)
-                s.setString(13, if (category == "codeloupe") r.head?.let(Scrubber::text) else null)
-                val sent = r.input.toString()
-                s.setInt(14, sent.length)
-                s.setInt(15, sent.hashCode())
+                s.setString(13, if (category == "codeloupe" || r.name == WRITE_TOOL) r.head?.let(Scrubber::text) else null)
+                s.setLong(14, InputSize.chars(r.input))
+                s.setInt(15, r.input.toString().hashCode())
+                s.setString(16, if (r.name in SHELL_TOOLS) ShellCommand.of(summary) else null)
                 s.addBatch()
             }
             s.executeBatch()
@@ -246,6 +249,10 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
         private const val ERROR_CHARS = 80
         private const val TITLE_CHARS = 120
         private val GAP_INPUT = setOf("codeloupe", "code_read", "code_search", "code_search_shell")
+
+        // The answer of a `Write` says whether it created the file or replaced it (`metrics commands`, CL-220).
+        private const val WRITE_TOOL = "Write"
+        private val SHELL_TOOLS = setOf("Bash", "PowerShell")
 
         /** Attributed cost of a step in SQL: [codeloupe.metrics.ToolCall.attr] for the run's current turn count. */
         const val ATTR_SQL = "chars / 4.0 * (2.0 + 0.1 * max(0, runs.turns - turn))"

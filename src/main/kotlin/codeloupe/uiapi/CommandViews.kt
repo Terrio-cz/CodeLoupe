@@ -10,7 +10,7 @@ import java.time.Instant
 
 /**
  * The Commands tab of the Runs screen: which commands agents use and what they cost, from the same report as `codeloupe metrics commands`.
- * A report reads every step of the period, so the last few are kept for [TTL_MS] and a screen that asks again within it is served from there.
+ * A report reads every step of the period (about two seconds for a month of every role), so the last few are kept for [TTL_MS] and a screen that asks again within it, between two ingest passes, is served from there.
  */
 internal class CommandViews(private val transcripts: Transcripts, private val clock: () -> Instant = Instant::now) {
     private val cache = LinkedHashMap<String, Pair<Long, CommandsView>>()
@@ -23,12 +23,13 @@ internal class CommandViews(private val transcripts: Transcripts, private val cl
         val filter = CommandFilter(from.toEpochMilli(), null, role?.trim()?.takeIf { it.isNotEmpty() })
         transcripts.fresh()
         val ingest = transcripts.ingest.status()
-        val key = listOf(since, filter.role, size, order, ingest.running, ingest.filesDone, ingest.at).joinToString("|")
-        cached(key, now.toEpochMilli())?.let { return it }
+        val key = listOf(since, filter.role, size, order).joinToString("|")
+        if (!ingest.running) cached(key, now.toEpochMilli())?.let { return it }
         val view = withContext(Dispatchers.IO) {
             CommandsView(transcripts.commands.report(filter, size, order), transcripts.queries.roles(), ingest)
         }
-        return remember(key, now.toEpochMilli(), view)
+        // A pass in progress is still changing what the report reads: only a report made between passes is worth keeping.
+        return if (ingest.running) view else remember(key, now.toEpochMilli(), view)
     }
 
     @Synchronized

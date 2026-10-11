@@ -39,8 +39,9 @@ so it needs no transcript scan but shows only what the daemon has ingested; the 
 A call falls in a **group**: a shell command is reduced to its program, subcommand, sorted flags and placeholders for what it passed
 (`git diff --stat <path>`, `rg -n <str> <path>`, `gradlew :app:test --console --tests <str>`, `sed -n <n> <path>`), a command with a heredoc is
 a group of its own (`heredoc write` for `cat > file <<EOF`, `heredoc python`, `heredoc git commit`), file tools are grouped by tool name, and a
-`Write` is `Write (new file)` or `Write (existing file)` (Claude Code makes an agent read a file before it overwrites it, so a path nothing
-touched earlier in the run is a new file). Only the first command of a chain or pipe counts, and the label never carries an argument. Per group the report gives
+`Write` is `Write (new file)`, `Write (existing file)` (the answer of the call says which; steps stored without it go by the run's history, as Claude Code makes an agent read
+a file before it overwrites it) or `Write (rejected)` (it wrote nothing, what it cost is waste). Of a chain such as `cd dir && echo ---; rg x` the first real command counts, the label never
+carries an argument, and a line cut at 200 characters that is still setting the scene is `(command cut off)`. Per group the report gives
 
 | Column | Meaning |
 |---|---|
@@ -54,7 +55,9 @@ touched earlier in the run is a new file). Only the first command of a chain or 
 
 and the same by tool category (the categories of `collect`, so the two commands can be compared), by role and by week (ISO week of the start of the
 run). The last column of the table lists the three runs that carried most of a group. Checked on the transcripts of 2026-10-01 to 2026-10-11:
-for the `terrio-coder` role the category shares of this command equal those of `collect` to the tenth of a percent (see docs/plan.md § 8.11).
+for the `terrio-coder` role the calls, result tokens and carried cost of every tool category equal those of `collect` to the unit (docs/plan.md § 8.13).
+The daemon stores what the report needs next to each step (the size and a hash of the call's input, the group of a shell call, the answer of a `Write`) and reads
+the transcripts again once after an update that adds them.
 
 ## Money
 

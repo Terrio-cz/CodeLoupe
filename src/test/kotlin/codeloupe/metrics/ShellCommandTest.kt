@@ -1,4 +1,4 @@
-package codeloupe.commands
+package codeloupe.metrics
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

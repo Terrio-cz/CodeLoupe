@@ -76,10 +76,12 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
         if ("tail" !in has) db.createStatement().use { it.execute("ALTER TABLE files ADD COLUMN tail TEXT") }
     }
 
-    // `steps.in_chars` and `in_hash` (the size and a hash of a call's whole input, for `metrics commands`, CL-220) came later: null for steps stored before them.
+    // `steps.in_chars`, `in_hash` (the size and a hash of a call's whole input) and `cmd` (the group of a shell call) came later, for `metrics commands` (CL-220): null for steps stored before them.
     private fun addStepInputColumns(db: Connection) {
         val has = db.createStatement().use { s -> s.executeQuery("PRAGMA table_info(steps)").use { r -> generateSequence { if (r.next()) r.getString("name") else null }.toList() } }
-        for (column in listOf("in_chars", "in_hash")) if (column !in has) db.createStatement().use { it.execute("ALTER TABLE steps ADD COLUMN $column INTEGER") }
+        for ((column, type) in listOf("in_chars" to "INTEGER", "in_hash" to "INTEGER", "cmd" to "TEXT")) {
+            if (column !in has) db.createStatement().use { it.execute("ALTER TABLE steps ADD COLUMN $column $type") }
+        }
     }
 
     private companion object {

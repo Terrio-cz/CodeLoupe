@@ -22,6 +22,23 @@ class CommandNormalizerTest {
     }
 
     @Test
+    fun `the answer of a write tells new from existing whatever the run read before`() {
+        val n = CommandNormalizer()
+        assertEquals("Write (existing file)", n.of("Write", "src/A.kt", "The file C:/w/src/A.kt has been updated successfully.").label)
+        assertEquals("Write (new file)", n.of("Write", "src/A.kt", "File created successfully at: C:/w/src/A.kt").label, "the answer wins over the history")
+        n.of("Read", "src/B.kt")
+        assertEquals("Write (new file)", n.of("Write", "src/B.kt", "File created successfully at: src/B.kt").label)
+        assertEquals("Write (existing file)", n.of("Write", "src/C.kt", "The file src/C.kt has been overwritten.").label)
+    }
+
+    @Test
+    fun `a rejected write wrote nothing and is a group of its own`() {
+        val n = CommandNormalizer()
+        assertEquals("Write (rejected)", n.of("Write", "src/A.kt", "<tool_use_error>File has not been read yet.</tool_use_error>", failed = true).label)
+        assertEquals("Write (new file)", n.of("Write", "src/A.kt").label, "and it touched nothing")
+    }
+
+    @Test
     fun `a path that is not known leaves the write plain`() {
         val n = CommandNormalizer()
         assertEquals("Write", n.of("Write", "").label)

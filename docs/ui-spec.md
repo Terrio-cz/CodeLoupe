@@ -208,7 +208,7 @@ Runs | Commands          [Role ▾] [Period ▾] [Rank by ▾]
 
 - Řádek je **skupina příkazů**: shell příkaz zredukovaný na program, podpříkaz, seřazené přepínače a zástupné znaky
   (`<str>` řetězec v uvozovkách, `<path>`, `<n>`, `<arg>`); heredoc zápisy jsou vlastní skupiny (`heredoc write`, `heredoc python`),
-  souborové nástroje podle jména (`Read`, `Edit`, `Write (new file)` / `Write (existing file)`), MCP nástroje jako `server/nástroj`.
+  souborové nástroje podle jména (`Read`, `Edit`, `Write (new file)` / `Write (existing file)` podle odpovědi, `Write (rejected)` pro zamítnutý), MCP nástroje jako `server/nástroj`.
   Popisek skupiny nikdy nenese argumenty volání.
 - Sloupce: volání, běhy, **Results** (tokeny výsledků, čtvrt tokenu na znak jako `metrics collect`), **Arguments** (co volání poslala),
   **Repeats** (volání shodná s dřívějším voláním téhož běhu a tokeny, které přinesla znovu), chyby, **Cost share** (podíl ceny běhů, který
@@ -757,7 +757,7 @@ uložené (nejnovější transcripty první), a klient volá znovu. Další vol�
 
 Které příkazy agenti používají a kolik stojí: zpráva `codeloupe metrics commands`, spočtená ze `steps` a `runs` v `transcripts.db`.
 `since` je `24h` | `7d` (výchozí) | `30d`, obecně `<n>d`, `<n>h`, den (`2026-10-01`) nebo ISO okamžik; `role` přesná role; `top` 1–100
-(výchozí 20) skupin; `sort` `cost` (výchozí) | `calls` | `tokens`. Odpověď se drží 20 s a platí jen pro stejný stav ingestu.
+(výchozí 20) skupin; `sort` `cost` (výchozí) | `calls` | `tokens`. Odpověď se drží 20 s, ale jen mezi dvěma průchody ingestu (za běžícího průchodu se nedrží).
 ```ts
 interface CommandsView { report: CommandReport; roles: string[]; ingest: IngestStatus }   // roles = všechny role pro filtr
 interface CommandReport {
@@ -780,7 +780,7 @@ interface CommandGroup {
 ```
 Tokeny jsou znaky děleno 4. `weighted` skupiny je `znaky / 4 × (2 + 0,1 × tahy po výsledku)` (zápis do cache 1 h a čtení v dalších tazích, jako
 `metrics collect`), `costPct` jeho podíl na ceně započtených běhů, `money` stejný podíl peněz běhu v jeho modelu. **Argumenty** a **opakování** se berou
-z velikosti a otisku celého vstupu volání (`steps.in_chars`, `in_hash`); kroky uložené před CL-220 je nemají a platí zkrácený popis (≤ 200 znaků).
+z velikosti a otisku celého vstupu volání (`steps.in_chars`, `in_hash`), skupina shell volání z `steps.cmd` a stav `Write` z uložené odpovědi (`steps.head`); kroky uložené před CL-220 je nemají (aktualizace přečte transcripty jednou znovu), do té doby platí zkrácený popis (≤ 200 znaků) a historie běhu.
 Neplatné `since`, `top` nebo `sort` → `400 bad_request`.
 
 ### 9.8 `GET /ui-api/v1/runs/{id}` a `GET /ui-api/v1/runs/{id}/steps?sort=&limit=&cursor=` (CL-62)

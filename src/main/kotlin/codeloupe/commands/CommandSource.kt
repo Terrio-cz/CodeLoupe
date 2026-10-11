@@ -31,14 +31,14 @@ class CommandSource(private val db: TranscriptDb) {
     }
 
     fun steps(runId: Long): List<CommandStep> = synchronized(db.reader) {
-        db.reader.prepareStatement("SELECT turn, name, category, summary, chars, err, in_chars, in_hash FROM steps WHERE run_id = ? ORDER BY seq").use { s ->
+        db.reader.prepareStatement("SELECT turn, name, category, summary, chars, err, in_chars, in_hash, head, cmd FROM steps WHERE run_id = ? ORDER BY seq").use { s ->
             s.setLong(1, runId)
             s.executeQuery().use { r ->
                 buildList {
                     while (r.next()) {
                         val inChars = r.getLong(7).takeIf { !r.wasNull() }
                         val inHash = r.getLong(8).takeIf { !r.wasNull() }
-                        add(CommandStep(r.getInt(1), r.getString(2), r.getString(3), r.getString(4), r.getInt(5), r.getInt(6) == 1, inChars, inHash))
+                        add(CommandStep(r.getInt(1), r.getString(2), r.getString(3), r.getString(4), r.getInt(5), r.getInt(6) == 1, r.getString(9), inChars, inHash, r.getString(10)))
                     }
                 }
             }

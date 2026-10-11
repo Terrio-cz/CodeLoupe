@@ -1304,6 +1304,34 @@ Největší položka zápisu je `Write` nového souboru (4,9 %) a heredoc úprav
 
 Omezení měření: `edit` je odhad podle tvaru příkazu (heuristika zápisu v shellu), úspěšný build podle `gradle exit 0` / `BUILD SUCCESSFUL` (82 z 336 běhů s buildem nemá zelený build ve svém běhu: odevzdání na review po předběžné kontrole); soubory úkolu z gitu mají 26 běhů bez shody (6 %); USD je z cenové tabulky (ne z `total_cost_usd`), součet `terrio-*` rolí 3 255 USD proti 3 224 USD jmenovateli.
 
+### 8.13 `metrics commands`: které příkazy agenti používají a kolik stojí (CL-220, 2026-10-11)
+
+Trvalá podoba jednorázových rozborů codera (§ 8.12): `codeloupe metrics commands [--since 10d] [--until] [--role] [--run] [--top 15] [--sort cost|calls|tokens] [--json]` a záložka
+Commands na obrazovce Runs (`GET /ui-api/v1/commands`), obojí z jednoho `CommandAnalyzer` nad `transcripts.db` (tabulky `runs` a `steps`), takže čísla jsou táž. Skupina příkazů je shell příkaz
+zredukovaný na program, podpříkaz, seřazené přepínače a zástupné znaky (`rg -n <str> <path>`, `git diff --stat <path>`, `gradlew :app:test --console --tests <str>`), heredoc jako vlastní
+skupina (`heredoc write` pro `cat > f <<EOF`, jinak `heredoc python` …), souborové nástroje podle jména a `Write` podle toho, co se souborem stalo (odpověď „File created“ proti „has been updated“,
+`Write (rejected)` pro zamítnutý; kroky bez odpovědi podle historie běhu: cesta, kterou běh dřív nečetl ani neupravil, je nový soubor). Z řetězce `cd … && echo … ; příkaz` se bere první skutečný příkaz,
+řádek useknutý na 200 znacích, který ještě jen nastavuje prostředí, je `(command cut off)`. Cena nesená skupinou je `znaky / 4 × (2 + 0,1 × tahy po výsledku)` jako `collect` (pravidlo výstupu z CL-206,
+ceny z `PriceTable`), peníze jsou jeho podíl na ceně běhu v jeho modelu. Ingest ukládá navíc `steps.in_chars` (znaky jmen a hodnot parametrů), `in_hash` (opakování), `cmd` (skupinu shell volání, spočtenou jednou
+při čtení; propočet za běhu by stál 4–5 s na 123 tis. kroků) a odpověď `Write`; `PARSER_VERSION` 4 proto přečte transcripty znovu.
+
+*Ověření* (throwaway daemony na portech 47840/47841 s vlastním `CODELOUPE_HOME` v `%TEMP%`, jen čtení transcriptů, bez `claude -p`; živý daemon se nedotkl): `collect --since 2026-10-01` a `metrics commands` nad týmiž přepisy.
+(1) **Shoda s `collect` do jednotky.** Všechny projekty, `terrio-coder`: 379 běhů, 8 418 volání, 4 354 558 tokenů výsledků, 33 782 324 jednotek nesených výsledky z 160 826 017 jednotek ceny běhů, všech 15 kategorií se shoduje
+(volání, jednotky, chyby; u `stack` o 1 token jiným zaokrouhlením součtu), `code_search_shell` **11,1 %**, `shell_other` **3,6 %**. Jen projekt Terrio (`metrics.transcriptDirs`; 232 běhů jako v § 8.12): 7 092 volání, 3 764 559 tokenů,
+32 196 735 z 151 982 825 jednotek (21,2 %, 64,39 USD), `code_search_shell` 11,5 % a `shell_other` 3,5 %, opět shoda do jednotky ve všech kategoriích. Čísla 12,4 / 3,7 % z CL-189 jsou z dřívějšího řezu dat (jiné období a počet běhů);
+dnešní `collect` dává 11,5 / 3,5 %, a o tu hodnotu se příkaz opírá (odchylka od staršího čísla tedy 0,9 bodu, 7 %, a není z metody).
+(2) **Zápis codera jako v § 8.12 § 6** (`terrio-coder` + `terrio-coder-high`, 401 běhů): `Edit` 1 755 volání (shoda), `Write` nového souboru **1 103** (shoda), `Write` existujícího **82 + 1 zamítnutý = 83** (shoda); průměrný argument
+`Write` nový 5 301 znaků proti 5 164 (+2,7 %), existující 5 696 proti 5 634 (+1,1 %), `Edit` 1 204 proti 1 040 (počítá se i jména parametrů a cesta). Shellová čtení vycházejí o 5–12 % výš než tamní počty
+(`rg` 2 370 proti 2 168, `sed -n` 1 668 proti 1 580, `cat` 523 proti 493, `git diff` 239 proti 192), protože se počítá každý řádek, jehož první skutečný příkaz je ten program, včetně řetězců `cd … && rg`.
+Heuristika historie běhu bez odpovědi `Write` přeceňuje „nový soubor“ o 50 volání (1 153 proti 1 103; agent smí přepsat soubor, který četl shellem), proto se odpověď ukládá. Přesné opakování téhož volání v běhu: u `terrio-coder` (všechny projekty)
+1 z 610 `Read`, 0 u `rg`, `cat`, `sed -n` (v souladu s mediánem 0 z § 8.12).
+(3) **Rychlost**: report za 30 dní všech rolí (2 569 běhů, 123 tis. kroků) 2,3 s přes HTTP, jedna role 0,3 s, CLI s JVM 8 s; odpověď se drží 20 s mezi průchody ingestu.
+(4) **Normalizace** (kontrola 70 nejdražších skupin všech rolí): `rg`, `git diff`, `sed -n`, `cat`, `gradlew` a heredoc zápisy se seskupují rozumně; zjištěné a opravené: řetězce `echo … ; příkaz` a `cd`/`export` na samostatných řádcích
+(řádky souhrnu jsou spojené mezerou), smyčky `for`/`while` jako `shell loop`. Zbylé: seznam skupin je dlouhý (6 108 skupin za 10 dní, ocas jednotlivých cest a přepínačů), proto `--top`.
+
+Top 15 skupin `terrio-coder` (projekt Terrio, od 2026-10-01; podíl ceny běhů): `sed -n <n> <path>` 4,8 % (715 volání), `Read` 3,5 % (433), `cat <path>` 2,6 % (211), `heredoc python` 1,4 % (799), `rg -n <str> <path>` 0,9 % (333),
+`node brain.mjs read <arg>` 0,4 %, `wc -l <path>` 0,3 %, `heredoc write` 0,3 %, `rg -n <str>` 0,3 %, `shell loop` 0,3 %, `grep -n <str> <path>` 0,2 %, `git status --porcelain` 0,2 %, `rg --glob -n <str> <path>` 0,2 %, `sed -i <str>` 0,2 %, `Write (new file)` 0,2 %.
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |

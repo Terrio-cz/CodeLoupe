@@ -23,8 +23,8 @@ class CommandReportTest {
     private val today = Instant.parse("2026-10-08T10:00:00Z")
     private val rg = "cd /w && rg -n \"Foo\" src"
 
-    // The results of session() held in context: 400, 80, 40 and 80 characters, the two short ones, and 120, at 2 + 0.1 per later turn of 3.
-    private val carried = 220 + 44 + 21 + 42 + 1 + 1 + 0 + 60
+    // What the results of session() cost held in context: 400, 80, 40, 80, 40, 50, 0, 120 and 50 characters, a quarter token each, at 2 + 0.1 per later turn of 3.
+    private val carried = 220 + 44 + 21 + 42 + 21 + 25 + 0 + 60 + 25
 
     private fun session(model: String, start: Instant = today) = TranscriptBuilder(start, model)
         .prompt("work on TER-12")
@@ -36,15 +36,17 @@ class CommandReportTest {
                 Triple("e", "Write", args("file_path" to "src/New.kt", "content" to "z".repeat(500))),
             ),
         )
-        .result("c", "x".repeat(40)).result("d", "y".repeat(80)).result("e", "ok")
+        .result("c", "x".repeat(40)).result("d", "y".repeat(80)).result("e", "File created successfully at: src/New.kt")
         .turn(
             tools = arrayOf(
                 Triple("f", "Write", args("file_path" to "src/New.kt", "content" to "w".repeat(300))),
+                Triple("i", "Write", args("file_path" to "src/Old.kt", "content" to "q".repeat(100))),
                 Triple("g", "Bash", args("command" to "cat > src/N.kt <<'EOF'\nclass N\nEOF")),
                 Triple("h", "Bash", args("command" to "git diff --stat")),
             ),
         )
-        .result("f", "ok").result("g", "").result("h", "d".repeat(120), error = true)
+        .result("f", "The file src/New.kt has been updated successfully.").result("i", "The file src/Old.kt has been updated successfully.")
+        .result("g", "").result("h", "d".repeat(120), error = true)
 
     private fun withRig(body: (IngestRig, Path) -> Unit) {
         val root = TestRepos.tmpDir("commands")
@@ -66,8 +68,8 @@ class CommandReportTest {
         val by = r.groups.associateBy { it.command }
 
         assertEquals(1, r.runs)
-        assertEquals(8, r.calls)
-        assertEquals((400 + 80 + 40 + 80 + 2 + 2 + 0 + 120) / 4L, r.resultTokens)
+        assertEquals(9, r.calls)
+        assertEquals(Math.round((400 + 80 + 40 + 80 + 40 + 50 + 0 + 120 + 50) / 4.0), r.resultTokens)
         val read = by.getValue("Read")
         assertEquals(2, read.calls)
         assertEquals(1, read.repeats, "the second read of the same file repeats the first")
@@ -79,8 +81,8 @@ class CommandReportTest {
         assertEquals(1, search.repeats)
         assertEquals(40, search.resultTokens)
         assertEquals(1, by.getValue("Write (new file)").calls)
-        assertEquals(1, by.getValue("Write (existing file)").calls)
-        assertTrue(by.getValue("Write (new file)").argTokens > by.getValue("Write (existing file)").argTokens, "the 500 characters sent cost more than the 300")
+        assertEquals(2, by.getValue("Write (existing file)").calls, "the answer says src/Old.kt was replaced although the run never read it")
+        assertTrue(by.getValue("Write (new file)").argTokens > by.getValue("Write (existing file)").argTokens, "the 500 characters sent cost more than the 300 and 100")
         assertEquals(1, by.getValue("heredoc write").calls)
         val diff = by.getValue("git diff --stat")
         assertEquals(1, diff.errors)
@@ -90,6 +92,17 @@ class CommandReportTest {
         assertEquals(2, read.topRuns.single().calls)
         assertEquals("main", read.topRuns.single().role)
         assertEquals("TER-12", read.topRuns.single().ter)
+    }
+
+    @Test
+    fun `the ingest stores the group of each shell call and nothing for the other tools`() = withRig { rig, _ ->
+        session("claude-sonnet-5-5").write(rig.project.resolve("s1.jsonl"))
+        rig.ingest.passNow()
+        val stored = rig.db.reader.createStatement().use { s -> s.executeQuery("SELECT group_concat(cmd, '|') FROM steps WHERE cmd IS NOT NULL").use { it.next(); it.getString(1) } }
+        assertEquals("rg -n <str> <arg>|rg -n <str> <arg>|heredoc write|git diff --stat", stored)
+        assertEquals(5, rig.scalar("SELECT count(*) FROM steps WHERE cmd IS NULL"), "two reads and three writes")
+        assertEquals(9, rig.scalar("SELECT count(*) FROM steps WHERE in_chars IS NOT NULL AND in_hash IS NOT NULL"))
+        assertEquals(3, rig.scalar("SELECT count(*) FROM steps WHERE head IS NOT NULL AND name = 'Write'"), "the answers of the writes")
     }
 
     @Test
@@ -142,7 +155,7 @@ class CommandReportTest {
         assertEquals(2, both.runs)
         assertEquals(listOf("2026-W38", "2026-W41"), both.weeks.map { it.key })
         assertEquals(listOf("main"), both.roles.map { it.key })
-        assertEquals(16, both.calls)
+        assertEquals(18, both.calls)
 
         assertEquals(1, report(rig, CommandFilter(today.minusSeconds(86_400).toEpochMilli())).runs)
         assertEquals(1, report(rig, CommandFilter(0, today.minusSeconds(86_400).toEpochMilli())).runs, "until")
@@ -168,14 +181,15 @@ class CommandReportTest {
     }
 
     @Test
-    fun `steps stored before the input was kept still give repeats and sizes from their summaries`() = withRig { rig, _ ->
+    fun `steps stored before the input, the answers and the groups were kept still give repeats, sizes, groups and Write states from their summaries`() = withRig { rig, _ ->
         session("claude-sonnet-5-5").write(rig.project.resolve("s1.jsonl"))
         rig.ingest.passNow()
-        rig.db.writer.createStatement().use { it.executeUpdate("UPDATE steps SET in_chars = NULL, in_hash = NULL") }
+        rig.db.writer.createStatement().use { it.executeUpdate("UPDATE steps SET in_chars = NULL, in_hash = NULL, head = NULL, cmd = NULL") }
         val by = report(rig).groups.associateBy { it.command }
         assertEquals(1, by.getValue("Read").repeats)
         assertEquals(1, by.getValue("rg -n <str> <arg>").repeats)
-        assertEquals(3, by.getValue("Write (new file)").argTokens, "the 10 characters of the path")
+        assertEquals(2, by.getValue("Write (new file)").calls, "without the answer a path nothing touched before is new")
+        assertEquals(5, by.getValue("Write (new file)").argTokens, "the 20 characters of the two paths")
     }
 
     @Test
@@ -187,7 +201,7 @@ class CommandReportTest {
         assertEquals(direct, fromFile)
 
         val text = CommandReportRender.text(fromFile)
-        assertTrue(text.startsWith("commands 1970-01-01 .. now: 1 runs, 8 calls, 181 result tokens"), text)
+        assertTrue(text.startsWith("commands 1970-01-01 .. now: 1 runs, 9 calls, 215 result tokens"), text)
         assertTrue("top 4 of 6 groups:" in text)
         assertTrue(text.lines().any { it.startsWith("Read ") && "runs 1" in it }, "a group line with its heaviest runs")
         assertTrue("by tool category (the categories of metrics collect):" in text)
