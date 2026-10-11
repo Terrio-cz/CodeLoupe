@@ -128,12 +128,13 @@ class BrainDaemonTest {
     }
 
     @Test
-    fun `brain_search and brain_hygiene answer from the index`() {
+    fun `brain_search answers from the index and hygiene over HTTP`() {
         fileEntry()
         val search = Json.parseToJsonElement(tool("brain_search", buildJsonObject { put("terms", buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("rounding")) }) })).jsonObject
         assertEquals("f-file0001", search["hits"]!!.jsonArray.first().jsonObject["id"]!!.jsonPrimitive.content)
         assertFalse("anchors" in search["hits"]!!.jsonArray.first().jsonObject, "empty lists are left out of what an agent reads")
-        assertTrue(Json.parseToJsonElement(tool("brain_hygiene", workspaceArgs())).jsonObject["duplicates"] == null, "nothing to report is an empty report")
+        val hygiene = Json.parseToJsonElement(post("/brain/hygiene", workspaceArgs()).body()).jsonObject
+        assertTrue(hygiene["duplicates"]!!.jsonArray.isEmpty() && hygiene["dangling"]!!.jsonArray.isEmpty(), hygiene.toString())
     }
 
     @Test

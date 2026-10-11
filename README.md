@@ -123,7 +123,6 @@ Every tool is on MCP and on the CLI (`codeloupe <tool> --help`); details in the
 | `update` | set fields and add a comment on a tracker issue (needs a tracker) |
 | `brain_brief` | the start of a role in a workspace that keeps a shared-memory brain (`brain/brain.mjs`): state, settled findings, task notes, decisions and the facts the role reads, whole entries ranked by code proximity (anchors on your files and symbols, callers, module, tasks that changed that code) above text; see [Brain index](docs/wiki/Brain-index.md) |
 | `brain_search` | whole brain entries for words and files, ranked the same way |
-| `brain_hygiene` | near-duplicate brain entries and entries anchored on code that is gone, for a nightly review |
 
 ## Documentation
 

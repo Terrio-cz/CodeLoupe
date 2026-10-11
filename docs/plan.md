@@ -1569,6 +1569,55 @@ zaplňovalo řádek chyb; počítají se jen vyhozená volání.
 *Co toto neměří.* Pravdivost tvrzení, ne užitečnost: že coder se podle karty chová stylověji a reviewer nehlásí stylové nálezy, ukáže až řízené A/B z karty CL-219 (brána z CL-213: kvalita ne horší, medián ceny nejvýš 90 %, ≥ 3 opakování × ≥ 3 tasky).
 To se nespustilo (stojí peníze; po schválení a po napojení do packů, které čeká na CL-216).
 
+### 8.16 Brain v daemonu: vyhledávání podle kódu, kotvy, nástroje `brain_brief` a `brain_search`, měření kol (CL-234, 2026-10-12)
+
+Navazuje na strukturovaný brain pracovního prostoru (CL-233) a na obrazovku Brain (CL-232). Soubory brainu zůstávají jedinou pravdou a `brain.mjs` jediným
+zapisovačem; daemon drží kopii, kterou lze zahodit. Nic na kritické cestě (claim, zámky, brána landu) daemon nevolá.
+
+- **Index.** `brain.mjs export` vypíše všechny záznamy faktů (obě úrovně) a nálezové řádky úkolů s metadaty (id, druh, úkol, soubory, symboly, kotvy, nahrazené,
+  čísla zpětné vazby), jazyk `workspace.json` (role, `canonicalRepo`) a místa ke sledování. Daemon z toho staví `BrainIndex` na pracovní prostor (BM25 nad kmeny
+  jako `find mode=search`, doc = text + soubory + symboly + kotvy + téma + úkol). Před každým dotazem porovná otisk (název, velikost, čas změny souborů pod `facts/`,
+  `tasks/`, `feedback.jsonl`, `workspace.json` a faktů stroje; žádný soubor nečte) s tím, při kterém index vznikl: připsaný `fact` / `note` je vidět hned v dalším
+  dotazu. Selže-li export, odpovídá poslední index. Registrace: `workspaces.brains` nebo repozitář v `workspaces.repos`, jako u obrazovky Brain.
+- **Pořadí** (`BrainRanker`): blízkost kódu rozhoduje, text jen řadí uvnitř stupně. Stupně: soubor nebo symbol dotazu (kotva, nebo soubor či symbol v textu, 100 / 85),
+  volající (soubory, které surově odkazují na deklarace dotazovaných souborů, 60), stejný modul (45), úkol, jehož commity ty soubory změnily (z `tasks.db` z CL-91, 30);
+  text (BM25) přidá nejvýš 20, zpětná vazba nejvýš 12, nikdy nic neubírá. Celé záznamy, nikdy ořezané; u každého zásahu `why` (`file+symbol+caller+module+task+text`).
+  Záznamy úkolu, který se ptá, se vynechají (jsou v jeho poznámkách). Kontext kódu (`BrainCodeContext`): deklarace souboru jako jména kotev, modul, volající přes `UsageFinder`
+  (nejvýš 6 souborů × 4 deklarace, jen přesné zásahy), úkoly z historie; omezeno na 24 souborů a 6 s, co se nepřečte, je poznámka a pořadí jde podle textu.
+- **Nástroje.** MCP `brain_brief(role, task, files[], terms[])` spustí `brain.mjs brief … --json` pracovního prostoru (stav, SETTLED, poznámky úkolu, rozhodnutí na kotvách,
+  fakta role) a ten si pořadí vyžádá od daemona (`POST /brain/rank`); tvar je tedy `brief --json` a brain, který ještě není v indexu, odpoví taky. `brain_search`
+  je `search` nad stejným pořadím. Nabízejí se jen s registrovaným brainem (každý nástroj stojí tokeny v každé relaci). `symbol` a `context` připojí k jedné deklaraci
+  řádek `brain: 3 on Billing.total — f-… TER-5 finding: …` (jen z už postaveného indexu, nikdy nečeká). `brain.mjs brief` použije daemona, když odpoví (nejvýš 9 s,
+  `BRAIN_DAEMON_TIMEOUT_MS`, `--no-daemon`), jinak řadí podle shody termů a řádek `# … ranked by matching terms only` to řekne.
+- **Kotvy.** Stabilní id deklarace jsou tři kotvy, nikdy řádek: `@sym:<FQN>` (u přetížení `(Typ,…)`), `@file:<cesta>`, `@mod:<modul>`. Při `fact` / `note` / `reject` převede
+  daemon `soubor:řádek` v textu (2,5 s) na kotvy obklopující deklarace; `@sym` jen když ji text jmenuje jako kód (CamelCase, `` `jméno` ``, `jméno(`, `.jméno`), nebo když řádek psal
+  autor ve svém worktree (`trusted`), jinak typ, který text jmenuje; soubor a modul vždy. Řádek poznámky úkolu nese kotvy jako `<!-- anchors=… -->`. Bez daemona zůstane `soubor:řádek`
+  a daemon doplní později připojeným záznamem `@anchor <id> <kotva>` (`brain.mjs backfill`, sám nejvýš jednou za 15 min a pracovní prostor, `CODELOUPE_BRAIN_BACKFILL=0` ho vypne);
+  přejmenování a přesun je `@anchor <id> <nová> replaces=<stará>`. Deklarace se jménem s mezerou (test pojmenovaný větou) kotva není. Zmizelý symbol je visící kotva a `brain.mjs hygiene`
+  ho navrhne k `--supersedes`; blízké duplicity (Jaccard kmenů ≥ 0,85 a stejná čísla, jako v `know`) navrhne ke sloučení, nic nepřepisuje.
+- **Zpětná vazba.** `brief` s úkolem připíše do `feedback.jsonl` id vrácených záznamů; záznam, jehož problém nálezy téhož úkolu po briefu znovu zvedly (shoda souborů či symbolů a slov),
+  dostane `hit`, v pořadí až +12. Zobrazený a nepotřebný se nemění.
+- **Review packet** (CL-196): `run/context.mjs` přidá sekci s `brain.mjs checklist TER-<n> --files …` (nálezy, rozhodnutí a gotchy ukotvené na změněných souborech a symbolech).
+  **Obrazovka Brain** čte téma z `show <téma> --json` (id, úkol, kotvy navíc; starší engine = čtení souboru jako dřív). Agenti `terrio-planner`, `-coder`, `-reviewer(-opus)`, `-deep-reviewer`
+  volají `brain_brief` (jinak `brain.mjs brief`), `terrio-retro` spouští `hygiene`.
+- **Ověření.** Gradle: 24 nových testů v `codeloupe.brain` a jeden v `BrainApiTest` (pořadí stupňů, vynechání vlastního úkolu, zpětná vazba, sekce a filtry, otisk a obnova po zápisu, kotvy s přetížením / typem / větou
+  pojmenovaným testem, přesun a visící kotva, duplicity, backfill, trasy a nástroje na skutečném daemonu s kanonickým `brain.mjs`); aplikace: tsc čistý, vitest 291/291 (node 24; node 20.6 na `rolldown` nestačí).
+  Terrio: `mcp/test/brain-index-test.mjs` (68), `brain-rounds-test.mjs` (19), `run-all.sh` zelený. Živě proti skutečnému brainu Terria (1 069 záznamů, 1 787 nálezových řádků) a repozitáři
+  TerrioImporter na samostatném daemonu: změněné soubory TER-664 (4) dají 245 jmen, 17 volajících souborů a 18 úkolů, nálezy z dřívějších úkolů na těch souborech jsou nahoře (`file+task+caller+text`),
+  celý `brain_brief` 0,4 s; `fact` s `AddressRepository.kt:73-80` dostane `@sym …selectAddressPage`, `@file`, `@mod`; zápis je v dalším dotazu; daemon vypnutý: `brief` 0,27 s po termech,
+  `fact` si nechá `soubor:řádek`, `claim` / `note` / `state` / zámek `gradle-test` / `release` projdou, `backfill` po restartu doplní kotvy.
+- **Nález z ostrého běhu.** První verze zakotvila člena podle řádku, když text jmenoval jen třídu nebo obyčejné slovo (`address`, `the`); automatický backfill zapsal do skutečného brainu 16 záznamů,
+  7 kotev se člena nedotklo jen podle řádku a bylo nahrazeno typem (`--replaces`), pravidlo „symbol jen když ho text jmenuje jako kód, jinak typ“ je v kódu a v testu.
+- **Měření kol a premortemu** (`node run/brain-rounds.mjs --since 30d`, skript ve workspace Terria, test `mcp/test/brain-rounds-test.mjs`). Úkol = uzavřený (`close=ok` / `land=ok`) v okně; kolo = průchod implementace (`code=ok`, nebo
+  `round=n`), nález = řádek `!P<n>` a odmítnutý `x …`, patří ke kolu, jehož implementaci soudil; „pojmenoval ho premortem“ = nález s plánem sdílí identifikátor kódu (CamelCase / snake_case, ≥ 8 znaků), volně i čtyři
+  společná výrazná slova. **Základ (30 dní do 2026-10-12, brain Terria vede od 2026-09-23):** okno od 2026-09-11, 229 uzavřených úkolů; kol na úkol průměr 2,62 (medián 2), víc než jedno kolo má 67,7 % úkolů, `rev=fail` 1,37 a
+  `test=fail` 0,43 na úkol; 876 nálezů (3,83 na úkol, 72 odmítnutých s důvodem); plán s premortem má 117 z 229 úkolů; **premortem pojmenoval 70 z 483 nálezů (14,5 %) striktně, 116 (24 %) volně**, u nálezů o kódu
+  (bez `text-only` / `evidence-only`) 13,1 % / 21,9 %, od 2. kola volně 17,3 %. Ruční vzorek 7 shod z těch striktních: 1 jasná, 1 částečná, zbytek sdílí jen název souboru nebo třídy ve zcela jiném významu, míra je tedy horní mez
+  skutečného pojmenování. Měření po nasazení: stejný skript s `--since <datum nasazení>` (≥ 2 týdny, nebo nejmenší n, které rozhoduje); porovnat se přímo.
+- **Co čeká na restart a zapnutí.** Běžící daemon (0.1.2) tyto nástroje nemá: po restartu s tímto buildem se objeví `brain_brief` / `brain_search` (agenti do té doby volají `brain.mjs brief`, tělo agentů to říká) a `symbol` / `context`
+  dostanou řádek z brainu. Nic se nemění v `.mcp.json`. Řízené A/B kvality (méně kol při stejném brainu) se nespouštělo: stojí peníze a pro rozhodnutí je potřeba po-měření výše.
+
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |

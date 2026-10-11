@@ -152,7 +152,7 @@ class Daemon private constructor(
     )
     // `batch` is optional (config `tools.batch`): it adds to the tool list every session carries.
     private val batchTool = BatchTool({ tools() }) { tool, args -> runner.run(tool, args, "batch").let { BatchTool.Outcome(it.ok, it.text) } }
-    private val baseTools = Tools.catalog(trackers, jobs, secrets, config.home, docs, brain, BrainNotes(brain, registry)) + listOfNotNull(batchTool.takeIf { config.tools.batch })
+    private val baseTools = Tools.catalog(trackers, jobs, secrets, config.home, docs, brain.takeIf { it.roots().isNotEmpty() }, BrainNotes(brain, registry)) + listOfNotNull(batchTool.takeIf { config.tools.batch })
     private val writeGate = WriteGate(config.write, config.home.resolve("write-gate.json")) { since ->
         val setup = MetricsSetup(config)
         MetricsCollector(setup.categorizer()).runs(setup.projectDirs(emptyList()), since, null)

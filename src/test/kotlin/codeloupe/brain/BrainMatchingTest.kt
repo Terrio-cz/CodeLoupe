@@ -49,6 +49,9 @@ class BrainMatchingTest {
         val one = BrainSignature.of(paths)
         assertNotEquals(empty, one)
         dir.resolve("feedback.jsonl").writeText("{}\n")
+        assertEquals(one, BrainSignature.of(paths), "a brief appends to the feedback log: that alone does not rebuild the index")
+        dir.resolve("tasks").createDirectories()
+        dir.resolve("tasks/TER-1.md").writeText("# TER-1\n")
         assertNotEquals(one, BrainSignature.of(paths))
         dir.toFile().deleteRecursively()
     }

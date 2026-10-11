@@ -17,7 +17,9 @@ The workspace's `brain/workspace.json` names its code repository (`canonicalRepo
 |---|---|
 | `brain_brief` | the start of a role: state, settled findings, the task's notes, decisions on the code and the facts the role reads, as the JSON of `brain.mjs brief --json` |
 | `brain_search` | whole entries for words and files, same ranking |
-| `brain_hygiene` | near-duplicate entries, dangling anchors, anchors that followed a move: proposals for a nightly review, nothing is rewritten |
+
+The tools are offered only when a brain workspace is registered. Upkeep is the engine's: `node brain/brain.mjs hygiene` lists near-duplicate entries (merge proposals), dangling
+anchors and anchors that followed a move for a nightly review (the daemon adds the code side); nothing is rewritten.
 
 `symbol` and `context` end with one line when entries are anchored on the declaration they answer for: `brain: 3 on Billing.total — f-3fa9… TER-5 finding: …`.
 
