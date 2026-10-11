@@ -16,6 +16,7 @@
 * [Plugin hooks](Plugin-hooks)
 * [Metrics and savings](Metrics-and-savings)
 * [Knowledge store](Knowledge-store)
+* [Brain index](Brain-index)
 * [Desktop app](Desktop-app)
 
 **How it works**
