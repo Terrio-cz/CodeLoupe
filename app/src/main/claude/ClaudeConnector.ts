@@ -70,12 +70,21 @@ export class ClaudeConnector {
 
   async status(): Promise<ClaudeStatus> {
     const version = await this.run(['--version']).catch(() => null);
-    if (!version || version.code !== 0) return { cli: false, mcp: false, plugin: false };
+    if (!version || version.code !== 0) return { cli: false, mcp: false, plugin: false, mcpVia: null, pluginVersion: null };
     const [mcp, plugins] = await Promise.all([
       this.run(['mcp', 'get', SERVER_NAME]).catch(() => null),
       this.run(['plugin', 'list', '--json']).catch(() => null),
     ]);
-    return { cli: true, mcp: mcp?.code === 0, plugin: hasPlugin(plugins?.stdout ?? '') };
+    // The plugin brings its own MCP server (plugin:codeloupe:codeloupe), which `claude mcp get codeloupe` does not show.
+    const standalone = mcp?.code === 0;
+    const plugin = findPlugin(plugins?.stdout ?? '');
+    return {
+      cli: true,
+      mcp: standalone || plugin !== null,
+      plugin: plugin !== null,
+      mcpVia: standalone ? 'user' : plugin ? 'plugin' : null,
+      pluginVersion: plugin?.version ?? null,
+    };
   }
 
   async connect(kind: ClaudeConnectKind, port: number): Promise<ClaudeConnectResult> {
@@ -117,12 +126,15 @@ export class ClaudeConnector {
   }
 }
 
-function hasPlugin(json: string): boolean {
+/** The installed codeloupe plugin from `claude plugin list --json` (its own version, not the app's), or null. */
+function findPlugin(json: string): { version: string | null } | null {
   try {
     const list = JSON.parse(json) as unknown;
-    return Array.isArray(list) && list.some(p => typeof p === 'object' && p !== null && String((p as { id?: unknown; name?: unknown }).id ?? (p as { name?: unknown }).name ?? '').startsWith(`${SERVER_NAME}@`));
+    if (!Array.isArray(list)) return null;
+    const hit = list.find(p => typeof p === 'object' && p !== null && String((p as { id?: unknown; name?: unknown }).id ?? (p as { name?: unknown }).name ?? '').startsWith(`${SERVER_NAME}@`)) as { version?: unknown } | undefined;
+    return hit ? { version: typeof hit.version === 'string' ? hit.version : null } : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
