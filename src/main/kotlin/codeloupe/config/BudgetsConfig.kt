@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * What the daemon may cost before `/status` warns, from `config.json` `budgets`:
  * `p95Ms` latency of the slowest 5 % of recent calls, `queueWaitMs` the longest a job waited for its lane, `rssMb`
  * resident memory, `busyRate` the share of recent calls answered "busy". `dailyWeighted` and `runWeighted` are the weighted
- * tokens (docs/ui-spec.md ง 9.1) a day and a single agent run may use before the desktop app is told; unset = no limit.
+ * tokens (docs/ui-spec.md ยง 9.1) a day and a single agent run may use before the desktop app is told; unset = no limit.
  */
 data class BudgetsConfig(
     val p95Ms: Long = 1_000,
