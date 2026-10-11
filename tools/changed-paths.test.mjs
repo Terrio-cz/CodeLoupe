@@ -6,13 +6,16 @@ test('documentation alone is not code and does not touch the update test', () =>
   assert.deepEqual(classify(['docs/ci.md', 'README.md', 'docs/screenshots/cli-dark.png', 'app/README.md', 'LICENSE']), { code: false, update: false });
 });
 
-test('tests and the plugin are code, but the update test cannot notice them', () => {
+test('Kotlin, tests and the plugin are code, but the update test is skipped for them', () => {
   assert.deepEqual(classify(['docs/ci.md', 'src/test/kotlin/A.kt', 'app/test/x.test.ts', 'plugin/hooks/h.sh']), { code: true, update: false });
+  assert.deepEqual(classify(['src/main/kotlin/codeloupe/A.kt', 'src/main/resources/x.json', 'tools/release-notes.mjs', 'tools/feed-check.test.mjs']), { code: true, update: false });
 });
 
-test('sources, the build and the workflows change both', () => {
-  for (const file of ['src/main/kotlin/codeloupe/A.kt', 'app/src/main/index.ts', 'build.gradle.kts', 'gradle/bundle.gradle.kts', '.github/workflows/ci.yml', 'tools/update-test.mjs']) {
-    assert.deepEqual(classify(['docs/ci.md', file]), { code: true, update: true }, file);
+test('the app, the build, the workflows and the updater scripts change both', () => {
+  const files = ['app/src/main/index.ts', 'app/package.json', 'app/electron-builder.yml', 'build.gradle.kts', 'gradle/bundle.gradle.kts', '.github/workflows/ci.yml',
+    ...['update-test', 'feed-check', 'break-bundle', 'no-java-env', 'daemon-token'].map(name => `tools/${name}.mjs`)];
+  for (const file of files) {
+    assert.deepEqual(classify(['docs/ci.md', 'src/main/kotlin/codeloupe/A.kt', file]), { code: true, update: true }, file);
   }
 });
 

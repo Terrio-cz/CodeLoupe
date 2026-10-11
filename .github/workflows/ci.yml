@@ -19,6 +19,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The Gradle and Kotlin compiler daemons get 2 GB instead of the 1 GB of gradle.properties (CL-195): every runner has 14 GB or
+  # more, and compileKotlin took 77 to 187 s on the same commit on the Intel Mac runner.
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx2g
+
 jobs:
   # Unit tests of the scripts in tools/ (release notes, manifests, ad hoc signing).
   tools:

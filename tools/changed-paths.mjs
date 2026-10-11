@@ -6,7 +6,9 @@
 //
 //   code    false when every changed file is documentation (docs/, markdown, the licence); tests, the build, the workflows
 //           and the plugin all count as code;
-//   update  false when, besides that, only the plugin and tests changed: the app update test notices neither.
+//   update  false when, besides that, only Kotlin sources, tests, the plugin and tools the update test does not use changed:
+//           the app update test installs built installers and checks the update mechanism (app/, the build, the feed and the
+//           scripts of the test itself), and the installer smoke test already starts the daemon of every bundle.
 //
 // The required checks still report: the jobs run and skip their steps, a job that is skipped as a whole would leave the
 // check pending. An unknown range (no base, a new branch or tag, a force push that dropped the base) answers true for both.
@@ -15,7 +17,9 @@ import { pathToFileURL } from 'node:url';
 
 const ZERO = /^0+$/;
 const DOCS = [/^docs\//, /\.md$/i, /^LICENSE(\.[a-z]+)?$/, /^\.github\/ISSUE_TEMPLATE\//];
-const UPDATE_INERT = [/^plugin\//, /^src\/test\//, /^app\/test\//];
+// Scripts the update test runs or imports (tools/update-test.mjs); every other script in tools/ is not part of it.
+const UPDATER_TOOLS = 'update-test|feed-check|break-bundle|no-java-env|daemon-token';
+const UPDATE_INERT = [/^plugin\//, /^src\//, /^app\/test\//, new RegExp(`^tools/(?!(${UPDATER_TOOLS})\\.mjs$)`)];
 
 const matches = (file, patterns) => patterns.some(p => p.test(file));
 
