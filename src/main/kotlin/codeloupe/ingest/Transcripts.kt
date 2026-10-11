@@ -26,11 +26,12 @@ class Transcripts(
     val queries = RunQueries(db)
     val commands = CommandAnalyzer(CommandSource(db), config.metrics.prices)
     val usage = AccountUsage(queries)
+    val limits = LimitSnapshots(db)
     val baseline = BaselineStore(config.home.resolve(BaselineStore.FILE))
     val budgets = config.budgets
     val ingest = TranscriptIngest(
         { projectDirs(config, accounts) }, db, MetricsSetup(config).categorizer(),
-        BudgetWatch(db, queries, config.budgets, emit), GapAnnouncer(emit), scope, log, config.metrics.ingestTtlMs,
+        BudgetWatch(db, queries, config.budgets, emit), GapAnnouncer(emit), scope, log, config.metrics.ingestTtlMs, accounts = accounts::claude,
     )
 
     suspend fun fresh() = ingest.refresh(waitMs)

@@ -54,7 +54,7 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
         }
     }
 
-    /** Drops everything read so far, for transcripts that must be read again (other categories). */
+    /** Drops everything read so far, for transcripts that must be read again (other categories). The `/usage` snapshots stay: Claude Code deletes old transcripts, so they could not be read again. */
     fun clear() = transaction { db ->
         db.createStatement().use { s -> listOf("steps", "usage_hours", "gaps", "limits", "runs", "files").forEach { s.executeUpdate("DELETE FROM $it") } }
     }
@@ -65,22 +65,19 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
     }
 
     private fun open(): Connection = Sqlite.open(file, SCHEMA).also { db ->
-        addTailColumn(db)
-        addStepInputColumns(db)
+        // `files.tail` came after the first databases: the hash of the bytes before the offset, empty for rows written before it.
+        addColumns(db, "files", "tail" to "TEXT")
+        // `steps.in_chars`, `in_hash` (the size and a hash of a call's whole input) and `cmd` (the group of a shell call) came later, for `metrics commands` (CL-220): null for steps stored before them.
+        addColumns(db, "steps", "in_chars" to "INTEGER", "in_hash" to "INTEGER", "cmd" to "TEXT")
+        // `files.account` and `identity` (CL-226): the account of the session (from where its transcript lies) and the account fingerprint the transcript names; null for files read before them and where the data does not say.
+        addColumns(db, "files", "account" to "TEXT", "identity" to "TEXT")
         db.createStatement().use { it.execute("PRAGMA cache_size = -2048") }
     }
 
-    // `files.tail` came after the first databases: the hash of the bytes before the offset, empty for rows written before it.
-    private fun addTailColumn(db: Connection) {
-        val has = db.createStatement().use { s -> s.executeQuery("PRAGMA table_info(files)").use { r -> generateSequence { if (r.next()) r.getString("name") else null }.toList() } }
-        if ("tail" !in has) db.createStatement().use { it.execute("ALTER TABLE files ADD COLUMN tail TEXT") }
-    }
-
-    // `steps.in_chars`, `in_hash` (the size and a hash of a call's whole input) and `cmd` (the group of a shell call) came later, for `metrics commands` (CL-220): null for steps stored before them.
-    private fun addStepInputColumns(db: Connection) {
-        val has = db.createStatement().use { s -> s.executeQuery("PRAGMA table_info(steps)").use { r -> generateSequence { if (r.next()) r.getString("name") else null }.toList() } }
-        for ((column, type) in listOf("in_chars" to "INTEGER", "in_hash" to "INTEGER", "cmd" to "TEXT")) {
-            if (column !in has) db.createStatement().use { it.execute("ALTER TABLE steps ADD COLUMN $column $type") }
+    private fun addColumns(db: Connection, table: String, vararg columns: Pair<String, String>) {
+        val has = db.createStatement().use { s -> s.executeQuery("PRAGMA table_info($table)").use { r -> generateSequence { if (r.next()) r.getString("name") else null }.toList() } }
+        for ((column, type) in columns) {
+            if (column !in has) db.createStatement().use { it.execute("ALTER TABLE $table ADD COLUMN $column $type") }
         }
     }
 
@@ -117,6 +114,11 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
             "CREATE INDEX IF NOT EXISTS gaps_run ON gaps(run_id)",
             // The usage-limit answers a run wrote (CL-210): when, when the limit lifts if the line says, and which limit it was.
             "CREATE TABLE IF NOT EXISTS limits (run_id INTEGER NOT NULL, at_ms INTEGER NOT NULL, resets_ms INTEGER, kind TEXT NOT NULL, text TEXT NOT NULL, PRIMARY KEY (run_id, at_ms)) WITHOUT ROWID",
+            // Every limit of every `/usage` report (CL-226), kept for good: neither clear() nor forget() touches it. path + time + meter is the identity, so reading a transcript again changes nothing; account is null when not decidable.
+            "CREATE TABLE IF NOT EXISTS usage_snapshots (path TEXT NOT NULL, at_ms INTEGER NOT NULL, kind TEXT NOT NULL, scope TEXT NOT NULL, grp TEXT, percent REAL, resets_ms INTEGER, " +
+                "severity TEXT, active INTEGER, session TEXT NOT NULL, account TEXT, identity TEXT, PRIMARY KEY (path, at_ms, kind, scope)) WITHOUT ROWID",
+            "CREATE INDEX IF NOT EXISTS usage_snapshots_at ON usage_snapshots(at_ms)",
+            "CREATE INDEX IF NOT EXISTS usage_snapshots_series ON usage_snapshots(account, kind, scope, at_ms)",
             // One row per day or run that went over a budget: the event for it is sent once.
             "CREATE TABLE IF NOT EXISTS breaches (key TEXT PRIMARY KEY, at TEXT NOT NULL)",
         )

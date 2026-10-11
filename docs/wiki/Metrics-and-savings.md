@@ -28,6 +28,11 @@ symbol or file, calls answered busy or with candidates only, and empty answers t
 `categories` (`[{ "category": "tests", "tool": "regex", "file": "regex", "command": "regex" }]`, tried before the built-in
 ones), `defaultCategories` (false = only yours), `prices` (see Money) and `ingestTtlMs` (see below); the hook command is described in [Plugin hooks](Plugin-hooks).
 
+## The limits agents reported
+
+`codeloupe metrics limits [--since 30d] [--until] [--account <id>|unknown] [--latest] [--max n] [--format jsonl|csv|json]` exports the `/usage` reports of agent sessions from the transcript database
+(5-hour, weekly and weekly-per-model percent, reset time, severity, session, account), so a limit calibration can be re-run without reading the transcripts. See [In the desktop app](Desktop-app#accounts).
+
 ## Which commands agents use
 
 `codeloupe metrics commands [--since 10d] [--until] [--role coder] [--run <id>] [--top 15] [--sort cost|calls|tokens] [--json]` ranks the

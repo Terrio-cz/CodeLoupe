@@ -1,6 +1,8 @@
 package codeloupe.ingest
 
 import codeloupe.JsonFormat
+import codeloupe.accounts.ClaudeAccount
+import codeloupe.accounts.TranscriptAccounts
 import codeloupe.metrics.Categorizer
 import codeloupe.metrics.ParserSnapshot
 import codeloupe.metrics.TranscriptParser
@@ -35,10 +37,12 @@ class TranscriptIngest(
     private val log: (String) -> Unit = {},
     private val ttlMs: Long = 10_000,
     private val now: () -> Long = System::currentTimeMillis,
+    private val accounts: () -> List<ClaudeAccount> = { emptyList() },
 ) {
     private val writer = RunWriter(db, categorizer)
     private var files: MutableMap<String, FileState>? = null
     private var job: Job? = null
+    private var attribution = TranscriptAccounts(emptyList())
     private val jobLock = Any()
     private val passLock = Any()
     @Volatile
@@ -82,6 +86,7 @@ class TranscriptIngest(
     private fun run() {
         try {
             val known = files ?: writer.loadFiles().also { files = it }
+            attribution = TranscriptAccounts(accounts())
             // Runs read by an older parser hold the first-line output of each message: they are read again, without announcing their gaps as new.
             val reparse = db.meta(PARSER) != PARSER_VERSION
             if (reparse || db.meta(CATEGORIES) != categorizer.fingerprint) {
@@ -141,7 +146,7 @@ class TranscriptIngest(
         }
         val (results, usages) = parser.drain()
         val ter = metaTer ?: TER.find(parser.firstPrompt)?.value
-        val delta = FileDelta(f, ter, parser, results, usages, parser.drainLimits(), consumed, TailHash.at(f.path, consumed))
+        val delta = FileDelta(f, ter, parser, results, usages, parser.drainLimits(), consumed, TailHash.at(f.path, consumed), parser.drainUsageSnapshots(), attribution.of(f.path), parser.identity)
         val added = writer.write(delta)
         known[f.key] = FileState(f.size, f.mtime, consumed, ter, JsonFormat.json.encodeToString(ParserSnapshot.serializer(), parser.snapshot()), delta.tail)
         return added
@@ -177,8 +182,8 @@ class TranscriptIngest(
         const val BASELINE = "baseline"
         const val PARSER = "parser"
 
-        /** Bumped when [TranscriptParser] counts differently, so the runs already stored are read again (2: output is the final count of a message, CL-206; 3: usage-limit answers are kept, CL-210; 4: steps keep the size and a hash of the call input, the answer of a `Write` and the group of a shell call, CL-220). */
-        const val PARSER_VERSION = "4"
+        /** Bumped when [TranscriptParser] counts differently, so the runs already stored are read again (2: output is the final count of a message, CL-206; 3: usage-limit answers are kept, CL-210; 4: steps keep the size and a hash of the call input, the answer of a `Write` and the group of a shell call, CL-220; 5: `/usage` snapshots and the account of every transcript are stored, CL-226). */
+        const val PARSER_VERSION = "5"
         const val CATEGORIES = "categories"
         const val META_GRACE_MS = 60_000L
         const val BATCH_FILES = 50

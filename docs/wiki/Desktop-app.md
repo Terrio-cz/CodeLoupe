@@ -27,3 +27,10 @@ of the last 5 hours (`weighted5h`, the session window) next to the 7 days, and `
 answers Claude Code writes into the transcripts ("You've hit your weekly limit · resets Oct 11, 8pm (Europe/Prague)"): the reset time is the line's own `quotaLimits.resetsAt`,
 else read from the text in the zone it names. `state` is `limited` while the reset lies ahead, `ok` once it passed, `unknown` when the account's transcripts hold no such answer;
 `source` is `transcript`. The Accounts screen shows the limit, the reset time and the secret name.
+
+**Limit snapshots (CL-226).** Every `/usage` report an agent session ran is kept in `transcripts.db`: per meter (5-hour `session`, `weekly_all`, `weekly_scoped` with its model) the time, percent, reset time and severity, with
+the session id and the account. They are kept for good (also when Claude Code deletes the transcript or the runs are read again), and a session that only ran `/usage` is stored too.
+`GET /ui-api/v1/limits?since=7d&account=<id|unknown>&limit=5000` returns `latest` (the newest snapshot of every meter per account) and the `snapshots` series; `codeloupe metrics limits [--since] [--until] [--account] [--latest] [--format jsonl|csv|json]` exports them. Metadata only, no conversation text.
+The **account** of a session is the account whose `projects` folder holds its transcript, and `null` (undetermined) when no listed account does or two share the directory; it is never guessed. Two logins sharing one config directory (`~/.claude`) are
+therefore not told apart by it. The transcript names its own account only in some sessions (`bridge-session` lines), kept as `identity`, a short fingerprint of the uuid; to separate shared-directory accounts the launcher would have to record
+`session id -> account` (or the uuid of the account) when it starts a session.

@@ -892,6 +892,23 @@ spotřebitel „CodeLoupe app (connection test)“ zapsaný do auditu, `GET <url
 ne daemon — read-only API zůstává bez zápisů a bez síťových akcí na povel. `overview` bere navíc `account=<id>`
 (neznámý účet = 400).
 
+### 9.13b `GET /ui-api/v1/limits?since=7d&account=&limit=` (CL-226; jen metadata)
+```ts
+interface Limits {
+  since: Iso; account: string | null; limit: number; truncated: boolean;   // limit 1..50000 (výchozí 5000); useknutá řada drží nejnovější
+  latest: LimitSnapshot[];      // nejnovější snapshot každého měřidla na účet
+  snapshots: LimitSnapshot[];   // řada od nejstaršího
+}
+interface LimitSnapshot {
+  at: Iso; kind: 'session' | 'weekly_all' | 'weekly_scoped' | string; group: string | null; scope: string | null;   // scope = model u weekly_scoped
+  percent: number | null; resetsAt: Iso | null; severity: string | null; active: boolean | null;
+  session: string;              // session Claude Code, která spustila /usage
+  account: string | null;       // účet, jehož config dir drží transcript; null = nelze určit (nikdy odhad)
+  identity: string | null;      // otisk uuid účtu, který transcript sám uvádí (jen některá sezení); jinak null
+}
+```
+`account=unknown` = snapshoty bez určeného účtu. Řádky žijí v `usage_snapshots` (`transcripts.db`), nemaže je `clear()` ani smazání transcriptu.
+
 ### 9.14 `GET /ui-api/v1/settings` (efektivní konfigurace daemonu, bez tajemství)
 ```ts
 interface DaemonSettings {
