@@ -99,21 +99,28 @@ Every required job reported with its steps skipped, 7 to 14 s each; `update test
 
 ### Trial runs of the final setup (branch CL-195, 2026-10-11)
 
-All green. "Kotlin only" means the update test was skipped as a whole job; seconds are the job time.
+"Kotlin only" means the update test was skipped as a whole job; seconds are the job time.
 
-| Run | Push | Update test | Wall | test windows 1 / 2 | test linux | test macOS | bundle Intel |
-|---|---|---|---|---|---|---|---|
-| 38158922783 | Kotlin and scripts | skipped | 615 s | 484 / 461 | 450 | 599 (2 forks) | 474 |
-| 38175517043 | workflow comment | 637 s | 802 s | 510 / 454 | 313 | 635 (2 forks) | 677 |
-| 38176508764 | Kotlin only | skipped | 674 s | 516 / 414 | 419 | 656 (2 forks) | 504 |
-| 38177390315 | workflow, macOS forks | 616 s | 644 s | 512 / 503 | 439 | 403 | 546 |
-| 38178234939 | Kotlin only | skipped | 668 s | 480 / 350 | 394 | 394 | 425 |
+| Run | Push | Update test | Wall | test windows 1 / 2 | test linux | test macOS | bundle Intel | Result |
+|---|---|---|---|---|---|---|---|---|
+| 38158922783 | Kotlin and scripts | skipped | 615 s | 484 / 461 | 450 | 599 (2 forks) | 474 | green |
+| 38175517043 | workflow comment | 637 s | 802 s | 510 / 454 | 313 | 635 (2 forks) | 677 | green |
+| 38176508764 | Kotlin only | skipped | 674 s | 516 / 414 | 419 | 656 (2 forks) | 504 | green |
+| 38177390315 | workflow, macOS forks | 616 s | 644 s | 512 / 503 | 439 | 403 | 546 | green |
+| 38178234939 | Kotlin only | skipped | 668 s | 480 / 350 | 394 | 394 | 425 | green |
+| 38179297126 | merge of main, docs | 733 s | 746 s | 491 / 313 | 463 | 482 | 462 | red: update test (Linux) read the AppImage while it was swapped |
+| 38180195012 | update test fix | 634 s | 654 s | 458 / 490 | 417 | 416 | 563 | red: `OverlayTest` read the sync counter too early |
+| 38181094368 | Kotlin only | skipped | 507 s | 493 / 479 | 321 | 421 | 356 | green |
+| 38181094368, 2nd attempt | the same | skipped | - | hung / 478 | 380 | 353 | 528 | red: `ProcessStopperTest` (busy by CPU on a loaded runner); Windows share 1 hung until the 20 minute limit |
 
-Five green runs in a row; the last three are the "three in a row" of the criterion. Medians of those three: the Windows
-`test` job 512 s (before, with two forks in one job: 708 s median of five main runs, 766 s in the run that set the target),
-the second Windows share 414 s, the Linux job 419 s, the whole run 668 s (before: 752 s median of the four green main runs of 2026-10-11, 12.5
-minutes, and 14 minutes over the 23 runs of 2026-10-09 and 10). In the last run the Intel runner started 164 s after the
-push; without that wait the run took about 8.5 minutes.
+Five green runs in a row (rows 1 to 5; rows 3 to 5 are the three of the criterion), then two red ones for a flaky test each (fixed, rows 6 and 7), a green one and a red
+one. The two flaky tests found last are not fixed: `ProcessStopperTest` fails when the daemon used CPU in the last 400 ms,
+which a loaded runner does (it failed on main before this work, run 38142734610), and one Windows share hung once with no
+output, so the test that hung is unknown. Medians of the three consecutive green runs: the Windows `test` job 512 s
+(before, with two forks in one job: 708 s median of five main runs, 766 s in the run that set the target), the second share
+414 s, the Linux job 419 s, the whole run 668 s. Median of the six green runs 656 s, of the Kotlin-only ones (615, 674,
+668, 507) 641 s; before: 752 s median of the four green main runs of 2026-10-11, 12.5 minutes, 14 minutes over the 23
+runs of 2026-10-09 and 10. The Intel runner started 164 s after the push in the run of row 5; the run of row 8 had no wait and took 8.5 minutes.
 
 What is left on the critical path is not test time but the macOS Intel runner: `compileKotlin` takes 137 to 190 s there
 against about 50 s on the other systems, then the bundle, the installer and the installer smoke test follow in series (425 to
