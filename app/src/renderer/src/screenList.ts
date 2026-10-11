@@ -24,6 +24,7 @@ export const SCREEN_DEFS = [
   { id: 'jobs', title: 'Jobs', icon: 'jobs', group: 'work', key: 'j' },
   { id: 'runs', title: 'Runs', icon: 'runs', group: 'work', key: 'r', range: true },
   { id: 'index', title: 'Index', icon: 'index', group: 'index', key: 'i' },
+  { id: 'brain', title: 'Brain', icon: 'brain', group: 'index', key: 'm' },
   { id: 'gaps', title: 'Gaps', icon: 'gaps', group: 'index', key: 'g', range: true },
   { id: 'environment', title: 'Environment', icon: 'environment', group: 'system', key: 'e' },
   { id: 'accounts', title: 'Accounts', icon: 'accounts', group: 'system', key: 'a' },

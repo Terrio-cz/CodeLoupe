@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Route, Screen } from './router';
 import { Branches } from './screens/Branches';
+import { Brain } from './screens/Brain';
 import { Accounts } from './screens/Accounts';
 import { Environment } from './screens/Environment';
 import { Gaps } from './screens/Gaps';
@@ -21,6 +22,7 @@ export const VIEWS: Record<Screen, (route: Route) => ReactNode> = {
   jobs: route => <Jobs route={route} />,
   runs: route => <Runs route={route} />,
   index: () => <IndexScreen />,
+  brain: route => <Brain route={route} />,
   gaps: () => <Gaps />,
   environment: route => <Environment route={route} />,
   accounts: () => <Accounts />,

@@ -33,6 +33,7 @@ ones), `defaultCategories` (false = only yours), `prices` (see Money) and `inges
 `codeloupe metrics limits [--since 30d] [--until] [--account <id>|unknown] [--latest] [--max n] [--format jsonl|csv|json]` exports the `/usage` reports of agent sessions from the transcript database
 (5-hour, weekly and weekly-per-model percent, reset time, severity, session, account), so a limit calibration can be re-run without reading the transcripts. See [In the desktop app](Desktop-app#accounts).
 Two logins sharing `~/.claude` show up as `identity-<fingerprint>` accounts (the plugin's session-start hook stamps each session with its login); `--account identity-<fingerprint>` and `--latest` take them like any account, and `unknown` leaves them out.
+With `desktopDir` on the accounts of `accounts.json` (the user-data directory of the Claude Desktop instance each is signed in to, CL-231) a session an instance lists in its `claude-code-sessions` goes to that instance's account, before the identity and the directory, so `--account a` and `--account b` split the `/usage` reports of two logins that share `~/.claude` by the app that started the session; sessions no instance lists keep the rules above.
 
 ## Which commands agents use
 

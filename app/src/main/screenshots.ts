@@ -16,6 +16,7 @@ const MOCK_ROUTES: [string, string][] = [
   ['runs', '#/runs'],
   ['run-detail', '#/runs/1004'],
   ['index', '#/index'],
+  ['brain', '#/brain/c0ffee000001?topic=db'],
   ['gaps', '#/gaps'],
   ['environment', '#/environment'],
   ['accounts', '#/accounts'],

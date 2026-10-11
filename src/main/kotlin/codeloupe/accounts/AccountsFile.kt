@@ -16,10 +16,12 @@ data class AccountsFile(val version: Int = 1, val claude: List<Claude> = emptyLi
      * One Claude Code account: its config directory (`CLAUDE_CONFIG_DIR`), the name shown for it, and optionally the name of the secret
      * that holds its long-lived token (CL-210); the launcher of unattended runs reads that secret, CodeLoupe never does. [identity] is the
      * fingerprint of the account uuid (as `identity-<fingerprint>` in the limits export): the sessions that carry it belong to this account
-     * even when it shares its config directory with another login (CL-226).
+     * even when it shares its config directory with another login (CL-226). [desktopDir] is the user-data directory of the Claude Desktop instance
+     * signed in as this account, given as the real path (a packaged app redirects `%APPDATA%`): the sessions its `claude-code-sessions` list
+     * belong to this account, before any other evidence (CL-231). [email] is the e-mail of its login, shown for the account in place of the one in the profile of the config directory, which accounts sharing a directory would all have the same.
      */
     @Serializable
-    data class Claude(val id: String, val label: String, val configDir: String, val tokenSecret: String? = null, val identity: String? = null)
+    data class Claude(val id: String, val label: String, val configDir: String, val tokenSecret: String? = null, val identity: String? = null, val desktopDir: String? = null, val email: String? = null)
 
     @Serializable
     data class Youtrack(val id: String, val label: String? = null, val url: String, val projects: List<String> = emptyList(), val token: String)

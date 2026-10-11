@@ -74,27 +74,27 @@ class RunQueries(private val db: TranscriptDb) {
     }
 
     /** Weighted tokens used per hour (epoch hour -> tokens) in the hours [fromHour, toHour). */
-    /** Cost per hour bucket; with [transcriptPrefix] only the runs whose transcript lies under it (one account's `projects` folder). */
-    fun hours(fromHour: Long, toHour: Long, transcriptPrefix: String? = null): Map<Long, Double> = synchronized(db.reader) {
-        val from = if (transcriptPrefix == null) "usage_hours h" else "usage_hours h JOIN runs r ON r.id = h.run_id"
-        val filter = if (transcriptPrefix == null) "" else " AND r.path LIKE ? ESCAPE '\\'"
+    /** Cost per hour bucket; with [scope] only the runs of one account. */
+    fun hours(fromHour: Long, toHour: Long, scope: RunScope? = null): Map<Long, Double> = synchronized(db.reader) {
+        val from = if (scope == null) "usage_hours h" else "usage_hours h JOIN runs r ON r.id = h.run_id"
+        val filter = if (scope == null) "" else " AND ${scope.condition("r")}"
         db.reader.prepareStatement("SELECT h.hour, sum(h.cost) FROM $from WHERE h.hour >= ? AND h.hour < ?$filter GROUP BY h.hour").use { s ->
             s.setLong(1, fromHour)
             s.setLong(2, toHour)
-            if (transcriptPrefix != null) s.setString(3, likePrefix(transcriptPrefix))
+            scope?.bind(s, 3)
             s.executeQuery().use { r -> HashMap<Long, Double>().also { while (r.next()) it[r.getLong(1)] = r.getDouble(2) } }
         }
     }
 
-    /** The same hour buckets run by run, with each run's role, total cost and last write; with [transcriptPrefix] only one account's runs. */
-    fun usageRows(fromHour: Long, toHour: Long, transcriptPrefix: String? = null): List<HourUsage> = synchronized(db.reader) {
-        val filter = if (transcriptPrefix == null) "" else " AND r.path LIKE ? ESCAPE '\\'"
+    /** The same hour buckets run by run, with each run's role, total cost and last write; with [scope] only one account's runs. */
+    fun usageRows(fromHour: Long, toHour: Long, scope: RunScope? = null): List<HourUsage> = synchronized(db.reader) {
+        val filter = if (scope == null) "" else " AND ${scope.condition("r")}"
         db.reader.prepareStatement(
             "SELECT h.hour, r.role, h.cost, r.cost, r.end_ms FROM usage_hours h JOIN runs r ON r.id = h.run_id WHERE h.hour >= ? AND h.hour < ?$filter",
         ).use { s ->
             s.setLong(1, fromHour)
             s.setLong(2, toHour)
-            if (transcriptPrefix != null) s.setString(3, likePrefix(transcriptPrefix))
+            scope?.bind(s, 3)
             s.executeQuery().use { r -> buildList { while (r.next()) add(HourUsage(r.getLong(1), r.getString(2), r.getDouble(3), r.getLong(4), r.getLong(5))) } }
         }
     }
@@ -154,35 +154,44 @@ class RunQueries(private val db: TranscriptDb) {
         runs to calls
     }
 
-    fun gapCount(fromMs: Long, transcriptPrefix: String? = null): Int = synchronized(db.reader) {
-        val from = if (transcriptPrefix == null) "gaps g" else "gaps g JOIN runs r ON r.id = g.run_id"
-        val filter = if (transcriptPrefix == null) "" else " AND r.path LIKE ? ESCAPE '\\'"
+    fun gapCount(fromMs: Long, scope: RunScope? = null): Int = synchronized(db.reader) {
+        val from = if (scope == null) "gaps g" else "gaps g JOIN runs r ON r.id = g.run_id"
+        val filter = if (scope == null) "" else " AND ${scope.condition("r")}"
         db.reader.prepareStatement("SELECT count(*) FROM $from WHERE g.at_ms >= ? AND g.kind != 'busy'$filter").use { s ->
             s.setLong(1, fromMs)
-            if (transcriptPrefix != null) s.setString(2, likePrefix(transcriptPrefix))
+            scope?.bind(s, 2)
             s.executeQuery().use { it.next(); it.getInt(1) }
         }
     }
 
-    /** The end of the newest run under [transcriptPrefix], or null when there is none. */
-    fun lastEndMs(transcriptPrefix: String): Long? = synchronized(db.reader) {
-        db.reader.prepareStatement("SELECT max(end_ms) FROM runs WHERE path LIKE ? ESCAPE '\\'").use { s ->
-            s.setString(1, likePrefix(transcriptPrefix))
+    /** The end of the newest run in [scope], or null when there is none. */
+    fun lastEndMs(scope: RunScope): Long? = synchronized(db.reader) {
+        db.reader.prepareStatement("SELECT max(r.end_ms) FROM runs r WHERE ${scope.condition("r")}").use { s ->
+            scope.bind(s, 1)
             s.executeQuery().use { r -> r.next(); r.getLong(1).takeIf { !r.wasNull() } }
         }
     }
 
-    /** The newest usage-limit answer written under [transcriptPrefix], or null when there is none. */
-    fun lastLimit(transcriptPrefix: String): LimitHit? = synchronized(db.reader) {
+    /** The newest usage-limit answer written in [scope], or null when there is none. */
+    fun lastLimit(scope: RunScope): LimitHit? = synchronized(db.reader) {
         db.reader.prepareStatement(
-            "SELECT l.at_ms, l.resets_ms, l.kind, l.text FROM limits l JOIN runs r ON r.id = l.run_id WHERE r.path LIKE ? ESCAPE '\\' ORDER BY l.at_ms DESC LIMIT 1",
+            "SELECT l.at_ms, l.resets_ms, l.kind, l.text FROM limits l JOIN runs r ON r.id = l.run_id WHERE ${scope.condition("r")} ORDER BY l.at_ms DESC LIMIT 1",
         ).use { s ->
-            s.setString(1, likePrefix(transcriptPrefix))
+            scope.bind(s, 1)
             s.executeQuery().use { r -> if (r.next()) LimitHit(r.getLong(1), r.getLong(2).takeIf { !r.wasNull() }, r.getString(3), r.getString(4)) else null }
         }
     }
 
-    private fun likePrefix(prefix: String) = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    /**
+     * The account of the newest transcript stored for a project directory (one of [names], as Claude Code names the directory of a
+     * working directory) whose account is known, or null when there is none.
+     */
+    fun accountOfProject(names: List<String>): String? = synchronized(db.reader) {
+        if (names.isEmpty()) null else db.reader.prepareStatement("SELECT account FROM files WHERE project IN (${names.joinToString { "?" }}) AND account IS NOT NULL ORDER BY mtime DESC LIMIT 1").use { s ->
+            names.forEachIndexed { i, n -> s.setString(i + 1, n) }
+            s.executeQuery().use { r -> if (r.next()) r.getString(1) else null }
+        }
+    }
 
     private fun bind(s: PreparedStatement, args: List<Any>): PreparedStatement {
         args.forEachIndexed { i, a -> if (a is Long) s.setLong(i + 1, a) else if (a is Int) s.setInt(i + 1, a) else s.setString(i + 1, a.toString()) }

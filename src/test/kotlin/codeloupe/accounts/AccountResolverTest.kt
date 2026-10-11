@@ -46,6 +46,18 @@ class AccountResolverTest {
     }
 
     @Test
+    fun `a session a desktop instance lists goes to its account before identity, own directory and the unknown`() {
+        val accounts = arrayOf(account("a", userHome.resolve(".claude"), identity = fp), account("b", userHome.resolve(".claude")), account("own", userHome.resolve("claude-own")))
+        val r = AccountResolver(accounts.toList(), userHome, desktop = mapOf("s-b" to "b", "s-own" to "b"))
+        assertEquals("b", r.resolve(null, fp, "s-b"), "desktop over the identity an account names")
+        assertEquals("b", r.resolve("own", null, "s-own"), "desktop over the account whose directory holds the transcript")
+        assertEquals("a", r.resolve(null, fp, "other"), "a session the desktop does not list falls back to the identity")
+        assertEquals("own", r.resolve("own", null, "other"), "then to the directory of its own")
+        assertEquals("own", r.resolve("own", null), "no session id, no desktop")
+        assertNull(r.resolve(null, null, "other"), "then to unknown")
+    }
+
+    @Test
     fun `an anonymous account is resolved again when its fingerprint changes or gets claimed`() {
         assertEquals("identity-$fp", resolver().resolve("identity-other0000000", fp))
         assertEquals("a", resolver(account("a", userHome.resolve("x"), identity = fp)).resolve("identity-$fp", fp))

@@ -7,6 +7,7 @@ import codeloupe.accounts.ClaudeAccount
 import codeloupe.accounts.ClaudeProfiles
 import codeloupe.daemon.CallRecord
 import codeloupe.ingest.AccountUsage
+import codeloupe.ingest.RunScope
 import codeloupe.ingest.RunWriter
 import codeloupe.ingest.Transcripts
 import codeloupe.metrics.BaselineStore
@@ -29,9 +30,9 @@ internal class AccountViews(
     suspend fun accounts(now: Instant = Instant.now()): AccountsView {
         transcripts.fresh()
         val claude = accounts.claude()
-        val roots = AccountRoots(claude)
+        val accountOf = rootAccounts(claude)
         val recent = calls.after(now.minusSeconds(ACTIVE_WINDOW_S)).filter { instant(it)?.isAfter(now.minusSeconds(ACTIVE_WINDOW_S)) == true }.mapNotNull { it.root }.distinct()
-        val windows = recent.mapNotNull { roots.accountOf(it) }.groupingBy { it }.eachCount()
+        val windows = recent.mapNotNull(accountOf).groupingBy { it }.eachCount()
         val since = now.minusSeconds(7 * 86_400).toEpochMilli()
         val baseline = transcripts.baseline.state()
         val loaded = (baseline as? BaselineStore.State.Loaded)?.baseline
@@ -40,32 +41,45 @@ internal class AccountViews(
         val finishedBefore = now.minusSeconds(ACTIVE_WINDOW_S).toEpochMilli()
         val stored = runCatching { secrets.store?.list().orEmpty().map { it.name }.toSet() }.getOrDefault(emptySet())
         val sessionSince = now.minusSeconds(SESSION_WINDOW_S).toEpochMilli()
-        fun saved(a: ClaudeAccount) = loaded?.let { Savings(transcripts.queries.usageRows(firstHour, untilHour, AccountUsage.prefix(a.projects)), it, finishedBefore).from(firstHour).savedPct }
+        fun saved(a: ClaudeAccount) = loaded?.let { Savings(transcripts.queries.usageRows(firstHour, untilHour, scope(a, claude)), it, finishedBefore).from(firstHour).savedPct }
         return AccountsView(
             claude = claude.map { a ->
-                val used = transcripts.usage.totals(a.projects, since)
+                val used = transcripts.usage.totals(scope(a, claude), since)
                 AccountsView.Claude(
-                    id = a.id, label = a.label, email = profiles.email(a), configDir = a.configDir.toString(), implicit = a.implicit,
+                    id = a.id, label = a.label, email = a.email ?: profiles.email(a), configDir = a.configDir.toString(), implicit = a.implicit,
                     exists = Files.isDirectory(a.configDir), windows = windows[a.id] ?: 0, weighted7d = used.weighted,
-                    weighted5h = transcripts.usage.totals(a.projects, sessionSince).weighted, savedPct7d = saved(a),
+                    weighted5h = transcripts.usage.totals(scope(a, claude), sessionSince).weighted, savedPct7d = saved(a),
                     lastUsedAt = used.lastUsedMs?.let { IsoTime.of(Instant.ofEpochMilli(it)) },
                     tokenSecret = a.tokenSecret, tokenConfigured = a.tokenSecret != null && a.tokenSecret in stored,
-                    limit = limit(AccountLimit.of(transcripts.queries.lastLimit(AccountUsage.prefix(a.projects)), now)),
+                    limit = limit(AccountLimit.of(transcripts.queries.lastLimit(scope(a, claude)), now)),
                 )
             },
             youtrack = youtrack(), baseline = BaselineInfo.of(baseline),
         )
     }
 
-    /** The account whose transcripts the Overview shows when filtered, or null for an id nobody has. */
-    fun transcriptPrefix(id: String): String? = accounts.claude().firstOrNull { it.id == id }?.let { codeloupe.ingest.AccountUsage.prefix(it.projects) }
+    /** The runs the Overview shows when filtered by this account, or null for an id nobody has. */
+    fun scopeOf(id: String): RunScope? = accounts.claude().let { all -> all.firstOrNull { it.id == id }?.let { scope(it, all) } }
 
     /** Account ids the Overview filter offers. */
     fun claudeIds(): List<String> = accounts.claude().map { it.id }
 
     fun rootsOf(id: String): (String) -> Boolean {
-        val roots = AccountRoots(accounts.claude())
-        return { root -> roots.accountOf(root) == id }
+        val accountOf = rootAccounts(accounts.claude())
+        return { root -> accountOf(root) == id }
+    }
+
+    /**
+     * The runs of an account. Where a desktop instance is configured (CL-231) the config directory proves nothing, as accounts share it:
+     * the account stored with each session decides. Without one, the account's own `projects` folder does.
+     */
+    private fun scope(a: ClaudeAccount, all: List<ClaudeAccount>): RunScope =
+        if (all.any { it.desktopDir != null }) RunScope.ofAccount(a.id) else RunScope.underPrefix(AccountUsage.prefix(a.projects))
+
+    /** The account of a working directory: by where its transcripts lie, or by the account stored for them when a desktop instance is configured. */
+    private fun rootAccounts(all: List<ClaudeAccount>): (String) -> String? {
+        if (all.none { it.desktopDir != null }) return AccountRoots(all)::accountOf
+        return { root -> transcripts.queries.accountOfProject(AccountRoots.names(root)) }
     }
 
     private fun youtrack(): List<AccountsView.Youtrack> {

@@ -50,6 +50,21 @@ class AccountsTest {
     }
 
     @Test
+    fun `the desktop directory of an account is read, and a blank one is none`() {
+        val desktop = TestRepos.tmpDir("desktop-dir")
+        write(
+            AccountsFile(
+                claude = listOf(
+                    AccountsFile.Claude("a", "A", "C:/a", desktopDir = desktop.toString()), AccountsFile.Claude("b", "B", "C:/b", desktopDir = "  "), AccountsFile.Claude("c", "C", "C:/c"),
+                ),
+            ),
+        )
+        assertEquals(listOf(desktop, null, null), accounts.claude().map { it.desktopDir })
+        write(AccountsFile(claude = listOf(AccountsFile.Claude("a", "A", "C:/a", email = " me@example.test "), AccountsFile.Claude("b", "B", "C:/b", email = "not-an-address"), AccountsFile.Claude("c", "C", "C:/c"))))
+        assertEquals(listOf("me@example.test", null, null), accounts.claude().map { it.email })
+    }
+
+    @Test
     fun `a file written with the retired default key still loads and the key is ignored`() {
         home.resolve(AccountsFile.FILE).writeText("""{"version":1,"claude":[{"id":"a","label":"Account A","configDir":"C:/a","default":false,"tokenSecret":"T"},{"id":"b","label":"Account B","configDir":"C:/b","default":true}],"youtrack":[]}""")
         val listed = accounts.claude()

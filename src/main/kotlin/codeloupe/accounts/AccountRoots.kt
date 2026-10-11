@@ -10,9 +10,15 @@ import java.nio.file.Path
  */
 class AccountRoots(private val accounts: List<ClaudeAccount>) {
     fun accountOf(root: String): String? {
-        val names = listOfNotNull(root, runCatching { Path.of(root).toRealPath().toString() }.getOrNull()).map(ProjectDirName::of).distinct()
+        val names = names(root)
         return accounts.flatMap { account -> names.mapNotNull { name -> modified(account.projects.resolve(name))?.let { account.id to it } } }.maxByOrNull { it.second }?.first
     }
 
     private fun modified(dir: Path): Long? = runCatching { if (Files.isDirectory(dir)) Files.getLastModifiedTime(dir).toMillis() else null }.getOrNull()
+
+    companion object {
+        /** The transcript directory names Claude Code may have given [root]: for the path as given and for its real path. */
+        fun names(root: String): List<String> =
+            listOfNotNull(root, runCatching { Path.of(root).toRealPath().toString() }.getOrNull()).map(ProjectDirName::of).distinct()
+    }
 }

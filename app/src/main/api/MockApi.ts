@@ -11,6 +11,7 @@ import type { ApiRequest, Query } from '../../shared/request';
 import { HttpError } from '../daemon/DaemonClient';
 import type { ApiSource } from './ApiSource';
 import { MockData } from './mockData';
+import { MockBrain } from './mockBrain';
 import { MockCommands } from './mockCommands';
 import { MockJobs } from './mockJobs';
 import { MockRuns } from './mockRuns';
@@ -36,6 +37,7 @@ export class MockApi implements ApiSource {
   private readonly jobs: MockJobs;
   private readonly runs: MockRuns;
   private readonly commands: MockCommands;
+  private readonly brain = new MockBrain();
 
   constructor(now = Date.now()) {
     this.data = new MockData(now);
@@ -76,6 +78,9 @@ export class MockApi implements ApiSource {
       case 'commands': return this.commands.view(q);
       case 'runs/:id': return found(this.runs.detail(req.id!));
       case 'runs/:id/steps': return found(this.runs.steps(req.id!, q));
+      case 'brain': return this.brain.view();
+      case 'brain/:id/topic': return this.brain.topic(req.id!, q.name);
+      case 'brain/:id/search': return this.brain.search(req.id!, q);
       case 'status': return this.jobs.status({});
       case 'jobs': return { items: this.jobs.list(Number(q.limit ?? 100) || 100) };
       case 'jobs/:id': return found(this.jobs.chain(req.id!));

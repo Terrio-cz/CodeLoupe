@@ -34,9 +34,9 @@ internal class OverviewViews(
         val firstHour = CostWindows.firstHour(now, maxOf(days, 2))
         val baseline = transcripts.baseline.state()
         val savings = (baseline as? BaselineStore.State.Loaded)?.let {
-            Savings(transcripts.queries.usageRows(firstHour, lastHour + 1, account?.transcriptPrefix), it.baseline, now.minusSeconds(ACTIVE_WINDOW_S).toEpochMilli())
+            Savings(transcripts.queries.usageRows(firstHour, lastHour + 1, account?.scope), it.baseline, now.minusSeconds(ACTIVE_WINDOW_S).toEpochMilli())
         }
-        val windows = CostWindows(transcripts.queries.hours(firstHour, lastHour + 1, account?.transcriptPrefix), zone, savings?.baselineHours().orEmpty())
+        val windows = CostWindows(transcripts.queries.hours(firstHour, lastHour + 1, account?.scope), zone, savings?.baselineHours().orEmpty())
         val series = if (days == 1L) windows.hourly(HOURS_PER_DAY, now) else windows.daily(days.toInt(), today)
         val usedToday = windows.between(todayStart.toEpochMilli(), Long.MAX_VALUE)
         val weightedRange = series.sumOf { it.weighted }
@@ -47,8 +47,8 @@ internal class OverviewViews(
             range = range, generatedAt = now.toString(),
             kpis = Overview.Kpis(
                 usedToday, windows.between(yesterdayStart.toEpochMilli(), sameTimeYesterday.toEpochMilli()), weightedRange, baselineRange, if (baselineRange == 0L) 0 else baselineRange - weightedRange, compared?.savedPct, recent.size, queried,
-                records.size, percentile(records.map { it.ms }, 50), transcripts.queries.gapCount(now.minusSeconds(days * 86_400).toEpochMilli(), account?.transcriptPrefix),
-                transcripts.queries.gapCount(now.minusSeconds(NEW_GAP_S).toEpochMilli(), account?.transcriptPrefix),
+                records.size, percentile(records.map { it.ms }, 50), transcripts.queries.gapCount(now.minusSeconds(days * 86_400).toEpochMilli(), account?.scope),
+                transcripts.queries.gapCount(now.minusSeconds(NEW_GAP_S).toEpochMilli(), account?.scope),
             ),
             baseline = BaselineInfo.of(baseline, compared?.coveredShare), budget = Overview.Budget(transcripts.budgets.dailyWeighted, usedToday),
             costSeries = if (compared?.savedPct == null) series.map { it.copy(baseline = 0) } else series, savingsByTool = emptyList(),
