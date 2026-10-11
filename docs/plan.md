@@ -1546,6 +1546,29 @@ Heuristika historie běhu bez odpovědi `Write` přeceňuje „nový soubor“ o
 Top 15 skupin `terrio-coder` (projekt Terrio, od 2026-10-01; podíl ceny běhů): `sed -n <n> <path>` 4,8 % (715 volání), `Read` 3,5 % (433), `cat <path>` 2,6 % (211), `heredoc python` 1,4 % (799), `rg -n <str> <path>` 0,9 % (333),
 `node brain.mjs read <arg>` 0,4 %, `wc -l <path>` 0,3 %, `heredoc write` 0,3 %, `rg -n <str>` 0,3 %, `shell loop` 0,3 %, `grep -n <str> <path>` 0,2 %, `git status --porcelain` 0,2 %, `rg --glob -n <str> <path>` 0,2 %, `sed -i <str>` 0,2 %, `Write (new file)` 0,2 %.
 
+### 8.15 Karta konvencí modulu: deterministická extrakce a přesnost (CL-219, 2026-10-11)
+
+Z poučení řízených běhů (§ 8.4–8.12): agent použije, co dostane do ruky, a coder nemá úsporu. Karta konvencí je krátký text z kódu samotného (bez modelu, bez indexu, jen čtení zdrojů na disku), který coder a reviewer
+dostanou v packu, aby styl nehledali zkoušením a reviewer nehlásil stylové nálezy proti tomu, co modul dělá všude. Komponenta je samostatná (`codeloupe.conventions`, příkaz `codeloupe conventions`), packy se na ni napojí zvlášť.
+
+*Obsah* (jedna řádka = jedno tvrzení s počtem a příkladným symbolem k vyhledání): uspořádání balíčků a zrcadlení testů, vztah souboru k typům, druhy a viditelnost typů a KDoc, přípony jmen typů, nejčastější nadtypy, chování při chybách (co se hází,
+pomocné `require`/`check`/`error`, co se chytá), styl testů (jména, import `@Test`, sdílené pomocné typy) a nejčastější importy. Zdrojem jsou fakta jazykového adaptéru (PSI) plus text zdroje s vyprázdněnými komentáři a řetězci
+(`CodeText`), takže se do karty nedostane ani slovo z dokumentace či literálu. Modul = adresář s `src/<sada>/(kotlin|java)`; `main` je produkce, každá sada se `test` ve jménu je test. Strop **1 500 B**: nejdřív se zkracují seznamy (4 → 1 položka),
+pak se vypouštějí nejméně užitečné řádky (importy testů, importy, uspořádání, nadtypy, druhy typů, tvar souborů), nakonec celé řádky odshora.
+
+*Měření* (TerrioImporter `bfc10dd`, jen čtení; tři největší moduly podle řádků produkčního kódu): `:app` 35 595, `:public-api` 27 021, `:common` 21 969 řádků. Karty mají 1 311, 1 346 a 1 459 B; JVM CLI včetně hledání modulů je 3,8–4,9 s na kartu.
+Samotný CodeLoupe (`codeloupe conventions --module :`, 925 produkčních souborů) dává 1 369 B.
+
+*Přesnost.* 20 tvrzení z karet ověřeno čtením kódu nezávislými prostředky (`grep -E` nad zdroji, malý skript s vlastními regexy pro tvar souborů a typů, ne kód extraktoru): **20 z 20 pravdivých (100 %, cíl ≥ 90 %)**, plus dalších 20 a více kontrol, také všechny
+pravdivé. Ověřené: počty souborů a balíčků (`:app` 301 + 294, `database` 232, `http` 43), zrcadlení testů (233 z 294, 96 ze 120, 58 z 58), tvar souborů (280 + 21), druhy a viditelnost typů (80 datových tříd, 122 `internal`, KDoc 139 ze 158 / 142 ze 143 / 174 z 217),
+přípony (`Result` 30, `Importer` 19, `Type` 12), nadtypy (`AutoCloseable` 8, `Table` 18 a 68), chyby (`throw` tovární funkce 72, `throw` typu 11 a 13, `require` 138, `catch Throwable` 44), testy (1 643 a 850 funkcí `@Test`, 846 z 850 se jmény v zpětných apostrofech,
+importy `@Test` 129 + 74, 39 + 14), sdílené pomocné typy (78, 19, 6 souborů) a importy (`org.slf4j` 41, `io.ktor.server` 29, `org.jetbrains.exposed` 76 a 82, doménový modul 99). Jediný rozdíl při první kontrole byl v tom, že karta počítá i zdrojovou sadu `testFixtures`
+(`:common` 58 testovacích souborů, ne 53); to je záměr (jsou to testovací zdroje) a kontrola se tak upravila. Dva nálezy z ostrého spuštění se opravily před měřením: počítání řádků padalo na souboru v jiném kódování a `throw e` (znovuvyhození proměnné)
+zaplňovalo řádek chyb; počítají se jen vyhozená volání.
+
+*Co toto neměří.* Pravdivost tvrzení, ne užitečnost: že coder se podle karty chová stylověji a reviewer nehlásí stylové nálezy, ukáže až řízené A/B z karty CL-219 (brána z CL-213: kvalita ne horší, medián ceny nejvýš 90 %, ≥ 3 opakování × ≥ 3 tasky).
+To se nespustilo (stojí peníze; po schválení a po napojení do packů, které čeká na CL-216).
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
