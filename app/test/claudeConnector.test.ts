@@ -82,11 +82,16 @@ describe('ClaudeConnector', () => {
     expect(f.calls).toEqual([]);
   });
 
+  it('reports the plugin version and counts its MCP server as added', async () => {
+    const f = fake({ 'plugin list': ok(JSON.stringify([{ id: 'codeloupe@codeloupe', version: '0.1.1' }])), 'mcp get': { code: 1, stdout: '', stderr: '' } });
+    expect(await new ClaudeConnector(f.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: true, mcpVia: 'plugin', pluginVersion: '0.1.1' });
+  });
+
   it('reads the status from mcp get and plugin list', async () => {
     const f = fake({ 'plugin list': ok(JSON.stringify([{ id: 'codeloupe@codeloupe' }])), 'mcp get': { code: 1, stdout: '', stderr: '' } });
-    expect(await new ClaudeConnector(f.run, () => null).status()).toEqual({ cli: true, mcp: false, plugin: true });
+    expect(await new ClaudeConnector(f.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: true, mcpVia: 'plugin', pluginVersion: null });
     const none = fake({ 'plugin list': ok('[]') });
-    expect(await new ClaudeConnector(none.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: false });
+    expect(await new ClaudeConnector(none.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: false, mcpVia: 'user', pluginVersion: null });
   });
 });
 
@@ -122,7 +127,7 @@ describe.skipIf(!findClaude(process.env))('Connect on a clean profile (real clau
   const connector = new ClaudeConnector(execClaude(env), () => marketplace);
 
   it('starts with nothing connected', async () => {
-    expect(await connector.status()).toEqual({ cli: true, mcp: false, plugin: false });
+    expect(await connector.status()).toEqual({ cli: true, mcp: false, plugin: false, mcpVia: null, pluginVersion: null });
   });
 
   it('adds the MCP server, and again with another port', async () => {

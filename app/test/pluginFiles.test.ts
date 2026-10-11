@@ -87,6 +87,13 @@ describe('Claude Code plugin files', () => {
     }
   });
 
+  it('checks an edited Kotlin or Java file from PostToolUse, through the same forwarding script', () => {
+    const post = JSON.parse(fs.readFileSync(path.join(pluginDir, 'hooks', 'hooks.json'), 'utf8')).hooks.PostToolUse[0];
+    expect(post.matcher).toBe('Edit|Write|MultiEdit');
+    expect(post.hooks[0].command).toContain('${CLAUDE_PLUGIN_ROOT}/hooks/hook.sh');
+    expect(post.hooks[0].timeout).toBeLessThanOrEqual(10);
+  });
+
   it('has a skill that names every tool of the daemon', () => {
     const skill = fs.readFileSync(path.join(pluginDir, 'skills', 'codeloupe', 'SKILL.md'), 'utf8');
     expect(skill).toMatch(/^---\nname: codeloupe\ndescription: .+\n---/);

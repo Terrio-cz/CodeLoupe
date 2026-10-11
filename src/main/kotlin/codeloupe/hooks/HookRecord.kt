@@ -8,7 +8,7 @@ data class HookRecord(
     val t: String,
     val hook: String,
     val tool: String,
-    /** `advised`, `denied`, `context` for a session start, `warned` for a session that carries too much. */
+    /** `advised`, `denied`, `context` for a session start, `warned` for a session that carries too much, `reported` for an edited file with findings. */
     val decision: String,
     /** The kind of advice (`search:usages`, `read`, …). */
     val why: String,

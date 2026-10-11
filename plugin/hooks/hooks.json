@@ -1,5 +1,5 @@
 {
-  "description": "Starts the CodeLoupe daemon with the session, gives it the repository map, points shell searches and whole-file reads at CodeLoupe, and says when a session carries too much",
+  "description": "Starts the CodeLoupe daemon with the session, gives it the repository map, points shell searches and whole-file reads at CodeLoupe, checks a file just edited, and says when a session carries too much",
   "hooks": {
     "SessionStart": [
       {
@@ -27,6 +27,18 @@
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/hook.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
         "hooks": [
           {
             "type": "command",

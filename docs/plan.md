@@ -1546,6 +1546,29 @@ Heuristika historie běhu bez odpovědi `Write` přeceňuje „nový soubor“ o
 Top 15 skupin `terrio-coder` (projekt Terrio, od 2026-10-01; podíl ceny běhů): `sed -n <n> <path>` 4,8 % (715 volání), `Read` 3,5 % (433), `cat <path>` 2,6 % (211), `heredoc python` 1,4 % (799), `rg -n <str> <path>` 0,9 % (333),
 `node brain.mjs read <arg>` 0,4 %, `wc -l <path>` 0,3 %, `heredoc write` 0,3 %, `rg -n <str>` 0,3 %, `shell loop` 0,3 %, `grep -n <str> <path>` 0,2 %, `git status --porcelain` 0,2 %, `rg --glob -n <str> <path>` 0,2 %, `sed -i <str>` 0,2 %, `Write (new file)` 0,2 %.
 
+### 8.15 Karta konvencí modulu: deterministická extrakce a přesnost (CL-219, 2026-10-11)
+
+Z poučení řízených běhů (§ 8.4–8.12): agent použije, co dostane do ruky, a coder nemá úsporu. Karta konvencí je krátký text z kódu samotného (bez modelu, bez indexu, jen čtení zdrojů na disku), který coder a reviewer
+dostanou v packu, aby styl nehledali zkoušením a reviewer nehlásil stylové nálezy proti tomu, co modul dělá všude. Komponenta je samostatná (`codeloupe.conventions`, příkaz `codeloupe conventions`), packy se na ni napojí zvlášť.
+
+*Obsah* (jedna řádka = jedno tvrzení s počtem a příkladným symbolem k vyhledání): uspořádání balíčků a zrcadlení testů, vztah souboru k typům, druhy a viditelnost typů a KDoc, přípony jmen typů, nejčastější nadtypy, chování při chybách (co se hází,
+pomocné `require`/`check`/`error`, co se chytá), styl testů (jména, import `@Test`, sdílené pomocné typy) a nejčastější importy. Zdrojem jsou fakta jazykového adaptéru (PSI) plus text zdroje s vyprázdněnými komentáři a řetězci
+(`CodeText`), takže se do karty nedostane ani slovo z dokumentace či literálu. Modul = adresář s `src/<sada>/(kotlin|java)`; `main` je produkce, každá sada se `test` ve jménu je test. Strop **1 500 B**: nejdřív se zkracují seznamy (4 → 1 položka),
+pak se vypouštějí nejméně užitečné řádky (importy testů, importy, uspořádání, nadtypy, druhy typů, tvar souborů), nakonec celé řádky odshora.
+
+*Měření* (TerrioImporter `bfc10dd`, jen čtení; tři největší moduly podle řádků produkčního kódu): `:app` 35 595, `:public-api` 27 021, `:common` 21 969 řádků. Karty mají 1 311, 1 346 a 1 459 B; JVM CLI včetně hledání modulů je 3,8–4,9 s na kartu.
+Samotný CodeLoupe (`codeloupe conventions --module :`, 925 produkčních souborů) dává 1 369 B.
+
+*Přesnost.* 20 tvrzení z karet ověřeno čtením kódu nezávislými prostředky (`grep -E` nad zdroji, malý skript s vlastními regexy pro tvar souborů a typů, ne kód extraktoru): **20 z 20 pravdivých (100 %, cíl ≥ 90 %)**, plus dalších 20 a více kontrol, také všechny
+pravdivé. Ověřené: počty souborů a balíčků (`:app` 301 + 294, `database` 232, `http` 43), zrcadlení testů (233 z 294, 96 ze 120, 58 z 58), tvar souborů (280 + 21), druhy a viditelnost typů (80 datových tříd, 122 `internal`, KDoc 139 ze 158 / 142 ze 143 / 174 z 217),
+přípony (`Result` 30, `Importer` 19, `Type` 12), nadtypy (`AutoCloseable` 8, `Table` 18 a 68), chyby (`throw` tovární funkce 72, `throw` typu 11 a 13, `require` 138, `catch Throwable` 44), testy (1 643 a 850 funkcí `@Test`, 846 z 850 se jmény v zpětných apostrofech,
+importy `@Test` 129 + 74, 39 + 14), sdílené pomocné typy (78, 19, 6 souborů) a importy (`org.slf4j` 41, `io.ktor.server` 29, `org.jetbrains.exposed` 76 a 82, doménový modul 99). Jediný rozdíl při první kontrole byl v tom, že karta počítá i zdrojovou sadu `testFixtures`
+(`:common` 58 testovacích souborů, ne 53); to je záměr (jsou to testovací zdroje) a kontrola se tak upravila. Dva nálezy z ostrého spuštění se opravily před měřením: počítání řádků padalo na souboru v jiném kódování a `throw e` (znovuvyhození proměnné)
+zaplňovalo řádek chyb; počítají se jen vyhozená volání.
+
+*Co toto neměří.* Pravdivost tvrzení, ne užitečnost: že coder se podle karty chová stylověji a reviewer nehlásí stylové nálezy, ukáže až řízené A/B z karty CL-219 (brána z CL-213: kvalita ne horší, medián ceny nejvýš 90 %, ≥ 3 opakování × ≥ 3 tasky).
+To se nespustilo (stojí peníze; po schválení a po napojení do packů, které čeká na CL-216).
+
 ## 9. Fáze
 
 | Fáze | Obsah | Hotovo když |
@@ -2811,6 +2834,30 @@ Zpět: záznam do `.mcp.json` a `SERVERS_EXPECTED`.
 - Měřeno na sondách startovního kontextu jako CL-75: první tah coder −424, tester −339, reviewer −558, planner −633 tokenů (3 opakování, rozptyl ≤ 10); CodeLoupe část schémat u rolí 0,65 → ≈ 0,48 pp,
   `bySource.mcpSchemas` včetně CodeLoupe 0,80 → ≈ 0,63 %. Regrese: 12 běhů reviewera (6 na variantu, dva uzavřené úkoly) a 4 běhy planneru, nálezy 4/4 a 6/6 ve všech, ceny v rozptylu; odpovědi 14 volání devíti nástrojů bajt po bajtu stejné.
   Podrobnosti a tabulky: `docs/context-audit.md`, „CL-184“.
+
+### Výsledek CL-217 — kontrola souboru po editaci (hook `PostToolUse`, 2026-10-11)
+
+- **Mechanismus**: `PostToolUse` na `Edit|Write|MultiEdit` jde stejným skriptem `plugin/hooks/hook.sh` na `POST /hook`. Daemon (`PostEditCheck`) načte upravený `.kt`/`.java` soubor indexovaného repozitáře
+  (žádný build, neindexovaný repozitář = ticho), rozparsuje ho přes `Extraction` (parse worker) a **syntaktické chyby vrátí s řádkem a sloupcem** (`FileFacts.problems`, prvních 10; `errors` počítá všechny).
+  Soubor, který se rozparsuje, projde `NameCheck` nad overlayem worktree (po `registry.touched`): **neznámé jméno** (nikde nedeklarované, nikde jinde nepoužité, bez importu, mimo stdlib),
+  **jméno deklarované jen v jiném balíčku a neimportované**, **počet argumentů** funkce z indexu (volání bez receiveru, nebo `Typ().f()`, kde je receiver psaný jako typ deklarující `f`). Odpověď má nejvýš 5 řádků
+  včetně hlavičky („parser and index, not a compiler“), bez nálezu je ticho, stejný text se v relaci řekne jednou. Mlčí tam, kde si není jistý: hvězdičkový import balíčku mimo index, třída s nadtypem mimo index,
+  extension funkce, kvalifikované volání s knihovním receiverem, Java (jen syntaxe). Limit `timeoutMs` 300 ms, vše selhává otevřeně.
+- **Nastavení**: `config.json` `hooks.postEdit` (`enabled` **výchozí `false`**, `maxLines` 5, `timeoutMs` 300). Vypnuto, dokud kontrolované běhy kodéra hook nepřijmou (kritérium 3 a 4 karty);
+  plugin hook registruje, takže A/B se přepíná jen v `config.json`.
+- **Měření 1: kolik chyb překladu by kontrola viděla** (transkripty workspace Terria od 2026-10-01, 2 915 souborů, výstupy Gradle `e: …kt:řádek:sloupec` a `javac`): **148 neúspěšných překladů v 49 relacích**.
+  S aspoň jednou syntaktickou chybou **54 (36 %)**, s `Unresolved reference` bez receiveru **67 (45 %)** (s receiverem 26, ty kontrola nehlásí), s chybou počtu argumentů či výběru přetížení **27 (18 %)**, jen s jinými
+  chybami (typy, nulovatelnost) **39 (26 %)**. Aspoň jednu viditelnou třídu má **109 z 148 (74 %)**, jen viditelné třídy **41 (28 %)**. Je to horní mez: `Unresolved reference` bez receiveru
+  zahrnuje i knihovní jména, která index nezná, a chyby přetížení jsou často typové.
+- **Měření 2: úspěšnost na vnesených chybách** (test `PostEditSampleTest`, každý třetí soubor, chyba po jedné, kontrola musí chybu pojmenovat): chybějící `}` **100 % / 99 %** (CodeLoupe 349 souborů / Terrio 577),
+  odstraněný import typu, který soubor používá, **89 % / 79 %** (38 / 348), vymyšlené jméno volané funkce **54 % / 70 %** (270 / 442). Zbytek jsou záměrná mlčení (lambda s receiverem, třída s knihovním nadtypem, jméno shodné s členem jinde).
+- **Měření 3: falešné poplachy na kódu, který se překládá** (každý soubor projektu „upraven“ beze změny, vše, co kontrola řekne, je chyba; hranice karty ≤ 2 %): **CodeLoupe 0 z 1 174 souborů (0 %)**, **TerrioImporter 1–2 z 2 114 (0,05–0,09 %)**
+  (`redirectError` na `ProcessBuilder.apply { … }`, typ z generovaného zdroje mimo repozitář). Opravy z prvního průchodu (jména ze stdlib, extension funkce, lambdy s receiverem pro počet argumentů, první segment kvalifikovaného typu)
+  snížily poplachy z 5 na 0 a z 5 na 1–2 soubory. Měření jiného projektu: `CODELOUPE_POSTEDIT_SAMPLE=<adresář>`.
+- **Latence v daemonu** (stejné běhy, včetně `registry.touched` a obnovy overlaye): medián **20 ms**, p95 **33 ms** (CodeLoupe); medián **45 ms**, p95 **83 ms** (Terrio, 2 114 souborů). Celý skript přidá start `bash` (≈ 50 ms). První parse po nečinnosti
+  parse workeru přesáhne 300 ms a hook jednou mlčí (práce doběhne a worker je teplý).
+- **Stav karty**: kritérium 1 (měření) a 2 (hook s testy, falešné poplachy ≤ 2 %) splněna; **kritérium 3 (kontrolovaný A/B kodéra: méně překladových cyklů, testy 9/9, cena ≤ 90 %) a 4 (přijato/zamítnuto) čekají na běh**.
+  Hook je do rozhodnutí vypnutý. Mezery: kvalifikované členy (`x.chybi()`) a typové chyby kontrola nevidí; „chybí import“ hlásí jen pro typy a funkce na nejvyšší úrovni.
 
 ## 10. Rizika
 
