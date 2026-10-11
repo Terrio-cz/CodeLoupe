@@ -15,9 +15,8 @@ class Accounts(
 
     fun claude(): List<ClaudeAccount> {
         val listed = file().claude
-        if (listed.isEmpty()) return listOf(ClaudeAccount(DEFAULT_ID, DEFAULT_LABEL, userHome.resolve(".claude"), isDefault = true, implicit = true))
-        val defaultId = listed.firstOrNull { it.default }?.id ?: listed.first().id
-        return listed.map { ClaudeAccount(it.id, it.label, Path.of(it.configDir), it.id == defaultId, implicit = false, tokenSecret = it.tokenSecret?.takeIf(String::isNotBlank)) }
+        if (listed.isEmpty()) return listOf(ClaudeAccount(DEFAULT_ID, DEFAULT_LABEL, userHome.resolve(".claude"), implicit = true))
+        return listed.map { ClaudeAccount(it.id, it.label, Path.of(it.configDir), implicit = false, tokenSecret = it.tokenSecret?.takeIf(String::isNotBlank)) }
     }
 
     fun youtrack(): List<AccountsFile.Youtrack> = file().youtrack

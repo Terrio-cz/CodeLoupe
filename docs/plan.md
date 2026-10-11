@@ -2139,7 +2139,7 @@ rozhoduje launcher.
 
 ### Výsledek CL-63 — účty Claude a YouTrack (2026-10-08)
 
-- `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`, `default`) a YouTrack instance (`url`, `projects`, `token` = jméno
+- `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`; starší klíč `default` se ignoruje, CL-224) a YouTrack instance (`url`, `projects`, `token` = jméno
   globálního tajemství `YOUTRACK_TOKEN_<ID>` ve storu). Bez souboru je jediným účtem `~/.claude`. Ingest čte `projects` každého vypsaného účtu a přiřazuje transcripty podle cesty
   (`runs.path LIKE <configDir>/projects/%`), takže cena 7 d na účet je jeden SQL přes `usage_hours`; filtr Overview (`overview?account=`) používá stejný předpona v `hours` a `gapCount`.
 - Okna účtu: pracovní složka, která za 15 min volala CodeLoupe, patří účtu, jehož `projects/<ProjectDirName>` existuje (u dvou účtů tomu s novější změnou). E-mail účtu je jediné, co se čte z `.claude.json`.

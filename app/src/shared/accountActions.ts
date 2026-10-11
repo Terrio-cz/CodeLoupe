@@ -5,7 +5,6 @@
 export const ACCOUNT_CH = {
   claudeAdd: 'cl:accounts:claude-add',
   claudeRename: 'cl:accounts:claude-rename',
-  claudeDefault: 'cl:accounts:claude-default',
   claudeRemove: 'cl:accounts:claude-remove',
   youtrackAdd: 'cl:accounts:youtrack-add',
   youtrackTest: 'cl:accounts:youtrack-test',
@@ -39,7 +38,6 @@ export interface YoutrackAccountInput {
 export interface AccountsBridge {
   claudeAdd(input: ClaudeAccountInput): Promise<AccountOutcome>;
   claudeRename(id: string, label: string): Promise<AccountOutcome>;
-  claudeSetDefault(id: string): Promise<AccountOutcome>;
   /** Main asks in a native dialog first; only the entry is removed, never the directory. */
   claudeRemove(id: string): Promise<AccountOutcome>;
   /** Main asks first (the daemon restarts to mirror the new instance). */

@@ -71,7 +71,6 @@ const bridge: CodeLoupeBridge = {
   accounts: {
     claudeAdd: input => ipcRenderer.invoke(ACCOUNT_CH.claudeAdd, input),
     claudeRename: (id, label) => ipcRenderer.invoke(ACCOUNT_CH.claudeRename, id, label),
-    claudeSetDefault: id => ipcRenderer.invoke(ACCOUNT_CH.claudeDefault, id),
     claudeRemove: id => ipcRenderer.invoke(ACCOUNT_CH.claudeRemove, id),
     youtrackAdd: input => ipcRenderer.invoke(ACCOUNT_CH.youtrackAdd, input),
     youtrackTest: id => ipcRenderer.invoke(ACCOUNT_CH.youtrackTest, id),

@@ -74,11 +74,11 @@ export class AccountsManager {
     } else if (!fs.statSync(configDir).isDirectory()) return fail('The path is not a folder.');
     const data = this.load();
     // With nothing listed, `~/.claude` is the account Claude Code uses; it becomes a real entry before another one joins it.
-    if (data.claude.length === 0) data.claude.push({ id: 'default', label: 'Default account', configDir: path.join(this.deps.userHome(), '.claude'), default: true });
+    if (data.claude.length === 0) data.claude.push({ id: 'default', label: 'Default account', configDir: path.join(this.deps.userHome(), '.claude') });
     if (data.claude.some(c => same(c.configDir, configDir))) return fail('An account with this folder already exists.');
     const id = slug(label, 'account', new Set(data.claude.map(c => c.id)));
-    data.claude.push({ id, label, configDir, default: false });
-    writeAccounts(this.deps.homeDir(), this.withDefault(data));
+    data.claude.push({ id, label, configDir });
+    writeAccounts(this.deps.homeDir(), data);
     return ok(`Account “${label}” added.`);
   }
 
@@ -95,16 +95,6 @@ export class AccountsManager {
     return ok('Account renamed.');
   }
 
-  async claudeSetDefault(id: string): Promise<AccountOutcome> {
-    const blocked = this.deps.blocked?.();
-    if (blocked) return fail(blocked);
-    const data = this.load();
-    if (!data.claude.some(c => c.id === id)) return fail('The account does not exist.');
-    for (const c of data.claude) c.default = c.id === id;
-    writeAccounts(this.deps.homeDir(), data);
-    return ok('Default account set.');
-  }
-
   async claudeRemove(id: string): Promise<AccountOutcome> {
     const blocked = this.deps.blocked?.();
     if (blocked) return fail(blocked);
@@ -113,7 +103,7 @@ export class AccountsManager {
     if (!entry) return fail('The account does not exist.');
     if (!(await this.deps.confirm(`Remove account ${entry.label}?`, `Only the account entry disappears from CodeLoupe. The folder ${entry.configDir} and its sign-in stay.`, 'Remove'))) return fail('Removal cancelled.');
     data.claude = data.claude.filter(c => c.id !== id);
-    writeAccounts(this.deps.homeDir(), this.withDefault(data));
+    writeAccounts(this.deps.homeDir(), data);
     return ok(`Account ${entry.label} removed.`);
   }
 
@@ -226,12 +216,6 @@ export class AccountsManager {
 
   private load(): AccountsData {
     return readAccounts(this.deps.homeDir());
-  }
-
-  /** A non-empty list always has a default account: the first when none says so. */
-  private withDefault(data: AccountsData): AccountsData {
-    if (data.claude.length > 0 && !data.claude.some(c => c.default)) data.claude[0].default = true;
-    return data;
   }
 }
 

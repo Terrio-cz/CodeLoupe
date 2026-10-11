@@ -458,8 +458,8 @@ main procesu jako v § 3.7.1 — nikdy přes daemon HTTP.
 ```
 Accounts
 ┌ Claude accounts ──────────────────────────────────────────────────── [+ Add account] ┐
-│ Account              Config dir                 Default  Windows Cost 7d  Savings Last used│
-│ account A (e-mail)   ~/.claude                  ●        4      12.1M     14%     2 min ago│
+│ Account              Config dir                          Windows Cost 7d  Savings Last used│
+│ account A (e-mail)   ~/.claude                           4      12.1M     14%     2 min ago│
 │ account B (e-mail)   ~/.claude-b                         2      6.8M      11%     1 h ago  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ┌ YouTrack accounts ───────────────────────────────────────────────── [+ Add account] ┐
@@ -472,7 +472,7 @@ Accounts
   transcript leží (ingest CL-62: `<configDir>/projects/…`). Overview se filtruje podle účtu (`overview?account=<id>`,
   výběr nad kartami; cena, rozpočet, mezery a volání dotazů z pracovních složek účtu).
 - Bez uloženého seznamu je jediným účtem implicitní `~/.claude` (v tabulce „implicit“, nejde přejmenovat ani odebrat);
-  první přidaný účet ho uloží jako řádek `default`. Odebrání účtu maže jen záznam, nikdy složku s přihlášením.
+  první přidaný účet ho uloží jako řádek `default` (jen id, příznak „výchozí účet“ neexistuje: aktivní účet si volí volající, např. Foreman, ze seznamu; starší klíč `default` v souboru se ignoruje a při dalším zápisu zmizí). Odebrání účtu maže jen záznam, nikdy složku s přihlášením.
 - YouTrack účet nahrazuje jedinou instanci z CL-29: URL, projekty, token (jen „set“), stav mirroru, test spojení.
   Tracker z `config.json` se v tabulce ukáže jen ke čtení („from config.json“). Přidání a odebrání účtu restartuje daemon
   (mirror se staví při startu; dialog to řekne předem), rotace tokenu ani test ne.
@@ -876,7 +876,7 @@ Audit je append-only soubor `<home>/secrets/audit.log` (řádek JSON na událost
 ```ts
 interface Accounts {
   claude: { id: string; label: string; email: string | null;      // e-mail z oauthAccount `.claude.json` účtu, nic jiného se nečte
-            configDir: string; isDefault: boolean; implicit: boolean; exists: boolean;
+            configDir: string; implicit: boolean; exists: boolean;
             windows: number;          // pracovní složky tohoto účtu, které volaly CodeLoupe za posledních 15 min
             weighted7d: number;
             savedPct7d: number | null;   // úspora běhů tohoto účtu za 7 dní vůči baseline; null = bez baseline nebo bez běhu k porovnání (ne 0 %)

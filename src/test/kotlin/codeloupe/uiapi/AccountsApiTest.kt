@@ -109,7 +109,7 @@ class AccountsApiTest {
         val body = awaitAccounts()
         val claude = body["claude"]!!.jsonArray.map { it.jsonObject }.associateBy { it["id"]!!.jsonPrimitive.content }
         assertEquals(listOf("a", "b", "gone"), claude.keys.toList())
-        assertEquals(listOf(true, false, false), claude.values.map { it["isDefault"]!!.jsonPrimitive.content.toBoolean() })
+        assertTrue(claude.values.none { "isDefault" in it }, "the default-account flag is gone from the API")
         assertEquals("Account A", claude.getValue("a")["label"]!!.jsonPrimitive.content)
         assertEquals(260L, claude.getValue("a")["weighted7d"]!!.jsonPrimitive.content.toLong(), "two turns of 130")
         assertEquals(130L, claude.getValue("b")["weighted7d"]!!.jsonPrimitive.content.toLong())

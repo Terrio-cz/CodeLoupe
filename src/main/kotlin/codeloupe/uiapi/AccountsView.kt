@@ -12,7 +12,6 @@ data class AccountsView(val claude: List<Claude>, val youtrack: List<Youtrack>, 
         /** The e-mail the account is signed in with, when its `.claude.json` says. */
         val email: String?,
         val configDir: String,
-        val isDefault: Boolean,
         /** Nobody listed it: it is the default config directory, shown until the first account is saved. */
         val implicit: Boolean,
         val exists: Boolean,

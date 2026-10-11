@@ -17,7 +17,7 @@ data class AccountsFile(val version: Int = 1, val claude: List<Claude> = emptyLi
      * that holds its long-lived token (CL-210); the launcher of unattended runs reads that secret, CodeLoupe never does.
      */
     @Serializable
-    data class Claude(val id: String, val label: String, val configDir: String, val default: Boolean = false, val tokenSecret: String? = null)
+    data class Claude(val id: String, val label: String, val configDir: String, val tokenSecret: String? = null)
 
     @Serializable
     data class Youtrack(val id: String, val label: String? = null, val url: String, val projects: List<String> = emptyList(), val token: String)
