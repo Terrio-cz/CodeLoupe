@@ -40,6 +40,11 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
     private val results = ArrayList<ToolResult>()
     private val usages = ArrayList<UsageAt>()
     private val limits = ArrayList<LimitHit>()
+    private val snapshots = ArrayList<UsageSnapshot>()
+
+    /** The fingerprint of the account uuid the transcript named in the lines read by this parser, or null when none did ([AccountIdentity]). Not part of the snapshot: the ingest keeps what an earlier read found. */
+    var identity: String? = null
+        private set
 
     /** False when [line] is not a JSON object, in which case nothing changed. */
     fun feed(line: String): Boolean {
@@ -51,6 +56,8 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
             if (start == null) start = timestamp
             end = timestamp
         }
+        if (type == "system" && o.containsKey("usageReport") && snapshots.size < MAX_SNAPSHOTS) snapshots += UsageReportReader.of(o, at(timestamp))
+        if (o.containsKey("ownerAccountUuid") || o.containsKey("accountUuid")) AccountIdentity.of(o)?.let { identity = it }
         val message = o["message"].obj()
         o["attachment"].obj()?.let(startTracker::attachment)
         if (type == "user" && message != null) startTracker.userLine(message)
@@ -71,6 +78,9 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
 
     /** The usage-limit answers read since the last call. */
     fun drainLimits(): List<LimitHit> = limits.toList().also { limits.clear() }
+
+    /** The limits of the `/usage` reports read since the last call. */
+    fun drainUsageSnapshots(): List<UsageSnapshot> = snapshots.toList().also { snapshots.clear() }
 
     fun snapshot() = ParserSnapshot(
         role, start, end, model, turns, usage, peak, firstPrompt, emitted, seen.toMap(),
@@ -176,6 +186,7 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
         const val MAX_SEEN = 5_000
         const val MAX_PENDING = 1_000
         const val MAX_LIMITS = 100
+        const val MAX_SNAPSHOTS = 10_000
         const val ERROR_CHARS = 80
         const val HEAD_CHARS = 200
         const val IMAGE_CHARS = 6000

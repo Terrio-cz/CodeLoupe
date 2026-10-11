@@ -29,7 +29,7 @@ desktop app's first-run onboarding reads. The running daemon already knows a rep
 | Weighted-token budgets of a day and of one agent run (events for the desktop app) | none | `config.json` `budgets` `{ "dailyWeighted": 150000000, "runWeighted": 20000000 }` |
 | One turn for several independent reads (`batch`) | off: the tool adds about 770 characters (about 150 tokens) to the tool list; `skills` and the session hint tell models to issue independent reads in parallel either way | `config.json` `tools` `{ "batch": true }` (restart the daemon; the agent's tool list must name `mcp__codeloupe__batch`) |
 | Writing by declaration (`edit`) | `auto`: offered when the gap detector shows the need; no write in `.git`, secrets, conflicted files | `config.json` `write` `{ "mode": "on", "linkedWorktreesOnly": true, "deny": ["**/generated/**"], "gate": { "wholeFileReads": 20, "manualRenames": 3, "windowDays": 30 } }` |
-| Hooks of the plugin | on; steering in `advise` mode, large from 150 lines, at most 40 pieces of advice a session, none after 4 unheeded in a row; session start: worktree state, map off (`map`, `budget` 1200 tokens); session weight: one line at 150k and 300k tokens of context (`weight.warnAt`); post-edit check: off (`postEdit.enabled`, at most 5 lines, 300 ms) | `config.json` `hooks` (see [Plugin hooks](Plugin-hooks)); `CODELOUPE_HOOKS=off` in Claude Code's environment |
+| Hooks of the plugin | on; steering in `advise` mode, large from 150 lines, at most 40 pieces of advice a session, none after 4 unheeded in a row; session start: worktree state, map off (`map`, `budget` 1200 tokens); session weight: one line at 150k and 300k tokens of context (`weight.warnAt`); post-edit check: off (`postEdit.enabled`, at most 5 lines, 300 ms); account stamp: on (`stampAccount`, local metadata only) | `config.json` `hooks` (see [Plugin hooks](Plugin-hooks)); `CODELOUPE_HOOKS=off` in Claude Code's environment |
 | Trackers to mirror | none | `config.json` `trackers`, see [Trackers](Trackers) |
 | Tracker sync while clients are active, idle stop | every 3 min; stops 10 min after the last tool call | `config.json` `trackerSyncMinutes`, `trackerIdleMinutes` |
 | Worktree registry, Docker cleanup, ports | see the page | `config.json` `workspaces`: [Workspaces and Docker cleanup](Workspaces-and-Docker-cleanup) |
@@ -82,7 +82,7 @@ What you see after an update:
 - **An old daemon still running** has no token file; the new CLI, app and hook send only `x-codeloupe`, as before. Restart it (`codeloupe stop`,
   then `codeloupe start`) to get the token.
 - **An old MCP entry** (`--header "x-codeloupe: 1"` only) is answered *this needs the daemon token ...*. Run `codeloupe mcp-config` and add the entry it prints; its `headersHelper` (`codeloupe mcp-headers`) gives Claude Code the token
-  on every connection, without writing it into Claude Code's configuration. The plugin does the same with `hooks/mcp-headers.sh`
+  on every connection, without writing it into Claude Code's configuration. The plugin does the same with `hooks/mcp-headers.cmd` (it runs `mcp-headers.sh`)
   once the plugin is updated from the marketplace.
 - **An old desktop app** against a new daemon gets 401 on its screens; update the app together with the CLI (the installers do).
 - **An old `hook.sh`** against a new daemon sends no token and is refused (401): update the plugin, or set `api.strict` to `false`.

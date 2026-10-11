@@ -36,7 +36,7 @@ describe('MockApi follows the read-only contract', () => {
   it('accounts carry usage per Claude account and no token, and the overview can be narrowed to one', async () => {
     const a = await get<Accounts>({ resource: 'accounts' });
     expect(a.claude.map(c => c.id)).toEqual(['default', 'b']);
-    expect(a.claude.filter(c => c.isDefault)).toHaveLength(1);
+    expect(a.claude.every(c => !('isDefault' in c))).toBe(true);
     expect(a.youtrack.find(y => y.id === 'acme')).toMatchObject({ tokenConfigured: true, editable: true });
     // `tokenSecret` is the name of a secret, never its value.
     expect(JSON.stringify(a).replace(/"tokenSecret"/g, '"')).not.toMatch(/"token"|secret|password/i);

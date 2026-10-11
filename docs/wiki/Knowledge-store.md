@@ -50,6 +50,13 @@ yet counts:
 | the code changed, the signature did not | `STALE: body changed: …` |
 | the declaration or the file is gone | `STALE: declaration gone: …` / `STALE: file gone: …` |
 
+A file or class the text names **without a directory** is anchored as well, when the index of the checkout resolves it: a file name
+(`PaymentGateway.kt`) held by exactly one file becomes that file's path, a CamelCase name of two or more words (`PaymentGateway`)
+declared in the checkout becomes a symbol anchor. Names the index does not know, a file name held by two files, and plain words
+(`Docker`, `UTC`) anchor nothing; at most six of each kind per fact. These anchors are not fingerprinted, so they only make the fact
+stale when the file or declaration is gone; `know verify` fingerprints them like any other. Facts written before this keep the anchors they
+have: write or import them again (a repeat is merged into the older fact) to add the new ones. An import resolves bare names in its first `--root`.
+
 A fact that was never fingerprinted (an import) is only checked for existence of its target. A file the index does not
 hold (Markdown, YAML, SQL) is looked up on disk, in a folder without a git repository too. A checkout that cannot be read
 leaves the status as it was. If the code returns to the verified state the flag goes away; `know verify <id>` records
@@ -69,6 +76,15 @@ codeloupe know search "how are retries backed off" --scope area:webhooks --kind 
 k41 decision area:webhooks  retries use exponential backoff capped at one minute (CL-86)
 k77 pattern symbol:src/Foo.kt#Foo.parse STALE: body changed: src/Foo.kt#Foo.parse  Foo.parse accepts only UTC (CL-90)
 ```
+
+```bash
+codeloupe know search --anchor PaymentGateway.kt             # the facts anchored to a file, newest first
+codeloupe know search "retries" --anchor PaymentGateway      # ranked by the question, only facts anchored to the class or its members
+```
+
+`--anchor` takes the text of an anchor: a file name or a path (`Foo.kt`, `src/Foo.kt`), a symbol (`Foo`, `Foo.parse`, also with its
+package) or `src/Foo.kt#Foo.parse`. A path matches whole or as its tail; a class also finds the facts anchored to its members. The question
+may be left out with `--anchor`; `--scope`, `--kind`, `--limit` and `--all` work as without it.
 
 Full-text search (SQLite FTS5, BM25 ranking) over the words of the text, scope, kind and task, with the stemming the code
 search uses (`retries`, `retried` and `retry` are one word; a longer word also matches as a prefix). `--scope` takes a
@@ -96,7 +112,7 @@ All behind the daemon token (`x-codeloupe-token`), like every route that is not 
 
 | Route | |
 |---|---|
-| `GET /know/search?q=&scope=&kind=&limit=&all=1` | `{"hits": [{"fact": …, "line": "…"}]}` |
+| `GET /know/search?q=&anchor=&scope=&kind=&limit=&all=1` (`q` or `anchor` is required) | `{"hits": [{"fact": …, "line": "…"}]}` |
 | `POST /know` | one fact `{"scope", "text", "kind", "task", "run", "root", "anchors": [{"path", "symbol", "root"}], "supersedes", "related", "verify"}` or `{"facts": [...]}`; answers `{"action": "added" or "updated", "fact": …, "replaced": n}` |
 | `GET /know/{id}` | one fact |
 | `GET /know/stale` | `{"checked", "unreachable", "stale": [hits]}` after reading every anchored fact |

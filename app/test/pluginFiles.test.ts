@@ -28,12 +28,33 @@ describe('Claude Code plugin files', () => {
 
   it('gets the daemon token for the MCP entry from a helper script that exists, not from the configuration', () => {
     const server = JSON.parse(fs.readFileSync(path.join(pluginDir, '.mcp.json'), 'utf8')).mcpServers[SERVER_NAME];
-    expect(server.headersHelper).toContain('${CLAUDE_PLUGIN_ROOT}/hooks/mcp-headers.sh');
+    expect(server.headersHelper).toContain('${CLAUDE_PLUGIN_ROOT}/hooks/mcp-headers.cmd');
     const script = fs.readFileSync(path.join(pluginDir, 'hooks', 'mcp-headers.sh'), 'utf8');
     expect(script.trimEnd().endsWith('exit 0')).toBe(true);
     expect(script).toContain('codeloupe_prove');
     expect(fs.existsSync(path.join(pluginDir, 'hooks', 'daemon-auth.sh'))).toBe(true);
     expect(JSON.stringify(server)).not.toMatch(/[0-9a-f]{32}/);
+  });
+
+  // Claude Code runs a headersHelper through cmd.exe on Windows, where a bare `bash` is the WSL launcher (System32) and exits 127 on a Windows path (CL-228).
+  it('starts the headers helper without a bare bash, which is the WSL launcher on Windows', () => {
+    const server = JSON.parse(fs.readFileSync(path.join(pluginDir, '.mcp.json'), 'utf8')).mcpServers[SERVER_NAME];
+    const [unix, windows] = (server.headersHelper as string).split(' || ');
+    expect(unix).toBe('sh "${CLAUDE_PLUGIN_ROOT}/hooks/mcp-headers.cmd"');
+    expect(windows).toBe('"${CLAUDE_PLUGIN_ROOT}/hooks/mcp-headers.cmd"');
+    expect(server.headersHelper).not.toMatch(/(^|[\s&|;(])bash\b/);
+    const launcher = fs.readFileSync(path.join(pluginDir, 'hooks', 'mcp-headers.cmd'), 'utf8');
+    // sh reads the first line and execs the bash script; cmd.exe takes that line for a label
+    expect(launcher.split('\n')[0]).toMatch(/^:; .*exec "\$b" "\$\(dirname "\$0"\)\/mcp-headers\.sh"$/);
+    expect(launcher).not.toContain('\r'); // a CR would end up in the sh line
+    // cmd.exe finds Git Bash itself (the one Claude Code needs) and never runs what `bash` resolves to
+    expect(launcher).toContain('CLAUDE_CODE_GIT_BASH_PATH');
+    expect(launcher).toContain('\\Git\\bin\\bash.exe');
+    expect(launcher).not.toMatch(/^\s*(bash|wsl)\b/m);
+    expect(launcher).not.toMatch(/^\s*"?bash(\.exe)?"?\s/m);
+    // and without Git Bash it still answers: the plain header, exit 0
+    expect(launcher).toContain('echo {"x-codeloupe":"1"}');
+    expect(launcher.trimEnd().endsWith('exit /b 0')).toBe(true);
   });
 
   it('starts the daemon from a SessionStart hook whose script exists and never fails the session', () => {

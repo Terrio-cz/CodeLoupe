@@ -159,7 +159,7 @@ CLI `codeloupe …` ──HTTP (spustí daemon, když neběží)─────�
   (`auth.withoutToken`). Volba tokenu místo
   kontroly vlastníka spojení (Windows `GetExtendedTcpTable`, Linux `/proc/net/tcp`, macOS `lsof`): jeden mechanismus pro tři systémy,
   žádný nativní kód ani závod o PID/port, a MCP klient ho dostane přes `headersHelper` (`codeloupe mcp-headers`, v pluginu
-  `hooks/mcp-headers.sh`), takže tajemství není v konfiguraci Claude Code.
+  `hooks/mcp-headers.cmd` → `mcp-headers.sh`; CL-228: pod `cmd.exe` na Windows je holé `bash` WSL launcher), takže tajemství není v konfiguraci Claude Code.
 - Totožnost daemonu: klient pošle `x-codeloupe-nonce` na `GET /status`, daemon odpoví `x-codeloupe-proof` = SHA-256 z
   `codeloupe-proof:<token>:<nonce>`; token se pošle jen tomu, kdo důkaz dal (CLI, aplikace, `hook.sh`). CLI navíc odmítne daemon, kterého
   `daemon.json` nejmenuje. `hook.sh` předává token přes `curl -H @soubor`, ne na příkazové řádce (vidí ji ostatní uživatelé).
@@ -1261,7 +1261,7 @@ Sdruženě (každý běh dělený mediánem A své buňky, 13 / 13): medián B *
 - **Steward: nepřijato.** Žádná fakta nečte ani nepíše; věta v těle se nevolá, +9 %.
 - **Packy s dřívějšími nálezy: nepřijato.** Formálně splněno „kvalita ne horší a medián ≤ 100 %“ (0,99), ale cíl (méně chyb a kol) se neukázal a karta CL-218 žádá medián ≤ 90 %. Planner sekci použil a stála ho −7 % (nejisté), reviewer ji nepoužil vůbec a +6 %. Hodnota je v příznaku STALE a zdroji u faktu, což zatím nikdo neměřitelně nepotřeboval, protože planner stejná fakta dohledá sám.
 - **Živý workspace se nemění** (nic k obnovení z `.bak-cl203`), kit zůstává připravený. Úložiště zůstává v CodeLoupe jako funkce (8.11); rozhodnutí z 8.6 o tokenech (strop ≈ 0,1 %, no-go) se potvrzuje měřením.
-- Co by to změnilo: daemonová volba `know search --anchor <soubor>` (dnes se kotva čte jen u faktů s cestou; dohledávání podle textu je obejití) a tělo plannera, které sekci používá místo vlastního čtení facts; obojí má smysl až poté, co jiný důvod vyžádá úložiště v živém toku.
+- Co by to změnilo: daemonová volba `know search --anchor <soubor>` (dnes se kotva čte jen u faktů s cestou; dohledávání podle textu je obejití) a tělo plannera, které sekci používá místo vlastního čtení facts; obojí má smysl až poté, co jiný důvod vyžádá úložiště v živém toku. Volba `know search --anchor` je hotová (CL-223): fakt, který jmenuje soubor bez adresáře nebo třídu o dvou a více slovech, dostane kotvu, kterou index dohledá (jen existence, bez otisku), a hledá se podle ní; těleso plannera zůstává.
 
 **Omezení.** 2-3 repliky na buňku, 10 z 36 zadaných běhů B2 vynecháno kvůli rozpočtu; úkoly dřívějších benchmarků jsou uzavřené (issue obsahuje nálezy pozdějších kol, takže reviewer a planner část „známých nálezů“ čtou z issue); fakta bez časové značky (451 z 1 076) se v B2 nepoužila, v živém toku by byla k dispozici; retro kontrolní seznam je z výstupů obou variant; kód steward čte z dnešního klonu. Skripty měření (`%TEMP%\cl218`) nejsou publikované.
 
@@ -1318,7 +1318,7 @@ Ocas je tedy velký a produktivní (úkoly s mnoha soubory), ne bloudící. Test
 jsou zároveň horní mez) a 0,07 % při primárním. 1 % překročí až 50 % řez volného pravidla (1,46 %), což je horní mez bez kontroly kvality. **Výhrada kvality:** řez bloudění může ubrat
 čtení, které kvalitu drží (coder test známého řešení 9/9, kritérium CL-189 až CL-205); proti 0,07–0,87 % úspory by zhoršení jediného úkolu z deseti stálo víc než celá úspora. Mimo to: podíl bloudění je malý, protože se příkazy neopakují
 (medián 0 přesných opakování) a velké běhy jsou velké úkoly. **Vedlejší nález mimo governor:** 12 běhů ve smyčce buildů nese 118 USD (3,7 % z 3 224); 30 % z toho je 35 USD = **1,10 %**, tedy nad pravidlem 1 %, ale neúspěšný build je zpětná vazba,
-ne zbytečný tah, a bez řízeného pokusu (nerozlišíme smyčku od nutné opravy) to není stavitelné; vede na kartu výzkumu.
+ne zbytečný tah, a bez řízeného pokusu (nerozlišíme smyčku od nutné opravy) to není stavitelné; vede na kartu výzkumu (výsledek: § 8.12a, no-go).
 
 **6. Co coder píše a čte (doplnění vlastníka; 401 běhů coder, cena nesená = generování argumentu + zápis do cache + čtení v pozdějších tazích, jednotky převedené na USD):**
 
@@ -1357,6 +1357,61 @@ Největší položka zápisu je `Write` nového souboru (4,9 %) a heredoc úprav
 | Hook `PreToolUse`, který jednou odmítne `Write` do existujícího souboru nad 40 řádků | všech 49 volání, ušetří se 56 % nezměněných řádků: 2,9 USD = **0,09 %** | odmítnuté volání už je vygenerované a zůstává v kontextu; ušetří se jen pozdější přepisy téhož běhu: 1,2 USD = 0,04 % (bez ceny odmítnutí) | **no-go** (< 1 %) |
 
 Omezení měření: `edit` je odhad podle tvaru příkazu (heuristika zápisu v shellu), úspěšný build podle `gradle exit 0` / `BUILD SUCCESSFUL` (82 z 336 běhů s buildem nemá zelený build ve svém běhu: odevzdání na review po předběžné kontrole); soubory úkolu z gitu mají 26 běhů bez shody (6 %); USD je z cenové tabulky (ne z `total_cost_usd`), součet `terrio-*` rolí 3 255 USD proti 3 224 USD jmenovateli.
+
+### 8.12a Smyčky buildů coderu: klasifikace neúspěšných buildů a go/no-go (CL-221, 2026-10-11)
+
+Navazuje na § 8.12 bod 5 (12 běhů ve smyčce buildů, 118 USD = 3,7 % ze 3 224). Jen počty z týchž transcriptů (401 běhů codera od 2026-10-01, žádný nový běh, žádný obsah), skript
+`tools/build-loops.mjs` (`node tools/build-loops.mjs`; váhy, cenová tabulka a pravidlo smyčky z CL-214, 12 běhů / 118,0 USD se reprodukuje přesně). Build je **cena tahu, který ho spustil, plus jeho výstup nesený
+pozdějšími tahy**; „oprava po něm“ jsou tahy do dalšího buildu (úpravy jsou produktivní práce, jde o strop, ne o ztrátu). Stejně jako v 8.12 je USD z cenové tabulky.
+
+**1. Co CL-214 spočítal jinak.** Detektor buildů z CL-214 bere každý příkaz, který gradle jen zmiňuje (heredoc s úpravou, `rg`), a zelený build zná jen z `BUILD SUCCESSFUL` / `gradle exit 0`, kdežto
+obálky Terria (`gradle compile|precheck`, `ci test`) tisknou jen `= PASS|FAIL …`. Přísný detektor (build na místě příkazu, výsledek z řádku verdiktu obálky, konec úlohy na pozadí z oznámení o dokončení úlohy,
+příčina z logu, který coder čte dál) dává: smyčka (≥ 3 neúspěšné buildy před prvním zeleným) je **13 běhů, 62,0 USD (1,9 %)**, s původními 12 sdílí jen 6. „82 běhů, které nikdy nedojdou k zelenému buildu“ je dnes 81 běhů
+(212 USD): **70 z nich zelený build má** (obálka tiskne `PASS`), 10 žádný build nespustilo (jen zmínka) a 1 skončil po neúspěšném. Vysvětlení z § 8.12 „odevzdání po předběžné kontrole“ tedy neplatí.
+Přísně bez zeleného buildu je 77 běhů (73,3 USD), z toho **76 nespustilo žádný build** (72,7 USD, medián 6 tahů); 26 z nich upravilo Kotlin/Java (12,4 USD, medián 2 úpravy), 50 ne (60,3 USD).
+
+**2. Neúspěšné buildy podle příčiny** (příčina = první vodítko v textu: chyba kompilátoru `e: file:`, selhání testu, prostředí, vypršení času; při samotném řádku verdiktu se hledá v logu, který coder čte před další
+úpravou či buildem; USD buildu + oprava po něm; „čas“ je doba buildu, kterou Gradle vytiskl):
+
+| Příčina | 12 smyček CL-214: neúsp. | build USD | oprava USD | čas min | všech 401 běhů: neúsp. | build USD | oprava USD | čas min |
+|---|---|---|---|---|---|---|---|---|
+| chyba kompilátoru | 13 | 0,7 | 7,0 | 16,5 | 65 | 2,8 | 20,1 | 53,2 |
+| selhání testu | 11 | 0,5 | 2,7 | 11,1 | 135 | 6,4 | 25,9 | 131,7 |
+| prostředí (síť, zámek, démon) | 2 | 0,2 | 0,0 | 3,8 | 10 | 0,4 | 0,1 | 8,0 |
+| vypršení času | 0 | 0,0 | 0,0 | 0,0 | 4 | 0,1 | 0,1 | – |
+| příčina není v přepisu (jen řádek verdiktu) | 23 | 2,0 | 14,1 | 11,8 | 105 | 6,8 | 55,0 | 47,4 |
+| příkaz nedošel ke Gradle | 5 | 0,4 | – | – | 45 | 2,0 | – | – |
+| **celkem** | **54** | **3,8** | **23,8** | **43,2** | **364** | **18,5** | **101,4** | **240,3** |
+
+Neúspěšný build má v obou množinách 25 % z 1 253 spuštěných (`precheck` 29 % ze 568, `compile` 22 % z 308, `test` 22 % z 328, `ci test` 1 z 9). Příkazy, které Gradle nedosáhly (45): obálka spuštěná ze špatného adresáře
+(`MODULE_NOT_FOUND`) 22, odmítnutí hookem guardu 12, chyba shellu 6, neznámý příkaz či přepínač 5.
+
+**3. Opakování** (neúspěšný build proti předchozímu, který proběhl): v 12 smyčkách z 49 neúspěšných je **první** 27, **nová chyba** 3, **stejná chyba po úpravě** 0, **opakování bez úpravy** 1, nerozhodnutelných 18 (text chyby
+v přepisu chybí). Ve všech 401 bězích z 319: první 211, nová chyba 16, stejná chyba po úpravě 6, opakování bez úpravy 5, nerozhodnutelných 81. Coder tedy build **neopakuje**: čtení chyby „jednou místo opakování“ ušetří
+5 + 6 buildů za deset dní (0,3 USD).
+
+**4. Tři páky z karty.** (a) *Kontrola kompilace dotčeného modulu před plným testem*: `precheck` a `compile` už kompilací začínají a tvoří 70 % buildů coderu; z 65 chyb kompilátoru jich plný `test` zachytil jen 5 a jiný
+gradlew 3. Plný test se zastaví na téže chybě, takže se ušetří minuty, ne tahy: **0 tahů**. (b) *Přečíst chybu jednou*: viz bod 3, 11 buildů. (c) *Precheck, který coder má*: používá ho (568 spuštění). Zbývá jen
+příkaz, který Gradle nedosáhl (45 tahů, 2,0 USD), z toho 22× špatný adresář, pravděpodobně relativní cesta obálky spuštěná z podadresáře.
+
+**5. Zbytečná část a pravidlo 1 %** (1 % = 32,2 USD ze 3 224):
+
+| Základ | jistě zbytečné (příkaz bez Gradle + opakování bez úpravy) | horní mez (+ chyby, které by hook ukázal při úpravě, + stejná chyba po úpravě) | 30 % z horní meze | strop: každý neúspěšný build s opravou |
+|---|---|---|---|---|
+| 12 smyček CL-214 (118 USD) | 6 buildů, 0,4 USD | 0,7 USD | **0,01 %** | 27,6 USD = 23 % běhů, 0,86 % z 3 224 (30 % = 0,26 %) |
+| 13 přísných smyček (62 USD) | 6, 0,4 USD | 0,6 USD | 0,01 % | 17,6 USD = 28 % běhů, 0,55 % |
+| všech 401 běhů (1 034 USD) | 50, 2,2 USD | 3,3 USD | **0,03 %** | 119,9 USD = 11,6 % běhů, 3,7 % (30 % = 1,12 %, ale z toho je většina nutná oprava) |
+
+**Rozhodnutí: no-go.** Realisticky zbytečné jsou 0,4–2,2 USD (jistě) až 0,7–3,3 USD (horní mez), řez o 30 % je 0,01–0,03 % ze 3 224, o dva řády pod pravidlem 1 %. Karta v § 8.12 počítala 30 % z **celé** ceny 12 běhů (35 USD = 1,10 %);
+neúspěšné buildy ale tvoří jen 3,2 % těchto běhů (3,8 z 118 USD) a s opravami po nich 23 %, zbytek jsou velké úkoly (medián 19 souborů, 37 tahů s úpravou). I strop (celé neúspěšné buildy včetně oprav, tedy bez jediné
+chyby) je v 12 smyčkách 0,86 %, pod 1 %. Smyčka tedy není plýtvání, ale cena úkolů, ve kterých se při psaní kódu padá.
+
+**6. Co to říká CL-217 (hook po úpravě).** Z 65 selhání kompilace ukazuje řádky kompilátoru 26, v nich je **syntaktická chyba 3, neznámé jméno 11, špatný počet argumentů 5 = 19** (73 % viditelných, 29 % všech); typové a ostatní 7,
+39 selhání má jen řádek verdiktu. Hook by tedy zachytil nejvýš 19 buildů: 1,0 USD (0,03 % ze 3 224) a po poměru ≈ 15 minut buildu za deset dní. Podle pravidla 1 % z ceny je to no-go; případné nasazení by muselo stát na
+čase a kvalitě, ne na USD. Chyby testů (135, 37 %) hook nevidí.
+
+Omezení: příčina u 29 % selhání (105 z 364) v přepisu chybí, protože coder volá obálku s `| tail`; 41 buildů na pozadí nemá viditelný verdikt a 79 příkazů je nerozpoznaných (5 % z 1 502 volání), do selhání se nepočítají;
+„oprava po něm“ obsahuje produktivní úpravy a jde o strop; USD je z cenové tabulky (ne z `total_cost_usd`).
 
 ### 8.13 Skriptovaný tester Terria bez LLM: strop, stavba, offline brána (FM-23, 2026-10-11)
 
@@ -2139,7 +2194,7 @@ rozhoduje launcher.
 
 ### Výsledek CL-63 — účty Claude a YouTrack (2026-10-08)
 
-- `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`, `default`) a YouTrack instance (`url`, `projects`, `token` = jméno
+- `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`; starší klíč `default` se ignoruje, CL-224) a YouTrack instance (`url`, `projects`, `token` = jméno
   globálního tajemství `YOUTRACK_TOKEN_<ID>` ve storu). Bez souboru je jediným účtem `~/.claude`. Ingest čte `projects` každého vypsaného účtu a přiřazuje transcripty podle cesty
   (`runs.path LIKE <configDir>/projects/%`), takže cena 7 d na účet je jeden SQL přes `usage_hours`; filtr Overview (`overview?account=`) používá stejný předpona v `hours` a `gapCount`.
 - Okna účtu: pracovní složka, která za 15 min volala CodeLoupe, patří účtu, jehož `projects/<ProjectDirName>` existuje (u dvou účtů tomu s novější změnou). E-mail účtu je jediné, co se čte z `.claude.json`.

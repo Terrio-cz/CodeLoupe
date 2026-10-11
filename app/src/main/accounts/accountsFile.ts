@@ -2,15 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // `<home>/accounts.json`: the app writes it, the daemon reads it (codeloupe.accounts.AccountsFile). No secret in it: a
-// YouTrack token is the name `token` in the encrypted store.
+// YouTrack token is the name `token` in the encrypted store. A `default` key in an older file is not read, so the next write drops it.
 
 export interface ClaudeEntry {
   id: string;
   label: string;
   configDir: string;
-  default: boolean;
   /** Name of the secret that holds the account's long-lived token; the launcher of unattended runs sets it, the app only keeps it. */
   tokenSecret?: string;
+  /** Fingerprint of the account uuid (`identity-<fingerprint>` in the limits export); written by hand, the app only keeps it. */
+  identity?: string;
 }
 
 export interface YoutrackEntry {
@@ -40,7 +41,8 @@ export function readAccounts(home: string): AccountsData {
   for (const c of Array.isArray(o.claude) ? o.claude : []) {
     if (isObject(c) && text(c.id) && text(c.label) && text(c.configDir)) {
       const tokenSecret = text(c.tokenSecret);
-      claude.push({ id: c.id as string, label: c.label as string, configDir: c.configDir as string, default: c.default === true, ...(tokenSecret ? { tokenSecret } : {}) });
+      const identity = text(c.identity);
+      claude.push({ id: c.id as string, label: c.label as string, configDir: c.configDir as string, ...(tokenSecret ? { tokenSecret } : {}), ...(identity ? { identity } : {}) });
     }
   }
   const youtrack: YoutrackEntry[] = [];

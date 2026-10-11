@@ -45,7 +45,7 @@ internal class AccountViews(
             claude = claude.map { a ->
                 val used = transcripts.usage.totals(a.projects, since)
                 AccountsView.Claude(
-                    id = a.id, label = a.label, email = profiles.email(a), configDir = a.configDir.toString(), isDefault = a.isDefault, implicit = a.implicit,
+                    id = a.id, label = a.label, email = profiles.email(a), configDir = a.configDir.toString(), implicit = a.implicit,
                     exists = Files.isDirectory(a.configDir), windows = windows[a.id] ?: 0, weighted7d = used.weighted,
                     weighted5h = transcripts.usage.totals(a.projects, sessionSince).weighted, savedPct7d = saved(a),
                     lastUsedAt = used.lastUsedMs?.let { IsoTime.of(Instant.ofEpochMilli(it)) },

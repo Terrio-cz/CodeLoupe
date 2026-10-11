@@ -346,7 +346,6 @@ export interface Accounts {
     /** The e-mail the account is signed in with, when its `.claude.json` says. */
     email: string | null;
     configDir: string;
-    isDefault: boolean;
     /** Nobody listed it: it is the default config directory, shown until the first account is saved. */
     implicit: boolean;
     exists: boolean;

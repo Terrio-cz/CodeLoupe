@@ -8,7 +8,9 @@ import kotlinx.serialization.json.JsonPrimitive
  * `PreToolUse` hook that points shell searches and whole-file reads at CodeLoupe ([SteerConfig]); `sessionStart` is the
  * `SessionStart` hook that adds the repository map and the state of the worktree ([SessionStartConfig]). Read again on every
  * hook call, so a change needs no daemon restart. `weight` is the `UserPromptSubmit`/`Stop` hook that tells the user when a session
- * carries too much ([WeightConfig]); `postEdit` is the `PostToolUse` check of a file just edited ([PostEditConfig]).
+ * carries too much ([WeightConfig]); `postEdit` is the `PostToolUse` check of a file just edited ([PostEditConfig]). `stampAccount` is the
+ * quiet part of the `SessionStart` and `SubagentStart` hooks that notes which login runs a session (local metadata only, CL-226); it does not
+ * depend on `sessionStart` and is on by default.
  */
 data class HooksConfig(
     val enabled: Boolean = true,
@@ -16,6 +18,7 @@ data class HooksConfig(
     val sessionStart: SessionStartConfig = SessionStartConfig(),
     val weight: WeightConfig = WeightConfig(),
     val postEdit: PostEditConfig = PostEditConfig(),
+    val stampAccount: Boolean = true,
 ) {
     /**
      * The `PostToolUse` hook after `Edit`, `Write` and `MultiEdit` of a Kotlin or Java file: parse the file and, for Kotlin, check the names against
@@ -79,6 +82,7 @@ data class HooksConfig(
                     changes = (start?.get("changes") as? JsonPrimitive)?.content != "false",
                     changesLimit = number(start, "changesLimit")?.coerceIn(1, 100) ?: startDefault.changesLimit,
                 ),
+                stampAccount = (section["stampAccount"] as? JsonPrimitive)?.content != "false",
                 weight = WeightConfig(
                     enabled = (weight?.get("enabled") as? JsonPrimitive)?.content != "false",
                     warnAt = (weight?.get("warnAt") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { n -> n > 0 } }?.sorted()?.distinct()?.takeIf { it.isNotEmpty() } ?: weightDefault.warnAt,

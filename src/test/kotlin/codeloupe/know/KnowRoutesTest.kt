@@ -104,6 +104,18 @@ class KnowRoutesTest {
         assertFalse(search("billing total").contains("STALE"))
     }
 
+    @Test
+    fun `a file named without its directory is anchored and found by anchor, with or without a question`() {
+        val put = json(call("POST", "/know", """{"scope":"area:billing","text":"Billing.kt is the one place that adds tax","root":${JsonPrimitive(repo.toString())}}"""))
+        val id = put["fact"]!!.jsonObject["id"]!!.jsonPrimitive.content
+        assertContains(put["fact"]!!.jsonObject["anchors"].toString(), "\"path\":\"$BILLING\"")
+
+        assertContains(json(call("GET", "/know/search?anchor=Billing.kt"))["hits"].toString(), id)
+        assertContains(json(call("GET", "/know/search?q=tax&anchor=$BILLING"))["hits"].toString(), id)
+        assertEquals("[]", json(call("GET", "/know/search?anchor=Other.kt"))["hits"].toString())
+        assertEquals(400, call("GET", "/know/search?anchor=%20").statusCode())
+    }
+
     private companion object {
         const val BILLING = "src/main/kotlin/demo/Billing.kt"
     }

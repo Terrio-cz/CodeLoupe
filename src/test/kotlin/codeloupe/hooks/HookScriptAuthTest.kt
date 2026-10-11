@@ -4,6 +4,9 @@ import codeloupe.CodeLoupe
 import codeloupe.TestRepos
 import codeloupe.daemon.DaemonToken
 import com.sun.net.httpserver.HttpServer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.net.InetSocketAddress
 import java.nio.file.Files
@@ -128,6 +131,52 @@ class HookScriptAuthTest {
             Files.writeString(dir.resolve(DaemonToken.FILE), "garbage")
             assertEquals("", run(bash!!, "hook.sh", port, dir, event))
             assertTrue(seen.isEmpty())
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    /** The `headersHelper` command of the plugin's `.mcp.json`, run the way Claude Code runs it: through the platform shell, from the plugin root. */
+    private fun runHelperCommand(port: Int, home: Path, path: String?): String {
+        val plugin = Path.of(System.getProperty("codeloupe.projectDir"), "plugin")
+        val helper = Json.parseToJsonElement(Files.readString(plugin.resolve(".mcp.json"))).jsonObject["mcpServers"]!!.jsonObject[CodeLoupe.NAME]!!
+            .jsonObject["headersHelper"]!!.jsonPrimitive.content
+        val windows = System.getProperty("os.name").lowercase().startsWith("windows")
+        val command = helper.replace("\${CLAUDE_PLUGIN_ROOT}", plugin.toString())
+        val process = ProcessBuilder(if (windows) listOf("cmd.exe", "/d", "/s", "/c", command) else listOf("sh", "-c", command))
+            .directory(plugin.toFile()).redirectError(ProcessBuilder.Redirect.DISCARD).apply {
+                environment()["CODELOUPE_PORT"] = port.toString()
+                environment()["CODELOUPE_HOME"] = home.toString()
+                environment()["CODELOUPE_BIN"] = "/nonexistent/codeloupe"
+                if (path != null) environment()[environment().keys.firstOrNull { it.equals("PATH", true) } ?: "PATH"] = path
+            }.start()
+        process.outputStream.close()
+        val out = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
+        assertTrue(process.waitFor(30, TimeUnit.SECONDS))
+        assertEquals(0, process.exitValue())
+        return out
+    }
+
+    @Test
+    fun `the plugin's helper command gets the token on Windows without a Git Bash on the PATH, where bash is the WSL launcher`() {
+        val git = Path.of("C:/Program Files/Git/bin/bash.exe")
+        assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows") && Files.exists(git), "not a Windows machine with Git Bash")
+        val (server, port, _) = fake { DaemonToken.proof(token, it) }
+        try {
+            val system = System.getenv("SystemRoot") ?: "C:\\Windows"
+            val out = runHelperCommand(port, home(), "$system\\System32;$system;C:\\Program Files\\Git\\cmd")
+            assertEquals("""{"x-codeloupe":"1","x-codeloupe-token":"$token"}""", out.trim())
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `the plugin's helper command gets the token through sh on macOS and Linux`() {
+        assumeTrue(!System.getProperty("os.name").lowercase().startsWith("windows") && bash() != null, "not a Unix machine with bash")
+        val (server, port, _) = fake { DaemonToken.proof(token, it) }
+        try {
+            assertEquals("""{"x-codeloupe":"1","x-codeloupe-token":"$token"}""", runHelperCommand(port, home(), null).trim())
         } finally {
             server.stop(0)
         }

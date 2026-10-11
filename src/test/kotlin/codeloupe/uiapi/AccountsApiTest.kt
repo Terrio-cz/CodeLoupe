@@ -52,7 +52,7 @@ class AccountsApiTest {
 
     init {
         // Account A worked in the fixture repository (two turns), account B in some other directory (one turn).
-        TranscriptBuilder(hourAgo).prompt("a").turn().turn().limit("You've hit your weekly limit · resets Oct 11, 8pm (Europe/Prague)", Instant.now().plusSeconds(26 * 3600)).write(claudeA.resolve("projects").resolve(ProjectDirName.of(repo.toRealPath().toString())).resolve("s1.jsonl"))
+        TranscriptBuilder(hourAgo).prompt("a").turn().turn().limit("You've hit your weekly limit · resets Oct 11, 8pm (Europe/Prague)", Instant.now().plusSeconds(26 * 3600)).usageReport(session = 30, weekly = 51, fable = 6, severity = "warning").write(claudeA.resolve("projects").resolve(ProjectDirName.of(repo.toRealPath().toString())).resolve("s1.jsonl"))
         TranscriptBuilder(hourAgo).prompt("b").turn().limit("You've hit your session limit", Instant.now().minusSeconds(1800), "five_hour").write(claudeB.resolve("projects").resolve("C--elsewhere-project").resolve("s2.jsonl"))
         Files.writeString(
             home.resolve(AccountsFile.FILE),
@@ -109,7 +109,7 @@ class AccountsApiTest {
         val body = awaitAccounts()
         val claude = body["claude"]!!.jsonArray.map { it.jsonObject }.associateBy { it["id"]!!.jsonPrimitive.content }
         assertEquals(listOf("a", "b", "gone"), claude.keys.toList())
-        assertEquals(listOf(true, false, false), claude.values.map { it["isDefault"]!!.jsonPrimitive.content.toBoolean() })
+        assertTrue(claude.values.none { "isDefault" in it }, "the default-account flag is gone from the API")
         assertEquals("Account A", claude.getValue("a")["label"]!!.jsonPrimitive.content)
         assertEquals(260L, claude.getValue("a")["weighted7d"]!!.jsonPrimitive.content.toLong(), "two turns of 130")
         assertEquals(130L, claude.getValue("b")["weighted7d"]!!.jsonPrimitive.content.toLong())
@@ -173,6 +173,27 @@ class AccountsApiTest {
         assertEquals(0, filteredCalls.size, "the find call came from account A's directory")
         assertTrue(json("overview?range=7d&account=a")["toolCalls"]!!.jsonArray.isNotEmpty())
         assertEquals(400, get("overview?account=nobody").statusCode())
+    }
+
+    @Test
+    fun `the limits resource lists the usage snapshots with the account of the config directory they were written under`() {
+        tool("find", "q" to "total", "root" to repo.toString())
+        awaitAccounts()
+        val body = json("limits")
+        val latest = body["latest"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("session", "weekly_all", "weekly_scoped"), latest.map { it["kind"]!!.jsonPrimitive.content })
+        assertEquals(listOf(30.0, 51.0, 6.0), latest.map { it["percent"]!!.jsonPrimitive.content.toDouble() })
+        assertTrue(latest.all { it["account"]!!.jsonPrimitive.content == "a" && it["severity"]!!.jsonPrimitive.content == "warning" })
+        assertEquals(3, body["snapshots"]!!.jsonArray.size)
+        assertEquals("false", body["truncated"]!!.jsonPrimitive.content)
+        assertEquals(3, json("limits?account=a")["snapshots"]!!.jsonArray.size)
+        assertEquals(0, json("limits?account=b")["snapshots"]!!.jsonArray.size)
+        assertEquals(0, json("limits?account=unknown&since=24h")["snapshots"]!!.jsonArray.size)
+        assertEquals(1, json("limits?account=a&limit=1")["snapshots"]!!.jsonArray.size)
+        assertEquals("true", json("limits?account=a&limit=1")["truncated"]!!.jsonPrimitive.content)
+        assertEquals(400, get("limits?since=yesterday-ish").statusCode())
+        assertEquals(400, get("limits?limit=0").statusCode())
+        assertFalse(launcherToken in body.toString())
     }
 
     private fun daemonLog(): String = Files.readString(home.resolve("daemon.log"))

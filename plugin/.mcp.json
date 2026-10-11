@@ -4,7 +4,7 @@
       "type": "http",
       "url": "http://127.0.0.1:${CODELOUPE_PORT:-47391}/mcp",
       "headers": { "x-codeloupe": "1" },
-      "headersHelper": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/mcp-headers.sh\""
+      "headersHelper": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/mcp-headers.cmd\" || \"${CLAUDE_PLUGIN_ROOT}/hooks/mcp-headers.cmd\""
     }
   }
 }

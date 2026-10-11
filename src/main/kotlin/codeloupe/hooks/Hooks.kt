@@ -1,6 +1,8 @@
 package codeloupe.hooks
 
 import codeloupe.JsonFormat
+import codeloupe.accounts.ClaudeLogin
+import codeloupe.accounts.SessionIdentities
 import codeloupe.config.Config
 import codeloupe.config.ConfigLoader
 import codeloupe.config.HooksConfig
@@ -31,6 +33,7 @@ class Hooks(
     private val warned: WarnedLevels? = null,
     private val forgetReads: (String) -> Unit = {},
     private val postEdit: PostEditCheck? = null,
+    private val stamps: SessionStamps? = null,
 ) {
     private class Session {
         var given = 0
@@ -64,6 +67,7 @@ class Hooks(
         if (input.event != "SessionStart") return handle(json)
         val started = System.nanoTime()
         val settings = runCatching(config).getOrDefault(HooksConfig())
+        stamp(input, settings)
         val context = session?.takeIf { settings.enabled && settings.sessionStart.enabled } ?: return pass("off", started)
         val cwd = input.cwd ?: return pass("ignored", started)
         val text = runCatching { context.build(cwd, input.source, settings.sessionStart) }.getOrNull() ?: return pass("no-context", started)
@@ -121,11 +125,19 @@ class Hooks(
         return runCatching {
             when (input.event) {
                 "PreToolUse" -> steer(input, settings.steer, started)
-                "SubagentStart" -> pass("subagent", started)
+                "SubagentStart" -> {
+                    stamp(input, settings)
+                    pass("subagent", started)
+                }
                 "UserPromptSubmit", "Stop" -> weigh(input, json, settings.weight, started)
                 else -> pass("ignored", started)
             }
         }.getOrElse { pass("error", started) }
+    }
+
+    // Local metadata and independent of the session-start context; nothing is written while the hooks are off.
+    private fun stamp(input: HookInput, settings: HooksConfig) {
+        if (settings.enabled && settings.stampAccount) runCatching { stamps?.note(input.event, input.session, input.transcriptPath) }
     }
 
     private fun steer(input: HookInput, steer: HooksConfig.SteerConfig, started: Long): JsonObject? {
@@ -217,6 +229,7 @@ class Hooks(
                 Steering(IndexedSources(registry, windows), paths), { ConfigLoader.hooks(config.home) },
                 AppendLog(config.home.resolve("hooks.jsonl"))::append, { path -> runCatching { registry.locate(directoryOf(path)).worktree }.getOrNull() }, callsOn,
                 SessionContext(registry, projects), SessionWeights(scope), WarnedLevels(config.home.resolve("weight-warned.txt")), forgetReads, PostEditCheck(registry, paths),
+                SessionStamps(SessionIdentities(config.home.resolve(SessionIdentities.FILE)), ClaudeLogin()),
             )
         }
     }

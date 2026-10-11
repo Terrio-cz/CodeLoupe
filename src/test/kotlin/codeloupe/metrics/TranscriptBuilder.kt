@@ -1,5 +1,6 @@
 package codeloupe.metrics
 
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -96,6 +97,50 @@ class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T1
             put("error", "rate_limit")
         }.toString()
     }
+
+    /**
+     * A `/usage` report the way Claude Code writes it: a `system/local_command` line with the three meters (session, weekly, weekly per
+     * model); the rendered text is a placeholder, only the structure counts. Without [limits] the report holds none, like one made while offline.
+     */
+    fun usageReport(session: Int?, weekly: Int?, fable: Int?, resetsAt: Instant = Instant.parse("2026-10-11T13:00:00Z"), severity: String = "normal", limits: Boolean = true) = apply {
+        lines += buildJsonObject {
+            put("type", "system")
+            put("subtype", "local_command")
+            put("timestamp", stamp())
+            put("content", "usage placeholder")
+            putJsonObject("usageReport") {
+                putJsonObject("rate_limits") {
+                    if (!limits) put("limits", JsonNull)
+                    else put("limits", buildJsonArray {
+                        fun meter(kind: String, group: String, percent: Int?, scope: String?, reset: String?) = add(buildJsonObject {
+                            put("kind", kind)
+                            put("group", group)
+                            put("percent", percent)
+                            put("resets_at", reset)
+                            if (scope == null) put("scope", JsonNull) else putJsonObject("scope") { putJsonObject("model") { put("display_name", scope) }; put("surface", JsonNull) }
+                            put("severity", severity)
+                            put("is_active", kind == "weekly_all")
+                        })
+                        meter("session", "session", session, null, resetsAt.minusSeconds(3 * 86_400).toString())
+                        meter("weekly_all", "weekly", weekly, null, resetsAt.toString().replace("Z", ".000000+00:00"))
+                        meter("weekly_scoped", "weekly", fable, "Fable", null)
+                    })
+                }
+            }
+        }.toString()
+    }
+
+    /** The line that names the account of the session (`bridge-session`); [uuid] is a made-up one. */
+    fun bridgeSession(uuid: String) = apply {
+        lines += buildJsonObject {
+            put("type", "bridge-session")
+            put("timestamp", stamp())
+            put("ownerAccountUuid", uuid)
+        }.toString()
+    }
+
+    /** The lines written so far, for appending to a transcript that already exists. */
+    fun text(): String = lines.joinToString("\n") + "\n"
 
     fun result(id: String, text: String, error: Boolean = false) = apply {
         lines += buildJsonObject {
