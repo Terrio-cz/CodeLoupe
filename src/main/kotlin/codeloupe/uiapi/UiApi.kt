@@ -37,6 +37,7 @@ class UiApi(
     private val transcripts = Transcripts(config, { type, data -> events.emit(type, data) }, scope, log, waitMs)
     private val runViews = RunViews(transcripts)
     private val commandViews = CommandViews(transcripts)
+    private val limitViews = LimitViews(transcripts)
     private val gapViews = GapScreen(transcripts, GapViews(config.home.resolve(GapViews.FILE)))
     private val feed = EventFeed(events, registry, transcripts)
     private val overview = OverviewViews(callLog, worktrees, transcripts)
@@ -61,6 +62,8 @@ class UiApi(
     }
 
     suspend fun accounts(): AccountsView = accountViews.accounts()
+
+    suspend fun limits(since: String?, account: String?, limit: String?): LimitsView = limitViews.limits(since, account, limit)
 
     suspend fun worktrees(repo: String?, layer: String?, q: String?): WorktreeList = worktrees.list(repo, layer, q)
 

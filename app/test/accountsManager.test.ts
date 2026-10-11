@@ -43,7 +43,7 @@ const dir = (name: string) => path.join(tmp, name);
 const everything = () => fs.readdirSync(home).map(f => fs.readFileSync(path.join(home, f), 'utf8')).join('\n');
 
 describe('Claude accounts', () => {
-  it('adds an account, materialising ~/.claude as the default first, and writes the file the daemon reads', async () => {
+  it('adds an account, materialising ~/.claude as the first entry, and writes the file the daemon reads', async () => {
     const t = setup();
     const out = await t.manager.claudeAdd({ label: 'Åsa B', configDir: dir('claude-b'), create: true });
     expect(out).toEqual({ ok: true, message: 'Account “Åsa B” added.' });
@@ -51,27 +51,27 @@ describe('Claude accounts', () => {
     const file = JSON.parse(fs.readFileSync(path.join(home, 'accounts.json'), 'utf8')) as Record<string, unknown>;
     expect(Object.keys(file).sort()).toEqual(['claude', 'version', 'youtrack']);
     expect(file.claude).toEqual([
-      { id: 'default', label: 'Default account', configDir: path.join(userHome, '.claude'), default: true },
-      { id: 'asa-b', label: 'Åsa B', configDir: path.normalize(dir('claude-b')), default: false },
+      { id: 'default', label: 'Default account', configDir: path.join(userHome, '.claude') },
+      { id: 'asa-b', label: 'Åsa B', configDir: path.normalize(dir('claude-b')) },
     ]);
   });
 
-  it('keeps the token secret name of an account through a rename and a change of default (CL-210)', async () => {
+  it('keeps the token secret name and the identity of an account through a rename, and a retired `default` key is dropped on the next write (CL-210, CL-224)', async () => {
     const t = setup();
     fs.writeFileSync(path.join(home, 'accounts.json'), JSON.stringify({
       version: 1,
       claude: [
-        { id: 'a', label: 'A', configDir: dir('claude-a'), default: true, tokenSecret: 'CLAUDE_TOKEN_A' },
-        { id: 'b', label: 'B', configDir: dir('claude-b'), default: false },
+        { id: 'a', label: 'A', configDir: dir('claude-a'), default: false, tokenSecret: 'CLAUDE_TOKEN_A' },
+        { id: 'b', label: 'B', configDir: dir('claude-b'), default: true, identity: 'ab12cd34ef56' },
       ],
       youtrack: [],
     }));
     expect((await t.manager.claudeRename('a', 'Renamed')).ok).toBe(true);
-    expect((await t.manager.claudeSetDefault('b')).ok).toBe(true);
     expect(readAccounts(home).claude).toEqual([
-      { id: 'a', label: 'Renamed', configDir: dir('claude-a'), default: false, tokenSecret: 'CLAUDE_TOKEN_A' },
-      { id: 'b', label: 'B', configDir: dir('claude-b'), default: true },
+      { id: 'a', label: 'Renamed', configDir: dir('claude-a'), tokenSecret: 'CLAUDE_TOKEN_A' },
+      { id: 'b', label: 'B', configDir: dir('claude-b'), identity: 'ab12cd34ef56' },
     ]);
+    expect(fs.readFileSync(path.join(home, 'accounts.json'), 'utf8')).not.toContain('"default":');
   });
 
   it('refuses a relative path, a missing directory without create, a file, a duplicate and the implicit default again', async () => {
@@ -93,19 +93,17 @@ describe('Claude accounts', () => {
     expect((await t.manager.claudeAdd({ label: 'B again', configDir: dir('b'), create: false })).message).toContain('already exists');
   });
 
-  it('renames, changes the default and removes with a confirmation that says the directory stays', async () => {
+  it('renames and removes with a confirmation that says the directory stays', async () => {
     const t = setup();
     fs.mkdirSync(dir('b'));
     await t.manager.claudeAdd({ label: 'B', configDir: dir('b'), create: false });
     expect((await t.manager.claudeRename('b', 'Work')).ok).toBe(true);
     expect((await t.manager.claudeRename('zzz', 'x')).ok).toBe(false);
-    expect((await t.manager.claudeSetDefault('b')).ok).toBe(true);
-    expect(readAccounts(home).claude.map(c => [c.id, c.label, c.default])).toEqual([['default', 'Default account', false], ['b', 'Work', true]]);
+    expect(readAccounts(home).claude.map(c => [c.id, c.label])).toEqual([['default', 'Default account'], ['b', 'Work']]);
     expect((await t.manager.claudeRemove('b')).message).toContain('removed');
     expect(t.confirms[0].detail).toContain('stay');
     expect(fs.existsSync(dir('b'))).toBe(true);
-    // The default went away: the one that is left takes over.
-    expect(readAccounts(home).claude.map(c => [c.id, c.default])).toEqual([['default', true]]);
+    expect(readAccounts(home).claude.map(c => c.id)).toEqual(['default']);
     const declined = setup({ confirm: async () => false });
     expect((await declined.manager.claudeRemove('default')).ok).toBe(false);
     expect(readAccounts(home).claude).toHaveLength(1);

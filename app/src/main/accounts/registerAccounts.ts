@@ -29,7 +29,6 @@ export function registerAccounts(ctx: AccountsContext, handle: <A extends unknow
   });
   handle(ACCOUNT_CH.claudeAdd, (input: unknown) => manager.claudeAdd(input as Parameters<AccountsManager['claudeAdd']>[0]));
   handle(ACCOUNT_CH.claudeRename, (id: unknown, label: unknown) => manager.claudeRename(String(id), String(label)));
-  handle(ACCOUNT_CH.claudeDefault, (id: unknown) => manager.claudeSetDefault(String(id)));
   handle(ACCOUNT_CH.claudeRemove, (id: unknown) => manager.claudeRemove(String(id)));
   handle(ACCOUNT_CH.youtrackAdd, (input: unknown) => manager.youtrackAdd(input as Parameters<AccountsManager['youtrackAdd']>[0]));
   handle(ACCOUNT_CH.youtrackTest, (id: unknown) => manager.youtrackTest(String(id)));

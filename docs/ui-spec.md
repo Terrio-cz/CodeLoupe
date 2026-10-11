@@ -458,8 +458,8 @@ main procesu jako v § 3.7.1 — nikdy přes daemon HTTP.
 ```
 Accounts
 ┌ Claude accounts ──────────────────────────────────────────────────── [+ Add account] ┐
-│ Account              Config dir                 Default  Windows Cost 7d  Savings Last used│
-│ account A (e-mail)   ~/.claude                  ●        4      12.1M     14%     2 min ago│
+│ Account              Config dir                          Windows Cost 7d  Savings Last used│
+│ account A (e-mail)   ~/.claude                           4      12.1M     14%     2 min ago│
 │ account B (e-mail)   ~/.claude-b                         2      6.8M      11%     1 h ago  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ┌ YouTrack accounts ───────────────────────────────────────────────── [+ Add account] ┐
@@ -472,7 +472,7 @@ Accounts
   transcript leží (ingest CL-62: `<configDir>/projects/…`). Overview se filtruje podle účtu (`overview?account=<id>`,
   výběr nad kartami; cena, rozpočet, mezery a volání dotazů z pracovních složek účtu).
 - Bez uloženého seznamu je jediným účtem implicitní `~/.claude` (v tabulce „implicit“, nejde přejmenovat ani odebrat);
-  první přidaný účet ho uloží jako řádek `default`. Odebrání účtu maže jen záznam, nikdy složku s přihlášením.
+  první přidaný účet ho uloží jako řádek `default` (jen id, příznak „výchozí účet“ neexistuje: aktivní účet si volí volající, např. Foreman, ze seznamu; starší klíč `default` v souboru se ignoruje a při dalším zápisu zmizí). Odebrání účtu maže jen záznam, nikdy složku s přihlášením.
 - YouTrack účet nahrazuje jedinou instanci z CL-29: URL, projekty, token (jen „set“), stav mirroru, test spojení.
   Tracker z `config.json` se v tabulce ukáže jen ke čtení („from config.json“). Přidání a odebrání účtu restartuje daemon
   (mirror se staví při startu; dialog to řekne předem), rotace tokenu ani test ne.
@@ -876,7 +876,7 @@ Audit je append-only soubor `<home>/secrets/audit.log` (řádek JSON na událost
 ```ts
 interface Accounts {
   claude: { id: string; label: string; email: string | null;      // e-mail z oauthAccount `.claude.json` účtu, nic jiného se nečte
-            configDir: string; isDefault: boolean; implicit: boolean; exists: boolean;
+            configDir: string; implicit: boolean; exists: boolean;
             windows: number;          // pracovní složky tohoto účtu, které volaly CodeLoupe za posledních 15 min
             weighted7d: number;
             savedPct7d: number | null;   // úspora běhů tohoto účtu za 7 dní vůči baseline; null = bez baseline nebo bez běhu k porovnání (ne 0 %)
@@ -891,6 +891,24 @@ Test spojení YouTrack účtu dělá main proces (IPC `accounts.youtrackTest(id)
 spotřebitel „CodeLoupe app (connection test)“ zapsaný do auditu, `GET <url>/api/users/me` bez následování přesměrování),
 ne daemon — read-only API zůstává bez zápisů a bez síťových akcí na povel. `overview` bere navíc `account=<id>`
 (neznámý účet = 400).
+
+### 9.13b `GET /ui-api/v1/limits?since=7d&account=&limit=` (CL-226; jen metadata)
+```ts
+interface Limits {
+  since: Iso; account: string | null; limit: number; truncated: boolean;   // limit 1..50000 (výchozí 5000); useknutá řada drží nejnovější
+  latest: LimitSnapshot[];      // nejnovější snapshot každého měřidla na účet
+  snapshots: LimitSnapshot[];   // řada od nejstaršího
+}
+interface LimitSnapshot {
+  at: Iso; kind: 'session' | 'weekly_all' | 'weekly_scoped' | string; group: string | null; scope: string | null;   // scope = model u weekly_scoped
+  percent: number | null; resetsAt: Iso | null; severity: string | null; active: boolean | null;
+  session: string;              // session Claude Code, která spustila /usage
+  account: string | null;       // účet sezení: pojmenovaný v accounts.json podle identity, jinak účet, jehož config dir drží transcript, jinak `identity-<otisk>`; null = nelze určit (nikdy odhad)
+  identity: string | null;      // otisk uuid účtu (12 hex): z hooku SessionStart (`<home>/session-identities.jsonl`) nebo z řádků, kterými transcript účet sám uvádí; jinak null
+}
+```
+Sdílí-li dva loginy `~/.claude`, `account` je `identity-<otisk>` (i pro implicitní `default`), dokud otisk nepojmenuje `"identity"` u položky `claude` v `accounts.json`; `account=identity-<otisk>` a `latest` s tím pracují jako s kterýmkoli účtem.
+`account=unknown` = snapshoty bez určeného účtu a bez identity. Řádky žijí v `usage_snapshots` (`transcripts.db`), nemaže je `clear()` ani smazání transcriptu.
 
 ### 9.14 `GET /ui-api/v1/settings` (efektivní konfigurace daemonu, bez tajemství)
 ```ts

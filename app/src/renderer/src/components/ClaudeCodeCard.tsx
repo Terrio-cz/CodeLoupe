@@ -38,8 +38,8 @@ export function ClaudeCodeCard() {
     <Card title="Claude Code">
       <dl className="dl">
         <dt>claude command</dt><dd>{status ? (status.cli ? 'found ✓' : 'not found — run the commands below by hand') : <Checking />}</dd>
-        <dt>MCP server</dt><dd>{status ? yes(status.mcp, 'added', 'not added') : <Checking />}</dd>
-        <dt>Plugin</dt><dd>{status ? yes(status.plugin, 'installed', 'not installed') : <Checking />}</dd>
+        <dt>MCP server</dt><dd>{status ? (status.mcpVia === 'plugin' ? 'provided by the plugin ✓' : yes(status.mcp, 'added', 'not added')) : <Checking />}</dd>
+        <dt>Plugin</dt><dd>{status ? yes(status.plugin, `installed${status.pluginVersion ? ` (plugin v${status.pluginVersion})` : ''}`, 'not installed') : <Checking />}</dd>
       </dl>
       <p className="t2">
         The plugin adds the MCP server, a skill, and starts the daemon when a session starts. The MCP server alone is the simpler option,
@@ -49,6 +49,12 @@ export function ClaudeCodeCard() {
         <button className="btn primary" disabled={busy || status?.plugin} onClick={() => void connect('plugin')}>Connect plugin…</button>
         <button className="btn" disabled={busy || status?.mcp} onClick={() => void connect('mcp')}>Add MCP server only…</button>
       </div>
+      {status?.plugin && (
+        <p className="t2 muted">
+          The plugin already provides the MCP server, with the daemon token; a second, standalone entry would be a duplicate. The plugin has its own
+          version number, independent of the app's.
+        </p>
+      )}
       {message && <Toast>{message}</Toast>}
       {manual.length > 0 && <pre className="mono">{manual.join('\n')}</pre>}
     </Card>

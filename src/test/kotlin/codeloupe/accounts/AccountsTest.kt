@@ -31,25 +31,38 @@ class AccountsTest {
         val only = accounts.claude().single()
         assertEquals(Accounts.DEFAULT_ID, only.id)
         assertEquals(userHome.resolve(".claude"), only.configDir)
-        assertTrue(only.isDefault && only.implicit)
+        assertTrue(only.implicit)
         userHome.resolve(".claude").resolve("projects").resolve("p").createDirectories()
         assertEquals(emptyList(), accounts.transcriptDirs(), "the ingest reads ~/.claude/projects on its own")
         assertEquals(emptyList(), accounts.youtrack())
     }
 
     @Test
-    fun `listed accounts keep their order, the first is the default unless one says so, and their projects are ingested`() {
+    fun `listed accounts keep their order and their projects are ingested`() {
         val b = TestRepos.tmpDir("claude-b")
         b.resolve("projects").resolve("one").createDirectories()
         b.resolve("projects").resolve("two").createDirectories()
         Files.writeString(b.resolve("projects").resolve("not-a-dir.txt"), "x")
         write(AccountsFile(claude = listOf(AccountsFile.Claude("a", "Account A", userHome.resolve(".claude").toString()), AccountsFile.Claude("b", "Account B", b.toString()))))
         assertEquals(listOf("a", "b"), accounts.claude().map { it.id })
-        assertEquals(listOf(true, false), accounts.claude().map { it.isDefault })
         assertEquals(setOf("one", "two"), accounts.transcriptDirs().map { it.fileName.toString() }.toSet())
-        write(AccountsFile(claude = listOf(AccountsFile.Claude("a", "Account A", "C:/a"), AccountsFile.Claude("b", "Account B", b.toString(), default = true))))
-        assertEquals(listOf(false, true), accounts.claude().map { it.isDefault })
         assertTrue(accounts.claude().none { it.implicit })
+    }
+
+    @Test
+    fun `a file written with the retired default key still loads and the key is ignored`() {
+        home.resolve(AccountsFile.FILE).writeText("""{"version":1,"claude":[{"id":"a","label":"Account A","configDir":"C:/a","default":false,"tokenSecret":"T"},{"id":"b","label":"Account B","configDir":"C:/b","default":true}],"youtrack":[]}""")
+        val listed = accounts.claude()
+        assertEquals(listOf("a", "b"), listed.map { it.id })
+        assertEquals(listOf("T", null), listed.map { it.tokenSecret })
+    }
+
+    @Test
+    fun `an account may name the fingerprint of its login, as printed by the export or bare, and a malformed one is ignored`() {
+        home.resolve(AccountsFile.FILE).writeText(
+            """{"version":1,"claude":[{"id":"a","label":"A","configDir":"C:/a","identity":"identity-AB12CD34EF56"},{"id":"b","label":"B","configDir":"C:/b","identity":"0123456789ab"},{"id":"c","label":"C","configDir":"C:/c","identity":"a-uuid-is-not-a-fingerprint"}],"youtrack":[]}""",
+        )
+        assertEquals(listOf("ab12cd34ef56", "0123456789ab", null), accounts.claude().map { it.identity })
     }
 
     @Test
@@ -63,15 +76,15 @@ class AccountsTest {
     fun `the e-mail of an account comes from its own dot claude json and nothing else is read`() {
         val dir = TestRepos.tmpDir("claude-mail")
         dir.resolve(".claude.json").writeText("""{"oauthAccount":{"emailAddress":"dev@example.test","organizationName":"x"},"projects":{"c:/x":{}}}""")
-        val account = ClaudeAccount("m", "M", dir, isDefault = false, implicit = false)
+        val account = ClaudeAccount("m", "M", dir, implicit = false)
         val profiles = ClaudeProfiles(userHome)
         assertEquals("dev@example.test", profiles.email(account))
         dir.resolve(".claude.json").writeText("""{"oauthAccount":{"emailAddress":"not-an-address"}}""")
         Files.setLastModifiedTime(dir.resolve(".claude.json"), FileTime.fromMillis(System.currentTimeMillis() + 5_000))
         assertNull(profiles.email(account), "re-read after the file changed, and a value without @ is no e-mail")
-        assertNull(profiles.email(ClaudeAccount("z", "Z", TestRepos.tmpDir("claude-none"), isDefault = false, implicit = false)))
+        assertNull(profiles.email(ClaudeAccount("z", "Z", TestRepos.tmpDir("claude-none"), implicit = false)))
         userHome.resolve(".claude.json").writeText("""{"oauthAccount":{"emailAddress":"home@example.test"}}""")
-        assertEquals("home@example.test", profiles.email(ClaudeAccount("d", "D", userHome.resolve(".claude"), isDefault = true, implicit = true)), "~/.claude is described by ~/.claude.json")
+        assertEquals("home@example.test", profiles.email(ClaudeAccount("d", "D", userHome.resolve(".claude"), implicit = true)), "~/.claude is described by ~/.claude.json")
     }
 
     @Test
@@ -81,7 +94,7 @@ class AccountsTest {
         val root = "C:\\Users\\dev\\Documents\\Claude\\terrio"
         assertEquals("C--Users-dev-Documents-Claude-terrio", ProjectDirName.of(root))
         assertEquals("-work-app", ProjectDirName.of("/work/app/"))
-        val accountsList = listOf(ClaudeAccount("a", "A", a, isDefault = true, implicit = false), ClaudeAccount("b", "B", b, isDefault = false, implicit = false))
+        val accountsList = listOf(ClaudeAccount("a", "A", a, implicit = false), ClaudeAccount("b", "B", b, implicit = false))
         val roots = AccountRoots(accountsList)
         assertNull(roots.accountOf(root))
         val inA = a.resolve("projects").resolve(ProjectDirName.of(root)).createDirectories()

@@ -55,7 +55,6 @@ export function Accounts() {
       render: a => (
         <span>
           {a.label}{' '}
-          {a.isDefault && <StatusBadge tone="ok">default</StatusBadge>}
           {a.email && <span className="muted" style={{ display: 'block' }}>{a.email}</span>}
         </span>
       ),
@@ -78,7 +77,6 @@ export function Accounts() {
       render: a => (
         <span className="row-actions">
           <button className="btn" aria-label={`Rename ${a.label}`} disabled={a.implicit} title={a.implicit ? 'Add an account first; the list is then saved' : undefined} onClick={() => setPanel({ kind: 'claude-rename', id: a.id, label: a.label })}>Rename</button>
-          {!a.isDefault && <button className="btn" aria-label={`Set ${a.label} as default`} onClick={() => void claude.claudeSetDefault(a.id).then(outcome)}>Make default</button>}
           <button className="btn" aria-label={`Remove ${a.label}`} disabled={a.implicit} onClick={() => void claude.claudeRemove(a.id).then(outcome)}>Remove</button>
         </span>
       ),

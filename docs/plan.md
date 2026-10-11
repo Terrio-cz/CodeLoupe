@@ -159,7 +159,7 @@ CLI `codeloupe …` ──HTTP (spustí daemon, když neběží)─────�
   (`auth.withoutToken`). Volba tokenu místo
   kontroly vlastníka spojení (Windows `GetExtendedTcpTable`, Linux `/proc/net/tcp`, macOS `lsof`): jeden mechanismus pro tři systémy,
   žádný nativní kód ani závod o PID/port, a MCP klient ho dostane přes `headersHelper` (`codeloupe mcp-headers`, v pluginu
-  `hooks/mcp-headers.sh`), takže tajemství není v konfiguraci Claude Code.
+  `hooks/mcp-headers.cmd` → `mcp-headers.sh`; CL-228: pod `cmd.exe` na Windows je holé `bash` WSL launcher), takže tajemství není v konfiguraci Claude Code.
 - Totožnost daemonu: klient pošle `x-codeloupe-nonce` na `GET /status`, daemon odpoví `x-codeloupe-proof` = SHA-256 z
   `codeloupe-proof:<token>:<nonce>`; token se pošle jen tomu, kdo důkaz dal (CLI, aplikace, `hook.sh`). CLI navíc odmítne daemon, kterého
   `daemon.json` nejmenuje. `hook.sh` předává token přes `curl -H @soubor`, ne na příkazové řádce (vidí ji ostatní uživatelé).
@@ -2217,7 +2217,7 @@ rozhoduje launcher.
 
 ### Výsledek CL-63 — účty Claude a YouTrack (2026-10-08)
 
-- `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`, `default`) a YouTrack instance (`url`, `projects`, `token` = jméno
+- `<home>/accounts.json` (píše aplikace, daemon čte při každém volání): Claude účty (`id`, `label`, `configDir`; starší klíč `default` se ignoruje, CL-224) a YouTrack instance (`url`, `projects`, `token` = jméno
   globálního tajemství `YOUTRACK_TOKEN_<ID>` ve storu). Bez souboru je jediným účtem `~/.claude`. Ingest čte `projects` každého vypsaného účtu a přiřazuje transcripty podle cesty
   (`runs.path LIKE <configDir>/projects/%`), takže cena 7 d na účet je jeden SQL přes `usage_hours`; filtr Overview (`overview?account=`) používá stejný předpona v `hours` a `gapCount`.
 - Okna účtu: pracovní složka, která za 15 min volala CodeLoupe, patří účtu, jehož `projects/<ProjectDirName>` existuje (u dvou účtů tomu s novější změnou). E-mail účtu je jediné, co se čte z `.claude.json`.

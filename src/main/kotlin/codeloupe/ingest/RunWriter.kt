@@ -56,6 +56,7 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
             aggregate(c, id)
             added = replaceGaps(c, id, delta.found.key, p)
         }
+        UsageSnapshotWriter.store(c, delta)
         saveFile(c, delta)
         added
     }
@@ -212,8 +213,9 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
 
     private fun saveFile(c: Connection, d: FileDelta) {
         c.prepareStatement(
-            "INSERT INTO files(path, size, mtime, offset, kind, project, session, ter, state, tail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
-                "ON CONFLICT(path) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, offset = excluded.offset, ter = excluded.ter, state = excluded.state, tail = excluded.tail",
+            "INSERT INTO files(path, size, mtime, offset, kind, project, session, ter, state, tail, account, identity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+                "ON CONFLICT(path) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, offset = excluded.offset, ter = excluded.ter, state = excluded.state, tail = excluded.tail, " +
+                "account = coalesce(excluded.account, files.account), identity = coalesce(excluded.identity, files.identity)",
         ).use { s ->
             s.setString(1, d.found.key)
             s.setLong(2, d.found.size)
@@ -225,6 +227,8 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
             s.setString(8, d.ter)
             s.setString(9, JsonFormat.json.encodeToString(codeloupe.metrics.ParserSnapshot.serializer(), scrubbed(d.parser.snapshot())))
             s.setString(10, d.tail)
+            s.setString(11, d.account)
+            s.setString(12, d.identity)
             s.executeUpdate()
         }
     }

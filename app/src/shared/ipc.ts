@@ -37,10 +37,14 @@ export type ClaudeConnectKind = 'mcp' | 'plugin';
 export interface ClaudeStatus {
   /** The claude CLI was found and runs. */
   cli: boolean;
-  /** A user-visible MCP server named codeloupe exists. */
+  /** Claude Code has a codeloupe MCP server: a user-level entry or the one the plugin provides. */
   mcp: boolean;
   /** The codeloupe plugin is installed. */
   plugin: boolean;
+  /** Where the MCP server comes from; null when there is none. */
+  mcpVia: 'user' | 'plugin' | null;
+  /** Version of the installed plugin, which has its own numbering (not the app's). */
+  pluginVersion: string | null;
 }
 
 export interface ClaudeConnectResult {
