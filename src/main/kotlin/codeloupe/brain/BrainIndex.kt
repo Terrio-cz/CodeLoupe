@@ -5,7 +5,7 @@ import codeloupe.index.SearchWords
 /** One workspace brain, searchable: its entries and task finding lines with a BM25 index over their stems. Immutable; a change makes a new one. */
 class BrainIndex(val snapshot: BrainSnapshot, val builtAt: Long = System.currentTimeMillis()) {
     val items: List<IndexedEntry> = (snapshot.entries + snapshot.findings).map { IndexedEntry(it, it.id?.let(snapshot.feedback::get)) }
-    private val bm25 = Bm25(items.map { it.words })
+    private val bm25 = Bm25(items.map { it.words() })
 
     val info: BrainWorkspaceInfo get() = snapshot.workspace
 

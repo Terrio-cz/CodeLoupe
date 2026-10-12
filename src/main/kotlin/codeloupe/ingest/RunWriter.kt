@@ -21,9 +21,15 @@ import java.time.Instant
 /** Stores what the ingest read of transcripts: runs, steps, hourly cost and gaps, each file in one transaction. */
 class RunWriter(private val db: TranscriptDb, private val categorizer: Categorizer) {
     fun loadFiles(): MutableMap<String, FileState> = db.writer.createStatement().use { s ->
-        s.executeQuery("SELECT path, size, mtime, offset, ter, state, tail FROM files").use { r ->
-            HashMap<String, FileState>().also { while (r.next()) it[r.getString(1)] = FileState(r.getLong(2), r.getLong(3), r.getLong(4), r.getString(5), r.getString(6), r.getString(7)) }
+        s.executeQuery("SELECT path, size, mtime, offset, ter, tail FROM files").use { r ->
+            HashMap<String, FileState>().also { while (r.next()) it[r.getString(1)] = FileState(r.getLong(2), r.getLong(3), r.getLong(4), r.getString(5), r.getString(6)) }
         }
+    }
+
+    /** The parser state stored for the transcript [key] to continue from; null for none. */
+    fun snapshot(key: String): String? = db.writer.prepareStatement("SELECT state FROM files WHERE path = ?").use { s ->
+        s.setString(1, key)
+        s.executeQuery().use { r -> if (r.next()) r.getString(1) else null }
     }
 
     /** Remembers a new size and time of a file that has nothing new to read. */

@@ -15,8 +15,11 @@ class IndexedEntry(val entry: BrainEntry, val feedback: BrainFeedback?) {
     val moduleAnchors: Set<String> = entry.anchors.filter { it.startsWith(MOD) }.map { it.removePrefix(MOD).lowercase() }.toSet()
     val moduleHints: Set<String> = pathKeys.flatMap { it.modulePrefixes() }.toSet()
 
-    /** Stems of everything the entry says and points at: text, files, symbols, anchors, topic and task. */
-    val words: List<String> = SearchWords.split(
+    /**
+     * Stems of everything the entry says and points at: text, files, symbols, anchors, topic and task. Computed for the BM25 index only, not
+     * kept: a list of its own strings per entry was the largest part of a brain index (CL-238).
+     */
+    fun words(): List<String> = SearchWords.split(
         listOf(entry.text, entry.files.joinToString(" "), entry.symbols.joinToString(" "), entry.anchors.joinToString(" ") { it.substringAfter(':') }, entry.topic, entry.task.orEmpty()).joinToString(" "),
     )
 

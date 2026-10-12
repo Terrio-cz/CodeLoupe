@@ -145,10 +145,10 @@ class TranscriptIngest(
         }
         if (state != null && f.size == state.offset) {
             writer.touch(f)
-            known[f.key] = FileState(f.size, f.mtime, state.offset, state.ter, state.state, state.tail)
+            known[f.key] = FileState(f.size, f.mtime, state.offset, state.ter, state.tail)
             return emptyList()
         }
-        val snapshot = state?.state?.let { JsonFormat.json.decodeFromString(ParserSnapshot.serializer(), it) }
+        val snapshot = state?.let { writer.snapshot(f.key) }?.let { JsonFormat.json.decodeFromString(ParserSnapshot.serializer(), it) }
         val (role, metaTer) = if (state == null) metaOf(f) ?: return emptyList() else (snapshot?.role ?: "main") to state.ter
         val parser = TranscriptParser(role, snapshot)
         val offset = state?.offset ?: 0
@@ -162,7 +162,7 @@ class TranscriptIngest(
         val identity = parser.identity ?: stamps[f.session]
         val delta = FileDelta(f, ter, parser, results, usages, parser.drainLimits(), consumed, TailHash.at(f.path, consumed), parser.drainUsageSnapshots(), resolver.resolve(attribution.of(f.path), identity, f.session), identity)
         val added = writer.write(delta)
-        known[f.key] = FileState(f.size, f.mtime, consumed, ter, JsonFormat.json.encodeToString(ParserSnapshot.serializer(), parser.snapshot()), delta.tail)
+        known[f.key] = FileState(f.size, f.mtime, consumed, ter, delta.tail)
         return added
     }
 
