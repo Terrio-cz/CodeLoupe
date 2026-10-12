@@ -68,6 +68,10 @@ export interface DaemonStatus {
   rssMb: number;
   heapMb: number;
   cpuSec: number;
+  /** Heap live after the last collections, its peak since the start and the limit (CL-238); absent from older daemons. */
+  heapLiveMb?: number;
+  heapLivePeakMb?: number;
+  heapLimitMb?: number;
   calls: { total: number; errors: number; busy: number };
   /** Percentiles over the last 1000 calls (CL-24). */
   latency?: CallLatency;

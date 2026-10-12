@@ -43,4 +43,8 @@ data class DaemonStatus(
     val toolList: ToolListStatus = ToolListStatus(),
     /** Whether the token is required for read-only calls too, and how many of those came without it. */
     val auth: AuthStatus = AuthStatus(),
+    /** The heap live after the last collections, the most of it seen since the start, and the limit ([HeapGauge]). */
+    val heapLiveMb: Long = 0,
+    val heapLivePeakMb: Long = 0,
+    val heapLimitMb: Long = 0,
 )

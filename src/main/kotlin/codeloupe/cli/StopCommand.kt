@@ -20,13 +20,20 @@ class StopCommand(private val load: () -> Config = { ConfigLoader.load() }) : Cl
         AotLauncher.cancel(config.home)
         // Before the daemon goes down, so the app never sees a stopped daemon without the marker.
         StopMarker.write(config.home)
-        val stopped = try {
-            DaemonClient(config).shutdown(force)
+        val client = DaemonClient(config)
+        val said = try {
+            // A wedged daemon cannot be asked: its process is ended. One that answered the longer look was only slow.
+            if (client.shutdown(force)) "stopped" else client.wedged()?.let(::end) ?: if (client.shutdown(force)) "stopped" else "not running"
         } catch (e: IllegalStateException) {
             StopMarker.clear(config.home)
             echo(e.message, err = true)
             throw ProgramResult(1)
         }
-        echo(if (stopped) "stopped" else "not running")
+        echo(said)
+    }
+
+    private fun end(wedged: WedgedDaemon): String {
+        if (wedged.end()) return "ended the wedged daemon pid ${wedged.pid}"
+        throw IllegalStateException("could not end the wedged daemon pid ${wedged.pid}")
     }
 }

@@ -210,6 +210,7 @@ class Daemon private constructor(
             queue = queueSnapshot, repos = registry.snapshot(), jobs = jobs.snapshot(), trackers = trackers.summary(),
             gitSpawns = Timings.gitSpawns(), timings = Timings.snapshot(), releases = reconciler.releaseStatus(), portAllocations = ports.allocated,
             hooks = hooks.stats(), toolList = ToolListStatus(toolListFingerprint, mcp.server().tools.size, offered.editOffered), auth = guard.summary(),
+            heapLiveMb = HeapGauge.liveMb(), heapLivePeakMb = HeapGauge.peakMb(), heapLimitMb = HeapGauge.limitMb(),
         )
     }
 

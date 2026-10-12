@@ -5,8 +5,14 @@ import kotlin.test.assertTrue
 
 class DaemonJvmTest {
     @Test
-    fun `the heap is 64 MB with a parse worker and 80 MB when the daemon parses itself`() {
-        assertTrue("-Xmx64m" in DaemonJvm.args())
-        assertTrue("-Xmx80m" in DaemonJvm.args(parsesHere = true))
+    fun `the heap is 256 MB with a parse worker and 320 MB when the daemon parses itself`() {
+        assertTrue("-Xmx256m" in DaemonJvm.args())
+        assertTrue("-Xmx320m" in DaemonJvm.args(parsesHere = true))
+    }
+
+    @Test
+    fun `a daemon that runs out of heap ends instead of holding its port`() {
+        assertTrue("-XX:+ExitOnOutOfMemoryError" in DaemonJvm.args())
+        assertTrue("-XX:+ExitOnOutOfMemoryError" in DaemonJvm.args(parsesHere = true))
     }
 }

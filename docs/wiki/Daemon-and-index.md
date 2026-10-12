@@ -65,7 +65,16 @@ file to parse and that exits after `parseWorkerIdleSeconds` (default 300) withou
 compiler's parser is some 20 MB of classes, symbols and code plus the heap its syntax trees fill; held in the daemon it
 would be resident for as long as the daemon lives. While the worker runs it holds about 100 MB of its own; a worker that
 cannot start or dies is replaced once, and then the daemon parses itself (slower on memory, never wrong). With the worker
-the daemon's heap limit is 64 MB, with `parseWorkerIdleSeconds` 0 it is 80.
+the daemon's heap limit is 256 MB, with `parseWorkerIdleSeconds` 0 it is 320. The limit is not the footprint (the
+serial collector commits what the live set needs); 64 MB ran out on a desktop with ~20 worktrees, three trackers and
+5 000 transcripts (CL-238). `/status` reports `heapLiveMb` (live after the last collections), `heapLivePeakMb` and
+`heapLimitMb`.
+
+A daemon or worker that runs out of heap ends (`-XX:+ExitOnOutOfMemoryError`) instead of collecting forever with its
+port bound. A daemon whose process is alive while its port gives no answer is **wedged**: `codeloupe status` says so
+(exit code 3), a CLI call fails naming it instead of starting a second daemon, and `codeloupe start` (which the desktop
+app runs) or `codeloupe stop` ends that process first. Only the process that wrote `daemon.json` counts: it must have
+started just before the `startedAt` written there.
 
 ## What it keeps in its home
 

@@ -54,6 +54,7 @@ object ParseWorker {
     val JVM_ARGS = listOf(
         "-Xlog:disable", "-Xms16m", "-Xmx96m", "-Xmn10m", "-Xss512k", "-XX:+UseSerialGC", "-XX:MinHeapFreeRatio=10", "-XX:MaxHeapFreeRatio=30",
         "-XX:+UseCompactObjectHeaders", "-XX:TieredStopAtLevel=1", "-XX:ReservedCodeCacheSize=32m", "-XX:MaxMetaspaceSize=128m",
+        "-XX:+ExitOnOutOfMemoryError",
     )
 
     const val DEFAULT_IDLE_SECONDS = 300L

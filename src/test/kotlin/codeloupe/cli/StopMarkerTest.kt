@@ -29,7 +29,7 @@ class StopMarkerTest {
         // A daemon that is up again (here: started in-process) is what `start` finds; it only has to clear the marker.
         val again = Daemon.start(config)
         try {
-            StartCommand { config }.parse(emptyList<String>())
+            StartCommand(load = { config }).parse(emptyList<String>())
             assertFalse(Files.exists(marker), "start removes the marker")
         } finally {
             again.stop()

@@ -50,8 +50,20 @@ class DaemonClient(private val config: Config, private val launcher: (() -> Unit
         return token
     }
 
-    fun ensureDaemon(): JsonObject {
+    /**
+     * The running daemon's status, starting it if need be. A wedged daemon ([WedgedDaemon]) holds the port a new one needs: with
+     * [endWedged] it is ended first and [ended] hears of it, otherwise the call fails naming it.
+     */
+    fun ensureDaemon(endWedged: Boolean = false, ended: (WedgedDaemon) -> Unit = {}): JsonObject {
         status()?.let { return named(it) }
+        val wedged = wedged()
+        if (wedged == null) {
+            status()?.let { return named(it) } // only slow: it answered the longer look
+        } else {
+            if (!endWedged) throw IllegalStateException(wedged.message)
+            if (!wedged.end()) throw IllegalStateException("${wedged.message}; it could not be ended")
+            ended(wedged)
+        }
         PortPolicy.refusal(config)?.let { throw IllegalStateException(it) }
         Files.createDirectories(config.home)
         (launcher ?: ::launch)()
@@ -62,6 +74,12 @@ class DaemonClient(private val config: Config, private val launcher: (() -> Unit
         }
         throw IllegalStateException("daemon did not start on 127.0.0.1:${config.port}; see ${config.home.resolve("daemon.log")}")
     }
+
+    /**
+     * The daemon `daemon.json` names when it is alive and our port gives no answer even to a longer look (a busy daemon may only
+     * be slow); call after [status] returned null.
+     */
+    fun wedged(): WedgedDaemon? = WedgedDaemon.find(config.home, config.port)?.takeIf { status(WEDGED_LOOK_MS) == null }
 
     private fun launch() {
         // Its own home as working directory: the daemon outlives the CLI and must not hold the user's directory.
@@ -176,6 +194,7 @@ class DaemonClient(private val config: Config, private val launcher: (() -> Unit
         const val MAIN_CLASS = "codeloupe.MainKt"
         const val NAMED_TRIES = 10
         const val NAMED_WAIT_MS = 200L
+        const val WEDGED_LOOK_MS = 5_000L
         val JSON_HEADERS = mapOf("content-type" to "application/json", CodeLoupe.HEADER to "1")
     }
 }

@@ -16,7 +16,8 @@ const ATTEMPT_WINDOW_MS = 10 * 60_000;
 /**
  * Watches the daemon through GET /status and starts or stops it through the CodeLoupe CLI.
  * Keeps the daemon up unless the user stopped it (here or via `codeloupe stop`); gives up after
- * 5 failed starts in 10 minutes.
+ * 5 failed starts in 10 minutes. A wedged daemon (its process alive, its port silent) is named, and the CLI's
+ * `start` ends it before starting a new one.
  */
 export class DaemonManager extends EventEmitter {
   private state: DaemonState;
@@ -109,7 +110,10 @@ export class DaemonManager extends EventEmitter {
     if (this.failures < threshold) return this.state;
     const manualStop = this.state.manualStop || this.home.stoppedByUser();
     const phase: DaemonPhase = manualStop ? 'stopped' : this.state.phase === 'error' ? 'error' : 'down';
-    this.set({ phase, status: null, port, manualStop });
+    // Its process alive while the port gives no answer: the start below (the CLI's) ends it first.
+    const wedged = this.home.alivePid();
+    const message = wedged ? { message: `Daemon process ${wedged} is alive but does not answer on port ${port}: it is wedged. Starting the daemon ends that process.` } : {};
+    this.set({ phase, status: null, port, manualStop, ...message });
     if (!manualStop && this.settings().autoStartDaemon) void this.autoStart();
     return this.state;
   }

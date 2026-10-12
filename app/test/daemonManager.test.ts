@@ -14,8 +14,8 @@ const status = (pid: number, name = 'codeloupe'): DaemonStatus => ({
 });
 
 /** A fake daemon: `up` decides whether /status answers, `pid` what it reports, daemon.json holds `filePid`. */
-function setup(opts: { up?: boolean; pid?: number; filePid?: number | null; stoppedMarker?: boolean; startedAfterStop?: boolean } = {}) {
-  const world = { up: opts.up ?? false, pid: opts.pid ?? 100, filePid: opts.filePid === undefined ? 100 : opts.filePid, name: 'codeloupe', marker: !!opts.stoppedMarker, startedAfterStop: opts.startedAfterStop ?? true };
+function setup(opts: { up?: boolean; pid?: number; filePid?: number | null; stoppedMarker?: boolean; startedAfterStop?: boolean; fileProcessAlive?: boolean } = {}) {
+  const world = { up: opts.up ?? false, pid: opts.pid ?? 100, filePid: opts.filePid === undefined ? 100 : opts.filePid, name: 'codeloupe', marker: !!opts.stoppedMarker, startedAfterStop: opts.startedAfterStop ?? true, fileProcessAlive: opts.fileProcessAlive ?? false };
   const client = { status: vi.fn(async () => { if (!world.up) throw new Error('down'); return status(world.pid, world.name); }) } as unknown as DaemonClient;
   const home = {
     port: () => 47391,
@@ -23,6 +23,7 @@ function setup(opts: { up?: boolean; pid?: number; filePid?: number | null; stop
     stoppedByUser: () => world.marker,
     setStoppedByUser: (v: boolean) => { world.marker = v; },
     startedAfterStop: () => world.startedAfterStop,
+    alivePid: () => (world.fileProcessAlive ? world.filePid : null),
   } as unknown as DaemonHome;
   const cli = vi.fn(async (verb: 'start' | 'stop') => { world.up = verb === 'start'; return ''; });
   const m = new DaemonManager(client, home, () => DEFAULT_SETTINGS, () => 1000, cli);
@@ -144,6 +145,16 @@ describe('DaemonManager', () => {
     expect(m.current.phase).toBe('error');
   });
 
+  it('names a wedged daemon (its process alive, its port silent) and starts it again through the CLI', async () => {
+    const { m, cli } = setup({ fileProcessAlive: true });
+    const messages: (string | null)[] = [];
+    m.on('state', s => messages.push(s.message));
+    await m.check(true);
+    expect(messages).toContain('Daemon process 100 is alive but does not answer on port 47391: it is wedged. Starting the daemon ends that process.');
+    await vi.waitFor(() => expect(m.current.phase).toBe('running'));
+    expect(cli).toHaveBeenCalledWith('start');
+  });
+
   it('a restart is not reported as an outage', async () => {
     const { m } = setup({ up: true });
     await m.check(true);
@@ -157,7 +168,7 @@ describe('DaemonManager', () => {
 
 function setupFailing() {
   const client = { status: vi.fn(async () => { throw new Error('down'); }) } as unknown as DaemonClient;
-  const home = { port: () => 47391, info: () => null, stoppedByUser: () => false, setStoppedByUser: () => undefined } as unknown as DaemonHome;
+  const home = { port: () => 47391, info: () => null, stoppedByUser: () => false, setStoppedByUser: () => undefined, alivePid: () => null } as unknown as DaemonHome;
   const cli = vi.fn(async () => { throw new Error('not found'); });
   return { m: new DaemonManager(client, home, () => DEFAULT_SETTINGS, () => 1000, cli), cli };
 }

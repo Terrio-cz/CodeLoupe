@@ -36,6 +36,21 @@ export class DaemonHome {
   }
 
   /**
+   * The pid daemon.json names while that process is alive; null when there is none or it has ended. With a port that
+   * does not answer, a wedged daemon (CL-238): `codeloupe start` ends it before it starts a new one.
+   */
+  alivePid(): number | null {
+    const pid = this.info()?.pid;
+    if (!pid) return null;
+    try {
+      process.kill(pid, 0);
+      return pid;
+    } catch (e) {
+      return (e as NodeJS.ErrnoException).code === 'EPERM' ? pid : null;
+    }
+  }
+
+  /**
    * `<home>/stopped`: a manual stop (in the app, or `codeloupe stop` once the CLI writes it, CL-62) that keeps the
    * app from starting the daemon against the user's will, also across app restarts.
    */

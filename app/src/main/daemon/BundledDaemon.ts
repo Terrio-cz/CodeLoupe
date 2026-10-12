@@ -10,7 +10,7 @@ export interface BundledDaemon {
 }
 
 // The launcher's flags for a short-lived CLI (gradle/start/codeloupe) without its AOT cache.
-const JVM_FLAGS = ['-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-Xshare:auto', '-Xss512k', '-Xmx128m', '-XX:-UsePerfData', '-Xlog:disable'];
+const JVM_FLAGS = ['-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-Xshare:auto', '-Xss512k', '-Xmx128m', '-XX:+ExitOnOutOfMemoryError', '-XX:-UsePerfData', '-Xlog:disable'];
 
 export interface BundleOptions {
   platform?: NodeJS.Platform;
