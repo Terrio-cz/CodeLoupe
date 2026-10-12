@@ -40,7 +40,11 @@ class BrainNotes(private val brain: BrainService, private val registry: Registry
         return if (plain.length <= MAX_TEXT) plain else plain.take(MAX_TEXT).trimEnd() + "…"
     }
 
-    private fun normalize(path: String) = path.replace('\\', '/').trimEnd('/').lowercase()
+    // The real path first: a temp directory behind a symlink (macOS /var) or a short 8.3 name (Windows) is the same repository git reports.
+    private fun normalize(path: String): String {
+        val real = runCatching { java.nio.file.Path.of(path).toRealPath().toString() }.getOrDefault(path)
+        return real.replace('\\', '/').trimEnd('/').lowercase()
+    }
 
     private companion object {
         val RANK = mapOf("decision" to 0, "finding" to 1, "gotcha" to 2, "fact" to 3)
