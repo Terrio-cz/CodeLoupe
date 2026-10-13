@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog } from 'electron';
 import { ACTION_CH, type ActionOutcome, type ReconcileOutcome } from '../../shared/actions';
 import type { DaemonClient } from '../daemon/DaemonClient';
+import { JobActions } from './JobActions';
 import { WorkspaceActions, type Confirm } from './WorkspaceActions';
 
 export interface ActionContext {
@@ -17,6 +18,7 @@ const DOWN: ActionOutcome = { ok: false, message: 'The daemon is not responding.
 /** Registers the channels of shared/actions.ts; `handle` checks the sender, as for every other channel. */
 export function registerActions(ctx: ActionContext, handle: <A extends unknown[], R>(channel: string, fn: (...args: A) => Promise<R> | R) => void): void {
   const workspaces = new WorkspaceActions(ctx.client, nativeConfirm);
+  const jobs = new JobActions(ctx.client);
   const guarded = <T extends ActionOutcome>(fn: (input: unknown) => Promise<T>, extra: Omit<T, keyof ActionOutcome>) => async (input: unknown): Promise<T> => {
     if (ctx.mock()) return { ...MOCK, ...extra } as T;
     if (!ctx.daemonTrusted()) return { ...DOWN, ...extra } as T;
@@ -29,6 +31,8 @@ export function registerActions(ctx: ActionContext, handle: <A extends unknown[]
 
   handle(ACTION_CH.workspaceRelease, guarded<ActionOutcome>(input => workspaces.release(input), {}));
   handle(ACTION_CH.reconcileRun, guarded<ReconcileOutcome>(input => workspaces.reconcile(input), { results: [] }));
+  handle(ACTION_CH.slotCapacity, guarded<ActionOutcome>(input => jobs.setCapacity(input), {}));
+  handle(ACTION_CH.jobMove, guarded<ActionOutcome>(input => jobs.move(input), {}));
 }
 
 // Verification runs (development builds only): CODELOUPE_APP_AUTOCONFIRM=accept|decline answers the dialogs and prints their text.

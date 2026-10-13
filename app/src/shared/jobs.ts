@@ -1,6 +1,6 @@
 // Jobs, slots, webhooks and the live event stream of the daemon
 // (`GET /jobs`, `/jobs/{id}`, `/webhooks`, `/webhooks/deliveries`, `/events/stream`; src/main/kotlin/codeloupe/{jobs,events}).
-// Read-only here. The commands, summaries and logs the daemon holds are scrubbed of secrets before they reach the app.
+// Read-only here except the two actions of shared/actions.ts (a slot's capacity, the order of a slot's queue). The commands, summaries and logs the daemon holds are scrubbed of secrets before they reach the app.
 
 import type { Iso } from './contract';
 
@@ -56,13 +56,29 @@ export interface JobChain {
   chain: JobRecord[];
 }
 
+/** A job holding a slot or waiting for it: since when, and for how many seconds as the daemon counted them when it answered. */
+export interface SlotEntry {
+  id: string;
+  since: Iso;
+  seconds: number;
+}
+
 export interface SlotSnapshot {
   name: string;
+  /** The capacity in force. */
   capacity: number;
   /** Ids of the jobs holding the slot. */
   running: string[];
   /** Ids of the jobs waiting for it, first in line first. */
   waiting: string[];
+  /** What `config.json` sets for the slot; null when it does not list it (the capacity is then 1). Absent on an older daemon. */
+  configured?: number | null;
+  /** The value in `config.json` that is not a positive whole number, as written; the daemon ignores it. */
+  invalid?: string | null;
+  /** `running` with since when each job holds the slot. */
+  holders?: SlotEntry[];
+  /** `waiting` with since when each job waits, first in line first. */
+  queue?: SlotEntry[];
 }
 
 /** `jobs` of `GET /status`. */

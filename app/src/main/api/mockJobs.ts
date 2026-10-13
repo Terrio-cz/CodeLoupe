@@ -1,7 +1,7 @@
 // Mock of the daemon's jobs, slots and webhooks (src/shared/jobs.ts): every status, a chain that ended in a follow-up,
 // a failed run with test counts, a queue behind a busy slot, a webhook with delivered, retried and failed deliveries.
 import type { DaemonStatus } from '../../shared/contract';
-import type { Delivery, JobChain, JobRecord, JobStatus, JobSummary, Webhook } from '../../shared/jobs';
+import type { Delivery, JobChain, JobRecord, JobStatus, JobSummary, SlotEntry, Webhook } from '../../shared/jobs';
 
 const MIN = 60_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -16,6 +16,8 @@ interface Seed {
   exit?: number | null;
   reason?: string | null;
   startedAgoMin?: number;
+  /** A queued job: how long it has been waiting. */
+  queuedAgoMin?: number;
   durationMin?: number;
   summary?: JobSummary | null;
   then?: string[];
@@ -40,8 +42,8 @@ const GRADLE_OK: JobSummary = { tests: 412, passed: 411, failed: 0, skipped: 1, 
 const SEEDS: Seed[] = [
   { id: 'J20261008-K2QF', status: 'running', command: 'gradlew test --console=plain', cwd: SHOP_WT, slot: 'gradle-test', tag: 'SHOP-671', startedAgoMin: 2.4, then: ['notify:tests of SHOP-671 done'], wake: 'failure' },
   { id: 'J20261008-M9ZD', status: 'running', command: 'npm run build', cwd: `${CL}/app`, slot: null, tag: 'CL-43', startedAgoMin: 0.6, wake: 'always' },
-  { id: 'J20261008-P4TX', status: 'queued', command: 'gradlew test --console=plain', cwd: 'C:/Users/dev/IdeaProjects/shop-api-worktrees/SHOP-672', slot: 'gradle-test', tag: 'SHOP-672', wake: 'failure' },
-  { id: 'J20261008-R7HB', status: 'queued', command: 'gradlew test --console=plain', cwd: 'C:/Users/dev/IdeaProjects/shop-api-worktrees/SHOP-664', slot: 'gradle-test', tag: 'SHOP-664', wake: 'failure' },
+  { id: 'J20261008-P4TX', status: 'queued', command: 'gradlew test --console=plain', cwd: 'C:/Users/dev/IdeaProjects/shop-api-worktrees/SHOP-672', slot: 'gradle-test', tag: 'SHOP-672', queuedAgoMin: 14.5, wake: 'failure' },
+  { id: 'J20261008-R7HB', status: 'queued', command: 'gradlew test --console=plain', cwd: 'C:/Users/dev/IdeaProjects/shop-api-worktrees/SHOP-664', slot: 'gradle-test', tag: 'SHOP-664', queuedAgoMin: 6.2, wake: 'failure' },
   { id: 'J20261008-A1B2', status: 'done', command: 'gradlew test --console=plain', cwd: SHOP_WT, slot: 'gradle-test', tag: 'SHOP-671', exit: 1, startedAgoMin: 31, durationMin: 3.2, summary: GRADLE_FAIL, then: ['notify:tests of SHOP-671 done'], onFailure: ['notify:tests of SHOP-671 failed'], next: 'J20261008-A1B3', wake: 'failure' },
   { id: 'J20261008-A1B3', status: 'done', command: 'notify: tests of SHOP-671 failed', cwd: SHOP_WT, slot: null, tag: 'SHOP-671', exit: 0, startedAgoMin: 27.8, durationMin: 0.0, root: 'J20261008-A1B2', parent: 'J20261008-A1B2', failureBranch: true, wake: 'failure' },
   { id: 'J20261008-C3D4', status: 'done', command: 'gradlew test --console=plain', cwd: 'C:/Users/dev/IdeaProjects/shop-api-worktrees/SHOP-664', slot: 'gradle-test', tag: 'SHOP-664', exit: 0, startedAgoMin: 75, durationMin: 2.9, summary: GRADLE_OK, then: ['webhook:http://127.0.0.1:9000/hooks/ci'], next: 'J20261008-C3D5', wake: 'failure' },
@@ -63,7 +65,7 @@ export class MockJobs {
         id: s.id, rootId: s.root ?? s.id, parentId: s.parent ?? null, nextId: s.next ?? null, tag: s.tag ?? null,
         command: s.command, cwd: s.cwd ?? SHOP_WT, envNames: s.slot ? ['JAVA_HOME'] : [], slot: s.slot ?? null,
         status: s.status, exit: s.exit ?? null, reason: s.reason ?? null,
-        createdAt: iso((started ?? now - (i + 1) * 40_000) - 4_000), startedAt: started === null ? null : iso(started), endedAt: ended === null ? null : iso(ended),
+        createdAt: iso(s.queuedAgoMin === undefined ? (started ?? now - (i + 1) * 40_000) - 4_000 : now - s.queuedAgoMin * MIN), startedAt: started === null ? null : iso(started), endedAt: ended === null ? null : iso(ended),
         durationMs: s.durationMin === undefined ? null : Math.round(s.durationMin * MIN),
         log: `C:/Users/dev/AppData/Local/codeloupe/jobs/${s.id}.log`, summary: s.summary ?? null, wakeOn: s.wake ?? 'failure',
         then: s.then ?? [], onFailure: s.onFailure ?? [], failureBranch: s.failureBranch ?? false,
@@ -115,14 +117,18 @@ export class MockJobs {
     const running = this.jobs.filter(j => j.status === 'running');
     const queued = this.jobs.filter(j => j.status === 'queued');
     const ids = (xs: JobRecord[], slot: string) => xs.filter(j => j.slot === slot).map(j => j.id);
+    // Holders count from the start, the queue from the submission; the first in line has waited longest.
+    const entries = (xs: JobRecord[], slot: string, from: (j: JobRecord) => string | null): SlotEntry[] =>
+      xs.filter(j => j.slot === slot).map(j => { const since = from(j) ?? j.createdAt; return { id: j.id, since, seconds: Math.max(0, Math.round((this.now - Date.parse(since)) / 1000)) }; });
     return {
       name: 'codeloupe', version: '0.4.0', pid: 1234, port: 47391, home: 'C:/Users/dev/AppData/Local/codeloupe', uptimeSec: 7_200, rssMb: 96, heapMb: 41, cpuSec: 53,
       calls: { total: 3412, errors: 6, busy: 3 }, queue: { fast: { running: null, waiting: [] }, heavy: { running: null, waiting: [] } }, repos: [],
       jobs: {
         running: running.length, queued: queued.length, policyHook: true,
         slots: [
-          { name: 'gradle-test', capacity: 2, running: ids(running, 'gradle-test'), waiting: ids(queued, 'gradle-test') },
-          { name: 'vps-test', capacity: 1, running: [], waiting: [] },
+          { name: 'gradle-test', capacity: 2, configured: 2, invalid: null, running: ids(running, 'gradle-test'), waiting: ids(queued, 'gradle-test'),
+            holders: entries(running, 'gradle-test', j => j.startedAt), queue: entries(queued, 'gradle-test', j => j.createdAt) },
+          { name: 'vps-test', capacity: 1, configured: null, invalid: null, running: [], waiting: [], holders: [], queue: [] },
         ],
       },
       ...base,
