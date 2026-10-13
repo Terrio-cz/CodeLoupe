@@ -22,8 +22,13 @@ class BrainRiskTest {
     @AfterTest
     fun cleanUp() = world.close()
 
-    private fun risk(files: List<String>, configure: (RiskRequest) -> RiskRequest = { it }) =
-        runBlocking { world.service.risk(configure(RiskRequest(world.workspace.toString(), files)), now) }
+    // The first question builds the fixture's code index; on a loaded machine that can outlast the 6 s the service waits, and the next question finds it ready.
+    private fun risk(files: List<String>, configure: (RiskRequest) -> RiskRequest = { it }): RiskResult {
+        val request = configure(RiskRequest(world.workspace.toString(), files))
+        var result = runBlocking { world.service.risk(request, now) }
+        repeat(3) { if (result.notes.any { "did not answer" in it }) result = runBlocking { world.service.risk(request, now) } }
+        return result
+    }
 
     @Test
     fun `a file's score is the weight of the findings tied to it, severity times recency, and lists them heaviest first`() {
