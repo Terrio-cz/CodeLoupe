@@ -16,11 +16,25 @@ claude plugin install codeloupe@codeloupe              # --scope user (default) 
 The plugin lives in [plugin/](https://github.com/Terrio-cz/CodeLoupe/tree/main/plugin) (`.claude-plugin/plugin.json`,
 `.mcp.json`, `hooks/`, `skills/codeloupe/`) and the marketplace manifest in
 [.claude-plugin/marketplace.json](https://github.com/Terrio-cz/CodeLoupe/blob/main/.claude-plugin/marketplace.json).
-Check changes with `claude plugin validate plugin --strict` and `claude plugin validate .`; try it for one session
-without installing: `claude --plugin-dir plugin`. What the hook does and its settings: [Hooks and token
+Check changes with `claude plugin validate plugin` and `claude plugin validate .` (each reports one warning, *No version
+specified*, on purpose: see below, so not `--strict`); try it for one session without installing: `claude --plugin-dir plugin`.
+What the hook does and its settings: [Hooks and token
 savings](Hooks-and-token-savings#the-sessionstart-hook). The skill,
 [SKILL.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/plugin/skills/codeloupe/SKILL.md), is the agent's routing
 table (which tool instead of which grep or read); this wiki's [Tools reference](Tools-reference) is for people.
+
+### Plugin version and updates
+
+Claude Code offers a plugin update when the plugin's version changes, and only then. Two copies exist:
+
+- **From GitHub** (`marketplace add Terrio-cz/CodeLoupe`): `plugin.json` in the repository has **no** `version`, so Claude Code
+  versions the plugin by the commit. `claude plugin marketplace update codeloupe && claude plugin update codeloupe@codeloupe`
+  brings the latest `main`. A pinned version there would keep every install on its first copy for good (the plugin said 0.1.1
+  through seven releases, CL-255); a test (`tools/plugin-version.test.mjs`) keeps it unversioned.
+- **From the app**: the installer ships `claude-plugin/` with the **app's version** in every `plugin.json` (stamped by the
+  `afterPack` hook, so a release carries the release version and the installer smoke test checks it). After an app update the
+  same two commands bring the installed plugin to that version; Settings → Claude Code shows both versions and says when they
+  differ.
 
 ## 2. MCP entry only
 
@@ -74,7 +88,8 @@ buttons *Connect plugin…* and *Add MCP server only…* run exactly the command
 lists them, with the daemon's current port), through the `claude` CLI, so Claude Code writes its own configuration.
 Without `claude` on `PATH` the card shows the commands to run by hand. The plugin is added from the marketplace folder
 next to the app (`resources/claude-plugin` when packaged, `CODELOUPE_PLUGIN_DIR` to override, the repository root in a
-development run); the installers ship `.claude-plugin/marketplace.json` and `plugin/` there. The plugin's session hook
+development run); the installers ship `.claude-plugin/marketplace.json` and `plugin/` there. The card shows the installed
+plugin's version next to the one the app ships and flags a difference with the commands that refresh it. The plugin's session hook
 looks for `codeloupe` on `PATH`; an installed app does not put it there, so set `CODELOUPE_BIN` to
 `<install>/resources/codeloupe/bin/codeloupe` (`.bat` on Windows) or add that directory to `PATH`.
 

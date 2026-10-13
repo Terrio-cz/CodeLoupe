@@ -1,4 +1,4 @@
-// electron-builder `afterPack` hook (CL-161, CL-130): flips the Electron fuses, then signs the macOS app ad hoc.
+// electron-builder `afterPack` hook (CL-161, CL-130, CL-255): stamps the plugin version, flips the Electron fuses, then signs the macOS app ad hoc.
 //
 // The order is the point. Flipping a fuse rewrites the Electron binary, which breaks any signature on it, so the fuses go first and
 // the ad hoc signature (ad-hoc-sign.mjs) seals the result. `electronFuses` in electron-builder.yml would flip them after this hook,
@@ -9,6 +9,7 @@
 // and the claude CLI, started with execFile.
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { afterPack as signAdHoc } from './ad-hoc-sign.mjs';
+import { stampPackedPlugin } from './plugin-version.mjs';
 
 export const FUSES = {
   version: FuseVersion.V1,
@@ -18,6 +19,8 @@ export const FUSES = {
 };
 
 export async function afterPack(context) {
+  // Before the fuses and the signature: the ad hoc seal on macOS covers the Resources folder.
+  stampPackedPlugin(context);
   await context.packager.addElectronFuses(context, FUSES);
   await signAdHoc(context);
 }

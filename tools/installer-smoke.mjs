@@ -5,7 +5,7 @@
 // without Java and with its own CODELOUPE_HOME, port and app data, so a developer's own daemon is never touched.
 //
 //   node tools/installer-smoke.mjs <installer file or the directory holding it> [--shots <dir>] [--out report.json]
-//                                  [--expect-version <version>]   (a release build: installer name, daemon, /status and CLI must say so)
+//                                  [--expect-version <version>]   (a release build: installer name, daemon, /status, CLI and the plugin must say so)
 //
 // Windows: NSIS installer, silent, into a temporary directory. Linux: the .deb through apt (needs sudo), the app on a
 // virtual display. macOS: the .dmg, the app copied to a temporary directory. Both of those only notify about a newer
@@ -19,6 +19,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { noJavaEnv } from './no-java-env.mjs';
 import { daemonTokenHeader } from './daemon-token.mjs';
+import { shippedPluginVersions } from '../app/scripts/plugin-version.mjs';
 
 const [target, ...rest] = process.argv.slice(2);
 const opt = name => (rest.includes(`--${name}`) ? rest[rest.indexOf(`--${name}`) + 1] : undefined);
@@ -219,8 +220,18 @@ try {
     if (daemon.version !== expected) throw new Error(`/status says version ${daemon.version}, expected ${expected}`);
     const v = cli(['--version'], tmp);
     if (!`${v.stdout}`.includes(expected)) throw new Error(`the CLI says "${v.stdout.trim()}", expected version ${expected}`);
+    // CL-255: the plugin shipped next to the app carries the release version, or Claude Code never offers its update.
+    for (const { file, version } of shippedPluginVersions(path.join(resources, 'claude-plugin'))) {
+      if (version !== expected) throw new Error(`${path.relative(resources, file)} says plugin version ${version}, expected ${expected}`);
+    }
     report.expectedVersion = expected;
+  } else {
+    // A development build carries the app's own version in the plugin, never none (an unversioned shipped plugin has no update to offer).
+    for (const { file, version } of shippedPluginVersions(path.join(resources, 'claude-plugin'))) {
+      if (!version) throw new Error(`${path.relative(resources, file)} carries no plugin version`);
+    }
   }
+  report.pluginVersion = shippedPluginVersions(path.join(resources, 'claude-plugin'))[0].version;
 
   await step('cli find', async () => {
     const r = cli(['find', 'greet'], repo);
