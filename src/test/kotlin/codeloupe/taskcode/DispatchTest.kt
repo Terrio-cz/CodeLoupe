@@ -10,7 +10,10 @@ import codeloupe.tools.DispatchPlanTool
 import codeloupe.tools.ToolArgs
 import codeloupe.tracker.RecordedYouTrack
 import codeloupe.tracker.TokenSource
+import codeloupe.tracker.IssueLink
+import codeloupe.tracker.LinkKind
 import codeloupe.tracker.TrackerInstance
+import codeloupe.tracker.TrackerIssue
 import codeloupe.tracker.TrackerMirror
 import codeloupe.tracker.TrackerSettings
 import codeloupe.tracker.Trackers
@@ -122,6 +125,79 @@ class DispatchTest {
         assertContains(text, "dispatch plan: ")
         assertContains(text, "CL-26")
         assertContains(plan("query" to JsonPrimitive("project: CL state: Archived")), "nothing to place")
+    }
+
+    // A state shaped like the dispatcher run that planned nothing: a workspace of project WS whose most urgent tasks are all taken, in progress,
+    // blocked or foreign, with 2 windows live. Rebuilt as a fixture: the mirror of that moment was not kept, so it cannot be replayed itself.
+    private class Pool(val tool: DispatchPlanTool, val workspace: Path)
+
+    private fun issue(id: String, rank: Int, state: String, dependsOn: String? = null) = TrackerIssue(
+        id = id, project = id.substringBefore('-'), summary = "Task $id", description = "## Context\nNo code is named here.\n\n## Acceptance criteria\n- [ ] Works\n",
+        created = 1_791_000_000_000L, updated = 1_791_000_000_000L + id.substringAfter('-').toLong(), state = state, type = "Task", priority = "P$rank", priorityRank = rank,
+        links = listOfNotNull(dependsOn?.let { IssueLink(LinkKind.DEPENDS_ON, "depends on", it) }),
+    )
+
+    private fun pool(scoped: Boolean = true): Pool {
+        val inProgress = (1..4).map { issue("WS-$it", 0, "In Progress") }
+        val blocked = (5..8).map { issue("WS-$it", 0, "To do", dependsOn = "WS-900") }
+        val worktreeHeld = (9..10).map { issue("WS-$it", 0, "To do") }
+        val excluded = listOf(issue("WS-11", 0, "To do"))
+        val foreign = (1..20).map { issue("XY-$it", 0, "To do") }
+        val free = (20..39).map { issue("WS-$it", 2, "To do") }
+        val dependency = issue("WS-900", 3, "To do")
+        val instance = TrackerInstance("pool", "youtrack", "https://pool.example", listOf("WS", "XY"), TokenSource.Env("UNUSED") { emptyMap() })
+        val mirror = TrackerMirror(instance, YouTrackAdapter(RecordedYouTrack()), MirrorStore(TestRepos.tmpDir("pool").resolve("p.db")), 3_600_000)
+        mirror.store.upsert(inProgress + blocked + worktreeHeld + excluded + foreign + free + dependency, System.currentTimeMillis())
+        listOf("WS", "XY").forEach { mirror.store.markSynced(it, System.currentTimeMillis(), null, checked = true) }
+        val pooled = Trackers(listOf(mirror), TrackerSettings(listOf(instance)), scope)
+        val workspace = TestRepos.tmpDir("workspace")
+        val scopes = if (scoped) DispatchScopes { DispatchScope(listOf("WS"), repo.toString()) } else DispatchScopes.NONE
+        return Pool(DispatchPlanTool(pooled, DocMemory(), scopes = scopes), workspace)
+    }
+
+    private fun Pool.plan(vararg args: Pair<String, JsonElement>, root: Path = workspace): String = runBlocking {
+        tool.answer(registry, root.toString(), ToolArgs(buildJsonObject { args.forEach { (k, v) -> put(k, v) } }))
+    }
+
+    private inline fun <T> withWorktrees(vararg branches: String, body: () -> T): T {
+        val dirs = branches.map { branch -> TestRepos.tmpDir("wt").resolve(branch.lowercase()).also { git(repo, "worktree", "add", "-q", "-b", branch, it.toString()) } }
+        try {
+            return body()
+        } finally {
+            dirs.forEach { git(repo, "worktree", "remove", "--force", it.toString()) }
+            branches.forEach { git(repo, "branch", "-D", it) }
+        }
+    }
+
+    @Test
+    fun `a pool filled with taken, blocked and foreign rows still yields the plannable tasks`() = withWorktrees("WS-9", "WS-10") {
+        val text = pool().plan("slots" to JsonPrimitive(4), "exclude" to JsonArray(listOf(JsonPrimitive("ws-11"))))
+        // The 4 free windows go to plannable tasks, which come after 4 + 4 + 2 + 1 + 20 rows that could not be planned.
+        assertContains(text, "dispatch plan: 4 windows of 4 slots")
+        assertContains(text, "W1 single WS-24 ")
+        val windows = text.substringAfter("## windows").substringBefore("## waiting")
+        listOf("WS-1 ", "WS-5 ", "WS-9 ", "WS-10 ", "WS-11 ", "XY-").forEach { assertFalse(it in windows, "$it in $windows") }
+        assertContains(text, "left out of the pool: 1 left out by the caller, 6 in a worktree or in progress/review, 4 waiting on a dependency")
+        text.substringAfter("## live").let { live -> assertContains(live, "WS-9 ("); assertContains(live, "WS-10 (") }
+    }
+
+    @Test
+    fun `the cut pool says how many plannable tasks it did not show and grows with the slots`() {
+        val few = pool().plan("slots" to JsonPrimitive(1))
+        assertContains(few, "9 more plannable tasks not shown (pool of 15)")
+        val many = pool().plan("slots" to JsonPrimitive(8))
+        assertFalse("not shown" in many, many)
+        assertContains(many, "dispatch plan: 8 windows of 8 slots")
+    }
+
+    @Test
+    fun `a request from a workspace stays in the workspace's project unless it names one`() {
+        val scoped = pool()
+        assertFalse("XY-" in scoped.plan("slots" to JsonPrimitive(8)))
+        assertContains(scoped.plan("query" to JsonPrimitive("project: XY"), "slots" to JsonPrimitive(1)), "W1 single XY-")
+        assertFalse("XY-" in scoped.plan("query" to JsonPrimitive("state: {To do}"), "slots" to JsonPrimitive(8), "since" to JsonPrimitive("none")))
+        // Without a workspace the pool spans every mirrored project, as before.
+        assertContains(pool(scoped = false).plan("slots" to JsonPrimitive(1), root = repo), "XY-")
     }
 
     private companion object {
