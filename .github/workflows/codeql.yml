@@ -63,9 +63,11 @@ jobs:
           build-mode: ${{ matrix.build-mode }}
         if: steps.paths.outputs.code != 'false'
 
+      # In-process compilation runs inside the Gradle JVM, whose 1 GB from gradle.properties the traced build outgrew
+      # (GC overhead limit exceeded, CL-250); the hosted runner has 16 GB.
       - name: Compile
         if: (matrix.language == 'java-kotlin') && steps.paths.outputs.code != 'false'
-        run: ./gradlew compileKotlin compileTestKotlin --rerun-tasks --no-daemon --no-build-cache --console=plain -Dkotlin.compiler.execution.strategy=in-process
+        run: ./gradlew compileKotlin compileTestKotlin --rerun-tasks --no-daemon --no-build-cache --console=plain -Dkotlin.compiler.execution.strategy=in-process "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g"
 
       - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         id: analyze
