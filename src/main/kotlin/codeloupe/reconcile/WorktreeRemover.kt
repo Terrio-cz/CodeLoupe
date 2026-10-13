@@ -31,10 +31,10 @@ class WorktreeRemover(private val removeDirectory: (Path) -> Unit = DirectoryRem
         }
         val resumed = entry.lastError?.contains(PARTIAL) == true
         if (!resumed) {
-            refusal(gitDir, path, entry)?.let { return Outcome.Blocked(it) }
+            refusal(path, entry)?.let { return Outcome.Blocked(it) }
             if (Git.run(gitDir, "worktree", "remove", path, allowFail = true) == null) {
                 // A refusal for changes made since the check above wins over the fallback.
-                refusal(gitDir, path, entry)?.let { return Outcome.Blocked(it) }
+                refusal(path, entry)?.let { return Outcome.Blocked(it) }
             }
         }
         if (Files.exists(dir)) {
@@ -49,21 +49,19 @@ class WorktreeRemover(private val removeDirectory: (Path) -> Unit = DirectoryRem
     }
 
     // Why the worktree must stay, or null when git would remove it without losing anything.
-    private fun refusal(gitDir: String, path: String, entry: PlanEntry): String? {
+    private fun refusal(path: String, entry: PlanEntry): String? {
         val head = Git.run(path, "rev-parse", "HEAD", allowFail = true)?.trim() ?: return "git cannot read the worktree"
         if (entry.head != null && head != entry.head) return "its HEAD moved to ${head.take(12)} after the plan was made"
-        if (locked(gitDir, path)) return "it is locked (git worktree lock)"
+        if (locked(path)) return "it is locked (git worktree lock)"
         val changed = WorktreeGit.changedSince(path, "HEAD").size + WorktreeGit.untracked(path).size
         return if (changed > 0) "$changed changed or untracked file(s); nothing removed" else null
     }
 
-    private fun locked(gitDir: String, path: String): Boolean {
-        val wanted = path.replace('\\', '/').trimEnd('/').lowercase()
-        val blocks = Git.run(gitDir, "worktree", "list", "--porcelain")!!.split("\n\n")
-        return blocks.any { block ->
-            val lines = block.lines()
-            lines.firstOrNull()?.removePrefix("worktree ")?.replace('\\', '/')?.trimEnd('/')?.lowercase() == wanted && lines.any { it.startsWith("locked") }
-        }
+    // `git worktree lock` writes `locked` into the worktree's admin directory. Asked from inside the worktree, so no path has to
+    // match the spelling git keeps (a symlinked temp directory, a Windows short name).
+    private fun locked(path: String): Boolean {
+        val adminDir = Git.run(path, "rev-parse", "--absolute-git-dir")?.trim() ?: return true
+        return Files.exists(Path.of(adminDir, "locked"))
     }
 
     // Only a branch still at the planned commit and contained in the default branch goes; update-ref checks the commit itself.

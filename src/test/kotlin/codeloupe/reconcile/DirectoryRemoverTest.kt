@@ -60,6 +60,19 @@ class DirectoryRemoverTest {
     }
 
     @Test
+    fun `a link whose target is gone is removed as an entry`() {
+        val target = root.resolve("gone-target").createDirectories()
+        val victim = root.resolve("dangling").createDirectories()
+        victim.resolve("file.txt").writeText("x")
+        link(victim.resolve("node_modules"), target)
+        Files.delete(target)
+
+        DirectoryRemover.remove(victim)
+
+        assertFalse(victim.exists(LinkOption.NOFOLLOW_LINKS))
+    }
+
+    @Test
     fun `read-only files do not stop the removal`() {
         val victim = root.resolve("readonly").createDirectories()
         val file = victim.resolve("object").also { it.writeText("x") }
