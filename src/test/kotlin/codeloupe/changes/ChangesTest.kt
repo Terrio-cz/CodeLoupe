@@ -4,6 +4,7 @@ import codeloupe.TestRepos
 import codeloupe.TestRepos.git
 import codeloupe.config.Config
 import codeloupe.daemon.JobQueue
+import codeloupe.index.Extraction
 import codeloupe.repo.Registry
 import codeloupe.tools.ChangesTool
 import codeloupe.tools.ToolArgs
@@ -148,6 +149,17 @@ class ChangesTest {
         }
         assertContains(a, "  ~ 4-6  [Billing] fun total(a: Int): Int")
         assertContains(b, "  ~ 3  fun useAll(): Int")
+    }
+
+    @Test
+    fun `old versions the base index holds are copied from it, not parsed again, and answer the same`() {
+        // The base is built first, as in a daemon in use; the worktree starts from the commit the base holds.
+        runBlocking { registry.query(repo.toString()) { } }
+        write(feature, BILLING, billing(total = "return a + 1"))
+        val before = Extraction.parsed.get()
+        val text = changes()
+        assertEquals(before + 1, Extraction.parsed.get(), "only the edited file is parsed, for the worktree's overlay")
+        assertContains(text, "  ~ 4-6  [Billing] fun total(a: Int): Int")
     }
 
     @Test
