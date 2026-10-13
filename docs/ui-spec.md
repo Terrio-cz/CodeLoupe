@@ -59,7 +59,7 @@ CL-54 (Environment), API daemonu CL-39 (§ 9 je jeho kontrakt).
 | `#/tasks` · `#/tasks/:id` | Tasks | celá stránka s panelem vlastností vpravo | `tasks`, `tasks/{id}` |
 | `#/index` | Index | — | `index` |
 | `#/gaps` | Gaps | řádek se rozbalí | `gaps` |
-| `#/brain` · `#/brain/<workspaceId>?topic=<téma>` | Brain (CL-232) | strom témat vlevo, obsah vpravo | `brain`, `brain/{id}/topic`, `brain/{id}/search` |
+| `#/brain` · `#/brain/<workspaceId>?topic=<téma>` · `#/brain/<workspaceId>?view=tasks` | Brain (CL-232), pohled Tasks (CL-248) | strom témat vlevo, obsah vpravo; tabulka úkolů | `brain`, `brain/{id}/topic`, `brain/{id}/search`, `brain/{id}/tasks` |
 | `#/environment` | Environment (CL-54) | — | `environment` |
 | `#/accounts` | Accounts (CL-63, plán) | — | `accounts` |
 | `#/settings` | Settings | — | `settings` + lokální nastavení aplikace (IPC) |
@@ -251,6 +251,9 @@ Detail (#/tasks/TER-671):
 │ ─ Acceptance criteria  3/5 ───────────────────────────  │ Assignee    …               │
 │ ☑ …  ☐ …                                                │ Updated     12:31           │
 │ ─ Links ──────────────────────────────────────────────  │ ─ Branches ─ TER-671 →      │
+│ ─ Brain · terrio  14 entries · last 12:30 ────────────  │                             │
+│ [plan=ok] [code=ok] [rev=fail@3f9c1e2] [test=wip]       │                             │
+│ =  PASS 212 tests                          w2 · 12:30   │                             │
 │ ─ Activity ───────────────────────────────────────────  │                             │
 │ ● 12:31 state → In Progress                             │ ─ Mirror ──────────────────  │
 │ ● 12:10 comment: …                                      │ synced 12:40                │
@@ -265,6 +268,12 @@ Detail (#/tasks/TER-671):
   `dangerouslySetInnerHTML`; odkazy jdou přes stejný allow-list jako „Open in YouTrack“, ostatní se
   zobrazí jako text.
 - Hlavička seznamu ukazuje čas synchronizace mirroru (`mirrorSyncedAt` v odpovědi `tasks`).
+- **Brain** (CL-248): sekce pod Links; pro každý workspace s `brain/tasks/<id>.md` jedna karta. Nahoře klíče stavu (`plan`, `code`,
+  `rev`, `test`, `round`, `land`, `merge`, `close`, `hold` …, poslední hodnota řádků `% klíč=hodnota` vyhrává), pod nimi záznamy od
+  nejnovějšího: značka (`=` důkaz, `~` rozhodnutí, `!P2` blokátor, `?`, `+`, `>`, `->` předání, `%` stav, `@`, `x` zamítnuto), text,
+  autor/okno a čas ze záhlaví sekce `## <čas> <kdo>`. Zamítnuté (`brain.mjs reject`) a nahrazené kontrolou (`coveredBy`) jsou označené.
+  Prvních 40 záznamů, zbytek tlačítkem. Úkol bez souboru: „No brain holds notes for this task.“ Sekce se čte ze souborů, ne z indexu
+  brainu: studený nebo padlý index detail nezdrží (jen se neukážou značky „superseded“ a sekce to řekne).
 - „Reads“ = kolikrát agenti issue četli (analysis.md § 2: průměr 6,5×) — cílová metrika modulu 3.
 
 ### 3.5 Index
@@ -329,6 +338,9 @@ Brain                          [terrio ▾] [🔍 Search the brain] [ ] Include 
   `brain/facts/<téma>.md` (jen čtení; až bude `brain.mjs show <téma> --json`, nahradí to).
 - **Hledání**: pole nad stromem, jeden dotaz na pauzu v psaní; výsledky nahrazují obsah tématu. „Include past task findings“
   přidá nálezy z minulých úkolů (`--tasks`), „Only in <téma>“ zúží hledání na vybrané téma. Zásah z tématu vede na téma, zásah z úkolu na Tasks.
+- **Pohled Tasks** (CL-248, `?view=tasks`, přepínač Topics/Tasks): tabulka souborů `brain/tasks/*.md` workspace — úkol, stav (klíče `%`
+  řádků), počet záznamů, čas posledního záznamu, nejnovější nahoře; pole hledání filtruje podle id a stavu. Řádek otevře detail úkolu
+  (`#/tasks/<id>`), když ho tracker mirror zná (`tracked`), jinak je jen text.
 - **Chyby**: workspace, jehož CLI selhalo, se v seznamu ukáže s důvodem — `node` chybí (`node_missing`), CLI neodpovědělo do 20 s
   (`timeout`), jiná chyba (`failed`, první řádek stderr). Ostatní workspacy tím nejsou dotčené.
 
@@ -847,6 +859,7 @@ interface TaskDetail extends TaskSummary {
   activity: { at: Iso; author: string; kind: 'created' | 'comment' | 'field' | 'state'; text: string }[];
   worktrees: WorktreeSummary[];
   mirror: { syncedAt: Iso; lastReadAt: Iso | null };
+  brain: TaskBrain;                                       // CL-248: poznámky brainů k úkolu, viz § 9.15a
 }
 ```
 
@@ -995,6 +1008,25 @@ interface BrainSearchView { workspaceId: string; terms: string[]; more: number;
 - `search` předá termy (max 8, bez úvodních `-`), `--in <téma>`, `--tasks` a `--limit` (výchozí 50, max 200) jako samostatné argumenty; selhání CLI je `503 unavailable`.
 - `topic`: jméno tématu jsou segmenty `[A-Za-z0-9._-]` oddělené `/` (bez `..`), jinak `400`; chybějící soubor `404`; soubor nad 2 MB se neukáže.
 
+`GET /ui-api/v1/brain/{id}/tasks` a sekce `brain` v `tasks/{id}` (CL-248; jen čtení):
+```ts
+interface BrainTasksView { workspaceId: string;
+  tasks: { id: string; lastAt: Iso | null; state: { key: string; value: string }[]; entries: number; tracked: boolean }[] }
+interface TaskBrain { brains: {                                // jeden prvek na brain, který má tasks/<id>.md
+  workspaceId: string; workspace: string; state: { key: string; value: string }[];
+  entries: { marker: string; text: string; who: string; at: Iso; line: number;
+             rejected: boolean; superseded: boolean; coveredBy: string | null }[];   // nejnovější první, nejvýš 300
+  entryCount: number; lastAt: Iso | null;
+  indexing: boolean;                                           // index brainu ještě není postavený: nejsou značky superseded
+  error: string | null }[] }                                    // soubor nešel přečíst
+```
+- Soubory `<workspace>/brain/tasks/<id>.md` čte daemon přímo (jen čtení, `id` musí být tvaru `PROJEKT-číslo`, soubor nad 2 MB se nečte): engine
+  nemá příkaz, který by soubor úkolu vypsal jako data, a soubor je jeho append-only zápis (`## <čas UTC> <kdo>`, jeden záznam na neprázdný řádek,
+  `## REJECTED …` pro `brain.mjs reject`). Stav je poslední hodnota každého klíče z řádků `% klíč=hodnota`. Seznam `brain/{id}/tasks` drží shrnutí
+  souborů v paměti, dokud se soubor nezmění.
+- Značky `superseded`/`coveredBy` bere daemon z už postaveného indexu brainu (`BrainIndexes.cached`); je-li studený, spustí jeho stavbu na pozadí,
+  nečeká na ni a vrátí `indexing: true`. Soubor, který nejde přečíst, je v `error` jeho brainu, ne chyba odpovědi. Neznámé workspace `id` je `404`.
+
 ### 9.16 Mapování obrazovka → endpoint
 
 | Obrazovka | Endpointy |
@@ -1002,11 +1034,11 @@ interface BrainSearchView { workspaceId: string; terms: string[]; more: number;
 | Sidebar | `nav` |
 | Overview | `overview`, `/status` |
 | Branches, detail | `worktrees`, `worktrees/{id}` |
-| Tasks, detail | `tasks`, `tasks/{id}` |
+| Tasks, detail (+ sekce Brain, CL-248) | `tasks`, `tasks/{id}` |
 | Index | `index` |
 | Runs, záložka Commands (CL-220) | `runs`, `runs/{id}`, `commands` |
 | Gaps | `gaps` |
-| Brain (CL-232) | `brain`, `brain/{id}/topic`, `brain/{id}/search` |
+| Brain (CL-232), pohled Tasks (CL-248) | `brain`, `brain/{id}/topic`, `brain/{id}/search`, `brain/{id}/tasks` |
 | Environment | `environment` |
 | Accounts (CL-63) | `accounts` |
 | Settings | `settings`, `/status` |
