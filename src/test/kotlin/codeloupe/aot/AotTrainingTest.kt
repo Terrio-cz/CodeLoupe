@@ -4,15 +4,24 @@ import codeloupe.TestRepos
 import codeloupe.cli.CliJvm
 import codeloupe.cli.DaemonJvm
 import codeloupe.cli.LocalHttp
+import codeloupe.index.ParseWorker
+import codeloupe.index.ParseWorkerClient
+import codeloupe.lang.FileFacts
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.FileTime
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import kotlin.io.path.name
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -43,6 +52,11 @@ class AotTrainingTest {
     fun `two first calls at once run, one trainer makes the caches, and calls with them work moved, damaged or not`() {
         Files.createDirectories(prefix.parent)
         val caches = AotCaches(prefix)
+        // Caches of other installs: one no daemon started from for 40 days (an AppImage version gone), one in use.
+        val stale = listOf("C__gone_codeloupe-aaaaaaaaaaaa.cli.aot", "C__gone_codeloupe-aaaaaaaaaaaa.worker.aot", "C__gone_codeloupe-aaaaaaaaaaaa.ready")
+        val inUse = listOf("C__other_codeloupe-bbbbbbbbbbbb.daemon.aot", "C__other_codeloupe-bbbbbbbbbbbb.ready")
+        for (name in stale + inUse) Files.writeString(prefix.parent.resolve(name), "x")
+        Files.setLastModifiedTime(prefix.parent.resolve(stale.last()), FileTime.fromMillis(System.currentTimeMillis() - 40 * 86_400_000L))
         // Two first calls at once find no cache and write nothing.
         val calls = (1..2).map { cli(jar).start().also { p -> p.outputStream.close() } }
         for (call in calls) {
@@ -60,7 +74,8 @@ class AotTrainingTest {
         while ((Files.exists(caches.lock) || Files.exists(caches.trainer)) && System.currentTimeMillis() < deadline) Thread.sleep(200)
 
         val files = Files.list(prefix.parent).use { entries -> entries.map { it.name }.toList().sorted() }
-        assertEquals(listOf("C__test_codeloupe-0123456789ab.cli.aot", "C__test_codeloupe-0123456789ab.daemon.aot", "C__test_codeloupe-0123456789ab.ready"), files, "one pair of caches, nothing left over")
+        val own = listOf("C__test_codeloupe-0123456789ab.cli.aot", "C__test_codeloupe-0123456789ab.daemon.aot", "C__test_codeloupe-0123456789ab.ready", "C__test_codeloupe-0123456789ab.worker.aot")
+        assertEquals((own + inUse).sorted(), files, "one set of caches, nothing left over, the unused install's caches removed")
 
         val (code, text) = output(cli(jar, "-XX:AOTCache=${caches.cli}"))
         assertEquals(0 to true, code to text.startsWith("codeloupe version"), text)
@@ -83,6 +98,53 @@ class AotTrainingTest {
 
         daemonStartsWith(caches.daemonFlags())
         daemonStartsWith(listOf("-XX:AOTCache=${home.resolve("damaged-garbage.aot")}"))
+
+        workersParseWithAndWithoutTheirCache(caches, moved)
+    }
+
+    /**
+     * The parse worker (CL-251) with its cache, with the cache of another build (a jar that differs, as after an update that kept
+     * the caches) and with a damaged one: every one answers, with the same facts as a worker without a cache.
+     */
+    private fun workersParseWithAndWithoutTheirCache(caches: AotCaches, moved: Path) {
+        assertEquals(listOf("-XX:AOTCache=${caches.worker}"), caches.workerFlags())
+        val otherBuild = moved.resolve("lib").resolve(jar.name)
+        rebuilt(jar, otherBuild)
+        val expected = facts(jar, emptyList())
+        assertEquals(WorkerSamples.files.size, expected.size)
+        val runs = listOf(
+            "own cache" to facts(jar, caches.workerFlags()),
+            "cache of another build" to facts(otherBuild, caches.workerFlags()),
+            "damaged cache" to facts(jar, listOf("-XX:AOTCache=${home.resolve("damaged-garbage.aot")}")),
+            "the daemon's cache" to facts(jar, listOf("-XX:AOTCache=${caches.daemon}")),
+        )
+        for ((name, facts) in runs) assertEquals(expected, facts, name)
+    }
+
+    private fun facts(jar: Path, flags: List<String>): List<FileFacts> {
+        val log = ArrayList<String>()
+        val command = { listOf(java) + ParseWorker.JVM_ARGS + flags + listOf("--enable-native-access=ALL-UNNAMED", "-cp", jar.toString(), ParseWorker::class.java.name, "60") }
+        val facts = ParseWorkerClient(command = command, log = { log += it }).use { it.extractAll(WorkerSamples.files) }
+        assertNotNull(facts, "no answer with $flags: $log")
+        assertTrue(log.single().startsWith("parse worker pid "), log.toString())
+        assertContains(log.single(), if (flags.isEmpty()) "(no AOT cache)" else "(AOT cache)")
+        return facts
+    }
+
+    // The same jar with one more entry: another size and content, as the next build has.
+    private fun rebuilt(source: Path, target: Path) {
+        ZipInputStream(Files.newInputStream(source)).use { input ->
+            ZipOutputStream(Files.newOutputStream(target)).use { output ->
+                generateSequence { input.nextEntry }.forEach { entry ->
+                    output.putNextEntry(ZipEntry(entry.name))
+                    input.copyTo(output)
+                    output.closeEntry()
+                }
+                output.putNextEntry(ZipEntry("codeloupe/another-build.txt"))
+                output.write("another build".toByteArray())
+                output.closeEntry()
+            }
+        }
     }
 
     private fun daemonStartsWith(flags: List<String>) {

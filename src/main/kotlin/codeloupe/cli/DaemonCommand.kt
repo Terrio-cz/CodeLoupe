@@ -36,7 +36,7 @@ class DaemonCommand : CliktCommand(name = "daemon") {
         } catch (e: IllegalStateException) {
             throw CliktError(e.message)
         }
-        AotLauncher.afterDaemonStart()
+        AotLauncher.afterDaemonStart(config.home)
         Thread.currentThread().join()
     }
 }

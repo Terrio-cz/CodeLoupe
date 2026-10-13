@@ -2223,10 +2223,46 @@ souborů s novou funkcí, takže se nic nedá převzít; `--large-pause 5000` s 
 - **Výstup beze změny**: 15 volání (`changes` výchozí, `callers`, `bodies`, `find`, `outline`) po 40 / 300 / 300 commitnutých editacích
   bajt po bajtu stejných starý vs nový build; 2 689 souborů Terria jednotlivě vs v dávkách na 4 vláknech 7× bez rozdílu;
   `ParallelParseTest` (vlastní zdroje, 1 vs 4 vlákna; base index řádek po řádku včetně id).
-- **Zbývá studený worker**: start JVM + prostředí parseru ~850 ms. AOT cache workeru (`-XX:AOTCacheOutput`) ho v pokusu zkrátila na
+- **Zbývá studený worker** (vyřešeno v CL-251): start JVM + prostředí parseru ~850 ms. AOT cache workeru (`-XX:AOTCacheOutput`) ho v pokusu zkrátila na
   ~330 ms; nezavedeno (desktopová aplikace daemon spouští bez AOT infrastruktury CL-150). Zamítnuto: předstartování workeru na každé
   `changes` (ušetří ≤ 150 ms, stojí ~100 MB na 5 min), delší nečinnost workeru (paměť CL-125).
 - **Hlídač**: `--large 40:1000,300:3000` skončí kódem 2 nad rozpočtem (teplý worker; starý build ho překročí, nový ne).
+
+### Výsledek CL-251 — AOT cache parse workeru a daemona desktopové aplikace (2026-10-14)
+
+- **Třetí cache k CL-150**: trenér po daemonovi a CLI nahraje i parse worker (`-XX:AOTMode=record` s příznaky `ParseWorker.JVM_ARGS`,
+  jeden požadavek s Kotlin souborem, skriptem `.kts` a Java souborem z `WorkerSamples`, zavřená roura worker ukončí) a vytvoří
+  `<…>.worker.aot` (44–48 MB). `.ready` má čtyři řádky (běhové ID JVM a velikosti tří souborů); třířádkové `.ready` z CL-150 není
+  hotové, takže se instalace jednou natrénuje znovu. `ParseWorkerClient` se na cache ptá při každém startu workeru
+  (`AotCaches.workerFlags`), takže ji použije i daemon, který běžel už před koncem tréninku.
+- **Desktopová aplikace**: spouští přibalený jar bez launcheru, proto jí CL-150 nepomáhalo. Teď předá `-Dcodeloupe.aot=auto` a CLI při
+  startu daemona dopočítá prefix stejně jako skripty (`AotInstall`: klíč z cesty instalace jako `codeloupe.bat` / `codeloupe`, build
+  = prvních 6 bajtů SHA-256 jaru jako `build.gradle.kts`; test hlídá shodu s nainstalovanými skripty). Aplikace i launcher v balíčku
+  tak sdílejí jednu sadu cache a jeden trénink. Jar se hashuje jen při spuštění daemona (7 MB, desítky ms).
+- **Proč ne cache v instalátoru**: +~120 MB na instalátor a cache patří k přesnému runtime a jaru; trénink na stroji uživatele (~25 s po
+  prvním startu daemona, na pozadí) už existuje a JVM cache jiného buildu sama zahodí. **Proč ne stále teplý worker**: nečinný worker
+  drží 86–93 MB RSS (měřeno), trvale navíc ke každému daemonu, a start by ušetřil jen tehdy, když by nikdy neskončil; s cache stojí studený
+  start ~150 ms a nic v klidu.
+- **Úklid**: AppImage má pro každou verzi vlastní adresář, tedy vlastní klíč; daemon při startu s hotovou cache obnoví čas `.ready`
+  (`AotLauncher.markUsed`) a trénink kterékoli instalace smaže sady, jejichž `.ready` nikdo 30 dní neobnovil (zámky nechá).
+- **Log**: `daemon.log` u startu daemona píše dobu od startu JVM a zda dostal cache, u každého workeru dobu startu (odpověď minus
+  `ParseReply.parseMs`) a zda měl cache.
+- **Měření** (Windows 11, JBR 25.0.3, stroj zatížený jinými okny):
+  - worker sám, start do první odpovědi: **780–826 → 172–195 ms**, i se 40 soubory Terria 930–950 → 263–300 ms; RSS 97 → 95 MB po
+    parsu, 91–93 → 86 MB v klidu (cache paměť nepřidává);
+  - `tools/profile.mjs --only tools --large 40:1000 --large-pause 5000` (studený worker, `parseWorkerIdleSeconds` 2, stejný build bez
+    cache / s cache, střídavě 2×): **p50/p95 994/1 065 a 1 084/1 149 → 528/564 a 502/763 ms**; RSS daemonu 151–161 / 159 MB, živý heap
+    16–18 MB; log: worker bez cache „started“ 248–314 ms + první parse 478–578 ms, s cache 134–212 ms + 75–126 ms;
+  - `tools/bundle-smoke.mjs --aot` na lokálním jlink balíčku: cache hotové za 23 s (23 / 53 / 44 MB), `workerStartMs` **670 → 181**;
+  - rozbalená aplikace (`electron-builder --dir`), příkaz daemona přesně jako `DaemonManager` (příznaky z `app.asar`), vlastní home a
+    port: první start bez cache, trénink, po restartu daemon „listening … 384 ms after the JVM started (AOT cache)“, workery 106–130 ms
+    (AOT cache).
+- **Testy**: `AotCachesTest` (čtvrtý soubor, `workerFlags`, `auto`, klíč obou skriptů), `AotLauncherTest` (`markUsed`),
+  `LauncherScriptsTest` (build `auto` = build v nainstalovaných skriptech), `AotTrainingTest` (sada čtyř souborů, nepoužívaná sada
+  jiné instalace smazána, používaná zůstane; worker s vlastní cache, s cache **jiného buildu** (jar s další položkou), s poškozenou a
+  s cache daemona odpoví stejná fakta jako bez cache), `bundledDaemon.test.ts`.
+- **Zbývá**: trénink v home s dlouhou cestou (> ~150 znaků) selže na hlubokých cestách tréninkového repozitáře („the recorded CLI call
+  failed“), platí od CL-150; výchozí home je krátký. Ověřit log nainstalované aplikace po vydání.
 
 ### Výsledek CL-71 — build daemony a procesy po workspacech (2026-10-08)
 

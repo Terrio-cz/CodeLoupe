@@ -9,8 +9,10 @@ export interface BundledDaemon {
   version: string;
 }
 
-// The launcher's flags for a short-lived CLI (gradle/start/codeloupe) without its AOT cache.
-const JVM_FLAGS = ['-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-Xshare:auto', '-Xss512k', '-Xmx128m', '-XX:+ExitOnOutOfMemoryError', '-XX:-UsePerfData', '-Xlog:disable'];
+// The launcher's flags for a short-lived CLI (gradle/start/codeloupe) without its AOT cache. `-Dcodeloupe.aot=auto` names the
+// install's AOT caches as the launcher would (CL-251): the daemon this CLI starts and its parse worker use them, and the daemon
+// makes them in the background after its first start.
+const JVM_FLAGS = ['-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-Xshare:auto', '-Xss512k', '-Xmx128m', '-XX:+ExitOnOutOfMemoryError', '-XX:-UsePerfData', '-Xlog:disable', '-Dcodeloupe.aot=auto'];
 
 export interface BundleOptions {
   platform?: NodeJS.Platform;

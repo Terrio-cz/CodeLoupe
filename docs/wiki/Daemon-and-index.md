@@ -64,7 +64,10 @@ The daemon does not parse in its own process: edited files (an overlay refresh, 
 file to parse and that exits after `parseWorkerIdleSeconds` (default 300) without one, or when the daemon ends. The
 compiler's parser is some 20 MB of classes, symbols and code plus the heap its syntax trees fill; held in the daemon it
 would be resident for as long as the daemon lives. While the worker runs it holds about 100 MB of its own; a worker that
-cannot start or dies is replaced once, and then the daemon parses itself (slower on memory, never wrong). With the worker
+cannot start or dies is replaced once, and then the daemon parses itself (slower on memory, never wrong). A worker starts from
+the install's AOT cache (`<home>/aot/…worker.aot`, made with the CLI and daemon caches, see [Getting started](Getting-started)):
+start to first answer ~150 ms instead of ~800, so `changes` after 40 edited files with a worker that has to start again takes
+~0.5 s instead of ~1 s. `daemon.log` says for every worker how long it took to start and whether it had the cache. With the worker
 the daemon's heap limit is 256 MB, with `parseWorkerIdleSeconds` 0 it is 320. The limit is not the footprint (the
 serial collector commits what the live set needs); 64 MB ran out on a desktop with ~20 worktrees, three trackers and
 5 000 transcripts (CL-238). `/status` reports `heapLiveMb` (live after the last collections), `heapLivePeakMb` and
@@ -82,7 +85,7 @@ started just before the `startedAt` written there.
 |---|---|
 | `config.json` | the settings ([Configuration](Configuration)) |
 | `daemon.json`, `daemon.log`, `calls.jsonl` | the running daemon's pid, port and version; its log; tool, latency and size of every call |
-| base and overlay databases, `aot/` | the indexes ([Worktrees and overlays](Worktrees-and-overlays)); the JVM AOT caches of the CLI and the daemon |
+| base and overlay databases, `aot/` | the indexes ([Worktrees and overlays](Worktrees-and-overlays)); the JVM AOT caches of the CLI, the daemon and its parse worker |
 | `jobs.db`, `jobs/`, `events.db` | jobs, their logs and the event log ([Jobs and events](Jobs-and-events)) |
 | `know.db` | the knowledge store, created on first use ([Knowledge store](Knowledge-store)) |
 | `trackers/` | tracker mirrors ([Trackers](Trackers)) |

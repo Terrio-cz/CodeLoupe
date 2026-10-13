@@ -4,6 +4,7 @@ import codeloupe.platform.DetachedStart
 import codeloupe.platform.JavaProcess
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 import java.time.Duration
 
 /**
@@ -20,15 +21,20 @@ object AotLauncher {
      * Called by a daemon that a launcher started. Waits a while so that the first queries have the machine, then starts a
      * trainer if the caches are missing. Does nothing in the daemons the trainer itself starts.
      */
-    fun afterDaemonStart(delayMs: Long = DAEMON_DELAY_MS) {
-        val caches = AotCaches.fromProperty() ?: return
+    fun afterDaemonStart(home: Path, delayMs: Long = DAEMON_DELAY_MS) {
+        val caches = AotCaches.fromProperty(home) ?: return
         if (System.getenv(AotTrainer.TRAINING_ENV) != null) return
         Thread.ofPlatform().daemon().name("codeloupe-aot").start {
             runCatching {
                 Thread.sleep(delayMs)
-                startTraining(caches, spawn = ::spawn)
+                if (!startTraining(caches, spawn = ::spawn)) markUsed(caches)
             }
         }
+    }
+
+    /** The caches of an install that no daemon started from for [AotTrainer.UNUSED_DAYS] are removed by the next training of any install. */
+    internal fun markUsed(caches: AotCaches) {
+        if (caches.isReady()) runCatching { Files.setLastModifiedTime(caches.ready, FileTime.fromMillis(System.currentTimeMillis())) }
     }
 
     /** True when a trainer was started. [spawn] starts it. */

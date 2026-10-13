@@ -2,6 +2,7 @@ package codeloupe.daemon
 
 import codeloupe.CodeLoupe
 import codeloupe.JsonFormat
+import codeloupe.aot.AotCaches
 import codeloupe.config.Config
 import codeloupe.config.PortPolicy
 import codeloupe.doc.DocMemory
@@ -261,7 +262,10 @@ class Daemon private constructor(
         daemonToken = DaemonToken.open(config.home)
         guard = RequestGuard(config.port, daemonToken, config.api.strict) { mutatingTools }
         // The compiler's parser lives in a child process that ends when it has had nothing to parse for a while.
-        if (config.parseWorkerIdleSeconds > 0) Extraction.useWorker(ParseWorkerClient(config.parseWorkerIdleSeconds.toLong(), log = ::log))
+        if (config.parseWorkerIdleSeconds > 0) {
+            val cacheFlags = { AotCaches.fromProperty(config.home)?.workerFlags().orEmpty() }
+            Extraction.useWorker(ParseWorkerClient(config.parseWorkerIdleSeconds.toLong(), cacheFlags = cacheFlags, log = ::log))
+        }
         // Class-data archives of earlier versions; the daemon no longer writes one.
         config.home.listDirectoryEntries("daemon-*.jsa").forEach { runCatching { Files.deleteIfExists(it) } }
         // CIO keeps a connection open until the client closes it or it idles; clients drop it on `Connection: close`.
@@ -293,7 +297,7 @@ class Daemon private constructor(
         Files.writeString(infoFile, JsonFormat.json.encodeToString(DaemonInfo.serializer(), info))
         // Every outgoing text is masked of the values in the vault; nothing is opened while there is no vault yet.
         Scrubber.knownValues = { (if (secrets.vaultExists()) secrets.store?.knownValues().orEmpty() else emptyList()) + listOfNotNull(System.getenv(KeyProtectors.PASSPHRASE_VARIABLE)) }
-        log("daemon ${CodeLoupe.VERSION} pid $pid listening on 127.0.0.1:${config.port}")
+        log("daemon ${CodeLoupe.VERSION} pid $pid listening on 127.0.0.1:${config.port}, ${JvmStart.describe()}")
     }
 
     private fun Application.module() {

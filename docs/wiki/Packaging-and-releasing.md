@@ -15,8 +15,10 @@ bundle runs without Java. jlink output runs only on the OS it was built on, so C
 (`bundle` job in [ci.yml](https://github.com/Terrio-cz/CodeLoupe/blob/main/.github/workflows/ci.yml)); the Electron installer takes the same directory (see [Installers](#installers)).
 `node tools/bundle-smoke.mjs <bundle dir>` runs a query on a PATH without any Java (two first calls at once) and prints the sizes and the
 daemon's RSS; CI runs it on every push and keeps the numbers as `bundle-report-<os>` artifacts. With `--aot` it also waits for the
-AOT caches the daemon makes in the background (`<home>/aot/`), checks that they are one clean pair, that a copy of the jars and a damaged
-cache run without a message, and times a CLI call with no archive, with a dynamic class-data archive and with the AOT cache.
+AOT caches the daemon makes in the background (`<home>/aot/`), checks that they are one clean set (CLI, daemon, parse worker), that a copy of
+the jars and a damaged cache run without a message, and times a CLI call with no archive, with a dynamic class-data archive and with the AOT
+cache, and the parse worker's start with and without its cache (`workerStartMs`). The caches are not shipped in the installers: the daemon
+makes them on the user's machine for the exact runtime and jar there (CL-251).
 
 Measured in CI on 2026-10-08 (Temurin 25.0.4, tiny repository, daemon idle after its first index build):
 

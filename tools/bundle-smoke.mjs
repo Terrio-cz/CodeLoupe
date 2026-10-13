@@ -5,9 +5,10 @@
 //
 //   node tools/bundle-smoke.mjs <bundle dir> [--zip <bundle zip>] [--out bundle-report.json] [--aot]
 //
-// --aot (CL-150) also waits for the AOT caches the daemon makes in the background, checks that they are one pair with nothing left over,
-// that a copy of the jars (other path, other modification times) and a damaged cache run without a word, and times a CLI call with no archive,
-// with the dynamic class-data archive and with the AOT cache (medians of interleaved calls).
+// --aot (CL-150) also waits for the AOT caches the daemon makes in the background, checks that they are one set (CLI, daemon, parse worker)
+// with nothing left over, that a copy of the jars (other path, other modification times) and a damaged cache run without a word, and times a
+// CLI call with no archive, with the dynamic class-data archive and with the AOT cache (medians of interleaved calls), and the parse worker's
+// start with and without its cache (CL-251).
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -99,6 +100,49 @@ git(repo, 'init', '-q', '-b', 'main');
 git(repo, 'add', '-A');
 git(repo, 'commit', '-q', '-m', 'init');
 
+// The parse worker's start (CL-251) with and without its cache, as the daemon starts it (codeloupe.index.ParseWorker.JVM_ARGS):
+// spawn to the answer of one small file, interleaved medians. A damaged cache must give the same answer.
+const WORKER_FLAGS = ['-Xlog:disable', '-Xms16m', '-Xmx96m', '-Xmn10m', '-Xss512k', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10', '-XX:MaxHeapFreeRatio=30',
+  '-XX:+UseCompactObjectHeaders', '-XX:TieredStopAtLevel=1', '-XX:ReservedCodeCacheSize=32m', '-XX:MaxMetaspaceSize=128m', '-XX:+ExitOnOutOfMemoryError'];
+function workerAnswer(extra) {
+  return new Promise((resolve, reject) => {
+    const started = performance.now();
+    const child = spawn(bundledJava, [...WORKER_FLAGS, ...extra, '--enable-native-access=ALL-UNNAMED', '-cp', jarPath, 'codeloupe.index.ParseWorker', '60'], { stdio: ['pipe', 'pipe', 'ignore'] });
+    let out = '';
+    const timer = setTimeout(() => { child.kill(); reject(new Error(`the parse worker did not answer with ${extra.join(' ') || 'no cache'}`)); }, 60_000);
+    child.stdout.on('data', d => {
+      out += d;
+      const line = out.split('\n').slice(0, -1).map(l => l.trim()).find(l => l.startsWith('{'));
+      if (!line) return;
+      clearTimeout(timer);
+      const ms = performance.now() - started;
+      child.stdin.end();
+      child.stdout.removeAllListeners('data');
+      child.stdout.resume();
+      resolve({ ms, facts: JSON.stringify(JSON.parse(line).facts) });
+    });
+    child.on('error', reject);
+    child.stdin.write(JSON.stringify({ id: 1, files: [{ path: 'src/Greeter.kt', text: 'package demo\n\nclass Greeter {\n    fun greet(name: String) = "Hello, $name"\n}\n' }] }) + '\n');
+  });
+}
+async function checkWorkerCache(report, workerCache) {
+  const damaged = path.join(tmp, 'damaged-worker.aot');
+  fs.writeFileSync(damaged, Buffer.alloc(2_000_000, 7));
+  const plain = await workerAnswer([]);
+  const broken = await workerAnswer([`-XX:AOTCache=${damaged}`]);
+  if (broken.facts !== plain.facts) throw new Error('a damaged worker cache changed the answer');
+  const times = { none: [], aot: [] };
+  for (let i = 0; i < 5; i++) {
+    times.none.push((await workerAnswer([])).ms);
+    const cached = await workerAnswer([`-XX:AOTCache=${workerCache}`]);
+    if (cached.facts !== plain.facts) throw new Error('the worker cache changed the answer');
+    times.aot.push(cached.ms);
+  }
+  const median = xs => [...xs].sort((a, b) => a - b)[xs.length >> 1];
+  report.workerStartMs = { none: Math.round(median(times.none)), aot: Math.round(median(times.aot)) };
+  if (report.workerStartMs.aot >= report.workerStartMs.none) throw new Error(`the worker cache is not faster: ${JSON.stringify(report.workerStartMs)}`);
+}
+
 // The AOT caches (CL-150): the daemon makes them in the background some seconds after it started.
 // What a training left behind, to show why a directory could not be removed.
 function leftovers(dir) {
@@ -121,11 +165,13 @@ async function checkAotCaches(report) {
   report.aotReadySeconds = Math.round((performance.now() - began) / 1000);
   while (list().some(f => f.endsWith('.lock') || f.endsWith('.trainer')) && performance.now() - began < 300_000) await sleep(500);
   const files = list().map(f => f.replace(/^.*-[0-9a-f]{12}/, '*')).sort();
-  if (files.join() !== '*.cli.aot,*.daemon.aot,*.ready') throw new Error(`the AOT caches are not one clean pair: ${files.join(', ')}${leftovers(aotDir)}`);
+  if (files.join() !== '*.cli.aot,*.daemon.aot,*.ready,*.worker.aot') throw new Error(`the AOT caches are not one clean set: ${files.join(', ')}${leftovers(aotDir)}`);
   const archives = path.join(tmp, 'home', 'cds');
   if (fs.existsSync(archives) && fs.readdirSync(archives).some(f => f.endsWith('.jsa'))) throw new Error('the dynamic archive was left behind');
   const cache = path.join(aotDir, list().find(f => f.endsWith('.cli.aot')));
-  report.aotCacheMb = { cli: mb(fs.statSync(cache).size), daemon: mb(fs.statSync(cache.replace('.cli.aot', '.daemon.aot')).size) };
+  const workerCache = cache.replace('.cli.aot', '.worker.aot');
+  report.aotCacheMb = { cli: mb(fs.statSync(cache).size), daemon: mb(fs.statSync(cache.replace('.cli.aot', '.daemon.aot')).size), worker: mb(fs.statSync(workerCache).size) };
+  await checkWorkerCache(report, workerCache);
 
   const flags = ['-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-Xss512k', '-Xmx128m', '-XX:-UsePerfData', '-Xlog:disable'];
   const direct = (extra, jarFile, args) => {

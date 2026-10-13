@@ -38,8 +38,10 @@ object ParseWorker {
             val line = requests.readLine() ?: exitProcess(0)
             working.set(true)
             val request = JsonFormat.json.decodeFromString(ParseRequest.serializer(), line)
+            val started = System.nanoTime()
             val facts = Extraction.parseAllHere(request.files)
-            replies.println(JsonFormat.json.encodeToString(ParseReply.serializer(), ParseReply(request.id, facts)))
+            val parseMs = (System.nanoTime() - started) / 1_000_000
+            replies.println(JsonFormat.json.encodeToString(ParseReply.serializer(), ParseReply(request.id, facts, parseMs)))
             replies.flush()
             lastActive.set(System.currentTimeMillis())
             working.set(false)

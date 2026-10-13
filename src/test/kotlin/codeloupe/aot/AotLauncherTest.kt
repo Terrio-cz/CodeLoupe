@@ -34,6 +34,7 @@ class AotLauncherTest {
         Files.createDirectories(dir)
         Files.write(caches.cli, ByteArray(10))
         Files.write(caches.daemon, ByteArray(20))
+        Files.write(caches.worker, ByteArray(30))
         Files.writeString(caches.ready, caches.readyContent())
         assertFalse(start())
 
@@ -44,6 +45,18 @@ class AotLauncherTest {
         assertTrue(start(), "an old failure is tried again")
         assertFalse(start(), "the trainer that was just started holds the lock")
         assertEquals(1, spawned.get())
+    }
+
+    @Test
+    fun `a daemon that starts with ready caches marks them used, so no other install's training removes them`() {
+        Files.createDirectories(dir)
+        for (file in listOf(caches.cli, caches.daemon, caches.worker)) Files.write(file, ByteArray(10))
+        Files.writeString(caches.ready, caches.readyContent())
+        val old = System.currentTimeMillis() - 40 * 86_400_000L
+        Files.setLastModifiedTime(caches.ready, java.nio.file.attribute.FileTime.fromMillis(old))
+        AotLauncher.markUsed(caches)
+        assertTrue(Files.getLastModifiedTime(caches.ready).toMillis() > old + 39 * 86_400_000L)
+        assertTrue(caches.isReady())
     }
 
     @Test

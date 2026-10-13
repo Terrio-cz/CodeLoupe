@@ -29,6 +29,14 @@ class LauncherScriptsTest {
     }
 
     @Test
+    fun `the desktop app's auto names the build as the installed scripts do`() {
+        val install = Path.of(System.getProperty("codeloupe.projectDir"), "build", "install", "codeloupe")
+        val jar = Files.list(install.resolve("lib")).use { files -> files.toList().single { it.fileName.toString().matches(Regex("codeloupe-.*[.]jar")) } }
+        val build = AotInstall.build(jar)
+        for (name in listOf("codeloupe", "codeloupe.bat")) assertContains(Files.readString(install.resolve("bin").resolve(name)), "-$build", message = name)
+    }
+
+    @Test
     fun `no script dumps an archive or gives -Xshare, which the JVM refuses beside an AOT cache`() {
         for ((name, text) in scripts) {
             assertFalse("-Xshare" in code(text), "$name: the JVM refuses -Xshare together with an AOT cache")

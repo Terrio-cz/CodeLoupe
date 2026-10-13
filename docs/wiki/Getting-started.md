@@ -46,9 +46,11 @@ daemon's state as JSON (exit code 3 when it is not running); `codeloupe repos ad
 before the first question ([Configuration](Configuration#repositories)).
 
 A CLI call against a running daemon takes ~0.15 s. The start script maps a JVM AOT cache from `<home>/aot/` (about 22 MB for
-the CLI and 51 MB for the daemon, per install and build). The daemon makes both in the background, a few seconds after it
-started and in a JVM of its own, so no call waits for it; until they exist (about 20 s) a call takes ~0.3 s, and a cache
-the JVM cannot use (another JDK, a damaged file) is ignored without a message. `codeloupe stop` ends a training that is
+the CLI, 51 MB for the daemon and 45 MB for its parse worker, per install and build). The daemon makes them in the background, a few
+seconds after it started and in a JVM of its own, so no call waits for it; until they exist (about 20-30 s) a call takes ~0.3 s, and a cache
+the JVM cannot use (another JDK, another build, a damaged file) is ignored without a message. The desktop app runs the bundled jar
+without the script and passes `-Dcodeloupe.aot=auto`, which names the same caches. Caches of an install that no daemon started
+from for 30 days are removed by the next training. `codeloupe stop` ends a training that is
 running. `JAVA_OPTS` / `CODELOUPE_OPTS` add JVM flags.
 
 ## Where things live

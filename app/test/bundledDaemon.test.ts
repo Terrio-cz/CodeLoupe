@@ -29,6 +29,14 @@ describe('bundled daemon', () => {
     expect(found?.args.slice(-2)).toEqual(['-jar', path.join(root, 'lib', 'codeloupe-0.1.0.jar')]);
   });
 
+  it('lets the daemon and its parse worker find the AOT caches of the install (CL-251)', () => {
+    const resources = tmp();
+    makeBundle(resources, 'win32');
+    const args = findBundledDaemon(resources, { platform: 'win32' })?.args ?? [];
+    expect(args).toContain('-Dcodeloupe.aot=auto');
+    expect(args.indexOf('-Dcodeloupe.aot=auto')).toBeLessThan(args.indexOf('-jar'));
+  });
+
   it('finds nothing when the app ships no bundle or it is incomplete', () => {
     const resources = tmp();
     expect(findBundledDaemon(resources)).toBeNull();
