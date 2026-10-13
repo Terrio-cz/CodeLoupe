@@ -57,7 +57,7 @@ class JobsTest {
     private val http = JdkHttpClient.newHttpClient()
 
     @AfterAll
-    fun stop() = daemon.stop()
+    fun stop() = daemon.stop(force = true)
 
     @Test
     fun `a job runs in the daemon, independent of the client that started it`() {
@@ -294,6 +294,8 @@ class JobsTest {
 
     @Test
     fun `stopping a daemon with running jobs needs force and leaves them lost`() {
+        // On Windows a running job outlives the stop and is taken over (JobTakeoverTest).
+        assumeTrue(!System.getProperty("os.name").lowercase().startsWith("windows"), "elsewhere a job cannot outlive its daemon")
         val home3 = TestRepos.tmpDir("jobs-stop")
         val port3 = freePort()
         val first = Daemon.start(config(home3, port3), jobKeyProtector = keys)

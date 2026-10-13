@@ -220,11 +220,12 @@ class Daemon private constructor(
         )
     }
 
-    fun stop() {
+    /** Stops serving; running jobs that can be taken over are left to the next daemon unless [force] ends them. */
+    fun stop(force: Boolean = false) {
         if (config.parseWorkerIdleSeconds > 0) Extraction.useThisProcess()
         Scrubber.knownValues = { emptyList() }
         server.stop(gracePeriodMillis = 100, timeoutMillis = 2_000)
-        jobs.shutdown()
+        jobs.shutdown(force)
         scope.cancel()
         uiApi.close()
         jobs.close()
@@ -345,15 +346,19 @@ class Daemon private constructor(
             knowRoutes(know)
             brainRoutes(brain)
             post("/shutdown") {
-                // Queued jobs whose launch is stored wait for the next daemon; what runs would end.
+                // Queued jobs whose launch is stored, and running ones the next daemon can take over, wait for it; the others would end.
+                val force = call.parameters["force"] == "1"
                 val atRisk = jobs.atRisk()
-                if (atRisk > 0 && call.parameters["force"] != "1") {
-                    return@post call.respondJson(HttpStatusCode.Conflict, error("$atRisk jobs running (or queued without a stored launch); stop --force ends them (they become lost)"))
+                if (atRisk > 0 && !force) {
+                    return@post call.respondJson(
+                        HttpStatusCode.Conflict,
+                        error("$atRisk jobs would end with the daemon (running ones it cannot hand over, or without a stored launch); stop --force ends them (they become lost)"),
+                    )
                 }
                 call.respondJson(HttpStatusCode.OK, buildJsonObject { put("ok", true) })
-                log("shutdown requested")
+                log("shutdown requested" + if (force) " (force)" else "")
                 scope.launch {
-                    stop()
+                    stop(force)
                     if (exitOnShutdown) exitProcess(0)
                 }
             }

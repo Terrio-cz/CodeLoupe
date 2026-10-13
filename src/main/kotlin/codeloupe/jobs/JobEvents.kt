@@ -30,7 +30,7 @@ object JobEvents {
             Wake.FAILURE -> failed
             Wake.NEVER -> false
         }
-        val fields = JsonFormat.json.encodeToJsonElement(JobRecord.serializer(), record).jsonObject - setOf("pid", "pidStart")
+        val fields = JsonFormat.json.encodeToJsonElement(JobRecord.serializer(), record).jsonObject - setOf("pid", "pidStart", "survivesRestart")
         val extra = mapOf(
             "ok" to JsonPrimitive(record.ok), "final" to JsonPrimitive(final), "wake" to JsonPrimitive(wake),
             "text" to JsonPrimitive(JobReport.text(chain)),

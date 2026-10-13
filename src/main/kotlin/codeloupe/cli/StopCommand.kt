@@ -10,7 +10,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 
 class StopCommand(private val load: () -> Config = { ConfigLoader.load() }) : CliktCommand(name = "stop") {
-    private val force by option(help = "Stop even while jobs run; they end and become lost").flag()
+    private val force by option(help = "Stop even while jobs run that the next daemon cannot take over; every running job ends and becomes lost").flag()
 
     override fun help(context: Context) = "Stop the background daemon; the desktop app leaves it stopped until `start`."
 

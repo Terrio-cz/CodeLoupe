@@ -122,7 +122,9 @@ class SlotQueueTest {
             waitFor(daemon, blocker) { it.status == JobStatus.RUNNING }
             val (q1, q2, q3) = listOf("exit=0", "exit=7", "exit=0").map { submit(daemon, "print=queued", "sleep=1500", it, slot = "line", env = mapOf("JOB_SECRET" to "v1")) }
             assertEquals(200, post(daemon, "/jobs/$q3/move", buildJsonObject { put("first", true) }).first)
-            assertEquals(1, daemon.jobs.atRisk(), "only the running job would be lost by a stop")
+            // On Windows the running job would outlive the stop (CL-244); this stop ends it on purpose, so it holds no slot after.
+            val windows = System.getProperty("os.name").lowercase().startsWith("windows")
+            assertEquals(if (windows) 0 else 1, daemon.jobs.atRisk(), "only a running job that cannot be taken over would be lost by a stop")
 
             val current = AtomicReference(daemon)
             // The waiter `job wait` uses, its polls cut short; it meets the daemon gone and starting again.
@@ -130,7 +132,7 @@ class SlotQueueTest {
                 JobWaiter({ path -> get(current.get(), path.replace("timeoutSec=300", "timeoutSec=2")) }, retryMs = 100).wait(q2)
             }
             Thread.sleep(500)
-            daemon.stop()
+            daemon.stop(force = true)
             daemon = start(home, port)
             current.set(daemon)
 
@@ -191,7 +193,7 @@ class SlotQueueTest {
         try {
             body(daemon)
         } finally {
-            daemon.stop()
+            daemon.stop(force = true)
         }
     }
 

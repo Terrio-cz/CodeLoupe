@@ -61,10 +61,18 @@ codeloupe job move J261007-142240-k3m9 --first               # or --before <id> 
   `job wait` on one of them returns its real result. A running job whose process is still the one it started (same pid and
   start time) is taken over: it keeps its slot, its end is recorded with its exit code (on Windows; elsewhere only the parent
   can read it, so it ends as `lost`) and its completion steps run. A running job whose process is gone, and a queued one whose
-  launch could not be stored (no OS key store) or read, is reported `lost` with its log kept. On Windows a job's process
-  ends with the daemon that started it (kill-on-close job object), so only queued jobs outlive a daemon there.
-  `codeloupe stop` refuses while a job runs or a queued one has no stored launch (`--force` ends them, they become `lost`);
-  queued jobs alone do not hold it back.
+  launch could not be stored (no OS key store) or read, is reported `lost` with its log kept.
+- **Restart on Windows**: a running job outlives a stop, a crash or an update of its daemon. The daemon sits in a
+  kill-on-close job object, so the parse worker, git and build tools it starts end with it; a job breaks away from it into a
+  kill-on-close job object of its own, which a small PowerShell watcher keeps open while the job runs (`survivesRestart` in the
+  job's record, `GET /jobs/<id>`). The watcher also writes the job's exit code to `<home>/jobs/<id>.exit`: a job that ends while no daemon
+  runs is recorded by the next daemon with that code, and its completion steps run then. Whatever ends the watcher ends the
+  job, so a job never runs on without an owner. Cancel and `stop --force` end the job's whole tree, after a takeover as well.
+  What a job leaves running (a Gradle daemon) stays until its daemon stops, or, for a job that was taken over, until the job
+  ends. A job that could not get its own job object (the OS refused) ends with the daemon, as before.
+- **Stop**: `codeloupe stop` (and the app's restart and update) refuses only while a job runs that the next daemon cannot
+  take over (any running job outside Windows) or one has no stored launch; `--force` ends every running job, which become
+  `lost`. Queued jobs, and on Windows running ones, do not hold it back.
 - **Cancel**: `job cancel <id>` ends the live job of the chain and its whole process tree; after a cancel no job steps run,
   `notify` and `webhook` steps still do.
 - **Completion actions** (`--then` after success, `--on-failure` after a failure, in order): a closed set of typed

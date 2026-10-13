@@ -30,6 +30,8 @@ data class JobRecord(
     val pid: Long? = null,
     /** Start time of [pid], so a restarted daemon never kills an unrelated process that reused the pid. */
     val pidStart: String? = null,
+    /** Its process runs on when the daemon stops, for the next daemon to take over (Windows: its own job object and exit watcher). */
+    val survivesRestart: Boolean = false,
     val summary: JobSummary? = null,
     /** When the end of its chain wakes the agent; the `job.finished` event carries the outcome as `wake`. */
     val wakeOn: Wake,
