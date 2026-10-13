@@ -45,6 +45,8 @@ export interface ClaudeStatus {
   mcpVia: 'user' | 'plugin' | null;
   /** Version of the installed plugin, which has its own numbering (not the app's). */
   pluginVersion: string | null;
+  /** Version of the plugin this app ships (stamped with the app's version at build time); null in a development run, where the plugin is unversioned. */
+  bundledPluginVersion: string | null;
 }
 
 export interface ClaudeConnectResult {

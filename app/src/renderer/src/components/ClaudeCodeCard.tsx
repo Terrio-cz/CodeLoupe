@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ClaudeConnectKind, ClaudeStatus } from '../../../shared/ipc';
 import { bridge } from '../api';
-import { Card, Toast } from './Parts';
+import { pluginVersionState, PLUGIN_REFRESH_COMMAND } from '../../../shared/pluginVersion';
+import { Banner, Card, Toast } from './Parts';
 
 const yes = (ok: boolean, on: string, off: string) => (ok ? `${on} ✓` : off);
 // The claude CLI answers in a second or two; until then a quiet word, not an ellipsis that looks like a value.
 const Checking = () => <span className="muted">checking…</span>;
+
+/** Says so when the installed plugin is at another version than the one this app ships, with the commands that refresh it (CL-255). */
+export function PluginVersionNotice({ status }: { status: ClaudeStatus }) {
+  if (!status.plugin || pluginVersionState(status.pluginVersion, status.bundledPluginVersion) !== 'differs') return null;
+  return (
+    <Banner>
+      Installed plugin v{status.pluginVersion} differs from the v{status.bundledPluginVersion} this app ships. To refresh it, run{' '}
+      <code className="mono">{PLUGIN_REFRESH_COMMAND}</code> and restart Claude Code.
+    </Banner>
+  );
+}
 
 /** "Connect to Claude Code": adds the MCP server or installs the plugin through the claude CLI after a native confirmation. */
 export function ClaudeCodeCard() {
@@ -40,6 +52,7 @@ export function ClaudeCodeCard() {
         <dt>claude command</dt><dd>{status ? (status.cli ? 'found ✓' : 'not found — run the commands below by hand') : <Checking />}</dd>
         <dt>MCP server</dt><dd>{status ? (status.mcpVia === 'plugin' ? 'provided by the plugin ✓' : yes(status.mcp, 'added', 'not added')) : <Checking />}</dd>
         <dt>Plugin</dt><dd>{status ? yes(status.plugin, `installed${status.pluginVersion ? ` (plugin v${status.pluginVersion})` : ''}`, 'not installed') : <Checking />}</dd>
+        {status?.bundledPluginVersion && <><dt>Plugin in this app</dt><dd>v{status.bundledPluginVersion}</dd></>}
       </dl>
       <p className="t2">
         The plugin adds the MCP server, a skill, and starts the daemon when a session starts. The MCP server alone is the simpler option,
@@ -51,10 +64,11 @@ export function ClaudeCodeCard() {
       </div>
       {status?.plugin && (
         <p className="t2 muted">
-          The plugin already provides the MCP server, with the daemon token; a second, standalone entry would be a duplicate. The plugin has its own
-          version number, independent of the app's.
+          The plugin already provides the MCP server, with the daemon token; a second, standalone entry would be a duplicate.
+          A release stamps the app's version on the plugin it ships.
         </p>
       )}
+      {status && <PluginVersionNotice status={status} />}
       {message && <Toast>{message}</Toast>}
       {manual.length > 0 && <pre className="mono">{manual.join('\n')}</pre>}
     </Card>

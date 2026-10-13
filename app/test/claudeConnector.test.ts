@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
-  ClaudeConnector, commandLines, execClaude, findClaude, findMarketplace, mcpUrl, type ClaudeRunner, type RunResult,
+  ClaudeConnector, commandLines, execClaude, findClaude, findMarketplace, mcpUrl, readBundledPluginVersion, type ClaudeRunner, type RunResult,
 } from '../src/main/claude/ClaudeConnector';
 
 const ok = (stdout = ''): RunResult => ({ code: 0, stdout, stderr: '' });
@@ -84,14 +84,43 @@ describe('ClaudeConnector', () => {
 
   it('reports the plugin version and counts its MCP server as added', async () => {
     const f = fake({ 'plugin list': ok(JSON.stringify([{ id: 'codeloupe@codeloupe', version: '0.1.1' }])), 'mcp get': { code: 1, stdout: '', stderr: '' } });
-    expect(await new ClaudeConnector(f.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: true, mcpVia: 'plugin', pluginVersion: '0.1.1' });
+    expect(await new ClaudeConnector(f.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: true, mcpVia: 'plugin', pluginVersion: '0.1.1', bundledPluginVersion: null });
   });
 
   it('reads the status from mcp get and plugin list', async () => {
     const f = fake({ 'plugin list': ok(JSON.stringify([{ id: 'codeloupe@codeloupe' }])), 'mcp get': { code: 1, stdout: '', stderr: '' } });
-    expect(await new ClaudeConnector(f.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: true, mcpVia: 'plugin', pluginVersion: null });
+    expect(await new ClaudeConnector(f.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: true, mcpVia: 'plugin', pluginVersion: null, bundledPluginVersion: null });
     const none = fake({ 'plugin list': ok('[]') });
-    expect(await new ClaudeConnector(none.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: false, mcpVia: 'user', pluginVersion: null });
+    expect(await new ClaudeConnector(none.run, () => null).status()).toEqual({ cli: true, mcp: true, plugin: false, mcpVia: 'user', pluginVersion: null, bundledPluginVersion: null });
+  });
+});
+
+describe('the version of the plugin the app ships', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-bundled-'));
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const write = (name: string, manifest: object, entry: object = {}) => {
+    const root = path.join(dir, name);
+    fs.mkdirSync(path.join(root, '.claude-plugin'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'plugin', '.claude-plugin'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.claude-plugin', 'marketplace.json'), JSON.stringify({ name: 'codeloupe', plugins: [{ name: 'codeloupe', source: './plugin', ...entry }] }));
+    fs.writeFileSync(path.join(root, 'plugin', '.claude-plugin', 'plugin.json'), JSON.stringify({ name: 'codeloupe', ...manifest }));
+    return root;
+  };
+
+  it('reads plugin.json, then the marketplace entry, and none when the plugin is unversioned or the folder is not one', () => {
+    expect(readBundledPluginVersion(write('stamped', { version: '0.1.9' }))).toBe('0.1.9');
+    expect(readBundledPluginVersion(write('entry', {}, { version: '0.1.8' }))).toBe('0.1.8');
+    expect(readBundledPluginVersion(write('dev', {}))).toBeNull();
+    expect(readBundledPluginVersion(path.join(dir, 'missing'))).toBeNull();
+    expect(readBundledPluginVersion(null)).toBeNull();
+  });
+
+  it('is part of the status, also without a claude command', async () => {
+    const marketplace = write('status', { version: '0.1.9' });
+    const f = fake({ 'plugin list': ok(JSON.stringify([{ id: 'codeloupe@codeloupe', version: '0.1.1' }])), 'mcp get': { code: 1, stdout: '', stderr: '' } });
+    expect(await new ClaudeConnector(f.run, () => marketplace).status()).toMatchObject({ plugin: true, pluginVersion: '0.1.1', bundledPluginVersion: '0.1.9' });
+    const missing: ClaudeRunner = async () => { throw new Error('claude not found'); };
+    expect(await new ClaudeConnector(missing, () => marketplace).status()).toMatchObject({ cli: false, bundledPluginVersion: '0.1.9' });
   });
 });
 
@@ -127,7 +156,7 @@ describe.skipIf(!findClaude(process.env))('Connect on a clean profile (real clau
   const connector = new ClaudeConnector(execClaude(env), () => marketplace);
 
   it('starts with nothing connected', async () => {
-    expect(await connector.status()).toEqual({ cli: true, mcp: false, plugin: false, mcpVia: null, pluginVersion: null });
+    expect(await connector.status()).toEqual({ cli: true, mcp: false, plugin: false, mcpVia: null, pluginVersion: null, bundledPluginVersion: null });
   });
 
   it('adds the MCP server, and again with another port', async () => {

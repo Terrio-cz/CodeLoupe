@@ -90,8 +90,12 @@ project need no card; their commits are listed under *Other*. See [CONTRIBUTING.
 
 The tag's version goes into Gradle (`-PreleaseVersion`: jar name, `build.properties`, `codeloupe --version`, `/status`,
 the bundle name) and into the app (`electron-builder -c.extraMetadata.version`: installer names, Settings → Version,
-the sidebar). The installer smoke test of a release checks all of them (`--expect-version`). A development build has
-Gradle version `0.1.0` and the app's `package.json` version.
+the sidebar). The same version is stamped into the Claude Code plugin the installer ships (every `plugin.json` under
+`resources/claude-plugin`, and a marketplace entry that carries a version) by the `afterPack` hook
+(`app/scripts/plugin-version.mjs`), because Claude Code offers a plugin update only when its version changes
+([Claude Code integration](Claude-Code-integration#plugin-version-and-updates)). The installer smoke test of a release checks all
+of them (`--expect-version`). A development build has Gradle version `0.1.0`, the app's `package.json` version, and
+the same version in the plugin it packs; the plugin in the repository has no version.
 
 ### Package-manager manifests
 

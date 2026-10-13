@@ -69,8 +69,9 @@ export class ClaudeConnector {
   }
 
   async status(): Promise<ClaudeStatus> {
+    const bundledPluginVersion = readBundledPluginVersion(this.marketplace());
     const version = await this.run(['--version']).catch(() => null);
-    if (!version || version.code !== 0) return { cli: false, mcp: false, plugin: false, mcpVia: null, pluginVersion: null };
+    if (!version || version.code !== 0) return { cli: false, mcp: false, plugin: false, mcpVia: null, pluginVersion: null, bundledPluginVersion };
     const [mcp, plugins] = await Promise.all([
       this.run(['mcp', 'get', SERVER_NAME]).catch(() => null),
       this.run(['plugin', 'list', '--json']).catch(() => null),
@@ -84,6 +85,7 @@ export class ClaudeConnector {
       plugin: plugin !== null,
       mcpVia: standalone ? 'user' : plugin ? 'plugin' : null,
       pluginVersion: plugin?.version ?? null,
+      bundledPluginVersion,
     };
   }
 
@@ -138,7 +140,22 @@ function findPlugin(json: string): { version: string | null } | null {
   }
 }
 
-const lastLine = (s: string) => s.trim().split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? 'failed';
+/** The version the plugin of a marketplace folder carries (its plugin.json, else its marketplace entry), or null when unversioned or unreadable. */
+export function readBundledPluginVersion(marketplaceDir: string | null): string | null {
+  if (!marketplaceDir) return null;
+  try {
+    const marketplace = JSON.parse(fs.readFileSync(path.join(marketplaceDir, '.claude-plugin', 'marketplace.json'), 'utf8')) as { plugins?: { name?: string; source?: string; version?: unknown }[] };
+    const entry = marketplace.plugins?.find(p => p.name === SERVER_NAME);
+    if (!entry || typeof entry.source !== 'string') return null;
+    const manifest = JSON.parse(fs.readFileSync(path.join(marketplaceDir, entry.source, '.claude-plugin', 'plugin.json'), 'utf8')) as { version?: unknown };
+    const version = manifest.version ?? entry.version;
+    return typeof version === 'string' && version ? version : null;
+  } catch {
+    return null;
+  }
+}
+
+const lastLine =(s: string) => s.trim().split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? 'failed';
 
 /**
  * `claude` is a real executable on a native install (~/.local/bin/claude[.exe], also on PATH). An npm install is a
