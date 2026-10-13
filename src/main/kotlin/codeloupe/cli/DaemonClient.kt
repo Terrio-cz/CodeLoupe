@@ -85,7 +85,7 @@ class DaemonClient(private val config: Config, private val launcher: (() -> Unit
         // Its own home as working directory: the daemon outlives the CLI and must not hold the user's directory.
         val args = listOf("daemon", "--detached", "--home", config.home.toString(), "--port", config.port.toString()) +
             config.defaultRoot?.let { listOf("--root", it) }.orEmpty()
-        val jvm = DaemonJvm.args(parsesHere = config.parseWorkerIdleSeconds <= 0) + AotCaches.fromProperty()?.daemonFlags().orEmpty()
+        val jvm = DaemonJvm.args(parsesHere = config.parseWorkerIdleSeconds <= 0) + AotCaches.fromProperty(config.home)?.daemonFlags().orEmpty()
         DetachedStart.start(JavaProcess.command(MAIN_CLASS, jvm, args), config.home)
     }
 
