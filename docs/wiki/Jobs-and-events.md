@@ -75,7 +75,7 @@ codeloupe job move J261007-142240-k3m9 --first               # or --before <id> 
 - **Wake**: the last `job.finished` of a chain carries `wake` — by default true only when something failed if the job
   declared `--then` steps, else always (`--wake always|failure|never`). A launcher subscribed to `job.finished` /
   `job.notify` resumes a headless session only when `wake` is true; `--tag` (default `CODELOUPE_JOB_TAG`) tells it which.
-- MCP: one tool, `job` (`action` start / status / cancel / slots / move); waiting is the CLI's job. In the desktop app the Jobs screen shows states, slots and holders, live logs and webhooks ([Desktop app](Desktop-app)).
+- MCP: one tool, `job` (`action` start / status / cancel / slots / move); waiting is the CLI's job. In the desktop app the Jobs screen shows states, slots with capacity (in force and configured), holders and the queue with wait times, live logs and webhooks, and sets a slot's capacity and moves a waiting job up or down (`job slots set`, `job move`; [Desktop app](Desktop-app)).
 
 ## Events
 

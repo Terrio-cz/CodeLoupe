@@ -5,7 +5,7 @@ branches and worktrees with their changed declarations and callers, workspaces w
 they hold, YouTrack tasks from the mirror, jobs with their slots and webhooks, the cost of agent runs from the transcripts,
 index health, gaps, the shared-memory brain of each workspace (topics, entries, search), environment keys and settings. A tray icon shows the daemon state, RSS and queue; the app starts the
 daemon when it is down, and it sends notifications for budget breaches, finished builds, new gaps and daemon outages. It reads;
-the only things it changes are a released workspace and a confirmed cleanup, after a native confirmation. It does not follow
+the only things it changes are a released workspace and a confirmed cleanup, after a native confirmation, and on the Jobs screen a slot's capacity and the order of its queue. It does not follow
 what an agent is doing now; the launcher does that. Spec: [../docs/ui-spec.md](../docs/ui-spec.md).
 
 ## Requirements
@@ -63,6 +63,7 @@ Verification modes (development builds only):
 - The Environment screen writes the encrypted store only through main: the page sends a value once from a password field (emptied on submit), main hands it to `<cli> env set` on stdin, and no answer, log or argument carries it. Delete, replacing sources and roll back are confirmed in a native dialog. "Copy" exists only where the OS can ask the user to authenticate again (Touch ID on macOS); elsewhere a value cannot be copied out at all.
 - Workspaces actions (release a worktree, confirm a cleanup) change the real daemon only after main has checked the request against the daemon's own registry and plan and the user said yes in a native dialog that lists what goes; the page never sends a path to delete, only plan keys.
 - The first-run onboarding writes through main only: the folder dialog is native, the chosen paths go to `<cli> repos add`, the YouTrack step is the Accounts flow (token on stdin into the store), and the trial query is `<cli> outline` on a repository the daemon lists.
+- Jobs actions (a slot's capacity, moving a waiting job in its slot's queue) are undoable, so there is no dialog; main checks the request against the daemon's own `GET /jobs/slots` (a known slot, a whole number 1 to 64, a job that waits, a target in the same slot) and a running job never moves.
 - Job logs: the page names a job id; main reads only `<home>/jobs/<id>.log` of a finished job, strips terminal codes and masks credential-looking values. The live event stream is opened while the Jobs screen is open and passes on only the event type and job id.
 - The Accounts screen changes `<home>/accounts.json` (names, folders, URLs) and puts a YouTrack token into the store through `<cli> env set` on stdin; the connection test reads the token back from the daemon in main, sends it only to the instance's own URL (redirects are not followed) and answers with a sentence. Removing an entry, adding or removing a YouTrack account (the daemon restarts) are confirmed in a native dialog.
 - Settings → Claude Code runs the `claude` CLI (no shell, fixed argv: `mcp add|remove`, `plugin marketplace add`, `plugin install`) only after a native confirmation that lists the commands; the page cannot click it, and the app never writes Claude Code's files itself. See the wiki, https://github.com/Terrio-cz/CodeLoupe/wiki/Claude-Code-integration.
