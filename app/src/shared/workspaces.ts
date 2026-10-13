@@ -73,7 +73,7 @@ export interface ResourceReport {
 }
 
 export type Verdict = 'auto' | 'confirm' | 'keep' | 'protected';
-export type TargetKind = 'container' | 'network' | 'volume' | 'image' | 'directory';
+export type TargetKind = 'process' | 'container' | 'network' | 'volume' | 'image' | 'worktree' | 'directory';
 
 export interface PlanEntry {
   /** `<kind>:<id>` (volumes by name, directories by path): what a confirmation names. */

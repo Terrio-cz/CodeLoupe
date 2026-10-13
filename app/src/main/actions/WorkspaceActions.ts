@@ -40,14 +40,14 @@ export class WorkspaceActions {
 
     const plan = await this.daemon.get<ReconcilePlan>('/reconcile');
     const own = plan.entries.filter(e => e.workspace?.toLowerCase() === found.name.toLowerCase() && sameRepo(e, registry, repo));
-    const stack = own.filter(e => e.verdict !== 'protected' && e.kind !== 'directory');
+    const stack = own.filter(e => e.verdict !== 'protected' && e.kind !== 'directory' && e.kind !== 'worktree');
     const ok = await this.confirm({
       message: `Release workspace ${found.name}?`,
       detail: [
         stack.length ? `The daemon removes its Docker resources (${stack.length}):` : 'The workspace has no Docker resources; it is only marked as released.',
         ...listing(stack),
         '',
-        'The worktree directory, branch and task do not change. Removal is retried while a resource is in use.',
+        'Once its branch is merged into the default branch and nothing in it is changed, the worktree and its branch go too; the task does not change. Removal is retried while a resource is in use.',
       ].join('\n'),
       accept: 'Release',
     });
