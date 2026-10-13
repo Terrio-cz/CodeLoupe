@@ -7,6 +7,7 @@ import codeloupe.tracker.Trackers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.nio.file.Path
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -55,6 +56,16 @@ class BrainService(
         val index = indexes.get(root(request.workspace))
         val context = if (request.files.isEmpty()) CodeContext.NONE else code.of(request.codeRoot ?: index.info.canonicalRepo, request.files)
         return BrainRankResult(sections = BrainRanker(index).rank(request, context), code = context.takeIf { request.files.isNotEmpty() }?.summary())
+    }
+
+    /** Where findings pile up for the files a task will touch: a score per file and module with the entries behind it ([BrainRisk]). */
+    suspend fun risk(request: RiskRequest, now: Instant = Instant.now()): RiskResult {
+        val index = indexes.get(root(request.workspace))
+        val at = request.asOf?.let { BrainRisk.instantOf(it) ?: throw IllegalArgumentException("asOf is not a date or date-time: ${request.asOf}") } ?: now
+        val files = request.files.map { it.trim() }.filter { it.isNotEmpty() }.take(MAX_RISK_FILES)
+        require(files.isNotEmpty()) { "pass files: the paths the task will touch" }
+        val context = code.of(request.codeRoot ?: index.info.canonicalRepo, files, declarationsOnly = true)
+        return BrainRisk(index).score(request.copy(files = files), context, at)
     }
 
     suspend fun resolve(request: ResolveRequest): ResolveResult {
@@ -125,5 +136,6 @@ class BrainService(
 
     private companion object {
         const val BACKFILL_EVERY_MS = 15 * 60 * 1000L
+        const val MAX_RISK_FILES = 200
     }
 }

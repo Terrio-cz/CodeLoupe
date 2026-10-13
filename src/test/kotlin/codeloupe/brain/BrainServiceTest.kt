@@ -103,6 +103,19 @@ class BrainServiceTest {
     }
 
     @Test
+    fun `an entry a landed check covers leaves the ranking, and with all asked it names the check`() {
+        world.export(
+            entries = listOf(
+                entry("f-cover001", "total adds tax before rounding", files = listOf("billing/.../Billing.kt")).copy(superseded = true, coveredBy = "TER-9@abc1234"),
+                entry("f-live0001", "total adds tax before rounding twice", files = listOf("billing/.../Billing.kt")),
+            ),
+        )
+        assertEquals(listOf("f-live0001"), ids(rank(listOf(BILLING), listOf("total")).getValue("facts")), "the covered entry is not briefed")
+        val all = runBlocking { world.service.rank(BrainRankRequest(world.workspace.toString(), files = listOf(BILLING), terms = listOf("total"), all = true)) }.sections.getValue("facts")
+        assertEquals("TER-9@abc1234", all.hits.single { it.id == "f-cover001" }.coveredBy)
+    }
+
+    @Test
     fun `the answer says what the code index found, and a limit reports how many more matched`() {
         world.export(entries = (1..6).map { entry("f-many000$it", "total adds tax before rounding $it", files = listOf("billing/.../Billing.kt")) })
         val result = runBlocking {

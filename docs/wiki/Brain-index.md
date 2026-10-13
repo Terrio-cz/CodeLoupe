@@ -17,11 +17,26 @@ The workspace's `brain/workspace.json` names its code repository (`canonicalRepo
 |---|---|
 | `brain_brief` | the start of a role: state, settled findings, the task's notes, decisions on the code and the facts the role reads, as the JSON of `brain.mjs brief --json` |
 | `brain_search` | whole entries for words and files, same ranking |
+| `brain_risk` | where findings pile up in the files a task will touch: a score per file and module with the entries behind it (below) |
 
 The tools are offered only when a brain workspace is registered. Upkeep is the engine's: `node brain/brain.mjs hygiene` lists near-duplicate entries (merge proposals), dangling
 anchors and anchors that followed a move for a nightly review (the daemon adds the code side); nothing is rewritten.
 
 `symbol` and `context` end with one line when entries are anchored on the declaration they answer for: `brain: 3 on Billing.total — f-3fa9… TER-5 finding: …`.
+
+## Risk map
+
+`brain_risk` (`POST /brain/risk`, `node brain/brain.mjs risk <files> --json`) answers "where did earlier tasks find problems in the code I am about to touch" with numbers an
+orchestrator can compare. It counts the `!P<n>` lines of task notes and the findings and gotchas of the workspace facts; facts and decisions say what is true, not where
+code broke. An entry weighs its severity (`P0` 10, `P1` 6, `P2` 3, `P3` 1, a fixed `x` finding 1, a gotcha 1) times `0.5^(age / half-life)` (60 days; an undated entry counts as
+one half-life old). A **file** scores the entries tied to it: a file it names or a `@file:` anchor (the index resolves a bare name to the path), or a symbol the code index
+finds in the file. A **module** scores the entries tied to the module plus those tied to a requested file in it, each once. `max` and `level` (`none`, `low`, `medium` from 4,
+`high` from 12) are the heaviest file's; module density is reported beside it, never folded in, because a big module is always dense. Every score lists its entries (heaviest first,
+`limit` of them, the rest as a count) with the whole text, the task, the weight and what tied them (`file`, `symbol`, `module`).
+
+The engine passes the workspace's `workspace.json` `risk` block (`halfLifeDays`, `levels`, `weights`) with the request, so the weights are the workspace's, not CodeLoupe's. `as_of` / `asOf` scores
+a past day and leaves out entries written later, which is how a rule is replayed over old tasks before it is switched on. A superseded entry, or one a landed automated check covers
+(`coveredBy`), weighs nothing. Without the daemon the engine scores by the files the entries name; the answer says which (`source`).
 
 ## Ranking
 

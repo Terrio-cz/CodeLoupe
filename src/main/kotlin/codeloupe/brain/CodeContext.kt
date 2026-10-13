@@ -14,6 +14,8 @@ class CodeContext(
     val taskIds: Set<String> = emptySet(),
     val notes: List<String> = emptyList(),
     val root: String? = null,
+    /** The names of [symbolKeys] by file, so a score can say which file a symbol belongs to. */
+    val symbolKeysByPath: Map<String, Set<String>> = emptyMap(),
 ) {
     val paths: List<String> = files.map { it.path }
     val modules: Set<String> = files.map { it.module.lowercase() }.filter { it.isNotEmpty() }.toSet()

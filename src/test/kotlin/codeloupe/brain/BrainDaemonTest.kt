@@ -138,6 +138,44 @@ class BrainDaemonTest {
     }
 
     @Test
+    fun `risk scores the files over HTTP and refuses a stranger, an unknown workspace and a bad request`() {
+        writeExport(listOf(entry("f-risk0001", "!P2 total drops the remainder", task = "TER-5", files = listOf("billing/.../Billing.kt:3"), at = "2026-10-13T12:00")))
+        fun body(files: List<String>, asOf: String = "2026-10-13T12:00:00Z") = buildJsonObject {
+            put("workspace", workspace.toString())
+            put("files", buildJsonArray { files.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
+            put("asOf", asOf)
+        }
+        val ok = post("/brain/risk", body(listOf(BILLING)))
+        assertEquals(200, ok.statusCode(), ok.body())
+        val answer = Json.parseToJsonElement(ok.body()).jsonObject
+        val file = answer["files"]!!.jsonArray.single().jsonObject
+        assertEquals(3.0, file["score"]!!.jsonPrimitive.content.toDouble())
+        assertEquals("f-risk0001", file["entries"]!!.jsonArray.single().jsonObject["id"]!!.jsonPrimitive.content)
+        assertEquals("billing", answer["modules"]!!.jsonArray.single().jsonObject["module"]!!.jsonPrimitive.content)
+        assertEquals(401, post("/brain/risk", body(listOf(BILLING)), token = false).statusCode())
+        assertEquals(404, post("/brain/risk", buildJsonObject { put("workspace", "C:/nowhere"); put("files", buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive(BILLING)) }) }).statusCode())
+        assertEquals(400, post("/brain/risk", body(emptyList())).statusCode())
+        assertEquals(400, post("/brain/risk", body(listOf(BILLING), asOf = "last week")).statusCode())
+    }
+
+    @Test
+    fun `brain_risk starts the workspace engine with the files as separate words`() {
+        val text = tool(
+            "brain_risk",
+            buildJsonObject {
+                put("workspace", workspace.toString())
+                put("files", buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("--who")); add(kotlinx.serialization.json.JsonPrimitive(BILLING)) })
+                put("as_of", "2026-10-13")
+                put("limit", 3)
+            },
+        )
+        val echoed = Json.parseToJsonElement(text).jsonObject
+        assertEquals(listOf("risk", "who", BILLING, "--limit", "3", "--as-of", "2026-10-13", "--json"), echoed["args"]!!.jsonArray.map { it.jsonPrimitive.content })
+        assertEquals(port.toString(), echoed["port"]!!.jsonPrimitive.content)
+        assertContains(tool("brain_risk", buildJsonObject { put("workspace", workspace.toString()); put("files", buildJsonArray { }) }), "pass files")
+    }
+
+    @Test
     fun `symbol and context add the brain line for an anchored declaration once the index is built`() {
         writeExport(listOf(entry("f-symb0001", "total adds the tax twice when rate is 21", task = "TER-5", kind = "finding", anchors = listOf("@sym:com.example.billing.Billing.total"))))
         post("/brain/rank", buildJsonObject { put("workspace", workspace.toString()); put("terms", buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("total")) }) })
@@ -156,7 +194,7 @@ class BrainDaemonTest {
             const a = process.argv.slice(2);
             import fs from 'node:fs';
             if (a[0] === 'export') process.stdout.write(fs.readFileSync('brain/export.json', 'utf8'));
-            else if (a[0] === 'brief') console.log(JSON.stringify({ args: a, port: process.env.CODELOUPE_PORT, home: process.env.CODELOUPE_HOME }));
+            else if (a[0] === 'brief' || a[0] === 'risk') console.log(JSON.stringify({ args: a, port: process.env.CODELOUPE_PORT, home: process.env.CODELOUPE_HOME }));
             else process.exit(2);
         """.trimIndent()
     }

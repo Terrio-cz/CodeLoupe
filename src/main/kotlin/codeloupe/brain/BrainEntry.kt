@@ -24,6 +24,8 @@ data class BrainEntry(
     val anchors: List<String> = emptyList(),
     val supersedes: List<String> = emptyList(),
     val superseded: Boolean = false,
+    /** The automated check that landed for what this entry says (CL-235): the entry is then `superseded` and left out of briefs and risk. */
+    val coveredBy: String? = null,
     /** Set on a ranked hit: the sum of the signals below. */
     val score: Int? = null,
     /** Set on a ranked hit: what tied it to the question (`file`, `symbol`, `caller`, `task`, `module`, `text`, `feedback`). */
