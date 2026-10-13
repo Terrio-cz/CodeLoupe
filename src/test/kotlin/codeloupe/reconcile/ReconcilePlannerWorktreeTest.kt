@@ -114,6 +114,16 @@ class ReconcilePlannerWorktreeTest {
     }
 
     @Test
+    fun `a repository that names its worktree roots gets only the worktrees under them removed`() {
+        val repo = RepoWorkspaces(
+            "C:/ws/Terrio", "Terrio", "C:/ws/Terrio/.git", "origin/main", listOf("C:/wt"), emptyMap(),
+            listOf(worktree("TER-15"), worktree("old-tool", task = null, path = "C:/hub/repos/old-tool"), worktree("TER-16", path = "C:/wtx/TER-16")),
+        )
+        val plan = planner().plan(emptyList(), WorkspaceList("now", listOf(repo))).map { it.workspace }
+        assertEquals(listOf("TER-15"), plan)
+    }
+
+    @Test
     fun `a protect rule keeps a worktree`() {
         val p = ReconcilePlanner(ReconcileConfig(graceMinutes = 60, protect = listOf(ProtectRule(Regex("^TER-12$")))), { _, _ -> null }) { now }
             .plan(emptyList(), registry(worktree("TER-12")))

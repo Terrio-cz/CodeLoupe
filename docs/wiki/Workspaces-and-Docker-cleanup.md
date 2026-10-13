@@ -150,7 +150,7 @@ so anchor them) against each name of a resource and its compose project; without
 | landed, its task resolved (or no task id), no git activity for `graceMinutes` | `auto` |
 | landed, its task still open | `confirm` |
 | a process or a running container still works in it; landed less than `graceMinutes` ago | `keep` |
-| active, abandoned, the main checkout, Claude Code's own worktrees under `.claude/worktrees/` | not planned |
+| active, abandoned, the main checkout, Claude Code's own worktrees under `.claude/worktrees/`, a worktree outside the repository's `roots` (when it names any) | not planned |
 
 These `auto` entries run unattended (on start, after a job, on the interval) unless `"worktrees": false`, whatever `auto`
 says. Removal is `git worktree remove` without `--force`: a worktree whose HEAD moved since the plan, that is locked
