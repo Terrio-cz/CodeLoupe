@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 /** Payloads of the job events. The event bus scrubs them; records hold no environment values to begin with. */
 object JobEvents {
@@ -46,5 +47,12 @@ object JobEvents {
         put("ok", record.ok)
         put("wake", true)
         put("text", JobReport.text(chain))
+    }
+
+    /** `job move`: the job that moved and the new order of its slot's queue. */
+    fun reordered(id: String, slot: String, waiting: List<String>) = buildJsonObject {
+        put("id", id)
+        put("slot", slot)
+        putJsonArray("waiting") { waiting.forEach { add(JsonPrimitive(it)) } }
     }
 }
