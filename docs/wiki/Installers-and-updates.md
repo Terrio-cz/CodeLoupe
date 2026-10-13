@@ -46,9 +46,11 @@ by itself). What happens next depends on the installation:
 | Windows installer (NSIS), Linux AppImage | Downloaded in the background, the SHA-512 and size from the release's `latest.yml` / `latest-linux.yml` checked (and, once the build embeds the project's update key, the signature of that feed, [Security](Security#how-far-the-updater-is-trusted)), then **Restart and update** in Settings (or the next quit) installs it. The installer stops the daemon of the old installation and replaces its files; settings (`%APPDATA%\codeloupe-desktop`), secrets, task mirror and indexes (the daemon's home) are not touched, and the new app starts the daemon from the new bundle. An index written in an older format is rebuilt, never served. |
 | macOS, Linux `.deb`, a Windows copy unpacked by Scoop | Only a notification and **Open release page** in Settings: macOS cannot update an app that has no Developer ID signature (nothing is paid for, [docs/code-signing.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/docs/code-signing.md)), the package manager owns the other two. Install the new version the way you installed this one. |
 
-The first run of a new version is watched: the daemon of the new bundle has 90 seconds to answer. If it does not, the
+The release list is GitHub's `releases.atom`, which also names the tag of a release that is still a draft or of a bare tag. The app takes the newest entry that is newer than the running version **and has a `latest.yml`**, so such an entry is skipped until it is published; only a failure other than a missing file (no network, a server error) fails the check.
+
+The first run of a new version is watched: the daemon of the new bundle has 90 seconds to answer, and longer while the app is still starting it (up to five minutes); a daemon of an older build that holds the port is restarted up to three times. If it does not answer, the
 previous bundle (kept in `<app data>/update/previous` while the update was pending, about 190 MB, deleted once the new
-daemon has answered) runs instead, Settings says so, and the next update tries again. Privacy: the app asks only
+daemon has answered) runs instead, Settings says so, and the next update tries again. The rollback is not final: when the daemon of that version answers `/status` later, the message goes and the shipped bundle runs again. Privacy: the app asks only
 `github.com/Terrio-cz/CodeLoupe` (the releases feed and the files of one release), with the User-Agent `CodeLoupe`, English as
 the language, no cookies, no account and no identifier; the installer is verified against the SHA-512 in the release before it
 runs. Pre-release versions follow each other only when the number after the dot grows (`v1.0.0-rc.1`, `rc.2`, `rc.10`); an rc

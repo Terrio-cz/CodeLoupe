@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { HttpStatusError } from '../src/main/update/ReleaseFeed';
 import { UpdateService, type UpdateDeps, type UpdateEngine } from '../src/main/update/UpdateService';
 
 const atom = (...tags: string[]) => tags.map(t => `href="https://github.com/Terrio-cz/CodeLoupe/releases/tag/${t}"`).join('\n');
@@ -28,7 +29,7 @@ describe('UpdateService', () => {
     const seen: string[] = [];
     service.on('state', s => seen.push(s.phase));
     const state = await service.check();
-    expect(asked).toEqual(['https://github.com/Terrio-cz/CodeLoupe/releases.atom']);
+    expect(asked).toEqual(['https://github.com/Terrio-cz/CodeLoupe/releases.atom', 'https://github.com/Terrio-cz/CodeLoupe/releases/download/v0.9.0-rc.2/latest.yml']);
     expect(engine.download).toHaveBeenCalledWith('https://github.com/Terrio-cz/CodeLoupe/releases/download/v0.9.0-rc.2/', expect.any(Function));
     expect(deps.beforeInstall).toHaveBeenCalledWith('0.9.0-rc.2');
     expect(seen).toEqual(['checking', 'downloading', 'downloading', 'ready']);
@@ -117,6 +118,39 @@ describe('UpdateService', () => {
   it('does not run two checks at once', async () => {
     const { service, asked } = setup();
     await Promise.all([service.check(), service.check()]);
-    expect(asked.length).toBe(1);
+    expect(asked.length).toBe(2);
+  });
+
+  // CL-254: GitHub's atom feed lists the tag of a release that is still a draft; its latest.yml is a 404.
+  describe('with a draft or a bare tag newer than the newest published release', () => {
+    const draftFeed = (published: string[]) => async (url: string) => {
+      if (url.endsWith('.atom')) return atom('v0.1.8', 'v0.1.7', 'v0.1.6', 'v0.1.4');
+      const tag = /\/download\/(v[^/]+)\//.exec(url)?.[1] ?? '';
+      if (!published.includes(tag)) throw new HttpStatusError(404, 'github.com');
+      return 'version: x';
+    };
+
+    it('downloads the newest published release and reports no error', async () => {
+      const { service, engine } = setup({ current: '0.1.4', fetchText: draftFeed(['v0.1.6', 'v0.1.4']) }, '0.1.6');
+      expect(await service.check()).toMatchObject({ phase: 'ready', latest: '0.1.6', message: null });
+      expect(engine.download).toHaveBeenCalledWith('https://github.com/Terrio-cz/CodeLoupe/releases/download/v0.1.6/', expect.any(Function));
+    });
+
+    it('is up to date when only the drafts are newer', async () => {
+      const { service, engine } = setup({ current: '0.1.6', fetchText: draftFeed(['v0.1.6']) }, null);
+      expect(await service.check()).toMatchObject({ phase: 'idle', latest: null, message: null });
+      expect(engine.download).not.toHaveBeenCalled();
+    });
+
+    it('names the newest published release where the installation only notifies', async () => {
+      const { service } = setup({ current: '0.1.4', mode: { kind: 'notify', reason: 'macOS' }, engine: null, fetchText: draftFeed(['v0.1.6']) });
+      expect(await service.check()).toMatchObject({ phase: 'available', latest: '0.1.6', releaseUrl: 'https://github.com/Terrio-cz/CodeLoupe/releases/tag/v0.1.6' });
+    });
+
+    it('still fails the check on a broken connection or a server error, not only a 404', async () => {
+      const down = async (url: string) => { if (url.endsWith('.atom')) return atom('v0.1.8'); throw new HttpStatusError(503, 'github.com'); };
+      const { service } = setup({ current: '0.1.4', fetchText: down });
+      expect(await service.check()).toMatchObject({ phase: 'error', message: 'github.com: HTTP 503' });
+    });
   });
 });

@@ -74,14 +74,15 @@ export function setupUpdates(w: UpdateWiring): Updates {
     }
   });
 
-  const usesBundle = !!w.shipped && !w.inForce && w.store.get().cliCommand === w.shipped.command;
+  // A rollback in force runs the previous bundle: the guard still needs the shipped one, to go back to it when its daemon answers.
+  const usesBundle = !!w.shipped && (!!w.inForce || w.store.get().cliCommand === w.shipped.command);
   const guard = new UpdateGuard({
     version: w.version,
     shipped: usesBundle ? w.shipped : null,
     files,
     manager: w.manager,
     useBundle: bundle => w.store.setBundled(bundle),
-    onRollback: record => service.setRollback(rollbackOf(record)),
+    onRollback: record => service.setRollback(record && rollbackOf(record)),
     tell: message => w.notifier.info('Daemon update', message, '#/settings'),
   });
   if (w.packaged) guard.watch();
