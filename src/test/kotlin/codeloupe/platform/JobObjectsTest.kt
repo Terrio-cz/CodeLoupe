@@ -15,6 +15,7 @@ class JobObjectsTest {
         assumeTrue(!NativeCalls.isWindows, "Windows has job objects")
         assertEquals(false, JobObjects.enterSelf())
         assertNull(JobObjects.forProcess(ProcessHandle.current().pid()))
+        assertNull(JobObjects.killOnClose())
     }
 
     @Test
