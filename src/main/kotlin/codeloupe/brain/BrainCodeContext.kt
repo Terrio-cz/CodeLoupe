@@ -19,11 +19,12 @@ import kotlinx.coroutines.withTimeout
  * cannot be read becomes a note, never an error, so ranking falls back to text.
  */
 class BrainCodeContext(private val registry: Registry, private val trackers: Trackers, private val timeoutMs: Long = 6_000) {
-    suspend fun of(codeRoot: String?, files: List<String>): CodeContext {
+    /** [declarationsOnly] skips the callers and the task history: what a score needs is each file's names and module. */
+    suspend fun of(codeRoot: String?, files: List<String>, declarationsOnly: Boolean = false): CodeContext {
         if (files.isEmpty()) return CodeContext.NONE
         val root = codeRoot?.takeIf { it.isNotBlank() } ?: return CodeContext.unavailable("no code root: workspace.json has no canonicalRepo and none was given")
         return try {
-            withTimeout(timeoutMs) { build(root, files.distinct().take(MAX_FILES)) }
+            withTimeout(timeoutMs) { build(root, files.distinct().take(MAX_FILES), declarationsOnly) }
         } catch (e: TimeoutCancellationException) {
             CodeContext.unavailable("the code index of $root did not answer in ${timeoutMs / 1000} s; ranked by text")
         } catch (e: CancellationException) {
@@ -35,17 +36,17 @@ class BrainCodeContext(private val registry: Registry, private val trackers: Tra
 
     private class Read(val path: String, val module: String, val decls: Int, val keys: Set<String>, val callers: Map<String, Int>)
 
-    private suspend fun build(root: String, files: List<String>): CodeContext {
+    private suspend fun build(root: String, files: List<String>, declarationsOnly: Boolean): CodeContext {
         val location = registry.locate(root)
         val prefix = location.worktree.replace('\\', '/').trimEnd('/') + "/"
         val reads = registry.query(root, speculative = false) { view ->
             val finder = lazy { UsageFinder(view) }
-            files.mapIndexedNotNull { i, raw -> read(view, finder, relative(raw, prefix), withCallers = i < MAX_CALLER_FILES) }
+            files.mapIndexedNotNull { i, raw -> read(view, finder, relative(raw, prefix), withCallers = !declarationsOnly && i < MAX_CALLER_FILES) }
         }
         val notes = ArrayList<String>()
         val missing = files.size - reads.size
         if (missing > 0) notes += "$missing of ${files.size} file(s) are not in the code index of $root"
-        val tasks = tasksTouching(root, reads.map { it.path }, notes)
+        val tasks = if (declarationsOnly) Tasks(emptySet(), emptyMap()) else tasksTouching(root, reads.map { it.path }, notes)
         val facts = reads.map { CodeFileFacts(it.path, it.module, it.decls, it.callers.size, tasks.byPath[it.path].orEmpty().toList().sorted()) }
         return CodeContext(
             files = facts,
@@ -54,6 +55,7 @@ class BrainCodeContext(private val registry: Registry, private val trackers: Tra
             taskIds = tasks.all,
             notes = notes,
             root = root,
+            symbolKeysByPath = reads.associate { it.path to it.keys },
         )
     }
 

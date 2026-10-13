@@ -18,10 +18,11 @@ import kotlinx.serialization.json.put
  * The brain index behind the daemon token like every route that is not a read-only code query. All of them name the workspace by its directory, which
  * must be a registered brain.
  * `POST /brain/rank`: [BrainRankRequest] -> [BrainRankResult]. `POST /brain/resolve`: [ResolveRequest] -> [ResolveResult].
- * `POST /brain/hygiene` and `POST /brain/backfill`: `{"workspace": "..."}` -> [HygieneReport] / [BackfillResult].
+ * `POST /brain/risk`: [RiskRequest] -> [RiskResult]. `POST /brain/hygiene` and `POST /brain/backfill`: `{"workspace": "..."}` -> [HygieneReport] / [BackfillResult].
  */
 fun Route.brainRoutes(service: BrainService) {
     post("/brain/rank") { call.answering { respond(BrainRankResult.serializer(), service.rank(body(BrainRankRequest.serializer()))) } }
+    post("/brain/risk") { call.answering { respond(RiskResult.serializer(), service.risk(body(RiskRequest.serializer()))) } }
     post("/brain/resolve") { call.answering { respond(ResolveResult.serializer(), service.resolve(body(ResolveRequest.serializer()))) } }
     post("/brain/hygiene") { call.answering { respond(HygieneReport.serializer(), service.hygiene(body(WorkspaceRequest.serializer()).workspace)) } }
     post("/brain/backfill") { call.answering { respond(BackfillResult.serializer(), service.backfill(body(WorkspaceRequest.serializer()).workspace)) } }
