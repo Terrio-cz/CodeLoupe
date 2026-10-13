@@ -620,10 +620,20 @@ pre.mono { background: var(--surface-2); padding: 10px 12px; border-radius: var(
 
 /* ── Jobs: slots, chains, logs (CL-89) ──────────────────────────────────── */
 .slots { list-style: none; margin: 0; padding: 0; }
-.slots li { display: grid; grid-template-columns: 130px 44px 120px 1fr; gap: 12px; align-items: center; min-height: 40px; padding: 4px 16px; border-bottom: 1px solid var(--border); }
-.slots li:last-child { border-bottom: 0; }
+.slots li { padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.slots > li:last-child { border-bottom: 0; }
+.slot-head { display: grid; grid-template-columns: 130px 44px 120px 1fr; gap: 4px 12px; align-items: center; min-height: 32px; }
 .slots .meter { margin: 0; }
-.slots .holders { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.slots .holders { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding-left: 142px; min-height: 24px; }
+.slots .held { white-space: nowrap; }
+.capacity { display: flex; gap: 8px; align-items: center; justify-self: end; }
+.capacity .input { min-width: 0; width: 72px; }
+.capacity .input[aria-invalid='true'] { border-color: var(--critical); }
+.queue { list-style: none; margin: 4px 0 0; padding: 0 0 0 142px; }
+.slots .queue li { display: flex; gap: 10px; align-items: center; min-height: 32px; padding: 0; border: 0; border-top: 1px solid var(--border); }
+.queue .num { width: 24px; }
+.queue .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue .wait { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chain { list-style: none; margin: 0; padding: 0; }
 .chain li { display: flex; gap: 10px; align-items: baseline; min-height: 30px; border-bottom: 1px solid var(--border); padding: 4px 6px; border-radius: 0; }
 .chain li[aria-current='true'] { background: var(--accent-weak); box-shadow: inset 2px 0 0 var(--accent); }

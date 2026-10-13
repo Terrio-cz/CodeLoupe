@@ -423,7 +423,7 @@ Workspaces                                 [Repo ▾] [State ▾] [🔍 search] 
 ### 3.7b Jobs (CL-89)
 
 Joby daemonu (`codeloupe job start`): co běží, co čeká na slot, co skončilo a jak, a webhooky, které o tom dostaly zprávu.
-Jen čtení; obrazovka se obnovuje z proudu událostí daemonu.
+Čtení, plus dvě vratné akce nad sloty (kapacita, pořadí fronty); obrazovka se obnovuje z proudu událostí daemonu.
 
 ```
 Jobs                                       [Status ▾] [🔍 search job, command, tag]  Last 12 jobs · live
@@ -438,7 +438,15 @@ Jobs                                       [Status ▾] [🔍 search job, comman
 
 - Stavy jobu: **waiting for slot X** (bez slotu **starting**), **running**, **done** (exit 0), **failed (exit N)**, **denied** politikou, **cancelled**,
   **lost** (daemon se zastavil, než skončil), **error** (program nešel spustit). Stav je slovo + tečka, ne jen barva.
-- **Sloty** jsou z `/status` `jobs.slots`: kapacita, kdo slot drží (běžící joby) a kdo čeká ve frontě, s proklikem na job.
+- **Sloty** jsou z `/status` `jobs.slots` (CL-243, CL-245). Řádek slotu: jméno, `použito/kapacita` s měřidlem a pod tím odkud kapacita je
+  (`configured N` z `config.json`, `not in config.json: default 1`, `configured 4, 2 in force`, nebo varování, že `config.json` má
+  hodnotu, která není kladné celé číslo a daemon ji ignoruje). Pod tím kdo slot drží (job · štítek, **for 2 min**) a **fronta**
+  jako číslovaný seznam, první v řadě nahoře, u každého jobu **waiting 14 min** (z `since`, tiká s hodinami; bez časů od staršího
+  daemonu se zobrazí `—`).
+- **Kapacita**: číselné pole (1–64) a **Set** u každého slotu → `POST /jobs/slots/{name}`; uloží se do `config.json` a platí hned
+  (zvýšení spustí čekající joby, snížení nikoho nezabije). Po úspěchu se stav načte znovu a pod seznamem je jedna věta s výsledkem.
+- **Pořadí fronty**: u čekajícího jobu tlačítka **↑** a **↓** (první nemá ↑, poslední ↓) → `POST /jobs/{id}/move`
+  (`first` při posunu z druhého místa, jinak `before` / `after` sousedního jobu). Běžící job je jen v „held by“ a posun nenabízí.
 - **Live**: main otevře `GET /events/stream` (SSE, navazuje po posledním `Last-Event-ID`, znovu se připojuje s prodlevou
   1 → 15 s), jen dokud je obrazovka otevřená; stránka dostane jen typ události a id jobu (ne data) a po 200 ms bez další
   události načte joby, sloty a doručení znovu. Bez proudu (mock) se běžící joby obnovují po 10 s.
@@ -1071,7 +1079,7 @@ rssMb, buildRssMb }], processes: [{ pid, startMs, kind: 'gradle-daemon' | 'gradl
 commandLine (maskovaná, ≤ 300 znaků), cwd, rssMb, repo, workspace, workspaceState, path, via: 'cwd' | 'last build' | 'command line', busy }], problems }`.
 V plánu `GET /reconcile` jsou build daemony jako položky `kind: 'process'` s klíčem `process:<pid>:<start>`.
 
-Zápisy (`POST /workspaces/release`, `POST /reconcile/run`) renderer nikdy nevolá; viz § 10. Mimo `api` jdou ještě dva
+Zápisy (`POST /workspaces/release`, `POST /reconcile/run`, `POST /jobs/slots/{name}`, `POST /jobs/{id}/move`) renderer nikdy nevolá; viz § 10. Mimo `api` jdou ještě dva
 stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 3.7b) a `live.subscribe` (proud událostí).
 
 ### 9.17 Zdroje dat a implementace
@@ -1132,6 +1140,10 @@ stálé kanály main procesu: `jobs.log(id)` (konec logu dokončeného jobu, § 
     (worktree musí být v registru, role `worktree`; klíče musí být v plánu s verdiktem `confirm`), ukáže nativní
     potvrzovací dialog s tím, co se změní, a teprve pak volá daemon (`POST` s hlavičkou `x-codeloupe`, bez `Origin`).
     Bez důvěryhodného daemonu a v mock režimu se neprovedou.
+  - **Akce Jobs** (CL-245): `slotCapacity({ name, capacity })` (`POST /jobs/slots/{name}`, celé číslo 1–64, slot musí být v `GET /jobs/slots`)
+    a `jobMove({ id, to: 'first' | 'before' | 'after', target? })` (`POST /jobs/{id}/move`; job musí čekat v některém slotu a
+    `target` ve stejném slotu). Jsou vratné (kapacitu lze vrátit, job posunout zpět), proto bez nativního dialogu; main je
+    ověří proti `GET /jobs/slots` a běžící job se nikdy nehne.
   - `env.*` (§ 3.7.1, CL-54) — se stejnou kontrolou odesílatele a vlastní validací; potvrzení mazání a nahrazení zdrojů dělá nativní dialog main procesu.
   - `open.worktree` a `open.external` jen když `/status.pid` odpovídá `daemon.json` (§ 8) — cizí proces na
     portu nic neotevře; `open.config` skládá cestu lokálně a kontrolu nepotřebuje.

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Delivery, JobLogText, JobRecord, SlotSnapshot, Webhook } from '../../../shared/jobs';
+import { MAX_SLOT_CAPACITY, type ActionOutcome, type JobMoveRequest } from '../../../shared/actions';
+import type { Delivery, JobLogText, JobRecord, SlotEntry, SlotSnapshot, Webhook } from '../../../shared/jobs';
 import { bridge, useApi } from '../api';
 import { DataTable, type Column } from '../components/DataTable';
 import { Drawer } from '../components/Drawer';
@@ -8,8 +9,9 @@ import { Card, Empty, ErrorState, KpiTile, Loading, Search, Section, Select } fr
 import { StatusBadge } from '../components/StatusBadge';
 import { ago, dateTime, ms, num } from '../format';
 import { useSettings } from '../hooks';
-import { deliveryLabel, deliveryTone, isActive, jobCounts, jobStatus, matches, maskUrl, shorten, slotLoad, stepLabel, type JobFilter } from '../jobModel';
+import { deliveryLabel, capacitySource, deliveryTone, entrySeconds, isActive, jobCounts, jobStatus, matches, maskUrl, moveStep, sameCapacity, shorten, slotEntries, slotLoad, stepLabel, waitLabel, type JobFilter } from '../jobModel';
 import { go, type Route } from '../router';
+import { useAction } from '../useAction';
 import { useLive, useNow } from '../useLive';
 
 const FILTERS: { value: JobFilter; label: string }[] = [
@@ -95,9 +97,7 @@ export function Jobs({ route }: { route: Route }) {
 
       <Card title="Slots and who holds them" bodyClass="">
         {slots.length === 0 ? <Empty icon="jobs">The daemon has no slots (every job runs right away).</Empty> : (
-          <ul className="slots" aria-label="Slots">
-            {slots.map(s => <SlotRow key={s.name} slot={s} byId={byId} />)}
-          </ul>
+          <SlotList slots={slots} byId={byId} now={now} onChanged={() => { status.reload(); jobs.reload(); }} />
         )}
       </Card>
 
@@ -120,19 +120,98 @@ export function Jobs({ route }: { route: Route }) {
   );
 }
 
-function SlotRow({ slot, byId }: { slot: SlotSnapshot; byId: Map<string, JobRecord> }) {
+/** The slots with their capacity control and queue; the outcome of the last change shows once, under the list. */
+export function SlotList({ slots, byId, now, onChanged }: { slots: SlotSnapshot[]; byId: Map<string, JobRecord>; now: number; onChanged(): void }) {
+  const action = useAction();
+  const run = async (fn: () => Promise<ActionOutcome>) => {
+    const r = await action.run(fn);
+    if (r?.ok) onChanged();
+  };
+  return (
+    <>
+      <ul className="slots" aria-label="Slots">
+        {slots.map(s => (
+          <SlotRow key={s.name} slot={s} byId={byId} now={now} busy={action.busy}
+            setCapacity={capacity => void run(() => bridge().actions.slotCapacity({ name: s.name, capacity }))}
+            move={req => void run(() => bridge().actions.jobMove(req))} />
+        ))}
+      </ul>
+      {action.outcome && <div className={`banner${action.outcome.ok ? ' info' : ''}`} role="status" style={{ margin: 12 }}>{action.outcome.message}</div>}
+    </>
+  );
+}
+
+interface SlotRowProps {
+  slot: SlotSnapshot;
+  byId: Map<string, JobRecord>;
+  now: number;
+  busy: boolean;
+  setCapacity(capacity: number): void;
+  move(req: JobMoveRequest): void;
+}
+
+function SlotRow({ slot, byId, now, busy, setCapacity, move }: SlotRowProps) {
   const { used } = slotLoad(slot);
-  const link = (id: string) => <button key={id} className="link mono" onClick={() => go('jobs', id)} title={byId.get(id)?.command}>{id}{byId.get(id)?.tag ? ` · ${byId.get(id)!.tag}` : ''}</button>;
+  const { holders, queue } = slotEntries(slot);
+  const source = capacitySource(slot);
+  const link = (id: string) => <button className="link mono" onClick={() => go('jobs', id)} title={byId.get(id)?.command}>{id}{byId.get(id)?.tag ? ` · ${byId.get(id)!.tag}` : ''}</button>;
+  const time = (e: SlotEntry) => (e.since ? waitLabel(entrySeconds(e, now)) : '—');
   return (
     <li>
-      <span className="mono name">{slot.name}</span>
-      <span className="num" aria-label={`${used} of ${slot.capacity} taken`}>{used}/{slot.capacity}</span>
-      <span className={`meter${used >= slot.capacity && slot.waiting.length > 0 ? ' over' : ''}`} role="meter" aria-valuemin={0} aria-valuemax={slot.capacity} aria-valuenow={used} aria-label={`Slot ${slot.name}`}><span style={{ width: `${(used / slot.capacity) * 100}%` }} /></span>
-      <span className="holders">
-        {slot.running.length === 0 ? <span className="muted">free</span> : <>held by: {slot.running.map(link)}</>}
-        {slot.waiting.length > 0 && <> · {slot.waiting.length} waiting: {slot.waiting.map(link)}</>}
-      </span>
+      <div className="slot-head">
+        <span className="mono name">{slot.name}</span>
+        <span className="num" aria-label={`${used} of ${slot.capacity} taken`}>{used}/{slot.capacity}</span>
+        <span className={`meter${used >= slot.capacity && queue.length > 0 ? ' over' : ''}`} role="meter" aria-valuemin={0} aria-valuemax={slot.capacity} aria-valuenow={used} aria-label={`Slot ${slot.name}`}><span style={{ width: `${Math.min(100, (used / slot.capacity) * 100)}%` }} /></span>
+        <CapacityControl slot={slot} busy={busy} onSet={setCapacity} />
+        {source.text && <span className={source.warn ? 'chip warn' : 'muted'} style={{ gridColumn: '2 / -1' }}>{source.text}</span>}
+      </div>
+      <div className="holders">
+        {holders.length === 0 ? <span className="muted">free</span> : (
+          <>held by: {holders.map(h => <span key={h.id} className="held">{link(h.id)} <span className="muted">for {time(h)}</span></span>)}</>
+        )}
+      </div>
+      {queue.length > 0 && (
+        <ol className="queue" aria-label={`Waiting for ${slot.name}`}>
+          {queue.map((e, i) => {
+            const up = moveStep(queue, i, -1);
+            const down = moveStep(queue, i, 1);
+            return (
+              <li key={e.id}>
+                <span className="num muted">{i + 1}.</span>
+                <span className="grow">{link(e.id)}</span>
+                <span className="wait" title={e.since ? `waiting since ${dateTime(e.since)}` : undefined}>waiting {time(e)}</span>
+                <span className="row-actions">
+                  <button className="btn ghost icon-only" disabled={busy || !up} onClick={() => up && move(up)} aria-label={`Move ${e.id} up`} title="Move up">↑</button>
+                  <button className="btn ghost icon-only" disabled={busy || !down} onClick={() => down && move(down)} aria-label={`Move ${e.id} down`} title="Move down">↓</button>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </li>
+  );
+}
+
+/** A number field and a Set button: the capacity is stored in the daemon's `config.json` and is in force at once. */
+function CapacityControl({ slot, busy, onSet }: { slot: SlotSnapshot; busy: boolean; onSet(capacity: number): void }) {
+  const [draft, setDraft] = useState(String(slot.capacity));
+  // The slot changes under the field (another window, a config edit): follow it unless the person is typing something else.
+  const last = useRef(slot.capacity);
+  useEffect(() => {
+    setDraft(d => (d === String(last.current) ? String(slot.capacity) : d));
+    last.current = slot.capacity;
+  }, [slot.capacity]);
+  const value = Number(draft);
+  const valid = draft.trim() !== '' && Number.isInteger(value) && value >= 1 && value <= MAX_SLOT_CAPACITY;
+  const submit = () => { if (valid && !sameCapacity(slot, value)) onSet(value); };
+  return (
+    <form className="capacity" onSubmit={e => { e.preventDefault(); submit(); }}>
+      <label className="muted" htmlFor={`cap-${slot.name}`}>Capacity</label>
+      <input id={`cap-${slot.name}`} className="input" type="number" min={1} max={MAX_SLOT_CAPACITY} step={1} value={draft} disabled={busy}
+        aria-invalid={!valid} onChange={e => setDraft(e.target.value)} />
+      <button type="submit" className="btn" disabled={busy || !valid || sameCapacity(slot, value)}>{busy ? 'Setting…' : 'Set'}</button>
+    </form>
   );
 }
 

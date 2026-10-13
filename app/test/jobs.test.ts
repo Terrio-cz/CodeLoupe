@@ -8,7 +8,7 @@ import { MockJobs } from '../src/main/api/mockJobs';
 import { JobLogReader } from '../src/main/jobs/JobLogReader';
 import { redactLine } from '../src/main/jobs/redact';
 import { EventStream } from '../src/main/live/EventStream';
-import { deliveryLabel, isActive, jobCounts, jobStatus, maskUrl, matches, stepLabel } from '../src/renderer/src/jobModel';
+import { capacitySource, sameCapacity, deliveryLabel, entrySeconds, isActive, jobCounts, jobStatus, maskUrl, matches, moveStep, slotEntries, stepLabel, waitLabel } from '../src/renderer/src/jobModel';
 import type { JobRecord, LiveEvent } from '../src/shared/jobs';
 
 const mock = new MockJobs(Date.parse('2026-10-08T12:00:00Z'));
@@ -55,6 +55,63 @@ describe('job model', () => {
     expect(chain.done).toBe(true);
     expect(chain.exit).toBe(1);
     expect(mock.chain('nope')).toBeNull();
+  });
+});
+
+describe('slot model', () => {
+  const now = Date.parse('2026-10-08T12:00:00Z');
+  const gradle = () => mock.status({}).jobs!.slots[0];
+
+  it('gives the mock slot its holders and a queue in which the first in line has waited longest', () => {
+    const slot = gradle();
+    expect(slot.running).toEqual(['J20261008-K2QF']);
+    expect(slot.queue!.map(e => e.id)).toEqual(slot.waiting);
+    const waits = slot.queue!.map(e => entrySeconds(e, now));
+    expect(waits).toEqual([870, 372]);
+    expect(waits[0]).toBeGreaterThan(waits[1]);
+    expect(entrySeconds(slot.holders![0], now)).toBe(144);
+  });
+
+  it('counts a wait from since, falls back to the daemon seconds, and writes it in the unit it is felt in', () => {
+    expect(entrySeconds({ id: 'x', since: new Date(now - 90_000).toISOString(), seconds: 1 }, now)).toBe(90);
+    expect(entrySeconds({ id: 'x', since: new Date(now + 5_000).toISOString(), seconds: 1 }, now)).toBe(0);
+    expect(entrySeconds({ id: 'x', since: '', seconds: 33 }, now)).toBe(33);
+    expect([5, 59, 60, 725, 3600, 7500].map(waitLabel)).toEqual(['5 s', '59 s', '1 min', '12 min', '1 h', '2 h 5 min']);
+  });
+
+  it('shows the entries of a daemon that sends only ids without times', () => {
+    expect(slotEntries({ name: 's', capacity: 1, running: ['a'], waiting: ['b', 'c'] })).toEqual({
+      holders: [{ id: 'a', since: '', seconds: 0 }], queue: [{ id: 'b', since: '', seconds: 0 }, { id: 'c', since: '', seconds: 0 }],
+    });
+  });
+
+  it('says where the capacity comes from: config.json, the default, a value that is ignored', () => {
+    const base = { name: 's', capacity: 2, running: [], waiting: [] };
+    expect(capacitySource({ ...base, configured: 2 })).toEqual({ text: 'configured 2', warn: false });
+    expect(capacitySource({ ...base, configured: null, capacity: 1 })).toEqual({ text: 'not in config.json: default 1', warn: false });
+    expect(capacitySource({ ...base, configured: 4 })).toEqual({ text: 'configured 4, 2 in force', warn: true });
+    // The daemon sends the invalid value as it reads in config.json, quotes included.
+    const invalid = { ...base, configured: null, invalid: '"many"', capacity: 1 };
+    expect(capacitySource(invalid).warn).toBe(true);
+    expect(capacitySource(invalid).text).toBe('config.json has "many", not a positive whole number: ignored, 1 in force');
+    expect(capacitySource(base).text).toBe('');
+  });
+
+  it('lets the capacity be set again when only config.json differs (a value the daemon ignored)', () => {
+    const base = { name: 's', capacity: 1, running: [], waiting: [] };
+    expect(sameCapacity({ ...base, configured: null, invalid: '"many"' }, 1)).toBe(false);
+    expect(sameCapacity({ ...base, configured: 1 }, 1)).toBe(true);
+    expect(sameCapacity({ ...base, configured: 2, capacity: 2 }, 1)).toBe(false);
+    expect(sameCapacity(base, 1)).toBe(true);
+  });
+
+  it('moves a job one place: up to the front from second place, before the one above, after the one below, nowhere at the ends', () => {
+    const q = ['a', 'b', 'c'].map(id => ({ id, since: '', seconds: 0 }));
+    expect(moveStep(q, 0, -1)).toBeNull();
+    expect(moveStep(q, 1, -1)).toEqual({ id: 'b', to: 'first' });
+    expect(moveStep(q, 2, -1)).toEqual({ id: 'c', to: 'before', target: 'b' });
+    expect(moveStep(q, 0, 1)).toEqual({ id: 'a', to: 'after', target: 'b' });
+    expect(moveStep(q, 2, 1)).toBeNull();
   });
 });
 

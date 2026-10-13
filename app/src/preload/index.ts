@@ -44,6 +44,8 @@ const bridge: CodeLoupeBridge = {
   actions: {
     workspaceRelease: req => ipcRenderer.invoke(ACTION_CH.workspaceRelease, req),
     reconcileRun: req => ipcRenderer.invoke(ACTION_CH.reconcileRun, req),
+    slotCapacity: req => ipcRenderer.invoke(ACTION_CH.slotCapacity, req),
+    jobMove: req => ipcRenderer.invoke(ACTION_CH.jobMove, req),
   },
   jobs: {
     log: id => ipcRenderer.invoke(JOB_CH.log, id),
