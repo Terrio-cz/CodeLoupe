@@ -28,6 +28,7 @@ const state = (phase: DaemonState['phase'], version?: string, over: Partial<Daem
 class FakeManager extends EventEmitter implements GuardedManager {
   current: DaemonState = state('unknown');
   restart = vi.fn(async () => this.current);
+  check = vi.fn(async () => this.current);
   push(s: DaemonState): void { this.current = s; this.emit('state', s); }
 }
 
@@ -47,7 +48,7 @@ describe('UpdateDir', () => {
 });
 
 describe('UpdateGuard', () => {
-  async function guard(opts: { pending?: boolean; withPrevious?: boolean; timeoutMs?: number } = {}) {
+  async function guard(opts: { pending?: boolean; withPrevious?: boolean; timeoutMs?: number; maxWaitMs?: number; restartPauseMs?: number } = {}) {
     const root = tmp();
     const files = new UpdateDir(path.join(root, 'update'));
     if (opts.withPrevious !== false) await files.snapshot(makeBundle(path.join(root, 'old'), '0.9.0-rc.1'), '0.9.0-rc.1');
@@ -59,7 +60,7 @@ describe('UpdateGuard', () => {
     const rolledBack: unknown[] = [];
     const g = new UpdateGuard({
       version: '0.9.0-rc.2', shipped, files, manager,
-      useBundle: b => used.push(b), onRollback: r => rolledBack.push(r), tell: m => told.push(m), timeoutMs: opts.timeoutMs ?? 90_000,
+      useBundle: b => used.push(b), onRollback: r => rolledBack.push(r), tell: m => told.push(m), timeoutMs: opts.timeoutMs ?? 90_000, maxWaitMs: opts.maxWaitMs, restartPauseMs: opts.restartPauseMs,
     });
     return { g, files, manager, shipped, used, told, rolledBack };
   }
@@ -148,5 +149,111 @@ describe('UpdateGuard', () => {
     await vi.waitFor(() => expect(told).toHaveLength(1));
     expect(used).toEqual([]);
     expect(manager.restart).not.toHaveBeenCalled();
+  });
+
+  // CL-254: the first start after an update can take minutes; the guard follows the real daemon, not a fixed deadline.
+  describe('a slow first start', () => {
+    it('waits past the deadline while the daemon is still being started, and succeeds when it answers', async () => {
+      vi.useFakeTimers();
+      try {
+        const { g, manager, files, rolledBack } = await guard({ timeoutMs: 5_000, maxWaitMs: 120_000 });
+        g.watch();
+        manager.push(state('starting'));
+        await vi.advanceTimersByTimeAsync(65_000);
+        expect(rolledBack).toHaveLength(0);
+        expect(files.readPending()).not.toBeNull();
+        manager.push(state('running', '0.9.0-rc.2'));
+        expect(files.readPending()).toBeNull();
+        expect(files.readRollback()).toBeNull();
+        await vi.advanceTimersByTimeAsync(300_000);
+        expect(rolledBack).toHaveLength(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('takes the daemon that answers at the deadline even when no state event came', async () => {
+      vi.useFakeTimers();
+      try {
+        const { g, manager, files, rolledBack } = await guard({ timeoutMs: 5_000 });
+        g.watch();
+        manager.current = state('running', '0.9.0-rc.2');
+        await vi.advanceTimersByTimeAsync(5_001);
+        expect(files.readPending()).toBeNull();
+        expect(rolledBack).toHaveLength(0);
+        expect(manager.restart).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stops waiting at the limit', async () => {
+      vi.useFakeTimers();
+      try {
+        const { g, manager, rolledBack } = await guard({ timeoutMs: 5_000, maxWaitMs: 40_000 });
+        manager.restart.mockImplementationOnce(async () => { manager.current = state('running', '0.9.0-rc.1'); return manager.current; });
+        g.watch();
+        manager.push(state('starting'));
+        await vi.advanceTimersByTimeAsync(80_000);
+        expect(rolledBack).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('restarts an older daemon again when another build took the port back, up to three times', async () => {
+      vi.useFakeTimers();
+      try {
+        const { g, manager } = await guard({ restartPauseMs: 1_000 });
+        g.watch();
+        manager.push(state('running', '0.9.0-rc.1'));
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(manager.restart).toHaveBeenCalledTimes(3);
+        manager.push(state('running', '0.9.0-rc.1'));
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(manager.restart).toHaveBeenCalledTimes(3);
+        g.dispose();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('a rollback that was not needed', () => {
+    it('ends when the daemon of the failed version answers later: the message goes, the shipped bundle runs again', async () => {
+      const { g, manager, files, used, rolledBack } = await guard();
+      manager.restart.mockImplementationOnce(async () => { manager.current = state('running', '0.9.0-rc.1'); return manager.current; });
+      g.watch();
+      manager.emit('failed', 'late');
+      await vi.waitFor(() => expect(rolledBack).toHaveLength(1));
+      expect(files.readRollback()).not.toBeNull();
+      manager.push(state('running', '0.9.0-rc.2'));
+      expect(rolledBack).toHaveLength(2);
+      expect(rolledBack[1]).toBeNull();
+      expect(files.readRollback()).toBeNull();
+      expect(files.previousBundle()).toBeNull();
+      expect(used.map(b => b.version)).toEqual(['0.9.0-rc.1', '0.9.0-rc.2']);
+    });
+
+    it('ends at the next start of the app when the daemon of the failed version already runs', async () => {
+      const { g, manager, files, rolledBack, used } = await guard({ pending: false });
+      files.writeRollback({ failedVersion: '0.9.0-rc.2', usingVersion: '0.9.0-rc.1', reason: 'the daemon did not respond within 90 seconds', at: 'now' });
+      manager.current = state('running', '0.9.0-rc.2');
+      expect(g.watch()).toBe(false);
+      expect(files.readRollback()).toBeNull();
+      expect(rolledBack).toEqual([null]);
+      expect(used.map(b => b.version)).toEqual(['0.9.0-rc.2']);
+    });
+
+    it('keeps the rollback while the previous version is the one that runs', async () => {
+      const { g, manager, files, rolledBack } = await guard({ pending: false });
+      files.writeRollback({ failedVersion: '0.9.0-rc.2', usingVersion: '0.9.0-rc.1', reason: 'x', at: 'now' });
+      manager.current = state('running', '0.9.0-rc.1');
+      g.watch();
+      manager.push(state('running', '0.9.0-rc.1'));
+      expect(files.readRollback()).not.toBeNull();
+      expect(rolledBack).toEqual([]);
+      g.dispose();
+    });
   });
 });

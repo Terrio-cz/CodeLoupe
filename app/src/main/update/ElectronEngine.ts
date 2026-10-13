@@ -1,6 +1,7 @@
 import { AppImageUpdater, NsisUpdater, type AppUpdater } from 'electron-updater';
 import { net } from 'electron';
 import { signedFeedProvider } from './SignedFeedProvider';
+import { HttpStatusError } from './ReleaseFeed';
 import type { UpdateEngine } from './UpdateService';
 
 /** Sent instead of the per-installation id electron-updater makes up for staged roll-outs, which CodeLoupe never uses. */
@@ -11,7 +12,7 @@ const HEADERS = { 'User-Agent': 'CodeLoupe', 'Accept-Language': 'en' };
 /** Plain text of a URL, redirects followed, no cookies; throws unless the answer is 200. */
 export async function fetchText(url: string): Promise<string> {
   const res = await net.fetch(url, { credentials: 'omit', headers: { ...HEADERS, accept: 'application/atom+xml, text/plain' } });
-  if (!res.ok) throw new Error(`${new URL(url).host}: HTTP ${res.status}`);
+  if (!res.ok) throw new HttpStatusError(res.status, new URL(url).host);
   return res.text();
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { feedOverride } from '../src/main/update/feedOverride';
-import { findRelease, isReleasePage, newestRelease, releaseInfo, releaseTags } from '../src/main/update/ReleaseFeed';
+import { findRelease, HttpStatusError, isReleasePage, newerReleases, newestRelease, releaseInfo, releaseTags } from '../src/main/update/ReleaseFeed';
 import { detectMode } from '../src/main/update/updateMode';
 import { compareVersions, parseVersion } from '../src/main/update/versions';
 
@@ -49,8 +49,44 @@ describe('release feed', () => {
   it('asks only for the releases atom feed of the repository', async () => {
     const asked: string[] = [];
     const found = await findRelease('0.9.0-rc.1', async url => { asked.push(url); return atom('v0.9.0-rc.2'); });
-    expect(asked).toEqual(['https://github.com/Terrio-cz/CodeLoupe/releases.atom']);
+    expect(asked).toEqual(['https://github.com/Terrio-cz/CodeLoupe/releases.atom', 'https://github.com/Terrio-cz/CodeLoupe/releases/download/v0.9.0-rc.2/latest.yml']);
     expect(found?.tag).toBe('v0.9.0-rc.2');
+  });
+});
+
+describe('findRelease with unpublished entries (CL-254)', () => {
+  const feed = (missing: string[], failure: Error = new HttpStatusError(404, 'github.com')) => async (url: string) => {
+    if (url.endsWith('.atom')) return atom('v0.1.8', 'v0.1.7', 'v0.1.6', 'v0.1.4');
+    if (missing.some(t => url.includes(`/${t}/`))) throw failure;
+    return 'version: x';
+  };
+
+  it('orders the newer releases newest first', () => {
+    expect(newerReleases('0.1.4', ['v0.1.6', 'v0.1.8', 'v0.1.7', 'v0.1.4']).map(r => r.tag)).toEqual(['v0.1.8', 'v0.1.7', 'v0.1.6']);
+  });
+
+  it('skips a draft and a bare tag and returns the newest published release', async () => {
+    expect((await findRelease('0.1.4', feed(['v0.1.8', 'v0.1.7'])))?.tag).toBe('v0.1.6');
+  });
+
+  it('returns the newest release when it is published', async () => {
+    expect((await findRelease('0.1.4', feed([])))?.tag).toBe('v0.1.8');
+  });
+
+  it('finds nothing when every newer entry is unpublished', async () => {
+    expect(await findRelease('0.1.6', feed(['v0.1.8', 'v0.1.7']))).toBeNull();
+  });
+
+  it('does not hide a server error as an unpublished release', async () => {
+    await expect(findRelease('0.1.4', feed(['v0.1.8'], new HttpStatusError(500, 'github.com')))).rejects.toThrow('HTTP 500');
+    await expect(findRelease('0.1.4', feed(['v0.1.8'], new Error('net::ERR_INTERNET_DISCONNECTED')))).rejects.toThrow('ERR_INTERNET');
+  });
+
+  it('does not probe a local test feed', async () => {
+    const asked: string[] = [];
+    const found = await findRelease('0.1.4', async url => { asked.push(url); return atom('v99.0.0'); }, 'http://127.0.0.1:1/releases.atom');
+    expect(found?.tag).toBe('v99.0.0');
+    expect(asked).toEqual(['http://127.0.0.1:1/releases.atom']);
   });
 });
 
