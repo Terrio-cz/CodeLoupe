@@ -191,6 +191,8 @@ export interface TaskDetail extends TaskSummary {
   activity: { at: Iso; author: string; kind: 'created' | 'comment' | 'field' | 'state'; text: string }[];
   worktrees: WorktreeSummary[];
   mirror: { syncedAt: Iso; lastReadAt: Iso | null };
+  /** What the configured brains hold on the task (CL-248); empty when none has a file for it. */
+  brain: TaskBrain;
 }
 
 // § 9.11
@@ -403,6 +405,32 @@ export interface BrainTopicView { workspaceId: string; topic: string; bytes: num
 export interface BrainHit { where: string; topic?: string | null; task?: string | null; line?: number | null; text: string; hits: number }
 export interface BrainSearchView { workspaceId: string; terms: string[]; hits: BrainHit[]; more: number }
 
+// Task notes of the brains (CL-248): `brain/tasks/<id>.md`, read from the files and never waiting on a brain index.
+export interface BrainStateKey { key: string; value: string }
+export interface TaskBrainEntry {
+  /** The notation's kind: `=` evidence, `~` decision, `!P2` blocker, `?` unknown, `+` fact, `>` action, `->` handoff, `%` state, `@` context, `x` rejected; empty without one. */
+  marker: string; text: string; who: string; at: Iso; line: number;
+  /** Declined on purpose (`brain.mjs reject`). */
+  rejected: boolean;
+  /** An automated check landed for what the entry says. */
+  superseded: boolean; coveredBy: string | null;
+}
+export interface TaskBrainNotes {
+  workspaceId: string; workspace: string;
+  /** The state keys as the `%` lines left them (`plan`, `code`, `rev`, `test`, `round`, `land`, `merge`, `close`, `hold` ...). */
+  state: BrainStateKey[];
+  /** Newest first, at most 300. */
+  entries: TaskBrainEntry[];
+  entryCount: number; lastAt: Iso | null;
+  /** True while the brain index is not built: no entry is marked superseded yet. */
+  indexing: boolean;
+  /** Set when the file could not be read; the other fields are then empty. */
+  error: string | null;
+}
+export interface TaskBrain { brains: TaskBrainNotes[] }
+export interface BrainTask { id: string; lastAt: Iso | null; state: BrainStateKey[]; entries: number; /** The tracker mirror holds the task, so its detail opens. */ tracked: boolean }
+export interface BrainTasksView { workspaceId: string; tasks: BrainTask[] }
+
 /** Resource name → response type, for the typed client in the renderer. */
 export interface ResourceMap {
   nav: Nav;
@@ -425,6 +453,7 @@ export interface ResourceMap {
   brain: BrainView;
   'brain/:id/topic': BrainTopicView;
   'brain/:id/search': BrainSearchView;
+  'brain/:id/tasks': BrainTasksView;
   'status/history': ResourceSample[];
   workspaces: WorkspaceList;
   resources: ResourceReport;

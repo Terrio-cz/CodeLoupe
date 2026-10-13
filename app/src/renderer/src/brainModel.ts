@@ -1,4 +1,5 @@
-import type { BrainTopic } from '../../shared/contract';
+import type { BrainStateKey, BrainTopic } from '../../shared/contract';
+import type { Tone } from './components/StatusBadge';
 
 /** One line of the topic tree. `topic` is null for a group that exists only as the parent of subtopics. */
 export interface TreeRow {
@@ -52,4 +53,27 @@ export function errorTitle(code: string | null | undefined): string {
   if (code === 'node_missing') return 'Node.js was not found';
   if (code === 'timeout') return 'The brain did not answer in time';
   return 'The brain could not be read';
+}
+
+const TASK_MARK_LABEL: Record<string, string> = {
+  '=': 'evidence', '~': 'decision', '!': 'blocker', '?': 'unknown', '+': 'fact', '>': 'action', '->': 'handoff', '%': 'state', '@': 'context', x: 'rejected', '-': 'note',
+};
+
+/** The word for a task note's kind marker (`!P2` is a blocker of severity P2); a line without one is a note. */
+export function taskMarkLabel(marker: string): string {
+  if (/^!P\d$/.test(marker)) return `blocker ${marker.slice(1)}`;
+  return TASK_MARK_LABEL[marker] ?? 'note';
+}
+
+/** How a state key's value reads: `ok` and `ok@sha` are done, `fail` is broken, `wip` runs, `-` and `skip` are neutral, a hold is a warning. */
+export function stateTone(key: string, value: string): Tone {
+  if (key === 'hold') return value === '-' ? 'neutral' : 'warning';
+  if (key === 'round' || key === 'merge') return 'neutral';
+  const base = value.split('@')[0];
+  return base === 'ok' ? 'ok' : base === 'fail' || base === 'blocked' ? 'critical' : base === 'wip' ? 'running' : 'neutral';
+}
+
+/** The state in one line, `plan=ok code=wip`, for a table cell and for assistive technology. */
+export function stateText(state: BrainStateKey[]): string {
+  return state.map(s => `${s.key}=${s.value}`).join(' ');
 }

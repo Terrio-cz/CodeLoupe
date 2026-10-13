@@ -37,10 +37,11 @@ export class MockApi implements ApiSource {
   private readonly jobs: MockJobs;
   private readonly runs: MockRuns;
   private readonly commands: MockCommands;
-  private readonly brain = new MockBrain();
+  private readonly brain: MockBrain;
 
   constructor(now = Date.now()) {
     this.data = new MockData(now);
+    this.brain = new MockBrain(new Set(this.data.tasks.map(t => t.id)));
     this.workspaces = new MockWorkspaces(now);
     this.jobs = new MockJobs(now);
     this.runs = new MockRuns(now);
@@ -57,7 +58,7 @@ export class MockApi implements ApiSource {
       case 'worktrees': return { items: this.worktrees(q) };
       case 'worktrees/:id': return found(d.worktreeDetail(req.id!));
       case 'tasks': return { ...this.tasks(q), mirrorSyncedAt: new Date(d.now - 120_000).toISOString() };
-      case 'tasks/:id': return found(d.taskDetail(req.id!));
+      case 'tasks/:id': return { ...found(d.taskDetail(req.id!)), brain: this.brain.taskBrain(req.id!) };
       case 'index': return d.index();
       case 'gaps': {
         const g = d.gaps(range(q));
@@ -81,6 +82,7 @@ export class MockApi implements ApiSource {
       case 'brain': return this.brain.view();
       case 'brain/:id/topic': return this.brain.topic(req.id!, q.name);
       case 'brain/:id/search': return this.brain.search(req.id!, q);
+      case 'brain/:id/tasks': return this.brain.tasks(req.id!);
       case 'status': return this.jobs.status({});
       case 'jobs': return { items: this.jobs.list(Number(q.limit ?? 100) || 100) };
       case 'jobs/:id': return found(this.jobs.chain(req.id!));

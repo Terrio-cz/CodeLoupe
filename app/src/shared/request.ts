@@ -44,6 +44,7 @@ const SPECS: Record<Resource, ResourceSpec> = {
   brain: ui('brain'),
   'brain/:id/topic': ui('brain/:id/topic', ['name']),
   'brain/:id/search': ui('brain/:id/search', ['q', 'topic', 'tasks', 'limit']),
+  'brain/:id/tasks': ui('brain/:id/tasks'),
   'status/history': daemon('/status/history'),
   workspaces: daemon('/workspaces', ['repo', 'size']),
   resources: daemon('/resources', ['stats']),

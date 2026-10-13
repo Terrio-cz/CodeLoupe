@@ -6,6 +6,7 @@ import { allowedOrigins, MarkdownView } from '../components/MarkdownView';
 import { Icon } from '../components/Icon';
 import { Card, ErrorState, Loading, Search, Section, Select } from '../components/Parts';
 import { LayerBadge, StatusBadge, taskTone } from '../components/StatusBadge';
+import { TaskBrainSection } from '../components/TaskBrainSection';
 import { ago, dateTime, num } from '../format';
 import { useDebounced, useSettings } from '../hooks';
 import { go, type Route } from '../router';
@@ -106,6 +107,7 @@ function TaskDetailView({ id }: { id: string }) {
               {t.links.map(l => <li key={l.id}><span className="muted">{l.type}</span><span className="mono">{l.id}</span><span className="grow">{l.summary}</span></li>)}
             </ul>
           </Card>
+          <TaskBrainSection brain={t.brain} />
           <Card title="Activity">
             <ol className="activity">
               {t.activity.map((a, i) => (

@@ -240,6 +240,7 @@ export class MockData {
       ],
       worktrees: this.worktrees.filter(w => w.taskId === id),
       mirror: { syncedAt: iso(this.now - 2 * 60_000), lastReadAt: iso(this.now - 47 * 60_000) },
+      brain: { brains: [] },
     };
   }
 

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import type { BrainHit, BrainWorkspace } from '../../../shared/contract';
 import { useApi } from '../api';
-import { Banner, Card, Empty, ErrorState, Loading, Search, Select } from '../components/Parts';
-import { errorTitle, pickTopic, searchTerms, treeRows } from '../brainModel';
+import { BrainTaskTable } from '../components/BrainTaskTable';
+import { Banner, Card, Empty, ErrorState, Loading, Search, Segmented, Select } from '../components/Parts';
+import { errorTitle, pickTopic, searchTerms, stateText, treeRows } from '../brainModel';
 import { bytes, num } from '../format';
-import { useDebounced } from '../hooks';
+import { useDebounced, useSettings } from '../hooks';
 import { go, href, type Route } from '../router';
 
 const MARK_LABEL: Record<string, string> = { '+': 'fact', '!': 'warning', '=': 'measured', x: 'removed', '?': 'open', '~': 'approximate', '-': 'note' };
@@ -35,16 +36,20 @@ export function Brain({ route }: { route: Route }) {
   const wanted = route.params.get('topic');
   const topic = pickTopic(ws.topics, wanted);
   const terms = searchTerms(shown);
+  const view = route.params.get('view') === 'tasks' ? 'tasks' : 'topics';
 
   return (
     <>
       <div className="filterbar">
-        <Select label="Workspace" value={ws.id} onChange={id => go('brain', id)} options={workspaces.map(w => ({ value: w.id, label: w.name }))} />
-        <Search label="Search the brain" value={q} onChange={setQ} />
-        <label className="check"><input type="checkbox" checked={tasks} onChange={e => setTasks(e.target.checked)} />Include past task findings</label>
-        {topic && <label className="check"><input type="checkbox" checked={onlyTopic} onChange={e => setOnlyTopic(e.target.checked)} />Only in <span className="mono">{topic}</span></label>}
+        <Select label="Workspace" value={ws.id} onChange={id => go('brain', id, view === 'tasks' ? { view } : undefined)} options={workspaces.map(w => ({ value: w.id, label: w.name }))} />
+        <Segmented label="View" value={view} options={[{ value: 'topics', label: 'Topics' }, { value: 'tasks', label: 'Tasks' }]} onChange={v => go('brain', ws.id, v === 'tasks' ? { view: v } : undefined)} />
+        <Search label={view === 'tasks' ? 'Filter tasks' : 'Search the brain'} value={q} onChange={setQ} />
+        {view === 'topics' && <label className="check"><input type="checkbox" checked={tasks} onChange={e => setTasks(e.target.checked)} />Include past task findings</label>}
+        {view === 'topics' && topic && <label className="check"><input type="checkbox" checked={onlyTopic} onChange={e => setOnlyTopic(e.target.checked)} />Only in <span className="mono">{topic}</span></label>}
       </div>
-      {ws.errorCode ? (
+      {view === 'tasks' ? (
+        <TaskFiles ws={ws} filter={shown} />
+      ) : ws.errorCode ? (
         <Card><ErrorState title={errorTitle(ws.errorCode)} message={ws.error ?? ''} onRetry={list.reload} /></Card>
       ) : (
         <div className="brain-layout">
@@ -55,6 +60,20 @@ export function Brain({ route }: { route: Route }) {
         </div>
       )}
     </>
+  );
+}
+
+/** The task files of the workspace: the notes each Claude window left per task; a row opens the task detail. */
+function TaskFiles({ ws, filter }: { ws: BrainWorkspace; filter: string }) {
+  const { data, error, loading, reload } = useApi('brain/:id/tasks', ws.id);
+  const [settings] = useSettings();
+  const needle = filter.trim().toLowerCase();
+  const tasks = data?.tasks.filter(t => !needle || t.id.toLowerCase().includes(needle) || stateText(t.state).includes(needle)) ?? null;
+  return (
+    <Card title="Task notes" actions={tasks && data ? <span className="muted">{num(tasks.length)}{tasks.length < data.tasks.length ? ` of ${num(data.tasks.length)}` : ''} tasks</span> : undefined} bodyClass="">
+      {tasks ? <BrainTaskTable tasks={tasks} onOpen={id => go('tasks', id)} shortcuts={settings?.shortcuts} />
+        : loading ? <Loading variant="table" /> : <ErrorState message={error?.message ?? 'Could not load the task files.'} onRetry={reload} />}
+    </Card>
   );
 }
 

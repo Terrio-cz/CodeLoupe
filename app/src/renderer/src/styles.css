@@ -757,4 +757,7 @@ table.data.import-table td { vertical-align: top; height: auto; padding-top: 8px
 .brain-entries .where { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brain-entries .mark { width: 1.2em; font-family: var(--mono); color: var(--text-muted); }
 .brain-entries .mark-warn { color: var(--serious-text); }
+.task-notes .mark { width: 2.4em; flex: none; }
+.task-state { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s-2); margin: 0; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.task-state-inline { display: inline-flex; flex-wrap: wrap; gap: var(--s-2); }
 @media (max-width: 900px) { .brain-layout { grid-template-columns: minmax(0, 1fr); } }
