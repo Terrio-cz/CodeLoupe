@@ -7,7 +7,7 @@ import com.github.ajalt.clikt.core.subcommands
 /** `codeloupe job …` — long commands run by the daemon, detached from the agent session. */
 class JobCommand : CliktCommand(name = "job") {
     init {
-        subcommands(JobStartCommand(), JobWaitCommand(), JobStatusCommand(), JobCancelCommand())
+        subcommands(JobStartCommand(), JobWaitCommand(), JobStatusCommand(), JobCancelCommand(), JobSlotsCommand(), JobMoveCommand())
     }
 
     override fun help(context: Context) =

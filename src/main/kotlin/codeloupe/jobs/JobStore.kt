@@ -55,6 +55,50 @@ class JobStore(file: Path, private val clock: Clock = Clock.systemUTC(), private
         }
     }
 
+    /** Seals of the [JobSpec]s of queued and running jobs, by id, with their place in their slot's queue. */
+    class SpecRow(val id: String, val seq: Long, val sealed: String)
+
+    @Synchronized
+    fun putSpec(id: String, seq: Long, sealed: String) {
+        db.prepareStatement("INSERT INTO specs(id, seq, sealed) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET seq = excluded.seq, sealed = excluded.sealed").use { s ->
+            s.setString(1, id)
+            s.setLong(2, seq)
+            s.setString(3, sealed)
+            s.executeUpdate()
+        }
+    }
+
+    @Synchronized
+    fun specs(): List<SpecRow> = db.createStatement().use { s ->
+        s.executeQuery("SELECT id, seq, sealed FROM specs ORDER BY seq").use { r -> buildList { while (r.next()) add(SpecRow(r.getString(1), r.getLong(2), r.getString(3))) } }
+    }
+
+    /** New queue places, in one transaction: a crash never leaves half a reorder. */
+    @Synchronized
+    fun reorder(seqs: Map<String, Long>) {
+        db.autoCommit = false
+        try {
+            db.prepareStatement("UPDATE specs SET seq = ? WHERE id = ?").use { s ->
+                for ((id, seq) in seqs) {
+                    s.setLong(1, seq)
+                    s.setString(2, id)
+                    s.executeUpdate()
+                }
+            }
+            db.commit()
+        } catch (e: Exception) {
+            db.rollback()
+            throw e
+        } finally {
+            db.autoCommit = true
+        }
+    }
+
+    @Synchronized
+    fun deleteSpec(id: String) {
+        db.prepareStatement("DELETE FROM specs WHERE id = ?").use { it.setString(1, id); it.executeUpdate() }
+    }
+
     @Synchronized
     fun count(): Long = db.createStatement().use { s -> s.executeQuery("SELECT count(*) FROM jobs").use { it.next(); it.getLong(1) } }
 
@@ -90,6 +134,9 @@ class JobStore(file: Path, private val clock: Clock = Clock.systemUTC(), private
         const val HARD_CAP = 20_000
         const val PRUNE_EVERY = 100
         val RETAIN: Duration = Duration.ofDays(7)
-        private val SCHEMA = listOf("CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, record TEXT NOT NULL)")
+        private val SCHEMA = listOf(
+            "CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, record TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS specs (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, sealed TEXT NOT NULL)",
+        )
     }
 }

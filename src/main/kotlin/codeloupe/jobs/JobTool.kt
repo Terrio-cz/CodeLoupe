@@ -7,14 +7,16 @@ import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * The one MCP tool for jobs: start, status, cancel. Waiting is not an MCP call (a tool call would hold a turn open):
- * `codeloupe job wait <id>` in a background Bash task, or the `job.finished` event.
+ * The one MCP tool for jobs: start, status, cancel, and the slots (capacity, queue order). Waiting is not an MCP call (a tool
+ * call would hold a turn open): `codeloupe job wait <id>` in a background Bash task, or the `job.finished` event.
  */
 class JobTool(private val jobs: JobRunner) {
     /** A [denial] answers every call with that text instead of touching a job: the caller has not shown it may. */
@@ -27,9 +29,15 @@ class JobTool(private val jobs: JobRunner) {
                     "start" -> start(args)
                     "status" -> status(string(args, "id"))
                     "cancel" -> cancel(string(args, "id") ?: throw IllegalArgumentException("cancel needs id"))
-                    else -> result("action must be start, status or cancel", isError = true)
+                    "slots" -> slots(args)
+                    "move" -> move(args)
+                    else -> result("action must be start, status, cancel, slots or move", isError = true)
                 }
             } catch (e: IllegalArgumentException) {
+                result("error: ${e.message}", isError = true)
+            } catch (e: NoSuchElementException) {
+                result("error: ${e.message}", isError = true)
+            } catch (e: IllegalStateException) {
                 result("error: ${e.message}", isError = true)
             }
         }
@@ -69,6 +77,25 @@ class JobTool(private val jobs: JobRunner) {
         return result("cancelling ${JobReport.line(job)}")
     }
 
+    /** The slots; with `slot` and `capacity`, that slot's capacity set first (in `config.json` and at once). */
+    private fun slots(args: JsonObject): CallToolResult {
+        val capacity = (args["capacity"] as? JsonPrimitive)?.intOrNull
+        val name = string(args, "slot")
+        if (capacity == null && name == null) return result(SlotReport.text(jobs.slots()))
+        val slot = jobs.setCapacity(
+            name ?: throw IllegalArgumentException("setting a capacity needs slot"),
+            capacity ?: throw IllegalArgumentException("setting a capacity needs capacity (a whole number, 1 or more)"),
+        )
+        return result(SlotReport.line(slot))
+    }
+
+    private fun move(args: JsonObject): CallToolResult {
+        val id = string(args, "id") ?: throw IllegalArgumentException("move needs id")
+        val position = QueuePosition.of((args["first"] as? JsonPrimitive)?.booleanOrNull == true, string(args, "before"), string(args, "after"))
+        val (slot, order) = jobs.move(id, position)
+        return result("slot $slot waiting: ${order.joinToString(" ")}")
+    }
+
     private fun string(args: JsonObject, key: String): String? = (args[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
     private fun strings(args: JsonObject, key: String): List<String> = when (val value = args[key]) {
@@ -85,12 +112,14 @@ class JobTool(private val jobs: JobRunner) {
             "instead of waiting on it: action=start returns at once; then end your turn and run `codeloupe job wait <id>` as a background " +
             "Bash task (one notification, compact result). slot queues on a named resource (e.g. gradle-test). then/onFailure: typed " +
             "follow-ups — `job[@slot]:<command>`, `notify[:message]`, `webhook:<url>`, optionally prefixed `failed==0 ? `. " +
-            "Every command passes the workspace policy hook first. action=status [id], action=cancel id."
+            "Every command passes the workspace policy hook first. action=status [id], action=cancel id. action=slots lists slots " +
+            "(capacity, holders, queue with wait times); with slot+capacity it sets that capacity at once and in config.json. " +
+            "action=move id with first=true, before=<id> or after=<id> reorders a queued job within its slot."
 
         val PROPERTIES: JsonObject = buildJsonObject {
             putJsonObject("action") {
                 put("type", "string")
-                putJsonArray("enum") { listOf("start", "status", "cancel").forEach { add(JsonPrimitive(it)) } }
+                putJsonArray("enum") { listOf("start", "status", "cancel", "slots", "move").forEach { add(JsonPrimitive(it)) } }
             }
             putJsonObject("command") {
                 put("type", "array")
@@ -128,6 +157,22 @@ class JobTool(private val jobs: JobRunner) {
                 put("description", "Free label carried into events, e.g. the session or task")
             }
             putJsonObject("id") { put("type", "string") }
+            putJsonObject("capacity") {
+                put("type", "integer")
+                put("description", "action=slots: the new capacity of slot")
+            }
+            putJsonObject("first") {
+                put("type", "boolean")
+                put("description", "action=move: to the head of its slot's queue")
+            }
+            putJsonObject("before") {
+                put("type", "string")
+                put("description", "action=move: just before this queued job")
+            }
+            putJsonObject("after") {
+                put("type", "string")
+                put("description", "action=move: just after this queued job")
+            }
         }
     }
 }

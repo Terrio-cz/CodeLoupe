@@ -11,12 +11,20 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 /**
  * `POST /jobs` (403 when the policy refuses), `GET /jobs`, `GET /jobs/{id}`, `POST /jobs/{id}/cancel`, and the long poll
  * `GET /jobs/{id}/wait?timeoutSec=` that answers when the job's chain ends (or the timeout passes, `done: false`).
+ * Slots: `GET /jobs/slots`, `POST /jobs/slots/{name}` `{"capacity": 2}` (stored in `config.json`, in force at once), and
+ * `POST /jobs/{id}/move` `{"first": true}` | `{"before": "<id>"}` | `{"after": "<id>"}` for a queued job.
  */
 fun Route.jobRoutes(jobs: JobRunner) {
     post("/jobs") {
@@ -59,6 +67,45 @@ fun Route.jobRoutes(jobs: JobRunner) {
         val timeoutSec = (call.parameters["timeoutSec"]?.toLongOrNull() ?: 300).coerceIn(1, 600)
         call.respondJson(chainBody(jobs.await(id, timeoutSec * 1000), jobs))
     }
+    get("/jobs/slots") {
+        call.respondJson(slotsBody(jobs.slots()))
+    }
+    post("/jobs/slots/{name}") {
+        val body = runCatching { JsonFormat.json.parseToJsonElement(call.receiveBoundedText()).jsonObject }.getOrNull()
+        val capacity = (body?.get("capacity") as? JsonPrimitive)?.intOrNull
+            ?: return@post call.respondJson(error("send {\"capacity\": <1 or more>}"), HttpStatusCode.BadRequest)
+        val slot = try {
+            jobs.setCapacity(call.parameters["name"].orEmpty(), capacity)
+        } catch (e: IllegalArgumentException) {
+            return@post call.respondJson(error(e.message.orEmpty()), HttpStatusCode.BadRequest)
+        } catch (e: IllegalStateException) {
+            return@post call.respondJson(error(e.message.orEmpty()), HttpStatusCode.Conflict)
+        }
+        call.respondJson(
+            buildJsonObject {
+                put("slot", JsonFormat.json.encodeToJsonElement(SlotSnapshot.serializer(), slot))
+                put("text", SlotReport.line(slot))
+            },
+        )
+    }
+    post("/jobs/{id}/move") {
+        val body = runCatching { JsonFormat.json.parseToJsonElement(call.receiveBoundedText()).jsonObject }.getOrElse { JsonObject(emptyMap()) }
+        fun text(key: String) = (body[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        val (slot, order) = try {
+            jobs.move(call.parameters["id"].orEmpty(), QueuePosition.of((body["first"] as? JsonPrimitive)?.booleanOrNull == true, text("before"), text("after")))
+        } catch (e: NoSuchElementException) {
+            return@post call.respondJson(error(e.message.orEmpty()), HttpStatusCode.NotFound)
+        } catch (e: IllegalArgumentException) {
+            return@post call.respondJson(error(e.message.orEmpty()), HttpStatusCode.BadRequest)
+        }
+        call.respondJson(
+            buildJsonObject {
+                put("slot", slot)
+                putJsonArray("waiting") { order.forEach { add(JsonPrimitive(it)) } }
+                put("text", "slot $slot waiting: ${order.joinToString(" ")}")
+            },
+        )
+    }
     post("/jobs/{id}/cancel") {
         val job = jobs.cancel(call.parameters["id"].orEmpty()) ?: return@post call.respondJson(error("no such job"), HttpStatusCode.NotFound)
         call.respondJson(buildJsonObject { put("job", record(job)) })
@@ -72,6 +119,11 @@ private fun chainBody(chain: List<JobRecord>, jobs: JobRunner) = buildJsonObject
     put("exit", JobReport.exitCode(chain))
     put("text", if (done) JobReport.text(chain) else JobReport.line(chain.last(), jobs.ahead(chain.last())))
     put("chain", JsonFormat.json.encodeToJsonElement(ListSerializer(JobRecord.serializer()), chain))
+}
+
+private fun slotsBody(slots: List<SlotSnapshot>) = buildJsonObject {
+    put("slots", JsonFormat.json.encodeToJsonElement(ListSerializer(SlotSnapshot.serializer()), slots))
+    put("text", SlotReport.text(slots))
 }
 
 private fun record(job: JobRecord) = JsonFormat.json.encodeToJsonElement(JobRecord.serializer(), job)
