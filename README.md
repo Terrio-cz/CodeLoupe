@@ -124,6 +124,7 @@ Every tool is on MCP and on the CLI (`codeloupe <tool> --help`); details in the
 | `attach` / `create` | attach a file to a tracker issue; create an issue under an epic (needs a tracker) |
 | `brain_brief` | the start of a role in a workspace that keeps a shared-memory brain (`brain/brain.mjs`): state, settled findings, task notes, decisions and the facts the role reads, whole entries ranked by code proximity (anchors on your files and symbols, callers, module, tasks that changed that code) above text; see [Brain index](docs/wiki/Brain-index.md) |
 | `brain_search` | whole brain entries for words and files, ranked the same way |
+| `brain_risk` | where earlier tasks found problems in the files a task will touch: a score per file and module (findings by severity and recency) with the entries behind it |
 
 ## Documentation
 

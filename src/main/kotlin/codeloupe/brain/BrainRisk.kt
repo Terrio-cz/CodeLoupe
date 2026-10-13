@@ -5,6 +5,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import kotlin.math.pow
 import kotlin.math.round
 
@@ -27,7 +28,7 @@ class BrainRisk(private val index: BrainIndex) {
         val modules = scored.filter { it.risk.module.isNotEmpty() }.groupBy { it.risk.module }.map { (module, inModule) -> moduleRisk(module, inModule, counted, request, limit) }
         val max = files.maxOfOrNull { it.score } ?: 0.0
         return RiskResult(
-            asOf = now.toString(), halfLifeDays = request.halfLifeDays, max = max, level = level(max, request),
+            asOf = now.truncatedTo(ChronoUnit.SECONDS).toString(), halfLifeDays = request.halfLifeDays, max = max, level = level(max, request),
             files = files.sortedByDescending { it.score }, modules = modules.sortedByDescending { it.score }, notes = code.notes,
         )
     }
