@@ -73,12 +73,22 @@ class TrackerMirror(
      * Writes [fields] and/or a [comment] to the mirrored issue [id] (canonical); the mirror takes the tracker's answer
      * as it is, with no second request. Throws a [TrackerException] the caller can show.
      */
-    suspend fun write(id: String, fields: Map<String, String>, comment: String?): WriteResult = try {
-        withContext(Dispatchers.IO) { sync.write(id, fields, comment) }
+    suspend fun write(id: String, fields: Map<String, String>, comment: String?, descriptionEdit: ((String) -> String)? = null): WriteResult =
+        guarded("write $id") { sync.write(id, fields, comment, descriptionEdit) }
+
+    /** Attaches [bytes] as a file called [name] to [id] (canonical); the mirror holds the new attachment list at once. */
+    suspend fun attach(id: String, name: String, bytes: ByteArray): IssueAttachment = guarded("attach to $id") { sync.attach(id, name, bytes) }
+
+    /** Creates an issue under [epic] (canonical) and returns it as the tracker holds it, linked. */
+    suspend fun create(epic: String, summary: String, description: String, fields: Map<String, String>): TrackerIssue =
+        guarded("create under $epic") { sync.create(epic, summary, description, fields) }
+
+    private suspend fun <T> guarded(what: String, block: () -> T): T = try {
+        withContext(Dispatchers.IO) { block() }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        log("tracker ${instance.name} write $id failed: ${safe(e)}")
+        log("tracker ${instance.name} $what failed: ${safe(e)}")
         throw TrackerException(safe(e))
     }
 

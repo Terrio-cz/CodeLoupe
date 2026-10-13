@@ -1,6 +1,6 @@
 With a tracker configured, CodeLoupe mirrors its issues into a local SQLite database and answers issue reads and task
 queries from it, in milliseconds and without a request: the [tracker tools](Tools-reference#tracker-tools) (`issue`,
-`tasks`, `similar`, `task_context`, `dispatch_plan`, `update`) work on the mirror, and `task_code` joins tasks to the
+`tasks`, `similar`, `task_context`, `dispatch_plan`, `update`, `attach`, `create`) work on the mirror, and `task_code` joins tasks to the
 code that landed for them. YouTrack is the supported tracker. Without a tracker none of this is on offer and the
 code tools work as usual.
 
@@ -30,8 +30,11 @@ instance itself ([Desktop app](Desktop-app#accounts)).
   whose `updated` moved, and only while tool calls arrive: no client, no polling. Syncing runs every 3 minutes while
   clients are active and stops 10 minutes after the last tool call (`trackerSyncMinutes`, `trackerIdleMinutes`).
 - A read more than 30 s after the project's last sync checks that one issue's `updated` first.
-- The mirror only reads. `update` is the one way CodeLoupe writes to the tracker (YouTrack: field values, `summary`,
-  `description`, comments), with the token's own permissions; the mirror stores the tracker's own answer to the write.
+- The mirror only reads. `update`, `attach` and `create` are the ways CodeLoupe writes to the tracker (YouTrack: field values,
+  `summary`, `description` including one ticked or rewritten acceptance criterion, comments, attachments, a new issue linked
+  under an epic), with the token's own permissions; the mirror stores the tracker's own answer to the write.
+  The CLI forms: `codeloupe update ABC-5 --check "text"`, `--edit-criterion "text" --to "new text"`, `codeloupe attach ABC-5 <file>`,
+  `codeloupe create --epic ABC-1 --summary … --type … --priority … --description-file <file>`.
 - `repos` are git repositories whose worktree branch names (`ABC-5`, `feature/ABC-5-x`) mark tasks as taken for
   `tasks mode=ready`, besides every repository the daemon has indexed.
 

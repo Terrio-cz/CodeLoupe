@@ -62,7 +62,7 @@ logs or the audit.
 | `GET /status` | no (so that anything can find the daemon); it answers a client's nonce with a proof (below) |
 | `GET /env/values` | its own token (`x-codeloupe-env-token`) |
 | `/mcp`, `POST /api/<tool>` of a read-only tool, `POST /hook` | yes; only with `api.strict` set to `false` does a caller with `x-codeloupe` alone get these |
-| a mutating tool (`run`, `env`, `update`, `edit`, and the MCP `job` tool) over MCP or `/api` | yes: over MCP the call is answered with the way to get it |
+| a mutating tool (`run`, `env`, `update`, `attach`, `create`, `edit`, and the MCP `job` tool) over MCP or `/api` | yes: over MCP the call is answered with the way to get it |
 | everything else: `/jobs`, `/workspaces`, `/resources`, `/processes`, `/reconcile`, `/ports`, `/events`, `/webhooks`, `/ui-api`, `/shutdown`, `/status/history`, `/session-weight` | yes |
 
 A wrong token is refused wherever it is sent (401), so a client that holds an old one learns it at once. **The default is strict**: a

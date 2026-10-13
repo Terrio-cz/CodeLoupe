@@ -5,6 +5,7 @@ import codeloupe.tracker.youtrack.HttpTransport
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -59,10 +60,15 @@ class RecordedYouTrack(dump: String = load()) : HttpTransport {
                 val stampsOnly = query["fields"] == "idReadable,updated"
                 ok(JsonArray(if (stampsOnly) page.map(::stamp) else page.filter { id(it) !in missedByPages }))
             }
+            decoded.startsWith("/api/users/me") -> ok(buildJsonObject { put("login", "dev1") })
             decoded.startsWith("/api/issues/") -> {
                 val asked = decoded.removePrefix("/api/issues/").substringBefore('?')
                 val issue = issues[moved[asked] ?: asked] ?: return HttpReply(404, """{"error":"Not Found"}""")
-                ok(if (query["fields"] == "updated") buildJsonObject { put("updated", long(issue, "updated")) } else issue)
+                when (query["fields"]) {
+                    "updated" -> ok(buildJsonObject { put("updated", long(issue, "updated")) })
+                    "project(id)" -> ok(buildJsonObject { put("project", buildJsonObject { put("id", "p-" + id(issue).substringBefore('-')) }) })
+                    else -> ok(issue)
+                }
             }
             decoded.startsWith("/api/activities?") && failActivities -> HttpReply(403, """{"error":"Forbidden","error_description":"no access to activities"}""")
             decoded.startsWith("/api/activities?") -> {
@@ -78,6 +84,8 @@ class RecordedYouTrack(dump: String = load()) : HttpTransport {
         val decoded = URLDecoder.decode(path, Charsets.UTF_8)
         requests += "POST $decoded"
         bodies += body
+        if (decoded.startsWith("/api/commands")) return command(Json.parseToJsonElement(body).jsonObject)
+        if (decoded.startsWith("/api/issues?")) return create(Json.parseToJsonElement(body).jsonObject)
         val route = decoded.substringBefore('?').removePrefix("/api/issues/")
         val id = route.substringBefore('/')
         if (id !in issues) return HttpReply(404, """{"error":"Not Found"}""")
@@ -109,6 +117,81 @@ class RecordedYouTrack(dump: String = load()) : HttpTransport {
             })
         }
         return ok(issues[id]!!)
+    }
+
+    /** The files uploaded, as name → bytes, in order. */
+    val uploads: MutableList<Pair<String, ByteArray>> = CopyOnWriteArrayList()
+
+    /** The command POSTs refused with a 400, as a tracker does for a link it does not allow. */
+    var failCommands = false
+
+    @Synchronized
+    override fun postFile(path: String, fileName: String, bytes: ByteArray): HttpReply {
+        val decoded = URLDecoder.decode(path, Charsets.UTF_8)
+        requests += "POST $decoded"
+        val id = decoded.removePrefix("/api/issues/").substringBefore('/')
+        if (id !in issues) return HttpReply(404, """{"error":"Not Found"}""")
+        uploads += fileName to bytes
+        writeClock += 1000
+        val stored = buildJsonObject {
+            put("id", "12-${300 + uploads.size}")
+            put("name", fileName)
+            put("size", bytes.size)
+            put("mimeType", "application/octet-stream")
+            put("created", writeClock)
+            put("author", buildJsonObject { put("login", "dev1") })
+        }
+        edit(id, writeClock) { it["attachments"] = JsonArray(it["attachments"]!!.jsonArray + stored) }
+        return ok(JsonArray(listOf(stored)))
+    }
+
+    @Synchronized
+    private fun create(payload: JsonObject): HttpReply {
+        writeClock += 1000
+        val project = payload["project"]!!.jsonObject["id"]!!.jsonPrimitive.content.removePrefix("p-")
+        val number = 200 + issues.size
+        val given = payload["customFields"]!!.jsonArray.map { it.jsonObject }.associateBy { it["name"]!!.jsonPrimitive.content }
+        val fields = given.values.map { f -> JsonObject(f + ("value" to JsonObject(f["value"]!!.jsonObject + ("\$type" to JsonPrimitive("EnumBundleElement"))))) } +
+            buildJsonObject {
+                put("name", "State")
+                put("\$type", "StateIssueCustomField")
+                put("value", buildJsonObject { put("name", "To do") })
+            }
+        val issue = JsonObject(
+            mapOf(
+                "idReadable" to JsonPrimitive("$project-$number"), "summary" to payload["summary"]!!, "description" to payload["description"]!!,
+                "created" to JsonPrimitive(writeClock), "updated" to JsonPrimitive(writeClock), "resolved" to JsonNull,
+                "project" to buildJsonObject { put("shortName", project) }, "reporter" to buildJsonObject { put("login", "dev1") },
+                "customFields" to JsonArray(fields), "links" to JsonArray(emptyList()), "comments" to JsonArray(emptyList()), "attachments" to JsonArray(emptyList()),
+            ),
+        )
+        issues["$project-$number"] = issue
+        return ok(issue)
+    }
+
+    /** `subtask of <epic>` on the issues named: both ends get the link, as YouTrack would. */
+    @Synchronized
+    private fun command(payload: JsonObject): HttpReply {
+        if (failCommands) return HttpReply(400, """{"error":"Bad Request","error_description":"cannot link"}""")
+        val epic = Regex("subtask of (\\S+)").find(payload["query"]!!.jsonPrimitive.content)!!.groupValues[1]
+        writeClock += 1000
+        for (target in payload["issues"]!!.jsonArray.map { it.jsonObject["idReadable"]!!.jsonPrimitive.content }) {
+            edit(target, writeClock) { it["links"] = linked(it["links"]!!.jsonArray, "INWARD", epic) }
+            edit(epic, writeClock) { it["links"] = linked(it["links"]!!.jsonArray, "OUTWARD", target) }
+        }
+        return ok(buildJsonObject {})
+    }
+
+    private fun linked(links: JsonArray, direction: String, other: String): JsonArray {
+        val type = buildJsonObject {
+            put("sourceToTarget", "parent for")
+            put("targetToSource", "subtask of")
+            put("name", "Subtask")
+        }
+        val found = links.firstOrNull { it.jsonObject["direction"]!!.jsonPrimitive.content == direction && it.jsonObject["linkType"]!!.jsonObject["name"]!!.jsonPrimitive.content == "Subtask" }
+        val ref = buildJsonObject { put("idReadable", other) }
+        if (found == null) return JsonArray(links + buildJsonObject { put("direction", direction); put("linkType", type); put("issues", JsonArray(listOf(ref))) })
+        return JsonArray(links.map { l -> if (l == found) JsonObject(l.jsonObject + ("issues" to JsonArray(l.jsonObject["issues"]!!.jsonArray + ref))) else l })
     }
 
     /** Changes [id] as YouTrack would: applies [change] and moves `updated` to [at]. */

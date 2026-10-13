@@ -7,6 +7,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.util.UUID
 
 /** HTTPS with a bearer token read per request; failures carry the path, never the token. */
 class JdkTransport(private val baseUrl: String, private val token: TokenSource, private val timeout: Duration = Duration.ofSeconds(30)) : HttpTransport {
@@ -16,6 +17,14 @@ class JdkTransport(private val baseUrl: String, private val token: TokenSource, 
 
     override fun post(path: String, body: String): HttpReply = send(path) {
         it.header("Content-Type", "application/json; charset=utf-8").POST(HttpRequest.BodyPublishers.ofString(body))
+    }
+
+    override fun postFile(path: String, fileName: String, bytes: ByteArray): HttpReply {
+        val boundary = "codeloupe" + UUID.randomUUID().toString().replace("-", "")
+        val safeName = fileName.replace(Regex("[\r\n\"]"), "_")
+        val head = "--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$safeName\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+        val body = head.toByteArray(Charsets.UTF_8) + bytes + "\r\n--$boundary--\r\n".toByteArray(Charsets.UTF_8)
+        return send(path) { it.header("Content-Type", "multipart/form-data; boundary=$boundary").POST(HttpRequest.BodyPublishers.ofByteArray(body)) }
     }
 
     private fun send(path: String, method: (HttpRequest.Builder) -> HttpRequest.Builder): HttpReply {
