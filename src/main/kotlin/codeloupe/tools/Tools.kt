@@ -6,6 +6,7 @@ import codeloupe.doc.DocFiles
 import codeloupe.doc.DocMemory
 import codeloupe.jobs.JobRunner
 import codeloupe.secrets.SecretAccess
+import codeloupe.taskcode.DispatchScopes
 import codeloupe.tracker.Trackers
 import kotlinx.serialization.json.JsonObject
 import java.nio.file.Path
@@ -26,7 +27,7 @@ object Tools {
         brain: BrainService? = null, notes: BrainNotes? = null,
     ): List<Tool> {
         // The document reader's memory [docs] is shared: `doc` and `task_context` tell a caller the same "you already have this".
-        val tracked = if (trackers.configured) listOf(IssueTool(trackers), TaskContextTool(trackers, docs), DispatchPlanTool(trackers, docs), TasksTool(trackers), SimilarTool(trackers), UpdateTool(trackers), AttachTool(trackers), CreateTool(trackers)) else emptyList()
+        val tracked = if (trackers.configured) listOf(IssueTool(trackers), TaskContextTool(trackers, docs), DispatchPlanTool(trackers, docs, scopes = brain?.let { b -> DispatchScopes(b::dispatchScope) } ?: DispatchScopes.NONE), TasksTool(trackers), SimilarTool(trackers), UpdateTool(trackers), AttachTool(trackers), CreateTool(trackers)) else emptyList()
         val handles = { handle: String -> jobs?.get(handle.removePrefix("job:"))?.log?.let { Path.of(it) } }
         // With a brain, symbol and context add one line of the brain entries anchored on the declaration; brain_brief and brain_search answer from it.
         val code = if (notes == null || brain == null) ALL else ALL.map { if (it.name == "symbol" || it.name == "context") BrainAnnotatedTool(it, notes) else it }

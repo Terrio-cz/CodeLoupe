@@ -127,6 +127,8 @@ class ReconcilePlanner(
 
     private fun worktree(repo: RepoWorkspaces, w: Workspace, processes: List<ProcessEntry>, running: Set<Pair<String, String>>): PlanEntry? {
         if (w.role != "worktree" || w.state == WorkspaceState.ORPHAN || CLAUDE_WORKTREES in w.path.replace('\\', '/')) return null
+        // A repository that names its worktree roots owns only the worktrees under them; one elsewhere (an older tool's checkout) is not ours to remove.
+        if (repo.roots.isNotEmpty() && repo.roots.none { under(w.path, it) }) return null
         val released = releasedAt(repo.name, w.name)?.takeIf { w.merge?.merged == true }
         if (w.state != WorkspaceState.LANDED && released == null) return null
         val protected = config.protect.any { it.covers(null, listOf(w.path, w.name), null) }
@@ -147,6 +149,11 @@ class ReconcilePlanner(
             "worktree:${w.path}", TargetKind.WORKTREE, w.path, repo.name, w.name, null, w.state, verdict, reason, released = release != null,
             path = w.path, gitDir = repo.commonDir, branch = w.branch, head = w.head,
         )
+    }
+
+    private fun under(path: String, root: String): Boolean {
+        fun norm(p: String) = p.replace('\\', '/').trimEnd('/').lowercase()
+        return norm(path).startsWith(norm(root) + "/")
     }
 
     // A worktree without a readable activity time counts as idle: the scanner only lacks it for one git cannot read.

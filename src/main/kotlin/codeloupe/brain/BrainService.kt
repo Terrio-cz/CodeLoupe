@@ -2,6 +2,7 @@ package codeloupe.brain
 
 import codeloupe.config.WorkspacesConfig
 import codeloupe.repo.Registry
+import codeloupe.taskcode.DispatchScope
 import codeloupe.tracker.Trackers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -31,6 +32,9 @@ class BrainService(
     private val backfiller = BrainBackfill(registry, anchors, engine, engineEnv)
 
     fun roots(): List<BrainRoot> = BrainRoot.all(config)
+
+    /** The tracker project and code repository of the workspace [root] lies in, for `dispatch_plan`; null outside a registered brain workspace. */
+    fun dispatchScope(root: String): DispatchScope? = WorkspaceTasks.scopeOf(config, root)
 
     fun root(workspace: String): BrainRoot = BrainRoot.at(config, workspace) ?: throw BrainException(BrainException.Kind.FAILED, "no registered workspace with a brain at $workspace (workspaces.brains / workspaces.repos)")
 
