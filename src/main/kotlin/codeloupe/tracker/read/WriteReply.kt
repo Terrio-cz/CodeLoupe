@@ -8,11 +8,12 @@ object WriteReply {
     const val LIMIT = 300
     private const val VALUE = 40
     private const val PROBLEM = 120
+    private const val NOTE = 110
 
-    /** [requested] names the fields the caller set; when the mirror held no earlier version they are all that can be shown. */
-    fun render(result: WriteResult, requested: Collection<String>): String {
+    /** [descriptionNote] says in a few words what a changed description now holds (a ticked criterion); [requested] names the fields the caller set; when the mirror held no earlier version they are all that can be shown. */
+    fun render(result: WriteResult, requested: Collection<String>, descriptionNote: String? = null): String {
         val after = result.after
-        val parts = changes(result, requested).toMutableList()
+        val parts = changes(result, requested, descriptionNote).toMutableList()
         result.comment?.let { parts += "+comment ${it.id}" }
         result.problem?.let { parts += it.oneLine(PROBLEM) }
         val tail = if (parts.any { it.startsWith("State:") }) "" else " · now ${after.state ?: "-"}"
@@ -23,7 +24,7 @@ object WriteReply {
         return line(n).take(LIMIT)
     }
 
-    private fun changes(result: WriteResult, requested: Collection<String>): List<String> {
+    private fun changes(result: WriteResult, requested: Collection<String>, descriptionNote: String?): List<String> {
         val before = result.before
         val now = values(result.after)
         val asked = requested.map { it.lowercase() }.toSet()
@@ -38,7 +39,7 @@ object WriteReply {
         }
         // A cleared field is gone from the new version.
         old?.forEach { (key, shown) -> if (key !in now) out += "${shown.first}: ${shown.second.oneLine(VALUE)}→—" }
-        if (descriptionChanged(before, result.after, asked)) out += "description changed (${result.after.description.length} chars)"
+        if (descriptionChanged(before, result.after, asked)) out += descriptionNote?.oneLine(NOTE) ?: "description changed (${result.after.description.length} chars)"
         return out
     }
 

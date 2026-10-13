@@ -29,7 +29,7 @@ object GapDetector {
     private val SUBJECT_ARGS = listOf("name", "q", "target", "pattern", "query", "id")
     private val LEADING_CD = Regex("""^cd\s+\S+\s*(&&|;)\s*""")
     private val SHELL_PROGRAMS = setOf("rg", "grep", "sed", "cat")
-    private val TRACKER_TOOLS = setOf("issue", "tasks", "task_context", "dispatch_plan", "similar", "update")
+    private val TRACKER_TOOLS = setOf("issue", "tasks", "task_context", "dispatch_plan", "similar", "update", "attach", "create")
     private val TASK_ID = Regex("\\b[A-Za-z][A-Za-z0-9_]*-\\d+\\b")
     private val LINE_RANGE = Regex("""\bsed\s+-n\s+'?\d+,\d+p""")
     private val FILE_NAME = Regex("""[A-Za-z0-9_\-]+\.[A-Za-z][A-Za-z0-9]{0,5}""")

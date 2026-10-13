@@ -23,6 +23,7 @@ internal object YouTrackJson {
     const val ISSUE_FIELDS = "idReadable,summary,description,created,updated,resolved,project(shortName),reporter(login)," +
         "customFields(name,value(name,login,presentation,text,ordinal)),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable))," +
         "comments(id,text,created,updated,author(login),deleted),attachments(id,name,size,mimeType,created,author(login))"
+    const val ATTACHMENT_FIELDS = "id,name,size,mimeType,created,author(login)"
     const val COMMENT_FIELDS = "id,text,created,updated,author(login),deleted,issue(updated)"
     const val STAMP_FIELDS = "idReadable,updated"
     const val ACTIVITY_FIELDS = "id,timestamp,target(idReadable),field(name),added(name,login,presentation),removed(name,login,presentation),author(login)"
@@ -75,7 +76,7 @@ internal object YouTrackJson {
     fun comment(o: JsonObject) =
         IssueComment(o.text("id").orEmpty(), o.obj("author")?.text("login"), o.long("created") ?: 0, o.long("updated"), o.text("text").orEmpty())
 
-    private fun attachment(o: JsonObject) =
+    fun attachment(o: JsonObject) =
         IssueAttachment(o.text("id").orEmpty(), o.text("name").orEmpty(), o.long("size") ?: 0, o.text("mimeType"), o.long("created") ?: 0, o.obj("author")?.text("login"))
 
     private fun links(o: JsonObject): List<IssueLink> {

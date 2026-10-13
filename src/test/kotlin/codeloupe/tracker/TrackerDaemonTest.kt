@@ -50,6 +50,8 @@ class TrackerDaemonTest {
                 auth != "Bearer $token" -> HttpReply(401, """{"error":"Unauthorized"}""")
                 // A misbehaving proxy that echoes the request headers in its error page.
                 failWith != null -> HttpReply(failWith!!, """{"error":"x","error_description":"echo: $auth"}""")
+                exchange.requestHeaders.getFirst("Content-Type").orEmpty().startsWith("multipart/form-data") ->
+                    upload(exchange.requestURI.rawPath + "?" + exchange.requestURI.rawQuery, exchange.requestBody.readBytes())
                 exchange.requestMethod == "POST" -> fake.post(exchange.requestURI.rawPath + "?" + exchange.requestURI.rawQuery, exchange.requestBody.readBytes().decodeToString())
                 else -> fake.get(exchange.requestURI.rawPath + "?" + exchange.requestURI.rawQuery)
             }
@@ -59,6 +61,15 @@ class TrackerDaemonTest {
         }
         start()
     }
+    /** The one file part of a multipart body, handed to the fake the way YouTrack would take it. */
+    private fun upload(path: String, body: ByteArray): HttpReply {
+        val text = String(body, Charsets.ISO_8859_1)
+        val name = Regex("filename=\"([^\"]*)\"").find(text)!!.groupValues[1]
+        val start = text.indexOf("\r\n\r\n") + 4
+        val end = text.lastIndexOf("\r\n--")
+        return fake.postFile(path, name, body.copyOfRange(start, end))
+    }
+
     private val home = TestRepos.tmpDir("tracker-home").also { home ->
         val tokenFile = home.resolve("token.txt")
         Files.writeString(tokenFile, "OTHER=1\nYT_TOKEN=\"$token\"\n")
@@ -147,12 +158,41 @@ class TrackerDaemonTest {
         assertTrue(reply.matches(Regex("CL-27 State: .+→Done · \\+comment \\S+")), reply)
         assertTrue(reply.length <= 300)
         assertContains(text(call("issue", "id" to "CL-27", "root" to "C:/work/d")), "Done")
-        assertEquals("nothing to write: pass set={Field: value} and/or comment=<text>", text(call("update", "id" to "CL-27")))
+        assertEquals("nothing to write: pass set={Field: value}, comment=<text>, check=<criterion> and/or edit_criterion=<criterion> with to=<text>", text(call("update", "id" to "CL-27")))
         assertContains(text(call("update", "id" to "ABC-1", "comment" to "x")), "no tracker mirrors")
     }
 
     @Test
     @Order(6)
+    fun `check, edit-criterion, attach and create write through the daemon`() {
+        assertEquals("CL-27 ticked: Criteria checklist rendered compactly · now Done", text(call("update", "id" to "cl-27", "check" to "checklist rendered")))
+        assertContains(text(call("issue", "id" to "CL-27")), "Criteria 1/2")
+        assertEquals("CL-27 criterion now: Checklist is compact · now Done", text(call("update", "id" to "CL-27", "edit_criterion" to "compactly", "to" to "Checklist is compact")))
+
+        val refused = call("update", "id" to "CL-26", "check" to "e")
+        assertFalse(refused["ok"]!!.jsonPrimitive.boolean)
+        assertContains(text(refused), "error: 'e' matches 3 open criteria")
+        assertContains(text(call("update", "id" to "CL-27", "check" to "x", "edit_criterion" to "y", "to" to "z")), "two writes")
+        assertContains(text(call("update", "id" to "CL-27", "edit_criterion" to "y")), "needs to=")
+
+        val file = Files.writeString(home.resolve("evidence.md"), "all green\n")
+        assertEquals("CL-27 attached evidence.md (10 B)", text(call("attach", "id" to "CL-27", "file" to file.toString())))
+        assertEquals(listOf("evidence.md" to "all green\n"), fake.uploads.map { it.first to String(it.second) })
+        assertContains(text(call("issue", "id" to "CL-27", "view" to "full")), "evidence.md")
+        assertContains(text(call("attach", "id" to "CL-27", "file" to "relative.md")), "must be absolute")
+        val secret = Files.writeString(home.resolve(".env"), "A=1")
+        val secretReply = call("attach", "id" to "CL-27", "file" to secret.toString())
+        assertFalse(secretReply["ok"]!!.jsonPrimitive.boolean)
+        assertContains(text(secretReply), "looks like a secret")
+
+        val created = text(call("create", "epic" to "CL-4", "summary" to "Made by the test", "description" to "## Context\nx", "type" to "Task", "priority" to "Normal"))
+        assertTrue(created.matches(Regex("CL-\\d+ created under CL-4 · Task · Normal")), created)
+        assertContains(text(call("tasks", "query" to "CL-4", "mode" to "graph")), "Made by the test")
+        assertContains(text(call("create", "epic" to "ABC-1", "summary" to "x")), "no tracker mirrors")
+    }
+
+    @Test
+    @Order(7)
     fun `the token is in no output, status, log or mirror file`() {
         val status = http.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/status")).build(), HttpResponse.BodyHandlers.ofString()).body()
         assertContains(status, "\"trackers\"")

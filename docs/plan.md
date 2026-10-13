@@ -1972,6 +1972,20 @@ rozhoduje launcher.
   5 628, TER-114 8 450; `yt_get_issue` stejného tvaru); `update` 31–52 zn. na živém CL (stav, komentář, stav + komentář),
   po každém zápisu mirror shodný s čerstvým čtením (stav, `updated`, komentáře, pole).
 
+### Výsledek CL-236 — zápisová slovesa trackeru (2026-10-13)
+
+- `update <id> --check "<text>"` odškrtne jedinou otevřenou `- [ ]` řádku popisu, `--edit-criterion "<text>" --to "<nový text>"`
+  přepíše jedinou řádku (otevřenou i odškrtnutou, políčko zůstane). Shoda s nulou nebo s více kritérii se odmítne **před**
+  zápisem (chyba, exit 1, jmenuje kandidáty); úprava popisu vychází z živého textu issue, ne z mirroru, aby se neztratila řádka
+  změněná mezitím. `attach <id> <soubor>` (≤ 4 MB, `.env`, klíče a certifikáty se odmítnou) a `create --epic <id> --summary …
+  --type … --priority … --description-file …` (další povinná pole `--set Pole=hodnota`, např. `Component` v TER; Assignee je
+  výchozí uživatel tokenu) jsou nové nástroje `attach` a `create`; projekt nové issue je projekt epicu, typy polí se zjistí z epicu,
+  vazba je `subtask of <epic>`. Issue vzniklé, ale nepřipojené k epicu, je v chybě jmenované (nevytvářet podruhé).
+- Odpověď je jeden řádek jako u CL-28 (`CL-241 ticked: First scratch criterion · now To do`); mirror dostane odpověď zápisu
+  (po `attach` a `create` jedno čtení issue, u epicu kontrola `updated`).
+- Ověřeno proti živému trackeru na scratch kartách CL-241, FM-31 a TER-697 (CL, FM, TER klíč): create pod epicem, check,
+  edit-criterion, attach, odmítnutá nejednoznačná shoda; karty uzavřeny jako Won't do.
+
 ### Výsledek startu CLI (CL-64, 2026-10-08)
 
 - `codeloupe find <q>` proti běžícímu daemonu, medián z 10 (throwaway daemon, bez zátěže nad běžný stroj):

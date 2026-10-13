@@ -1,5 +1,6 @@
 package codeloupe.tracker.mirror
 
+import codeloupe.tracker.IssueAttachment
 import codeloupe.tracker.IssueComment
 import codeloupe.tracker.TrackerAdapter
 import codeloupe.tracker.TrackerException
@@ -51,11 +52,14 @@ class MirrorSync(
      * Writes [fields] and then [comment] to [id] (canonical) and stores what the tracker answered in the mirror at once,
      * so the issue is current without a read. A comment that fails after the fields went through is reported in the result.
      */
-    fun write(id: String, fields: Map<String, String>, comment: String?): WriteResult {
-        val before = store.issue(id)
+    fun write(id: String, fields: Map<String, String>, comment: String?, descriptionEdit: ((String) -> String)? = null): WriteResult {
+        // An edit of the description starts from the tracker's own text, not the mirror's, so that a line changed meanwhile is not lost.
+        val edited = descriptionEdit?.let { edit -> (adapter.issue(id) ?: throw TrackerException("no issue $id")).let { it to edit(it.description) } }
+        val toWrite = if (edited == null) fields else fields + ("description" to edited.second)
+        val before = edited?.first ?: store.issue(id)
         var current: TrackerIssue? = null
-        if (fields.isNotEmpty()) {
-            current = adapter.update(id, fields)
+        if (toWrite.isNotEmpty()) {
+            current = adapter.update(id, toWrite)
             store.upsert(listOf(current), clock())
         }
         var added: IssueComment? = null
@@ -71,6 +75,31 @@ class MirrorSync(
             }
         }
         return WriteResult(before, current ?: throw TrackerException("nothing to write to $id"), added, problem)
+    }
+
+    /** Stores [bytes] as [name] on [id] and the issue as the tracker now holds it (its attachments with it). */
+    fun attach(id: String, name: String, bytes: ByteArray): IssueAttachment {
+        val stored = adapter.attach(id, name, bytes)
+        adapter.issue(id)?.let { store.upsert(listOf(it), clock()) }
+        return stored
+    }
+
+    /**
+     * Creates the issue under [epic] (canonical) and stores it with its link. An issue that was made but could not be linked is
+     * named in the error, since it exists and is not to be made twice.
+     */
+    fun create(epic: String, summary: String, description: String, fields: Map<String, String>): TrackerIssue {
+        val made = adapter.create(epic, summary, description, fields)
+        store.upsert(listOf(made), clock())
+        try {
+            adapter.subtaskOf(made.id, epic)
+        } catch (e: TrackerException) {
+            throw TrackerException("${made.id} was created but is not under $epic: ${e.message}")
+        }
+        val linked = adapter.issue(made.id) ?: made
+        store.upsert(listOf(linked), clock())
+        runCatching { refresh(epic) }
+        return linked
     }
 
     /** The issue with [comment] in it, stored. Without a held version it is fetched, since the comment is already there. */
