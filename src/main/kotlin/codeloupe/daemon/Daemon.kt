@@ -36,6 +36,7 @@ import codeloupe.ports.LocalPorts
 import codeloupe.ports.PortRegistry
 import codeloupe.ports.PortStore
 import codeloupe.ports.portRoutes
+import codeloupe.secrets.KeyProtector
 import codeloupe.secrets.KeyProtectors
 import codeloupe.secrets.SecretAccess
 import codeloupe.secrets.SecretStore
@@ -129,6 +130,7 @@ class Daemon private constructor(
     private val exitOnShutdown: Boolean,
     webhookBackoffMs: List<Long>,
     secretStore: SecretStore? = null,
+    jobKeyProtector: KeyProtector? = null,
 ) {
     private val started = Instant.now()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -139,7 +141,11 @@ class Daemon private constructor(
     private val webhooks = Webhooks(eventStore, webhookKey, WebhookUrls(config.port, config.jobs.remoteWebhooks), scope, ::log, webhookBackoffMs)
     val events = EventBus(eventStore, webhooks)
     val registry = Registry(config, queue, log = ::log, emit = events::emit)
-    val jobs = JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
+    val jobs = if (jobKeyProtector == null) {
+        JobRunner(config.home, config.jobs, events, webhooks, scope, ::log)
+    } else {
+        JobRunner(config.home, config.jobs, events, webhooks, scope, ::log) { jobKeyProtector }
+    }
     private val know = Know(config.home.resolve("know.db"), AnchorChecker(RegistryIndex(registry)), config.defaultRoot)
     private val secrets = SecretAccess(config.home, preset = secretStore, rotationDays = config.secrets.rotationDays)
     private val trackerSettings = TrackerSettingsLoader.load(config.home, store = { secrets.store })
@@ -339,9 +345,10 @@ class Daemon private constructor(
             knowRoutes(know)
             brainRoutes(brain)
             post("/shutdown") {
-                val pending = jobs.pending()
-                if (pending > 0 && call.parameters["force"] != "1") {
-                    return@post call.respondJson(HttpStatusCode.Conflict, error("$pending jobs queued or running; stop --force ends them (they become lost)"))
+                // Queued jobs whose launch is stored wait for the next daemon; what runs would end.
+                val atRisk = jobs.atRisk()
+                if (atRisk > 0 && call.parameters["force"] != "1") {
+                    return@post call.respondJson(HttpStatusCode.Conflict, error("$atRisk jobs running (or queued without a stored launch); stop --force ends them (they become lost)"))
                 }
                 call.respondJson(HttpStatusCode.OK, buildJsonObject { put("ok", true) })
                 log("shutdown requested")
@@ -380,9 +387,12 @@ class Daemon private constructor(
          * Binds 127.0.0.1:<port> (one start at a time per home, [StartLock]); fails with a BindException while another daemon holds the port, and with an
          * IllegalStateException when a non-default home asks for the default home's port ([PortPolicy]).
          */
-        fun start(config: Config, exitOnShutdown: Boolean = false, webhookBackoffMs: List<Long> = Webhooks.BACKOFF_MS, secretStore: SecretStore? = null): Daemon {
+        fun start(
+            config: Config, exitOnShutdown: Boolean = false, webhookBackoffMs: List<Long> = Webhooks.BACKOFF_MS, secretStore: SecretStore? = null,
+            jobKeyProtector: KeyProtector? = null,
+        ): Daemon {
             PortPolicy.refusal(config)?.let { throw IllegalStateException(it) }
-            return StartLock.held(config.home, config.port) { Daemon(config, exitOnShutdown, webhookBackoffMs, secretStore).apply { start() } }
+            return StartLock.held(config.home, config.port) { Daemon(config, exitOnShutdown, webhookBackoffMs, secretStore, jobKeyProtector).apply { start() } }
         }
     }
 }

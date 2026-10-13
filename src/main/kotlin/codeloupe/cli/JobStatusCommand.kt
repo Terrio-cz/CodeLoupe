@@ -19,7 +19,7 @@ class JobStatusCommand : CliktCommand(name = "status") {
     private val id by argument(help = "Job id; without it the latest jobs").optional()
     private val limit by option(help = "How many of the latest jobs (default 10)").int().default(10)
 
-    override fun help(context: Context) = "One job (with its follow-ups) or the latest jobs, without waiting."
+    override fun help(context: Context) = "One job (with its follow-ups), or the latest jobs and the slots, without waiting."
 
     override fun run() {
         val client = DaemonClient(ConfigLoader.load())
@@ -31,5 +31,8 @@ class JobStatusCommand : CliktCommand(name = "status") {
         if (id != null) return echo(body.getValue("text").jsonPrimitive.content)
         val jobs = body.getValue("items").jsonArray.map { JsonFormat.json.decodeFromJsonElement(JobRecord.serializer(), it) }
         echo(jobs.joinToString("\n") { JobReport.line(it) }.ifEmpty { "no jobs" })
+        val (slotStatus, slots) = client.send("GET", "/jobs/slots")
+        val text = slots["text"]?.jsonPrimitive?.content
+        if (slotStatus == 200 && text != null && slots["slots"]?.jsonArray?.isNotEmpty() == true) echo("slots:\n" + text.prependIndent("  "))
     }
 }

@@ -9,6 +9,7 @@ import codeloupe.config.Config
 import codeloupe.config.JobsConfig
 import codeloupe.daemon.Daemon
 import codeloupe.events.EventTypes
+import codeloupe.secrets.PassphraseProtector
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.sse.SSE
@@ -50,7 +51,8 @@ class JobsTest {
     private val home = TestRepos.tmpDir("jobs-home")
     private val hookRecord = home.resolve("hook-calls.jsonl")
     private val config = config(home, port)
-    private val daemon = Daemon.start(config, webhookBackoffMs = listOf(100, 200, 400))
+    private val keys = PassphraseProtector("test".toCharArray(), iterations = 1_000)
+    private val daemon = Daemon.start(config, webhookBackoffMs = listOf(100, 200, 400), jobKeyProtector = keys)
     private val work = TestRepos.tmpDir("jobs-work")
     private val http = JdkHttpClient.newHttpClient()
 
@@ -251,29 +253,40 @@ class JobsTest {
     }
 
     @Test
-    fun `a daemon that crashed leaves its jobs lost, their processes ended and their logs kept`() {
+    fun `a daemon that crashed takes over a job whose process survived and loses one whose process is gone`() {
         val home2 = TestRepos.tmpDir("jobs-crash")
-        val orphan = ProcessBuilder(FakeJob.command("sleep=60000")).start()
-        val log = home2.resolve("jobs").also(Files::createDirectories).resolve("J1.log").also { Files.writeString(it, "line before the crash\n") }
+        val survivor = ProcessBuilder(FakeJob.command("sleep=2500", "exit=6")).start()
+        val gone = ProcessBuilder(FakeJob.command("exit=0")).start().also { it.waitFor(30, java.util.concurrent.TimeUnit.SECONDS) }
+        val logs = home2.resolve("jobs").also(Files::createDirectories)
+        fun running(id: String, process: Process, wake: Wake) = JobRecord(
+            id = id, rootId = id, command = "sleep", cwd = work.toString(), slot = "crash-slot", status = JobStatus.RUNNING, createdAt = Instant.now().toString(),
+            startedAt = Instant.now().toString(), log = logs.resolve("$id.log").also { Files.writeString(it, "line before the crash\n") }.toString(),
+            pid = process.pid(), pidStart = process.info().startInstant().map(Instant::toString).orElse(null), wakeOn = wake,
+        )
         JobStore(home2.resolve("jobs.db")).use {
-            it.put(
-                JobRecord(
-                    id = "J1", rootId = "J1", command = "sleep", cwd = work.toString(), status = JobStatus.RUNNING, createdAt = Instant.now().toString(),
-                    startedAt = Instant.now().toString(), log = log.toString(), pid = orphan.pid(),
-                    pidStart = orphan.info().startInstant().map(Instant::toString).orElse(null), wakeOn = Wake.FAILURE,
-                ),
-            )
+            it.put(running("J1", survivor, Wake.FAILURE))
+            it.put(running("J2", gone, Wake.FAILURE))
         }
-        val restarted = Daemon.start(config(home2, freePort()))
+        val restarted = Daemon.start(config(home2, freePort()), jobKeyProtector = keys)
         try {
-            val lost = restarted.jobs.get("J1")!!
+            val lost = restarted.jobs.get("J2")!!
             assertEquals(JobStatus.LOST, lost.status)
             assertEquals(listOf("line before the crash"), lost.summary!!.tail)
-            assertTrue(orphan.waitFor(10, java.util.concurrent.TimeUnit.SECONDS), "the orphan was ended")
-            assertTrue(Files.exists(log))
-            val event = restarted.events.since(0, 100).single { it.type == EventTypes.JOB_FINISHED }
+            val event = restarted.events.since(0, 100).single { it.type == EventTypes.JOB_FINISHED && it.data["id"]?.jsonPrimitive?.content == "J2" }
             assertEquals("lost", event.data.getValue("status").jsonPrimitive.content)
             assertEquals("true", event.data.getValue("wake").jsonPrimitive.content)
+
+            assertEquals(JobStatus.RUNNING, restarted.jobs.get("J1")!!.status, "the survivor is taken over, not killed")
+            assertEquals(listOf("J1"), restarted.status().jobs.slots.single { it.name == "crash-slot" }.running, "and holds its slot")
+            val ended = runBlocking { restarted.jobs.await("J1", 30_000) }.single()
+            assertTrue(survivor.waitFor(1, java.util.concurrent.TimeUnit.SECONDS))
+            if (System.getProperty("os.name").lowercase().startsWith("windows")) {
+                assertEquals(JobStatus.DONE, ended.status)
+                assertEquals(6, ended.exit, "its real exit code")
+            } else {
+                assertEquals(JobStatus.LOST, ended.status, "only its parent could read the exit code")
+            }
+            assertTrue(restarted.status().jobs.slots.none { it.name == "crash-slot" }, "the slot is free again")
         } finally {
             restarted.stop()
         }
@@ -283,7 +296,7 @@ class JobsTest {
     fun `stopping a daemon with running jobs needs force and leaves them lost`() {
         val home3 = TestRepos.tmpDir("jobs-stop")
         val port3 = freePort()
-        val first = Daemon.start(config(home3, port3))
+        val first = Daemon.start(config(home3, port3), jobKeyProtector = keys)
         val id = runBlocking { first.jobs.submit(JobRequest(FakeJob.command("print=working", "sleep=60000"), work.toString())) }
             .let { (it as Submission.Accepted).job.id }
         val pid = waitFor(id, first) { it.status == JobStatus.RUNNING && "working" in runCatching { Files.readString(Path.of(it.log)) }.getOrDefault("") }.pid!!
@@ -294,7 +307,7 @@ class JobsTest {
         assertEquals(409, refused.statusCode())
         first.stop()
         assertFalse(ProcessHandle.of(pid).map { it.isAlive }.orElse(false))
-        val second = Daemon.start(config(home3, port3))
+        val second = Daemon.start(config(home3, port3), jobKeyProtector = keys)
         try {
             val lost = second.jobs.get(id)!!
             assertEquals(JobStatus.LOST, lost.status)
