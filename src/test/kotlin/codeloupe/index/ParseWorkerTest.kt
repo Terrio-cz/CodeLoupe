@@ -45,6 +45,16 @@ class ParseWorkerTest {
     }
 
     @Test
+    fun `a batch comes back in its order with the facts of each file`() {
+        val files = (0 until 40).map { i ->
+            if (i % 5 == 0) ParseFile("src/Order$i.java", javaSource.replace("Order", "Order$i")) else ParseFile("src/Billing$i.kt", kotlinSource.replace("Billing", "Billing$i"))
+        }
+        ParseWorkerClient().use { client ->
+            assertEquals(files.map { Extraction.parseHere(it.path, it.text) }, client.extractAll(files))
+        }
+    }
+
+    @Test
     fun `a worker with nothing to parse ends by itself and the next file starts another`() {
         ParseWorkerClient(idleSeconds = 2).use { client ->
             assertNotNull(client.extract("src/Billing.kt", kotlinSource))

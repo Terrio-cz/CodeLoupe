@@ -20,16 +20,19 @@ object BaseBuilder {
         Store.open(outFile).use { db ->
             db.autoCommit = false
             StoreWriter(db).use { writer ->
+                val queue = ParseQueue()
                 BlobReader.read(repoDir, bySha.keys) { sha, text ->
                     val entries = bySha.getValue(sha)
-                    val facts = Extraction.extract(entries[0].path, text)
-                    val hash = Sha1.hex(text)
-                    for (entry in entries) {
-                        writer.put(IndexedFile(entry.path, Languages.languageOf(entry.path)!!, hash, entry.size, content = text), facts)
-                        files++
-                        if (facts.errors > 0) errors++
+                    queue.parse(ParseFile(entries[0].path, text)) { facts ->
+                        val hash = Sha1.hex(text)
+                        for (entry in entries) {
+                            writer.put(IndexedFile(entry.path, Languages.languageOf(entry.path)!!, hash, entry.size, content = text), facts)
+                            files++
+                            if (facts.errors > 0) errors++
+                        }
                     }
                 }
+                queue.flush()
             }
             Store.setMeta(db, "schema", Store.SCHEMA_VERSION)
             Store.setMeta(db, "format", Store.FORMAT)

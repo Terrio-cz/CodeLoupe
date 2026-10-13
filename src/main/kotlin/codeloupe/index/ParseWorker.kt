@@ -13,12 +13,14 @@ import kotlin.system.exitProcess
  * Child process of the daemon that parses files for it: one [ParseRequest] JSON line on stdin, one [ParseReply] line on
  * stdout. The Kotlin compiler's parser is some 30 MB of classes, symbols and code the daemon would hold for as long as it
  * lives; here it is held only while files are being edited. The worker ends when its parent closes the pipe, or when
- * nothing was asked for the number of seconds given as its argument.
+ * nothing was asked for the number of seconds given as its argument. The files of one request are parsed on
+ * [Extraction.workerThreads] threads at once; the request holds no more text than one large file (CL-247).
  */
 object ParseWorker {
     @JvmStatic
     fun main(args: Array<String>) {
         val idleMs = (args.firstOrNull()?.toLongOrNull() ?: DEFAULT_IDLE_SECONDS) * 1000
+        Extraction.useThreads(Extraction.workerThreads())
         // Anything the parser's libraries print must not be taken for an answer.
         val replies = PrintStream(FileOutputStream(FileDescriptor.out), false, Charsets.UTF_8)
         System.setOut(System.err)
@@ -36,7 +38,7 @@ object ParseWorker {
             val line = requests.readLine() ?: exitProcess(0)
             working.set(true)
             val request = JsonFormat.json.decodeFromString(ParseRequest.serializer(), line)
-            val facts = Extraction.parseHere(request.path, request.text)
+            val facts = Extraction.parseAllHere(request.files)
             replies.println(JsonFormat.json.encodeToString(ParseReply.serializer(), ParseReply(request.id, facts)))
             replies.flush()
             lastActive.set(System.currentTimeMillis())

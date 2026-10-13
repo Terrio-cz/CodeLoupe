@@ -16,6 +16,11 @@
 // agent starts), then `changes` there after the worktree moved to the task's branch origin/<id> (the coder's commits) and once
 // more unchanged. Exits 2 when the p95 of task_context or of the unchanged `changes` is over --budget ms. The worktrees and
 // branches are removed at the end.
+//
+//   ... --only tools --clone <scratch clone> --large 40:1000,300:3000 [--large-rounds 5] [--large-pause 1100]
+//
+// --large (CL-247) adds `changes` right after <count> Kotlin files were edited in a new worktree of --clone, p95 checked against
+// <budget> ms; --tasks may then be left out. A --large-pause longer than the home's parseWorkerIdleSeconds starts the worker cold.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
@@ -40,17 +45,18 @@ async function call(tool, body) {
   return { ms: performance.now() - t, ok: json.ok, text: json.text ?? json.error };
 }
 
-/** One query with the daemon's timings diffed around it; retries while the daemon is busy building. */
+/** One query with the daemon's timings diffed around it; retries while the daemon is busy building, the wait counted in. */
 async function measured(tool, body) {
+  let waited = 0;
   for (let i = 0; i < 120; i++) {
     const before = await status();
     const r = await call(tool, body);
     const after = await status();
-    if (!r.ok && /^busy/.test(r.text)) { await sleep(1000); continue; }
+    if (!r.ok && /^busy/.test(r.text)) { waited += r.ms + 1000; await sleep(1000); continue; }
     if (!r.ok) throw new Error(`${tool} ${JSON.stringify(body)}: ${r.text}`);
     const parts = {};
     for (const [k, v] of Object.entries(after.timings)) parts[k] = { count: v.count - before.timings[k].count, ms: (v.us - before.timings[k].us) / 1000 };
-    return { ms: r.ms, spawns: after.gitSpawns - before.gitSpawns, parts, rss: after.rssMb };
+    return { ms: waited + r.ms, spawns: after.gitSpawns - before.gitSpawns, parts, rss: after.rssMb };
   }
   throw new Error('daemon stayed busy');
 }
@@ -85,7 +91,7 @@ function table(rows) {
 /** The --only tools rows; returns the budget failures. */
 async function tools(rows) {
   const clone = path.resolve(args.clone), tasks = String(args.tasks || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (!tasks.length) throw new Error('--only tools needs --clone and --tasks');
+  if (!tasks.length && !args.large) throw new Error('--only tools needs --clone and --tasks or --large');
   const budget = Number(args.budget || 1000), settle = Number(args.settle ?? 20_000);
   const git = (...a) => execFileSync('git', ['-C', clone, ...a], { encoding: 'utf8' });
   const dir = fs.mkdtempSync(path.join(path.dirname(clone), 'profile-wt-'));
@@ -94,7 +100,7 @@ async function tools(rows) {
   try {
     // A daemon in use has its classes loaded and compiled: the first calls after the restart are not counted.
     await measured('find', { root: clone, q: 'LoginFailures' });
-    await measured('task_context', { root: clone, id: tasks[0] });
+    if (tasks.length) await measured('task_context', { root: clone, id: tasks[0] });
     await measured('changes', { root: clone });
     for (const id of tasks) {
       const wt = path.join(dir, id).replaceAll('\\', '/');
@@ -117,13 +123,59 @@ async function tools(rows) {
     }
     fs.rmSync(dir, { recursive: true, force: true });
   }
-  rows.push(summary('task_context, first call in a new worktree', first));
+  if (first.length) rows.push(summary('task_context, first call in a new worktree', first));
   if (moved.length) rows.push(summary('changes, first call after the task branch was checked out', moved));
   if (unchanged.length) rows.push(summary('changes, unchanged worktree', unchanged));
   const over = [];
   const p95 = runs => pct(runs.map(r => r.ms), 95);
-  if (p95(first) > budget) over.push(`task_context p95 ${p95(first).toFixed(0)} ms > ${budget} ms`);
+  if (first.length && p95(first) > budget) over.push(`task_context p95 ${p95(first).toFixed(0)} ms > ${budget} ms`);
   if (unchanged.length && p95(unchanged) > budget) over.push(`changes p95 ${p95(unchanged).toFixed(0)} ms > ${budget} ms`);
+  return over.concat(await largeEdits(rows, clone));
+}
+
+/**
+ * The --large rows (CL-247): `changes` right after a coder touched many files. For each `count:budget` a worktree of --clone gets
+ * `count` Kotlin files edited (a new function appended, new text and other files every round so no facts can be reused) and
+ * `changes` is timed; --large-pause ms between rounds (longer than the daemon's parseWorkerIdleSeconds) measure a parse worker that
+ * has to start again.
+ */
+async function largeEdits(rows, clone) {
+  const sizes = String(args.large || '').split(',').map(s => s.trim()).filter(Boolean).map(s => s.split(':').map(Number));
+  if (!sizes.length) return [];
+  const rounds = Number(args['large-rounds'] || 5), pause = Number(args['large-pause'] || 1100), over = [];
+  const git = (...a) => execFileSync('git', ['-C', clone, ...a], { encoding: 'utf8' });
+  const dir = fs.mkdtempSync(path.join(path.dirname(clone), 'profile-large-'));
+  try {
+    for (const [count, limit] of sizes) {
+      const wt = path.join(dir, `large-${count}`).replaceAll('\\', '/');
+      git('worktree', 'add', '-q', '-b', `profile-large-${count}`, wt, 'origin/HEAD');
+      try {
+        const all = execFileSync('git', ['-C', wt, 'ls-files', '*.kt'], { encoding: 'utf8' }).split('\n').filter(f => f.includes('/src/main/')).sort();
+        if (all.length < count) throw new Error(`--large ${count}: only ${all.length} Kotlin files`);
+        await measured('changes', { root: wt });
+        const runs = [];
+        let edited = [];
+        for (let r = 0; r < WARMUP + rounds; r++) {
+          await sleep(pause);
+          // The edits of the round before are undone; this round edits files shifted by one, so the merge-base versions of most
+          // are not indexed yet either, as on a reviewer's first call.
+          for (const [file, text] of edited) fs.writeFileSync(file, text);
+          const files = Array.from({ length: count }, (_, i) => path.join(wt, all[(Math.floor(i * all.length / count) + r) % all.length]));
+          edited = files.map(f => [f, fs.readFileSync(f)]);
+          edited.forEach(([f, text], i) => fs.writeFileSync(f, Buffer.concat([text, Buffer.from(`\nfun profileLarge${r}x${i}(): Int = ${i}\n`)])));
+          await sleep(1100);
+          const run = await measured('changes', { root: wt });
+          if (r >= WARMUP) runs.push(run);
+        }
+        const row = summary(`changes, ${count} Kotlin files edited`, runs);
+        row.heapLivePeakMb = (await status()).heapLivePeakMb;
+        rows.push(row);
+        if (limit && row.p95 > limit) over.push(`changes after ${count} edited files p95 ${row.p95.toFixed(0)} ms > ${limit} ms`);
+      } finally {
+        try { git('worktree', 'remove', '--force', wt); git('branch', '-q', '-D', `profile-large-${count}`); } catch (e) { console.error(String(e.message).split('\n')[0]); }
+      }
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   return over;
 }
 

@@ -14,6 +14,7 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
     private val fileWithHash = source.prepareStatement(
         "SELECT id, lang, module, source_set, package, hash, eol, errors, content FROM files WHERE path = ? AND hash = ? AND deleted = 0",
     )
+    private val holding = source.prepareStatement("SELECT 1 FROM files WHERE path = ? AND hash = ? AND deleted = 0")
     private val imports = source.prepareStatement("SELECT fqn, alias, star FROM imports WHERE file_id = ?")
     private val decls = source.prepareStatement("SELECT id, $DECL_COLUMNS, parent_id FROM decls WHERE file_id = ? ORDER BY id")
     private val refs = source.prepareStatement("SELECT $REF_COLUMNS, decl_id FROM refs WHERE file_id = ?")
@@ -37,6 +38,13 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
 
     /** As [copy], but only when the source holds [path] with the content of hash [hash]: the same text has the same facts. */
     fun copyIfSame(path: String, hash: String, size: Long, mtime: Long): Boolean = copy(fileWithHash.also { it.setString(2, hash) }, path, size, mtime)
+
+    /** Whether [copyIfSame] would copy [path] with hash [hash]; writes nothing. */
+    fun holds(path: String, hash: String): Boolean = holding.run {
+        setString(1, path)
+        setString(2, hash)
+        executeQuery().use { it.next() }
+    }
 
     private fun copy(select: PreparedStatement, path: String, size: Long, mtime: Long): Boolean {
         val (oldId, newId, content) = select.run {
@@ -85,8 +93,7 @@ class StoreCopier(source: Connection, private val target: Connection) : AutoClos
     }
 
     override fun close() {
-        listOf(file, fileWithHash, imports, decls, refs, insertFile, insertImport, insertDecl, insertRef).forEach { it.close() }
-        search.close()
+        listOf(file, fileWithHash, holding, imports, decls, refs, insertFile, insertImport, insertDecl, insertRef).forEach { it.close() }
         search.close()
     }
 

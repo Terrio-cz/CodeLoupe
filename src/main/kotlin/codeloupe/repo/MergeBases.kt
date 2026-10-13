@@ -83,7 +83,9 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
         val deadline = System.currentTimeMillis() + waitMs
         while (true) {
             if (!file.exists()) prune(dir)
-            val missing = old.filter { it.path !in present(file) }
+            // Once per round: inside the filter it opened the store once per changed file, 2-3 s for 300 files (CL-247).
+            val indexed = present(file)
+            val missing = old.filter { it.path !in indexed }
             if (missing.isEmpty()) return file
             val job = start(repo, mergeBase, file, missing)
             withTimeoutOrNull(maxOf(1, deadline - System.currentTimeMillis())) { job.await() }
@@ -116,8 +118,9 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
             // their facts are copied from there instead of parsed again, which is most of a first `changes` in a new worktree.
             factSources = synchronized(repo) { listOfNotNull(repo.baseFile, repo.previousFile) }.map { it.toString() },
         )
-        val inline = InlineParse.fits(update.puts)
-        return queue.run(if (inline) JobQueue.Lane.FAST else JobQueue.Lane.HEAVY, "merge-base:${repo.id}:$mergeBase") {
+        val inline = InlineParse.fitsAwaited(update.puts)
+        // Its own lane: in FAST it waited for the overlay refresh of the same `changes` call (1.7 s for 300 edited files, CL-247).
+        return queue.run(if (inline) JobQueue.Lane.MERGE_BASE else JobQueue.Lane.HEAVY, "merge-base:${repo.id}:$mergeBase") {
             withContext(Dispatchers.IO) {
                 if (inline) Store.open(file).use { StoreUpdater.apply(it, update, GitObjects.blobs(repo.commonDir)) } else launcher.update(repo.commonDir, null, file, update, repo.dir)
             }

@@ -7,11 +7,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Priority job queue of the daemon. Jobs with the same key coalesce (callers share one result). Lane FAST
- * (overlay refresh, writes) and lane HEAVY (base builds, normally in a child process) each run one job at a
+ * (overlay refresh, writes), lane HEAVY (base builds, normally in a child process) and lane MERGE_BASE (the
+ * merge-base index `changes` waits for beside the overlay refresh of the same call, CL-247) each run one job at a
  * time. Reads never queue.
  */
 class JobQueue(private val scope: CoroutineScope) {
-    enum class Lane { FAST, HEAVY }
+    enum class Lane { FAST, HEAVY, MERGE_BASE }
 
     private class Job(val key: String, val work: suspend () -> Any?, val queuedAt: Long) {
         val result = CompletableDeferred<Any?>()
@@ -45,7 +46,7 @@ class JobQueue(private val scope: CoroutineScope) {
 
     fun snapshot(): QueueSnapshot = synchronized(this) {
         fun lane(state: LaneState) = LaneSnapshot(state.running?.key, state.waiting.map { it.key }, state.done)
-        QueueSnapshot(lane(lanes.getValue(Lane.FAST)), lane(lanes.getValue(Lane.HEAVY)), done, failed, coalesced, waitMsMax)
+        QueueSnapshot(lane(lanes.getValue(Lane.FAST)), lane(lanes.getValue(Lane.HEAVY)), done, failed, coalesced, waitMsMax, lane(lanes.getValue(Lane.MERGE_BASE)))
     }
 
     // Called with the lock held.
