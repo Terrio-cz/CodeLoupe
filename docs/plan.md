@@ -2166,6 +2166,34 @@ rozhoduje launcher.
 - **Zamítnuto měřením**: levnější round trip workeru (režie mimo parse 1,5–2 ms; parse 4–6,5 ms a klesá s rozehřátím JIT), řidší zápis snapshotu (2,6–3,8 ms; neshoda snapshotu s overlayem se pozná, ale testy restartu Registry v jednom JVM by
   závodily o soubor, jako v CL-134), zápis snapshotu na pozadí z téhož důvodu. Nezměněno: žádné watchery, nulové CPU v klidu, hranice paměti (CL-125).
 
+### Výsledek CL-246 — `task_context` a `changes` v rozpočtu 1 s (2026-10-13)
+
+Živá telemetrie (`calls.jsonl`, daemon 0.1.6): `task_context` je skoro vždy **první** volání v čerstvém worktree plánovače
+(p50 1,6 s, p95 6,2 s za den), `changes` volá reviewer po commitech kodéra (worktree p50 ~1,8 s, canonical ~0,3 s). Profil
+(JFR + časy po částech, scratch klon Terria, worktree vytvořené 20 s před voláním jako `git start`) ukázal, že čas není CPU, ale
+čekání v řadě za sebou: tracker (`updated`) **dvakrát** za volání (pack + code facts), kontrola overlaye (3 git procesy),
+change set worktree vůči merge-base (merge-base + `diff` + `ls-files --others` za sebou), čtení ~35 markdown dokumentů pro
+`norms` (~250 ms v novém worktree); u `changes` diff vůči merge-base a kontrola overlaye za sebou a parse starých verzí změněných
+souborů do indexu merge-base, i když je base index má.
+
+- **`task_context`**: kontrola overlaye a čtení dokumentů (dopředu jen do 4 MB dohromady, větší se čtou po jednom jako dřív)
+  běží souběžně s dotazem na tracker; code facts převezmou odpověď téhož
+  refreshe (jeden round trip); change set worktree běží souběžně s historií a predikcí; `norms` souběžně s deklaracemi a callery.
+  Kontrola overlaye spuštěná dopředu se nezruší v půli (naplánovaná a neaplikovaná by prošla jako čerstvá).
+- **`changes`**: kontrola overlaye souběžně s merge-base diffem (čtení pak najde kontrolu hotovou od příchodu volání, parametr
+  `arrived` u `Registry.query`); `diff` a `untracked` souběžně; staré verze, které base index (nebo předchozí base) drží se stejným
+  obsahem na stejné cestě, se do indexu merge-base kopírují (`factSources`, jako u overlayů), ne parsují.
+- **Měření** (`tools/profile.mjs --only tools`, 10 úkolů, 4 přepnutí na větev úkolu; střídavě starý/nový build, dva páry, ms
+  klienta p50 / p95): `task_context` první volání **1 334 / 1 513, 1 301 / 1 430 → 468 / 582, 444 / 597**; `changes` beze změny
+  **464 / 566, 426 / 540 → 258 / 422, 242 / 337**; `changes` první po přepnutí na větev 2 357 / 7 969, 2 350 / 7 993 → 1 871 / 9 112,
+  1 759 / 6 522 (zbytek je parse změněných souborů do overlaye, 38 souborů ~0,5–1,4 s, 305 souborů build worker 6–8 s). První
+  `changes` v neznámém worktree na větvi úkolu: p50 2 254 / 2 226 / 2 771 → 1 758 / 1 771 / 1 957.
+- **Výstup beze změny**: 10× `task_context` a 16× `changes` (s `callers` i bez) na Terriu bajt po bajtu stejné starý vs nový build.
+- **`usages`** teplý: p50 10–114 ms (8 jmen; `ApiKey.id` poprvé 833 ms, pak 114), živě p50 98 ms za den; 901 ms v panelu bylo jedno
+  volání. **`brain_brief`** je jiná příčina (spouští node engine), beze změny.
+- **Hlídač**: `tools/profile.mjs --only tools` skončí kódem 2, když p95 `task_context` nebo nezměněného `changes` přesáhne `--budget`
+  (1 000 ms; starý build ho překročí, nový ne); testy: merge-base kopíruje z base indexu (žádný parse navíc), tracker jednou za pack.
+
 ### Výsledek CL-71 — build daemony a procesy po workspacech (2026-10-08)
 
 - **Procesy po workspacech** (`codeloupe.processes`, `GET /processes`, `ws processes`, `workspaces --ram`): proces patří workspace,

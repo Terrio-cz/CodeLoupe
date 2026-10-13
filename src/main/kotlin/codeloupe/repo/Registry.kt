@@ -15,8 +15,10 @@ import codeloupe.query.ViewPool
 import codeloupe.query.usages.BaseCaches
 import codeloupe.taskcode.TaskCodes
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
@@ -119,10 +121,15 @@ class Registry(
      * Runs [read] on what [root]'s worktree changed against the merge-base with the default branch: the change set, the
      * worktree as it is now and the merge-base versions of the changed files (null when there are none).
      */
-    suspend fun <T> changes(root: String, read: (ChangeSet, View, View?) -> T): T {
+    suspend fun <T> changes(root: String, read: (ChangeSet, View, View?) -> T): T = coroutineScope {
+        val arrived = System.nanoTime()
         val location = locate(root)
+        // The overlay check and the merge-base diff are each a few git processes, and a refresh may parse: they overlap. The read
+        // below then finds the check done since the call came in. A check is not cancelled half way: planned but not applied, it
+        // would pass for a fresh one.
+        launch { runCatching { withContext(NonCancellable) { query(root, speculative = false, arrived) { } } } }
         val set = mergeBases.changes(repo(location.commonDir), location.worktree)
-        return query(root, speculative = false) { after -> set.beforeFile?.let(::View).use { before -> read(set, after, before) } }
+        query(root, speculative = false, arrived) { after -> set.beforeFile?.let(::View).use { before -> read(set, after, before) } }
     }
 
     /** The files [root]'s worktree changed against the merge-base with the default branch, without their old versions. */
@@ -145,10 +152,9 @@ class Registry(
     /**
      * Runs [read] on the base index of [root]'s repository with [root]'s worktree overlay on top. A [speculative] read
      * starts while the worktree is checked and is thrown away when the check changed something: worth it for cheap
-     * reads only.
+     * reads only. [arrived] is when the caller's request came in (`System.nanoTime()`): a check started since then is fresh enough.
      */
-    suspend fun <T> query(root: String, speculative: Boolean = true, read: (View) -> T): T {
-        val arrived = System.nanoTime()
+    suspend fun <T> query(root: String, speculative: Boolean = true, arrived: Long = System.nanoTime(), read: (View) -> T): T {
         val location = locate(root)
         val repo = base(repo(location.commonDir))
         repeat(ATTEMPTS) {

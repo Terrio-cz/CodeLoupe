@@ -17,6 +17,7 @@ import codeloupe.lang.Languages
 import codeloupe.platform.IsoTime
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.nio.file.Files
@@ -35,9 +36,11 @@ import kotlin.io.path.name
 internal class MergeBases(private val queue: JobQueue, private val launcher: BuildLauncher, private val waitMs: Long) {
     /** [withBefore] false skips the merge-base index: the caller wants the changed paths only. */
     suspend fun changes(repo: RepoState, worktree: String, withBefore: Boolean = true): ChangeSet = withContext(Dispatchers.IO) {
+        // Two git processes that do not depend on each other: on a busy machine each takes 100-300 ms.
+        val untrackedFiles = async { WorktreeGit.untracked(worktree) }
         val mergeBase = mergeBase(repo, worktree)
         val diff = DiffEntry.parse(Git.run(worktree, "diff", "--raw", "-z", "--no-renames", "--no-abbrev", "--no-ext-diff", "--no-textconv", mergeBase, "--")!!)
-        val untracked = WorktreeGit.untracked(worktree).toSet()
+        val untracked = untrackedFiles.await().toSet()
         val (indexed, other) = (diff.map { it.path } + untracked).distinct().partition { Languages.languageOf(it) != null }
         val status = diff.associate { it.path to it.status }
         val files = indexed.map { ChangedFile(it, statusOf(status[it], it in untracked)) }
@@ -109,6 +112,9 @@ internal class MergeBases(private val queue: JobQueue, private val launcher: Bui
         val update = StoreUpdate(
             puts = missing.map { FilePut(it.path, blob = it.oldBlob, size = sizes[it.oldBlob] ?: 0) },
             meta = mapOf("commit" to mergeBase, "built_at" to IsoTime.now()),
+            // Most old versions are what the base index holds at the same path (a worktree started from a recent default branch):
+            // their facts are copied from there instead of parsed again, which is most of a first `changes` in a new worktree.
+            factSources = synchronized(repo) { listOfNotNull(repo.baseFile, repo.previousFile) }.map { it.toString() },
         )
         val inline = InlineParse.fits(update.puts)
         return queue.run(if (inline) JobQueue.Lane.FAST else JobQueue.Lane.HEAVY, "merge-base:${repo.id}:$mergeBase") {

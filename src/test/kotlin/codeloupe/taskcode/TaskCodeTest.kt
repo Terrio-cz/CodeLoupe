@@ -244,6 +244,18 @@ class TaskCodeTest {
         assertFalse("## norms" in text, text)
     }
 
+    @Test
+    fun `task_context asks the tracker about its issue once`() {
+        // A mirror that is never fresh asks on every refresh: the pack's own and the code facts' would be two round trips.
+        val eager = TrackerMirror(instance, YouTrackAdapter(fake), MirrorStore(TestRepos.tmpDir("eager").resolve("t.db")), 0)
+        runBlocking { eager.syncProject("CL", 0) }
+        val tool = TaskContextTool(Trackers(listOf(eager), TrackerSettings(listOf(instance)), scope), DocMemory())
+        fake.requests.clear()
+        val text = runBlocking { tool.answer(registry, repo.toString(), ToolArgs(buildJsonObject { put("id", JsonPrimitive("CL-91")) })) }
+        assertContains(text, "## declarations")
+        assertEquals(1, fake.requests.count { it.startsWith("/api/issues/CL-91?fields=updated") }, fake.requests.joinToString("\n"))
+    }
+
     private val contextTool = TaskContextTool(trackers, DocMemory())
 
     private fun context(id: String, vararg more: Pair<String, String>, session: String = repo.toString()): String = runBlocking {

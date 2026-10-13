@@ -49,6 +49,9 @@ What no test proves, because it needs a machine CI does not offer or cannot repr
 profiles a warm query, the first query in a worktree and (with `--clone`) an overlay refresh: client latency split
 by the daemon's own timings (`/status` `timings`, `gitSpawns`) into git, worktree walk, SQL, the rest of the tool and HTTP.
 `--only edit` runs just the refresh rows, after `--warmup` (2) cycles that are not counted.
+`--only tools --clone <scratch clone> --tasks TER-1,TER-2` profiles what starts a plan and a review: `task_context` as the first
+call in a new worktree of each task, then `changes` after the worktree moved to the task's branch (`origin/<id>`) and unchanged;
+it exits 2 when the p95 of `task_context` or of the unchanged `changes` is over `--budget` (1000 ms).
 
 `node tools/benchmark.mjs --work <scratch dir>` reproduces [docs/benchmarks.md](https://github.com/Terrio-cz/CodeLoupe/blob/main/docs/benchmarks.md) after `./gradlew installDist`
 (needs git, ripgrep and network; about 25 minutes). It clones the public repositories at pinned commits into the scratch

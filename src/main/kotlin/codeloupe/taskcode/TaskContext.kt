@@ -12,6 +12,13 @@ import codeloupe.tracker.read.IssueRender
 import codeloupe.tracker.read.Parts
 import codeloupe.tracker.read.TaskRows
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.nio.file.Path
 
 /**
  * What a planner needs to start on a task, as one [Doc] of sections instead of the issue, related and search round trips:
@@ -24,15 +31,19 @@ import kotlinx.coroutines.CancellationException
 class TaskContext(private val registry: Registry, private val trackers: Trackers, private val code: TaskCodeQuery) {
     private val callers = TouchedCallers(registry)
 
-    suspend fun build(root: String, id: String): Doc {
+    suspend fun build(root: String, id: String): Doc = coroutineScope {
         val (mirror, canonical) = trackers.mirror(id)
             ?: throw IllegalArgumentException("no tracker mirrors the project of '$id'; mirrored: ${trackers.projects().joinToString(", ")}")
+        // The first call in a new worktree waits on git, the tracker and the disk; none of these depends on another, so they overlap.
+        // The overlay check is not cancelled half way: a check that was planned but not applied would pass for a fresh one.
+        launch { runCatching { withContext(NonCancellable) { registry.query(root, speculative = false) { } } } }
+        val documents = async(Dispatchers.IO) { runCatching { Path.of(registry.locate(root).worktree).let { it to DocMentions.readAhead(it) } } }
         val note = mirror.refresh(canonical)
         val issue = mirror.store.issue(canonical) ?: throw IllegalArgumentException(note ?: "no issue $canonical")
         val context = IssueContext(mirror.store, issue)
         var failure: String? = null
         val facts = try {
-            code.facts(root, canonical)
+            code.facts(root, canonical, TaskCodeQuery.Refreshed(note))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -40,6 +51,10 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
             null
         }
         val paths = facts?.let { paths(it) }.orEmpty()
+        val norms = async(Dispatchers.IO) {
+            val read = documents.await().getOrNull()
+            optional { norms(facts, paths) { worktree -> read?.takeIf { it.first == worktree }?.second } }
+        }
         val pieces = listOf(
             "issue" to IssueRender.render(context, Parts.of(null, emptyList())),
             "description" to IssueDescription.render(issue.description),
@@ -51,9 +66,9 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
             "callers" to optional { callers.render(root, paths, facts?.let(::members).orEmpty()) },
             "prior" to prior(facts, canonical, paths, mirror.store),
             "cochange" to optional { cochange(facts, canonical, paths) },
-            "norms" to optional { norms(facts, paths) },
+            "norms" to norms.await(),
         )
-        return Doc.of("context:$canonical", pieces.filter { it.second.isNotBlank() }.map { (handle, text) -> Triple(handle, handle, "## $handle\n$text") })
+        Doc.of("context:$canonical", pieces.filter { it.second.isNotBlank() }.map { (handle, text) -> Triple(handle, handle, "## $handle\n$text") })
     }
 
     /** The extra parts of the pack are a help, not the answer: one that fails (an unreadable file, a hostile document) is left out. */
@@ -144,13 +159,16 @@ class TaskContext(private val registry: Registry, private val trackers: Trackers
         return CoChange(f.store).render(self, paths, named)
     }
 
-    /** The repository's own rules and documents that bear on the touched code, so the planner reads those lines and not the whole files. */
-    private fun norms(f: TaskCodeQuery.Facts?, paths: List<String>): String {
+    /**
+     * The repository's own rules and documents that bear on the touched code, so the planner reads those lines and not the whole files.
+     * [documents] gives the markdown documents of a worktree when they were read ahead.
+     */
+    private fun norms(f: TaskCodeQuery.Facts?, paths: List<String>, documents: (Path) -> List<DocMentions.Document>?): String {
         if (f == null) return ""
         // New files count for the areas they join: their module and folders tell which rules apply.
         val fresh = f.answer.prediction?.predictions.orEmpty().filter { it.mark == Prediction.NEW }.mapNotNull { it.path }
         val terms = NormTerms.of((paths + fresh).distinct())
-        val docs = DocMentions.render(f.worktree, terms)
+        val docs = DocMentions.render(f.worktree, terms, documents(f.worktree))
         val docsText = if (docs.isEmpty()) "" else "documents that name the touched files:" + NL + docs
         return listOf(AgentsNorms.render(f.worktree, terms), docsText).filter { it.isNotEmpty() }.joinToString(NL)
     }

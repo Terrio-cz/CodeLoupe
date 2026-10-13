@@ -13,6 +13,8 @@ import codeloupe.tracker.read.TaskList
 import codeloupe.tracker.read.TaskRow
 import codeloupe.tracker.read.TaskRows
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.nio.file.Files
 import java.nio.file.Path
@@ -49,11 +51,17 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
         return if (p.note == null) answer else "$answer\n${p.note}"
     }
 
-    /** The code facts of the task [id]: landed, in a worktree, predicted. */
-    suspend fun facts(root: String, id: String): Facts {
+    /**
+     * The code facts of the task [id]: landed, in a worktree, predicted. A caller that has just refreshed the mirrored issue passes
+     * what that refresh answered as [refreshed], so the tracker is not asked twice in one call.
+     */
+    suspend fun facts(root: String, id: String, refreshed: Refreshed? = null): Facts {
         val p = prelude(root)
-        return Facts(taskAnswer(root, p.dir, p.repo, p.store, id.trim()), p.store, p.repo, p.dir, p.note)
+        return Facts(taskAnswer(root, p.dir, p.repo, p.store, id.trim(), refreshed), p.store, p.repo, p.dir, p.note)
     }
+
+    /** What [TrackerMirror.refresh] answered for the issue: null when it is current, else its note. */
+    class Refreshed(val note: String?)
 
     /** Where a task touches the code: [files] path → mark (`=` sure, `~` likely, `?` guess, `+` new); landed work counts as sure. */
     class Touch(val id: String, val files: Map<String, Char>, val landed: Boolean)
@@ -90,22 +98,23 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
         }
     }
 
-    private suspend fun taskAnswer(root: String, dir: Path, repo: RepoState, store: TaskCodeStore, query: String): TaskCodeRender.TaskAnswer {
+    private suspend fun taskAnswer(root: String, dir: Path, repo: RepoState, store: TaskCodeStore, query: String, refreshed: Refreshed? = null): TaskCodeRender.TaskAnswer = coroutineScope {
         val mirrored = trackers.mirror(query)
         val id = mirrored?.second ?: query.uppercase()
-        val note = mirrored?.first?.refresh(id)?.takeIf { it.startsWith("(") }
+        val note = (if (refreshed != null) refreshed.note else mirrored?.first?.refresh(id))?.takeIf { it.startsWith("(") }
         val issue = mirrored?.first?.store?.issue(id)
         val row = mirrored?.let { TaskRows.row(it.first.store, id) }
+        // The worktree's change set is two git processes; they run while the history and the prediction are read.
+        val worktree = async { worktree(repo, id) }
         val landed = withContext(Dispatchers.IO) { LandedTask.of(store, id) }
         val files = withContext(Dispatchers.IO) { landed.files(store) }
         val decls = withContext(Dispatchers.IO) { landed.decls { registry.taskCodes.decls(repo, store, it) } }
-        val worktree = worktree(repo, id)
         val prediction = if (issue != null && (issue.resolved == null || landed.commits.isEmpty())) {
             registry.query(root, speculative = false) { view -> predict(view, dir, repo, mirrored.first, id, issue.updated) }
         } else {
             null
         }
-        return TaskCodeRender.TaskAnswer(id, row, landed, files, decls, worktree, prediction, note)
+        TaskCodeRender.TaskAnswer(id, row, landed, files, decls, worktree.await(), prediction, note)
     }
 
     /** The worktree whose branch names [id], with what it changed against the merge-base. */

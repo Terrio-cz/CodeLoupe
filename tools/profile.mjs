@@ -8,6 +8,14 @@
 //     --root <repo> --worktree <linked worktree> [--clone <scratch clone to edit>] [--n 60] [--edits 5] [--warmup 2] [--only edit] [--out profile.json]
 //
 // --only edit runs just the overlay-refresh rows (needs --clone). --root and --worktree are only read. --clone gets a line appended to one of its .kt files and restored afterwards.
+//
+//   node tools/profile.mjs --only tools --cli ... --home <tmp> --port 47471 --clone <scratch clone> --tasks TER-193,TER-638 [--budget 1000] [--settle 20000]
+//
+// --only tools (CL-246) profiles the calls that start a plan and a review: `task_context` as the first call in a new worktree of
+// --clone for each --tasks id (branch profile-<id> at the default branch, made --settle ms earlier, as `git start` does before an
+// agent starts), then `changes` there after the worktree moved to the task's branch origin/<id> (the coder's commits) and once
+// more unchanged. Exits 2 when the p95 of task_context or of the unchanged `changes` is over --budget ms. The worktrees and
+// branches are removed at the end.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
@@ -74,10 +82,64 @@ function table(rows) {
   return out.join('\n');
 }
 
+/** The --only tools rows; returns the budget failures. */
+async function tools(rows) {
+  const clone = path.resolve(args.clone), tasks = String(args.tasks || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!tasks.length) throw new Error('--only tools needs --clone and --tasks');
+  const budget = Number(args.budget || 1000), settle = Number(args.settle ?? 20_000);
+  const git = (...a) => execFileSync('git', ['-C', clone, ...a], { encoding: 'utf8' });
+  const dir = fs.mkdtempSync(path.join(path.dirname(clone), 'profile-wt-'));
+  const made = [];
+  const first = [], moved = [], unchanged = [];
+  try {
+    // A daemon in use has its classes loaded and compiled: the first calls after the restart are not counted.
+    await measured('find', { root: clone, q: 'LoginFailures' });
+    await measured('task_context', { root: clone, id: tasks[0] });
+    await measured('changes', { root: clone });
+    for (const id of tasks) {
+      const wt = path.join(dir, id).replaceAll('\\', '/');
+      git('worktree', 'add', '-q', '-b', `profile-${id}`, wt, 'origin/HEAD');
+      made.push(wt);
+    }
+    await sleep(settle);
+    for (const [i, id] of tasks.entries()) first.push(await measured('task_context', { root: made[i], id }));
+    for (const [i, id] of tasks.entries()) {
+      try { git('rev-parse', '-q', '--verify', `origin/${id}^{commit}`); } catch { continue; }
+      execFileSync('git', ['-C', made[i], 'reset', '-q', '--hard', `origin/${id}`]);
+      await sleep(1100);
+      moved.push(await measured('changes', { root: made[i] }));
+      await sleep(1100);
+      unchanged.push(await measured('changes', { root: made[i] }));
+    }
+  } finally {
+    for (const wt of made) {
+      try { git('worktree', 'remove', '--force', wt); git('branch', '-q', '-D', `profile-${path.basename(wt)}`); } catch (e) { console.error(String(e.message).split('\n')[0]); }
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  rows.push(summary('task_context, first call in a new worktree', first));
+  if (moved.length) rows.push(summary('changes, first call after the task branch was checked out', moved));
+  if (unchanged.length) rows.push(summary('changes, unchanged worktree', unchanged));
+  const over = [];
+  const p95 = runs => pct(runs.map(r => r.ms), 95);
+  if (p95(first) > budget) over.push(`task_context p95 ${p95(first).toFixed(0)} ms > ${budget} ms`);
+  if (unchanged.length && p95(unchanged) > budget) over.push(`changes p95 ${p95(unchanged).toFixed(0)} ms > ${budget} ms`);
+  return over;
+}
+
 async function main() {
   const rows = [];
   await restart();
   const root = args.root, wt = args.worktree;
+  if (args.only === 'tools') {
+    const over = await tools(rows);
+    cli('stop');
+    const md = table(rows);
+    console.log(md);
+    if (args.out) fs.writeFileSync(args.out, JSON.stringify({ at: new Date().toISOString(), clone: args.clone, tasks: args.tasks, rows, table: md, over }, null, 2));
+    if (over.length) { console.error(`over budget: ${over.join('; ')}`); process.exit(2); }
+    return;
+  }
   const edit = args.only === 'edit';
   if (!edit) {
     await measured('find', { root, q: 'LoginFailures' });
