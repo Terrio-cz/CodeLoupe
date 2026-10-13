@@ -12,9 +12,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 /**
- * The daemon's side of a [ParseWorker]: starts it on the first file to parse, asks it for the facts of each file, and starts
- * it again when it ended (idle, or a crash). A worker that does not answer within [answerSeconds] is killed. [extract] gives
- * null when no worker can be had, so the caller parses itself rather than failing.
+ * The daemon's side of a [ParseWorker]: starts it on the first file to parse, asks it for the facts of a batch of files, and
+ * starts it again when it ended (idle, or a crash). A worker that does not answer within [answerSeconds] is killed. [extractAll]
+ * gives null when no worker can be had, so the caller parses itself rather than failing.
  */
 class ParseWorkerClient(
     private val idleSeconds: Long = ParseWorker.DEFAULT_IDLE_SECONDS,
@@ -32,11 +32,13 @@ class ParseWorkerClient(
     @get:Synchronized
     val pid: Long? get() = process?.takeIf { it.isAlive }?.pid()
 
+    fun extract(path: String, text: String): FileFacts? = extractAll(listOf(ParseFile(path, text)))?.single()
+
     @Synchronized
-    fun extract(path: String, text: String): FileFacts? {
+    fun extractAll(files: List<ParseFile>): List<FileFacts>? {
         repeat(ATTEMPTS) { attempt ->
             try {
-                return roundTrip(path, text)
+                return roundTrip(files)
             } catch (e: Exception) {
                 // Also a reply that is not what was asked for (a serializer error): the worker is not trusted after it.
                 log("parse worker: ${e.message.orEmpty().lineSequence().first()}" + if (attempt + 1 < ATTEMPTS) "; starting another" else "")
@@ -52,19 +54,21 @@ class ParseWorkerClient(
         killer.shutdownNow()
     }
 
-    private fun roundTrip(path: String, text: String): FileFacts {
+    private fun roundTrip(files: List<ParseFile>): List<FileFacts> {
         val worker = ensure()
         val id = next++
         val watch = killer.schedule({ worker.destroyForcibly() }, answerSeconds, TimeUnit.SECONDS)
+        val what = files.first().path + if (files.size > 1) " and ${files.size - 1} more" else ""
         try {
-            output!!.write(JsonFormat.json.encodeToString(ParseRequest.serializer(), ParseRequest(id, path, text)))
+            output!!.write(JsonFormat.json.encodeToString(ParseRequest.serializer(), ParseRequest(id, files)))
             output!!.newLine()
             output!!.flush()
             // A JVM message that slipped onto stdout is not an answer.
-            var line = input!!.readLine() ?: throw IOException("ended before answering for $path")
-            while (!line.startsWith("{")) line = input!!.readLine() ?: throw IOException("ended before answering for $path")
+            var line = input!!.readLine() ?: throw IOException("ended before answering for $what")
+            while (!line.startsWith("{")) line = input!!.readLine() ?: throw IOException("ended before answering for $what")
             val reply = JsonFormat.json.decodeFromString(ParseReply.serializer(), line)
             if (reply.id != id) throw IOException("answered ${reply.id} to $id")
+            if (reply.facts.size != files.size) throw IOException("answered ${reply.facts.size} files of ${files.size}")
             return reply.facts
         } finally {
             watch.cancel(false)

@@ -234,7 +234,8 @@ Pozice jen řádek/sloupec (CRLF vs LF nevadí).
 - Lokace worktree (`.git`, `gitdir:`, `commondir`), výchozí větev, seznam worktree a refy se čtou ze souborů
   v procesu, merge-base a git objekty přes JGit; git proces jen pro stav pracovního stromu (diff, untracked,
   ignorované) a jako záloha, když JGit repozitář neotevře (CL-96).
-- Obnova vrstvy ve FAST lane, parse v daemonu (≤ 200 souborů do 512 KB), jinak build worker v HEAVY lane.
+- Obnova vrstvy ve FAST lane, parse v daemonu (≤ 200 souborů do 512 KB; s parse workerem ≤ 1 000 souborů, CL-247), jinak build
+  worker v HEAVY lane. Totéž pro index merge-base, na který `changes` čeká.
 - Správnost vrstvy nezávisí na čerstvosti báze; zastaralá báze jen zvětší vrstvu.
 - Sync báze líně (výchozí větev ≠ `B`): předchozí báze + změněné bloby; ≤ 200 souborů inline (dotaz počká),
   větší v HEAVY lane (worker) a dotazy mezitím odpovídají ze staré báze. Předchozí báze zůstává do dalšího
@@ -2193,6 +2194,39 @@ souborů do indexu merge-base, i když je base index má.
   volání. **`brain_brief`** je jiná příčina (spouští node engine), beze změny.
 - **Hlídač**: `tools/profile.mjs --only tools` skončí kódem 2, když p95 `task_context` nebo nezměněného `changes` přesáhne `--budget`
   (1 000 ms; starý build ho překročí, nový ne); testy: merge-base kopíruje z base indexu (žádný parse navíc), tracker jednou za pack.
+
+### Výsledek CL-247 — `changes` po velkých editacích (2026-10-13)
+
+Scénář `tools/profile.mjs --only tools --large 40:1000,300:3000` (scratch klon Terria, nový worktree, každé kolo jiných 40 / 300
+souborů s novou funkcí, takže se nic nedá převzít; `--large-pause 5000` s `parseWorkerIdleSeconds` 2 měří studený parse worker).
+Čas nešel hlavně na parse:
+
+- **Index merge-base se otevíral jednou na každý změněný soubor**: `old.filter { it.path !in present(file) }` volal `present` (otevření
+  storu jen pro čtení, 1–8 ms) v lambdě filtru; 300 souborů 2–3 s při každém `changes`, 40 souborů ~0,3 s. Teď jednou za kolo.
+- **Přes 200 souborů build worker**: studený JVM s nižší prioritou a heapem 512 MB, 4,5–10 s, pod zátěží i 51 s. S parse workerem
+  drží daemon jen jednu dávku textu, proto obnova overlaye a index merge-base (na obojí dotaz čeká) zůstávají v daemonu do
+  1 000 souborů (`InlineParse.fitsAwaited`); sync báze a soubory nad 512 KB beze změny.
+- **Čtení souborů po jednom**: první otevření právě zapsaného souboru čeká na Windows na on-access scan (5–15 ms). Plánovač overlaye i
+  `StoreUpdater` čtou teď 8 vlákny dopředu, nejvýš 1 MB (`ReadAhead`), v původním pořadí.
+- **Parse po jednom souboru s round tripem**: `ParseQueue` sbírá zápisy a parsuje dávky (nejvýš 128 K znaků a 64 kroků) jedním
+  požadavkem; worker (i build worker) je parsuje na `clamp(jader / 2, 1, 4)` vláknech. Zápisy jdou v pořadí, v jakém přišly (i kopie
+  z `factSources`, o nichž rozhodne dotaz bez zápisu), takže store je řádek po řádku stejný včetně id. Dávka 512 K znaků měla odpověď
+  ~4 MB JSON, která šla rovnou do tenured generace: RSS daemonu 343–359 MB po 300 souborech; se 128 K 162 MB.
+- **Index merge-base čekal ve FAST lane na obnovu overlaye téhož volání** (1,7 s u 300 souborů): má vlastní lane `MERGE_BASE`.
+- **Měření** (ms klienta p50 / p95, 5 kol, stroj zatížený jinými okny ~50 % CPU, starý a nový build ~1 h od sebe): teplý worker
+  40 souborů **896 / 1 008 → 361 / 386**, 300 souborů **8 178 / 9 865 → 1 507 / 1 656**; studený worker 40 souborů 1 854 / 2 366 →
+  1 038 / 1 490, 300 souborů 92 356 / 112 741 (build worker hladověl, `busy`) → 2 622 / 2 949. První `changes` v čerstvém daemonu
+  (40 / 300 necommitnutých, 300 commitnutých na starší merge-base): 2 366 / 20 492 / 13 759 → 1 341 / 1 831 / 2 377.
+- **Paměť**: živý heap daemonu (`heapLivePeakMb`) 18–20 MB z 256; RSS daemonu ve špičce 222–233 MB (starý 178–201, rozpočet špičky
+  300); parse worker 116–165 MB RSS při 4 vláknech (heap dál 96 MB, dávka drží text jednoho velkého souboru); build worker se pro
+  overlay do 1 000 souborů nespouští.
+- **Výstup beze změny**: 15 volání (`changes` výchozí, `callers`, `bodies`, `find`, `outline`) po 40 / 300 / 300 commitnutých editacích
+  bajt po bajtu stejných starý vs nový build; 2 689 souborů Terria jednotlivě vs v dávkách na 4 vláknech 7× bez rozdílu;
+  `ParallelParseTest` (vlastní zdroje, 1 vs 4 vlákna; base index řádek po řádku včetně id).
+- **Zbývá studený worker**: start JVM + prostředí parseru ~850 ms. AOT cache workeru (`-XX:AOTCacheOutput`) ho v pokusu zkrátila na
+  ~330 ms; nezavedeno (desktopová aplikace daemon spouští bez AOT infrastruktury CL-150). Zamítnuto: předstartování workeru na každé
+  `changes` (ušetří ≤ 150 ms, stojí ~100 MB na 5 min), delší nečinnost workeru (paměť CL-125).
+- **Hlídač**: `--large 40:1000,300:3000` skončí kódem 2 nad rozpočtem (teplý worker; starý build ho překročí, nový ne).
 
 ### Výsledek CL-71 — build daemony a procesy po workspacech (2026-10-08)
 

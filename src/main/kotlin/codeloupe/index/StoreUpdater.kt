@@ -1,7 +1,9 @@
 package codeloupe.index
 
 import codeloupe.git.BlobSource
+import codeloupe.lang.FileFacts
 import codeloupe.lang.Languages
+import codeloupe.platform.ReadAhead
 import codeloupe.platform.Sha1
 import java.io.IOException
 import java.nio.file.Files
@@ -20,8 +22,9 @@ object StoreUpdater {
                     update.removes.forEach(writer::remove)
                     update.tombstones.forEach(writer::tombstone)
                     copy(db, update)
-                    update.puts.filter { it.blob == null }.forEach(::putFile)
+                    putFiles(update.puts.filter { it.blob == null })
                     putBlobs(blobs, update.puts.filter { it.blob != null })
+                    finish()
                 } }
             }.also {
                 for ((key, value) in update.meta) Store.setMeta(db, key, value)
@@ -43,21 +46,32 @@ object StoreUpdater {
         var reused = 0
         val unread = ArrayList<String>()
 
+        private val queue = ParseQueue()
+
         fun copy(db: Connection, update: StoreUpdate) {
             if (update.copies.isEmpty()) return
             Store.open(Path.of(update.copySource!!), readOnly = true).use { source ->
                 StoreCopier(source, db).use { copier ->
                     for (entry in update.copies) {
-                        writer.remove(entry.path)
-                        if (copier.copy(entry.path, entry.size, entry.mtime)) files++ else putFile(entry)
+                        queue.then {
+                            writer.remove(entry.path)
+                            if (copier.copy(entry.path, entry.size, entry.mtime)) files++ else putFile(entry)
+                        }
                     }
+                    queue.flush()
                 }
             }
         }
 
-        fun putFile(entry: FilePut) {
-            // Gone or locked since it was stamped: left as it was; the caller checks it again next time.
-            val text = read(Path.of(entry.file!!))
+        /** Writes what still waits for its parse. */
+        fun finish() = queue.flush()
+
+        fun putFiles(entries: List<FilePut>) = ReadAhead.each(entries, { it.size }, { read(Path.of(it.file!!)) }, ::putText)
+
+        fun putFile(entry: FilePut) = putText(entry, read(Path.of(entry.file!!)))
+
+        // Gone or locked since it was stamped: left as it was; the caller checks it again next time.
+        private fun putText(entry: FilePut, text: String?) {
             if (text == null) unread += entry.path else put(entry, text, entry.size)
         }
 
@@ -72,13 +86,25 @@ object StoreUpdater {
         private fun put(entry: FilePut, text: String, size: Long) {
             val hash = Sha1.hex(text)
             // The same text at the same path has the same facts: a store that parsed it already hands them over.
-            writer.remove(entry.path)
-            if (sources.copy(entry.path, hash, size, entry.mtime)) {
-                files++
-                reused++
+            if (sources.has(entry.path, hash)) {
+                queue.then(text.length) {
+                    writer.remove(entry.path)
+                    if (sources.copy(entry.path, hash, size, entry.mtime)) {
+                        files++
+                        reused++
+                    } else {
+                        write(entry, text, hash, size, Extraction.extract(entry.path, text))
+                    }
+                }
                 return
             }
-            val facts = Extraction.extract(entry.path, text)
+            queue.parse(ParseFile(entry.path, text)) { facts ->
+                writer.remove(entry.path)
+                write(entry, text, hash, size, facts)
+            }
+        }
+
+        private fun write(entry: FilePut, text: String, hash: String, size: Long, facts: FileFacts) {
             writer.put(IndexedFile(entry.path, Languages.languageOf(entry.path)!!, hash, size, entry.mtime, text), facts)
             files++
             if (facts.errors > 0) errors++

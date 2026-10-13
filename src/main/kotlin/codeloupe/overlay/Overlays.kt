@@ -255,7 +255,7 @@ class Overlays(
             commit(state, change, emptyList())
             return null
         }
-        val heavy = !InlineParse.fits(update.puts)
+        val heavy = !InlineParse.fitsAwaited(update.puts)
         val job = queue.run(if (heavy) JobQueue.Lane.HEAVY else JobQueue.Lane.FAST, "overlay:${state.worktree}") {
             withContext(Dispatchers.IO) {
                 val started = System.nanoTime()

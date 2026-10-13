@@ -6,6 +6,7 @@ import codeloupe.index.InlineParse
 import codeloupe.index.Store
 import codeloupe.index.StoreUpdate
 import codeloupe.lang.Languages
+import codeloupe.platform.ReadAhead
 import codeloupe.platform.Sha1
 import java.io.IOException
 import java.nio.file.Files
@@ -106,6 +107,7 @@ internal object OverlayPlanner {
         val remembered = HashMap(scan)
         val unknown = ArrayList<String>()
         val gone = ArrayList<String>()
+        val compared = ArrayList<String>()
         BaseFiles(baseFile).use { base ->
             for (path in moved) {
                 val stamp = scan[path]
@@ -131,13 +133,15 @@ internal object OverlayPlanner {
                     }
                     continue
                 }
-                val baseText = base.content(path)!!
-                val text = read(Path.of(state.worktree, path))
+                compared += path
+            }
+            // Read several at a time: after a large edit each first open waits for the on-access scan (CL-247).
+            ReadAhead.each(compared, { scan.getValue(it).size }, { read(Path.of(state.worktree, it)) }) { path, text ->
                 when {
                     // Locked or gone while we looked: keep the old stamp, so the next check reads it again.
                     text == null -> state.scan[path]?.let { remembered[path] = it } ?: remembered.remove(path)
-                    sameText(text, baseText) -> target -= path
-                    else -> target[path] = stamp
+                    sameText(text, base.content(path)!!) -> target -= path
+                    else -> target[path] = scan.getValue(path)
                 }
             }
         }

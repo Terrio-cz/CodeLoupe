@@ -33,4 +33,17 @@ class JobQueueTest {
         val stats = queue.snapshot()
         assertEquals(listOf(2, 1, 1), listOf(stats.done, stats.failed, stats.coalesced))
     }
+
+    @Test
+    fun `a merge-base index does not wait for the overlay refresh of the same call`() = runBlocking(Dispatchers.Default) {
+        val queue = JobQueue(this)
+        val refreshGate = CompletableDeferred<Unit>()
+        val refresh = queue.run(JobQueue.Lane.FAST, "overlay:wt") { refreshGate.await() }
+        val mergeBase = queue.run(JobQueue.Lane.MERGE_BASE, "merge-base:r:abc") { "indexed" }
+        assertEquals("indexed", mergeBase.await(), "done while the refresh still runs")
+        assertEquals("overlay:wt", queue.snapshot().fast.running)
+        refreshGate.complete(Unit)
+        refresh.await()
+        assertEquals(1, queue.snapshot().mergeBase.done)
+    }
 }

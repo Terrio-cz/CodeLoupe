@@ -20,6 +20,12 @@ internal class FactSources(private val paths: List<String>, private val target: 
         return opened.any { runCatching { it.copier.copyIfSame(path, hash, size, mtime) }.getOrDefault(false) }
     }
 
+    /** Whether [copy] would find [path] with hash [hash] in some store; writes nothing. */
+    fun has(path: String, hash: String): Boolean {
+        if (!loaded) open()
+        return opened.any { runCatching { it.copier.holds(path, hash) }.getOrDefault(false) }
+    }
+
     private fun open() {
         loaded = true
         for (p in paths) {

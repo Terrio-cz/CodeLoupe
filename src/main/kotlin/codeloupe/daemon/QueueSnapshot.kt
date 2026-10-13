@@ -10,4 +10,5 @@ data class QueueSnapshot(
     val failed: Int,
     val coalesced: Int,
     val waitMsMax: Long,
+    val mergeBase: LaneSnapshot = LaneSnapshot(null, emptyList()),
 )
