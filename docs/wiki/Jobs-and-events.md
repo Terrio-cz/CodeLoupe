@@ -51,8 +51,9 @@ codeloupe job move J261007-142240-k3m9 --first               # or --before <id> 
   `.bat`/`.cmd` like in Bash (a bare name only on `PATH`); a batch file refuses arguments holding `& | < > ^ % ! " ( )`,
   which cmd.exe would parse again. The job gets the daemon's environment plus `--env K=V` (values never emitted, and
   stored only sealed while the job is queued or running, see below).
-- **Wait once**: `job wait` long-polls the daemon (5 min per request, re-sent, across daemon restarts) until the job and
-  its follow-ups end, prints the compact report and exits with the job's code.
+- **Wait once**: `job wait` long-polls the daemon (5 min per request, re-sent, across daemon restarts: a daemon that is gone,
+  starting or still ending is asked again every second for up to 2 min) until the job and its follow-ups end, prints the
+  compact report and exits with the job's code.
 - **Restart**: queued jobs survive a stop or a crash of the daemon. While a job is queued or running, its launch (argv,
   `--env` values, completion steps) is kept in `jobs.db` sealed with AES-256-GCM under a key in `<home>/jobs.key` that the
   OS key store protects (DPAPI, Keychain, libsecret, or `CODELOUPE_PASSPHRASE`), and removed when the job ends. The next

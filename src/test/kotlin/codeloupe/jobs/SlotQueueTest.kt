@@ -14,12 +14,10 @@ import codeloupe.secrets.PassphraseProtector
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import java.io.IOException
 import java.net.ServerSocket
 import java.net.URI
 import java.net.http.HttpRequest
@@ -127,7 +125,10 @@ class SlotQueueTest {
             assertEquals(1, daemon.jobs.atRisk(), "only the running job would be lost by a stop")
 
             val current = AtomicReference(daemon)
-            val waiter = CompletableFuture.supplyAsync { waitAcrossRestarts(current, q2) }
+            // The waiter `job wait` uses, its polls cut short; it meets the daemon gone and starting again.
+            val waiter = CompletableFuture.supplyAsync {
+                JobWaiter({ path -> get(current.get(), path.replace("timeoutSec=300", "timeoutSec=2")) }, retryMs = 100).wait(q2)
+            }
             Thread.sleep(500)
             daemon.stop()
             daemon = start(home, port)
@@ -138,9 +139,9 @@ class SlotQueueTest {
             assertEquals(listOf(q3), slot.running, "the moved job is still first")
             assertEquals(listOf(q1, q2), slot.waiting, "the others in their order")
 
-            val answer = waiter.get(60, TimeUnit.SECONDS)
-            assertEquals(7, answer.getValue("exit").jsonPrimitive.int, "the waiter got the real exit code")
-            assertContains(answer.getValue("text").jsonPrimitive.content, "$q2 done exit 7")
+            val (waited, text) = waiter.get(60, TimeUnit.SECONDS)
+            assertEquals(7, waited, "the waiter got the real exit code")
+            assertContains(text, "$q2 done exit 7")
             val (exit, _) = JobWaiter(DaemonClient(config(home, port))).wait(q1)
             assertEquals(0, exit)
             val records = listOf(q3, q1, q2).map { daemon.jobs.get(it)!! }
@@ -182,20 +183,6 @@ class SlotQueueTest {
             assertEquals("daemon stopped", lost.reason)
         } finally {
             second.stop()
-        }
-    }
-
-    /** What `job wait` does: long polls, sent again while the daemon is away. */
-    private fun waitAcrossRestarts(daemon: AtomicReference<Daemon>, id: String): JsonObject {
-        while (true) {
-            val answer = try {
-                get(daemon.get(), "/jobs/$id/wait?timeoutSec=2")
-            } catch (e: IOException) {
-                Thread.sleep(100)
-                continue
-            }
-            if (answer.first == 200 && answer.second.getValue("done").jsonPrimitive.content == "true") return answer.second
-            if (answer.first != 200) Thread.sleep(100)
         }
     }
 
