@@ -9,6 +9,7 @@ import codeloupe.events.Scrubber
 import codeloupe.events.Webhooks
 import codeloupe.platform.ExitCodes
 import codeloupe.platform.IsoTime
+import codeloupe.platform.JobObjects
 import codeloupe.secrets.KeyProtector
 import codeloupe.secrets.KeyProtectors
 import kotlinx.coroutines.CancellationException
@@ -17,6 +18,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -31,6 +33,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -40,7 +43,8 @@ import java.util.concurrent.atomic.AtomicLong
  * a waiting client on the next state change.
  *
  * A restart keeps the queue: each job's launch ([JobSpec]) is stored sealed while it is queued or running, so the next daemon
- * queues the waiting jobs again in their order and takes back a running job whose process survived.
+ * queues the waiting jobs again in their order and takes back a running job whose process survived. On Windows a running job
+ * survives a stop on purpose ([JobProcess.survives]); one that ended while no daemon ran is told by its exit file ([ExitFile]).
  */
 class JobRunner(
     private val home: Path,
@@ -62,8 +66,15 @@ class JobRunner(
     private val active = ConcurrentHashMap<String, Active>()
     private val changes = MutableStateFlow(0L)
 
+    /** Job objects of ended jobs that still hold processes the jobs left (a build daemon): they end with this daemon. */
+    private val leftovers = ConcurrentLinkedQueue<JobObjects.Tree>()
+
     @Volatile
     private var stopping = false
+
+    /** The stop ends running jobs instead of leaving them to the next daemon. */
+    @Volatile
+    private var forced = false
 
     /** A job this daemon still owns. Command and environment live here in memory, and sealed in the store while it lives. */
     private class Active(
@@ -79,6 +90,9 @@ class JobRunner(
     ) {
         @Volatile var process: JobProcess? = null
 
+        /** Started by a previous daemon: watched to its end ([adopted]), or found already ended with its exit file. */
+        @Volatile var takenOver = false
+
         /** The process of a job a previous daemon started, found still running. */
         @Volatile var adopted: ProcessHandle? = null
         var exitWatch: ExitCodes.Watch? = null
@@ -93,6 +107,9 @@ class JobRunner(
         @Volatile var entered = false
         lateinit var task: Job
         val id: String get() = record.id
+
+        /** A stop can leave it running for the next daemon. */
+        fun survives(): Boolean = process?.survives ?: (adopted != null && record.survivesRestart)
 
         /** Ends its process tree, whoever started it; false when it has none. */
         fun kill(): Boolean {
@@ -184,8 +201,8 @@ class JobRunner(
 
     fun ahead(job: JobRecord): Int = job.slot?.let { slots.ahead(it, job.id) } ?: 0
 
-    /** Jobs a stop would lose: the running ones, and queued ones whose launch could not be stored. */
-    fun atRisk(): Int = active.values.count { it.record.status == JobStatus.RUNNING || !it.stored }
+    /** Jobs a stop would lose: running ones the next daemon cannot take over, and any whose launch could not be stored. */
+    fun atRisk(): Int = active.values.count { !it.stored || (it.record.status == JobStatus.RUNNING && !it.survives()) }
 
     fun snapshot() = JobsSnapshot(
         running = active.values.count { it.record.status == JobStatus.RUNNING },
@@ -226,16 +243,25 @@ class JobRunner(
         if (logFiles > records) log("jobs: $logFiles job logs lie in $logs but jobs.db holds $records records: the others were removed outside the daemon")
     }
 
-    /** The daemon is stopping: what runs is killed and lost, with its log kept; queued jobs stay queued for the next daemon. */
-    fun shutdown() {
+    /**
+     * The daemon is stopping: queued jobs stay queued for the next daemon, and so do running ones that survive it (unless [force]);
+     * what else runs is killed and lost, with its log kept. What ended jobs left running ends.
+     */
+    fun shutdown(force: Boolean = false) {
+        forced = force
         stopping = true
         for (job in active.values) {
             job.task.cancel()
             if (job.record.status == JobStatus.QUEUED && job.stored) continue
+            if (job.record.status == JobStatus.RUNNING && leftRunning(job)) {
+                log("job ${job.id} left running for the next daemon")
+                continue
+            }
             job.kill()
             lose(job.record, "daemon stopped")
         }
         active.clear()
+        generateSequence { leftovers.poll() }.forEach { it.close() }
         changed()
     }
 
@@ -304,12 +330,12 @@ class JobRunner(
         job.task.start()
     }
 
-    /** A job a previous daemon ran: watched on if its process is still the one it started, else lost. */
+    /** A job a previous daemon ran: watched on if its process is still the one it started, finished if its exit file tells its end, else lost. */
     private fun adopt(record: JobRecord, row: JobStore.SpecRow?) {
         val handle = record.pid?.let { pid ->
             ProcessHandle.of(pid).filter { h -> h.isAlive && h.info().startInstant().map { it.toString() == record.pidStart }.orElse(false) }.orElse(null)
         }
-        if (handle == null) {
+        if (handle == null && ExitFile.read(exitFile(record.id)) == null) {
             lose(record, "daemon restarted")
             return
         }
@@ -318,13 +344,14 @@ class JobRunner(
         val then = actions(spec?.then ?: record.then)
         val onFailure = actions(spec?.onFailure ?: record.onFailure)
         val job = active(record, spec?.command.orEmpty(), spec?.env.orEmpty(), then, onFailure, prechecked = true, place = row?.seq ?: seq.incrementAndGet())
+        job.takenOver = true
         job.adopted = handle
-        job.exitWatch = ExitCodes.watch(handle.pid())
+        job.exitWatch = handle?.let { ExitCodes.watch(it.pid()) }
         job.stored = row != null
         record.slot?.let { slots.adopt(it, record.id, record.startedAt?.let(Instant::parse) ?: Instant.now()) }
         active[job.id] = job
         job.task.start()
-        log("job ${record.id} taken over: its process ${handle.pid()} survived the restart")
+        log("job ${record.id} taken over: " + if (handle != null) "its process ${handle.pid()} survived the restart" else "it ended while no daemon ran")
     }
 
     /** A job a previous daemon left queued, ready to be launched again; null when it is lost. */
@@ -359,7 +386,7 @@ class JobRunner(
         val ended = try {
             val ticket = job.ticket
             when {
-                job.adopted != null -> watch(job)
+                job.takenOver -> watch(job)
                 job.cancelled -> {
                     ticket?.let(slots::leave)
                     Ended(JobStatus.CANCELLED, reason = "cancelled")
@@ -368,7 +395,7 @@ class JobRunner(
                 else -> slots.hold(ticket, onQueued = ::changed) { waited -> run(job, waited) }
             }
         } catch (e: CancellationException) {
-            job.kill()
+            if (!leftRunning(job)) job.kill()
             if (!job.cancelled || stopping) throw e
             Ended(JobStatus.CANCELLED, reason = "cancelled")
         } catch (e: Exception) {
@@ -387,36 +414,55 @@ class JobRunner(
         if (stopping) throw CancellationException("daemon stopping")
         Files.createDirectories(logs)
         val process = try {
-            JobProcess.start(job.command, Path.of(job.record.cwd), job.env, Path.of(job.record.log))
+            JobProcess.start(job.command, Path.of(job.record.cwd), job.env, Path.of(job.record.log), exitFile(job.id)) { log("job ${job.id}: $it") }
         } catch (e: Exception) {
             return Ended(JobStatus.ERROR, reason = e.message?.substringAfter("error=")?.let { "cannot run ${job.command.first()}: $it" } ?: e.toString())
         }
         job.process = process
+        var recorded = false
         try {
             job.record = job.record.copy(
-                status = JobStatus.RUNNING, startedAt = IsoTime.now(), pid = process.process.pid(),
-                pidStart = process.process.info().startInstant().map(Instant::toString).orElse(null),
+                status = JobStatus.RUNNING, startedAt = IsoTime.now(), pid = process.pid, pidStart = process.startedAt, survivesRestart = process.survives,
             )
             store.put(job.record)
+            recorded = true
             log("job ${job.id} started: ${job.record.command.take(200)}")
             bus.emit(EventTypes.JOB_STARTED, JobEvents.started(job.record))
             changed()
             if (job.cancelled) process.kill()
-            val exit = process.process.onExit().await().exitValue()
+            process.onExit().await()
+            val exit = process.exitValue()
+            // Its watcher writes the exit file just after: waited for, so the file is removed with the job, not left behind.
+            if (process.survives && !job.cancelled) exitFromFile(job.id, wait = true)
             return if (job.cancelled) Ended(JobStatus.CANCELLED, exit, "cancelled") else Ended(JobStatus.DONE, exit)
         } finally {
-            // Whatever ended the wait, no process outlives its record untracked, and the job object is closed.
-            if (process.process.isAlive) process.kill()
-            process.release()
+            // Whatever ended the wait, no process outlives its record untracked: only a recorded survivor is left to the next daemon.
+            if (recorded && leftRunning(job)) {
+                process.leave()
+            } else {
+                if (process.isAlive) process.kill()
+                process.release()?.let(::keep)
+            }
         }
     }
 
-    /** Waits for the end of a process a previous daemon started; its exit code where the OS still tells it. */
+    /** The daemon stops and hands [job] over to the next one rather than ending it. */
+    private fun leftRunning(job: Active): Boolean = stopping && !forced && job.stored && job.survives()
+
+    /** Keeps the job object of an ended job open while the job left processes in it; closes those that emptied. */
+    private fun keep(tree: JobObjects.Tree) {
+        leftovers.removeIf { left -> (left.processes() == 0).also { empty -> if (empty) left.close() } }
+        if (stopping) tree.close() else leftovers += tree
+    }
+
+    /** Waits for the end of a process a previous daemon started; its exit code where the OS or the job's exit file still tells it. */
     private suspend fun watch(job: Active): Ended {
-        val handle = job.adopted ?: error("not an adopted job")
+        val handle = job.adopted
         try {
-            handle.onExit().await()
-            val exit = job.exitWatch?.exitCode()
+            handle?.onExit()?.await()
+            // A watcher writes the exit file just after the end; waited for also when the OS tells the code, so the file goes with the job.
+            val fromFile = exitFromFile(job.id, wait = handle != null && job.record.survivesRestart && !job.cancelled)
+            val exit = job.exitWatch?.exitCode() ?: fromFile
             return when {
                 job.cancelled -> Ended(JobStatus.CANCELLED, exit, "cancelled")
                 exit != null -> Ended(JobStatus.DONE, exit)
@@ -427,6 +473,19 @@ class JobRunner(
             job.record.slot?.let { slots.release(it, job.id) }
         }
     }
+
+    /** The code the job's watcher wrote; [wait] gives it a moment, for a process that has just ended. */
+    private suspend fun exitFromFile(id: String, wait: Boolean): Int? {
+        val file = exitFile(id)
+        val tries = if (wait) EXIT_FILE_TRIES else 1
+        repeat(tries) { attempt ->
+            ExitFile.read(file)?.let { return it }
+            if (attempt + 1 < tries) delay(EXIT_FILE_WAIT_MS)
+        }
+        return null
+    }
+
+    private fun exitFile(id: String): Path = logs.resolve("$id.exit")
 
     /** Records the end, plans the completion steps, emits; the bookkeeping that unblocks waiters always happens. */
     private fun finish(job: Active, ended: Ended) {
@@ -459,6 +518,7 @@ class JobRunner(
         } finally {
             active.remove(job.id)
             if (job.stored) runCatching { store.deleteSpec(job.id) }
+            ExitFile.delete(exitFile(job.id))
             next?.let(::launch)
             changed()
         }
@@ -491,6 +551,7 @@ class JobRunner(
         val lost = ended(record, Ended(JobStatus.LOST, reason = reason))
         store.put(lost)
         runCatching { store.deleteSpec(record.id) }
+        ExitFile.delete(exitFile(record.id))
         log("job ${record.id} lost: $reason")
         runCatching { bus.emit(EventTypes.JOB_FINISHED, JobEvents.finished(lost, final = true, chainUpTo(lost))) }
     }
@@ -519,5 +580,7 @@ class JobRunner(
         const val MAX_TAG = 200
         const val MAX_COMMAND = 1000
         const val MAX_CAPACITY = 64
+        const val EXIT_FILE_TRIES = 50
+        const val EXIT_FILE_WAIT_MS = 100L
     }
 }
