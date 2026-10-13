@@ -6,12 +6,15 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * The reconciler, from `config.json` `workspaces.reconcile`:
- * `{ "auto": true, "intervalMinutes": 30, "graceMinutes": 60, "retryBaseMinutes": 1, "retryMaxMinutes": 360, "protect": [ … ] }`.
- * Nothing runs unattended unless [auto] is set; the dry-run report and confirmed cleanups work either way.
+ * `{ "auto": true, "worktrees": true, "intervalMinutes": 30, "graceMinutes": 60, "retryBaseMinutes": 1, "retryMaxMinutes": 360, "protect": [ … ] }`.
+ * Docker resources are cleaned unattended only when [auto] is set, finished worktrees unless [worktrees] is switched off;
+ * the dry-run report and confirmed cleanups work either way.
  */
 data class ReconcileConfig(
     /** Clean released workspaces without being asked: on daemon start, on finished jobs and at [intervalMinutes] while clients are active. */
     val auto: Boolean = false,
+    /** Remove finished worktrees without being asked (landed and idle, task resolved, nothing changed in them), whatever [auto] says. */
+    val worktrees: Boolean = true,
     val intervalMinutes: Int = 30,
     /** A resource younger than this is never cleaned without confirmation: a fresh stack of a workspace that only looks landed. 0 switches the wait off. */
     val graceMinutes: Int = 60,
@@ -29,6 +32,7 @@ data class ReconcileConfig(
             val protect = rules.mapNotNull { (it as? JsonObject)?.let(ProtectRule::parse) }
             return ReconcileConfig(
                 auto = (section["auto"] as? JsonPrimitive)?.content == "true",
+                worktrees = (section["worktrees"] as? JsonPrimitive)?.content != "false",
                 intervalMinutes = minutes("intervalMinutes", 30),
                 graceMinutes = minutes("graceMinutes", 60, min = 0),
                 retryBaseMinutes = minutes("retryBaseMinutes", 1),

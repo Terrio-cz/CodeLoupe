@@ -5,6 +5,7 @@ import codeloupe.docker.OwnershipClass
 import codeloupe.docker.ResourceEntry
 import codeloupe.docker.ResourceKind
 import codeloupe.processes.ProcessEntry
+import codeloupe.workspace.RepoWorkspaces
 import codeloupe.workspace.Workspace
 import codeloupe.workspace.WorkspaceList
 import codeloupe.workspace.WorkspaceState
@@ -21,7 +22,11 @@ import java.time.Instant
  * - the workspace is active: kept; the repository is not in the registry at all: kept;
  * - the workspace landed and the resource is labelled by CodeLoupe, has no running sibling and is older than the grace
  *   period: `auto`; adopted, running or abandoned/orphan/gone: `confirm`;
- * - an orphan directory under a worktree root: always `confirm`;
+ * - a worktree (not the main checkout, not one of Claude Code's own under `.claude/worktrees/`): released and merged into the
+ *   default branch, or landed with its task resolved (or no task) and no git activity for the grace period: `auto`; landed but
+ *   its task still open: `confirm`; anything still working in it (a process, a running container): kept; otherwise not planned.
+ *   The executor removes nothing that changed since the plan or holds changes git would lose;
+ * - an orphan directory under a worktree root: released (what a removal that a lock interrupted leaves): `auto`, else `confirm`;
  * - a build tool (Gradle daemon or worker, Kotlin daemon) working in a workspace directory: released: `auto`; the workspace is
  *   active: kept; landed, abandoned or orphan: `confirm`. Other processes are never planned, only reported.
  */
@@ -39,7 +44,8 @@ class ReconcilePlanner(
         val directories = registry.repos.flatMap { repo -> repo.workspaces.filter { it.role == "directory" && it.state == WorkspaceState.ORPHAN }.map { repo.name to it } }
             .map { (repo, directory) -> directory(repo, directory) }
         val tools = processes.filter { it.kind.buildTool }.map(::process)
-        return (owned + directories + tools).sortedWith(compareBy({ it.kind.ordinal }, { it.workspace.orEmpty().lowercase() }, { it.name }))
+        val worktrees = registry.repos.flatMap { repo -> repo.workspaces.mapNotNull { worktree(repo, it, processes, running) } }
+        return (owned + directories + tools + worktrees).sortedWith(compareBy({ it.kind.ordinal }, { it.workspace.orEmpty().lowercase() }, { it.name }))
     }
 
     private fun entry(resource: ResourceEntry, repoKnown: Boolean, running: Set<Pair<String, String>>): PlanEntry {
@@ -107,13 +113,50 @@ class ReconcilePlanner(
 
     private fun directory(repo: String, directory: Workspace): PlanEntry {
         val protected = config.protect.any { it.covers(null, listOf(directory.path, directory.name), null) }
+        val release = if (protected) null else releasedAt(repo, directory.name)
+        val (verdict, reason) = when {
+            protected -> Verdict.PROTECTED to "protected by the config"
+            release != null -> Verdict.AUTO to "the workspace was released at $release; git has no worktree for the directory any more"
+            else -> Verdict.CONFIRM to "a directory under a worktree root that git has no worktree for"
+        }
         return PlanEntry(
-            "directory:${directory.path}", TargetKind.DIRECTORY, directory.path, repo, directory.name, null, WorkspaceState.ORPHAN,
-            if (protected) Verdict.PROTECTED else Verdict.CONFIRM, if (protected) "protected by the config" else "a directory under a worktree root that git has no worktree for",
+            "directory:${directory.path}", TargetKind.DIRECTORY, directory.path, repo, directory.name, null, WorkspaceState.ORPHAN, verdict, reason,
+            released = release != null,
         )
     }
 
+    private fun worktree(repo: RepoWorkspaces, w: Workspace, processes: List<ProcessEntry>, running: Set<Pair<String, String>>): PlanEntry? {
+        if (w.role != "worktree" || w.state == WorkspaceState.ORPHAN || CLAUDE_WORKTREES in w.path.replace('\\', '/')) return null
+        val released = releasedAt(repo.name, w.name)?.takeIf { w.merge?.merged == true }
+        if (w.state != WorkspaceState.LANDED && released == null) return null
+        val protected = config.protect.any { it.covers(null, listOf(w.path, w.name), null) }
+        val release = if (protected) null else released
+        val workspace = repo.name.lowercase() to w.name.lowercase()
+        // A released workspace's build tools are stopped by the same run; anything else working in the directory keeps it.
+        val busy = processes.count { (it.repo.lowercase() to it.workspace.lowercase()) == workspace && (release == null || !it.kind.buildTool) }
+        val (verdict, reason) = when {
+            protected -> Verdict.PROTECTED to "protected by the config"
+            busy > 0 -> Verdict.KEEP to "$busy process(es) still work in it"
+            workspace in running -> Verdict.KEEP to "its containers still run"
+            release != null -> Verdict.AUTO to "the workspace was released at $release and its branch is merged into ${w.merge?.defaultRef}"
+            w.taskId != null && w.tracker?.resolved != true -> Verdict.CONFIRM to "the workspace landed, but ${w.taskId} is not resolved"
+            idleFor(w) < Duration.ofMinutes(config.graceMinutes.toLong()) -> Verdict.KEEP to "git worked in it less than ${config.graceMinutes} min ago"
+            else -> Verdict.AUTO to if (w.taskId != null) "the workspace landed and ${w.taskId} is resolved" else "the workspace landed"
+        }
+        return PlanEntry(
+            "worktree:${w.path}", TargetKind.WORKTREE, w.path, repo.name, w.name, null, w.state, verdict, reason, released = release != null,
+            path = w.path, gitDir = repo.commonDir, branch = w.branch, head = w.head,
+        )
+    }
+
+    // A worktree without a readable activity time counts as idle: the scanner only lacks it for one git cannot read.
+    private fun idleFor(w: Workspace): Duration =
+        w.lastActivity?.let { runCatching { Duration.between(Instant.parse(it), now()) }.getOrNull() } ?: Duration.ofDays(365)
+
     internal companion object {
         val RUNNING = setOf("running", "restarting", "paused")
+
+        /** Worktrees Claude Code makes for its sessions and agents: it removes them itself. */
+        const val CLAUDE_WORKTREES = "/.claude/worktrees/"
     }
 }

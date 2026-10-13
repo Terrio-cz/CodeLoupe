@@ -18,7 +18,8 @@ import java.time.Instant
  * (so a PC restart is followed by the cleanup it interrupted), after a job finished (a close-out ran), every
  * `intervalMinutes` while a client has talked to the daemon recently, and whenever a backed-off retry falls due.
  * With `auto` off it still finishes the cleanup of released workspaces (`ws release`), at the start, after a job and
- * on retries, never on the interval; the `auto` entries of other workspaces wait for a person then.
+ * on retries, never on the interval; the `auto` entries of other workspaces wait for a person then. `workspaces.reconcile.worktrees`
+ * (on by default) runs it on the interval too, for finished worktrees: their `auto` entries go, Docker ones still wait.
  */
 class ReconcileScheduler(
     private val scope: CoroutineScope,
@@ -35,8 +36,10 @@ class ReconcileScheduler(
 ) {
     private var lastRun: Instant = now()
 
-    // Work to do on its own: everything with `auto`, otherwise only what somebody released.
-    private fun wanted(): Boolean = config.auto || reconciler.hasReleases()
+    // Work to do on its own: everything with `auto`, finished worktrees with `worktrees`, otherwise only what somebody released.
+    private fun unattended(): Boolean = config.auto || config.worktrees
+
+    private fun wanted(): Boolean = unattended() || reconciler.hasReleases()
 
     fun start() {
         scope.launch {
@@ -50,7 +53,7 @@ class ReconcileScheduler(
                 val active = lastClientCall()?.let { Duration.between(it, now()) < ACTIVE_WINDOW } == true
                 when {
                     wanted() && reconciler.retryDue() -> attempt("retry")
-                    config.auto && active && Duration.between(lastRun, now()) >= interval -> attempt("interval")
+                    unattended() && active && Duration.between(lastRun, now()) >= interval -> attempt("interval")
                 }
             }
         }

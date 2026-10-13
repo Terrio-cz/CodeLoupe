@@ -24,8 +24,12 @@ data class PlanEntry(
     val attempts: Int = 0,
     val nextAttempt: String? = null,
     val lastError: String? = null,
-    /** A process: the directory of the workspace it was found in, which it is checked against again before it is stopped. */
+    /** A process: the directory of the workspace it was found in, which it is checked against again before it is stopped. A worktree: its directory. */
     val path: String? = null,
     /** A container: it was running (or restarting, paused) when planned; one that started since is not stopped without a new plan. */
     val running: Boolean = false,
+    /** A worktree: the repository's git directory, and the branch and commit it had when planned (a worktree that moved since stays). */
+    val gitDir: String? = null,
+    val branch: String? = null,
+    val head: String? = null,
 )

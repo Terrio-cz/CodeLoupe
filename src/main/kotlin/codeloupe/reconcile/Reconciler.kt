@@ -14,7 +14,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Brings the Docker resources and orphan directories of released workspaces to the state the registry wants: gone.
+ * Brings the Docker resources, worktrees and orphan directories of finished workspaces to the state the registry wants: gone.
  * Every run starts from a fresh read of the registry and of Docker (only the dry run [plan] may use the scan the read-only
  * routes share, [planRegistry]), so it is idempotent and needs no memory of earlier
  * runs except the backoff of what could not be removed ([ReconcileState]). Runs never overlap.
@@ -72,7 +72,7 @@ class Reconciler(
         for (entry in entries.sortedBy { it.kind.ordinal }) {
             val named = entry.key in confirm || entry.workspace?.lowercase() in wanted
             val selected = when (entry.verdict) {
-                Verdict.AUTO -> auto || entry.released || named
+                Verdict.AUTO -> auto || entry.released || named || (entry.kind == TargetKind.WORKTREE && config.worktrees)
                 // A removal somebody confirmed that has not gone through yet is retried without asking again.
                 Verdict.CONFIRM -> named || state.get(entry.key)?.confirmed == true
                 Verdict.KEEP, Verdict.PROTECTED -> false

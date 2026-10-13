@@ -5,6 +5,7 @@ import codeloupe.docker.DockerObject
 import codeloupe.docker.DockerUnavailable
 import codeloupe.docker.OwnershipClass
 import codeloupe.docker.Ownership
+import codeloupe.git.GitException
 import codeloupe.processes.ProcessStopper
 import java.io.IOException
 import java.nio.file.Path
@@ -18,6 +19,8 @@ class ReconcileExecutor(
     private val stopper: ProcessStopper = ProcessStopper(),
     private val removeDirectory: (Path) -> Unit = DirectoryRemover::remove,
 ) {
+    private val worktrees = WorktreeRemover(removeDirectory)
+
     fun execute(entry: PlanEntry): ActionResult {
         fun result(outcome: ActionOutcome, detail: String = "") = ActionResult(entry.key, entry.kind, entry.name, entry.workspace, outcome, detail)
         return try {
@@ -27,9 +30,16 @@ class ReconcileExecutor(
                 TargetKind.NETWORK -> outcome(docker().removeNetwork(entry.key.substringAfter(':')), ::result)
                 TargetKind.VOLUME -> outcome(docker().removeVolume(entry.key.substringAfter(':')), ::result)
                 TargetKind.IMAGE -> outcome(docker().removeImage(entry.key.substringAfter(':')), ::result)
+                TargetKind.WORKTREE -> when (val removed = worktrees.remove(entry)) {
+                    is WorktreeRemover.Outcome.Removed -> result(ActionOutcome.REMOVED, removed.detail)
+                    WorktreeRemover.Outcome.Gone -> result(ActionOutcome.GONE)
+                    is WorktreeRemover.Outcome.Blocked -> result(ActionOutcome.BLOCKED, removed.reason)
+                }
                 TargetKind.DIRECTORY -> directory(entry.key.substringAfter(':'), ::result)
             }
         } catch (e: DockerUnavailable) {
+            result(ActionOutcome.FAILED, e.message.orEmpty())
+        } catch (e: GitException) {
             result(ActionOutcome.FAILED, e.message.orEmpty())
         }
     }

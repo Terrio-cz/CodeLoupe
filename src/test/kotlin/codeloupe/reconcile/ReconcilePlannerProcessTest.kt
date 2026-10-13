@@ -24,7 +24,8 @@ class ReconcilePlannerProcessTest {
     private fun planner(releasedAt: Instant? = null, vararg protect: ProtectRule) =
         ReconcilePlanner(ReconcileConfig(protect = protect.toList()), { _, workspace -> releasedAt.takeIf { workspace == "TER-1" } }) { now }
 
-    private fun plan(planner: ReconcilePlanner, vararg processes: ProcessEntry) = planner.plan(emptyList(), registry, processes.toList())
+    // The registry's worktrees are planned too; these tests look at the processes only.
+    private fun plan(planner: ReconcilePlanner, vararg processes: ProcessEntry) = planner.plan(emptyList(), registry, processes.toList()).filter { it.kind == TargetKind.PROCESS }
 
     @Test
     fun `a build tool of a released workspace is stopped without asking, whatever state the workspace is in`() {
