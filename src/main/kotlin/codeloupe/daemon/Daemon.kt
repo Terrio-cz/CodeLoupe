@@ -170,7 +170,7 @@ class Daemon private constructor(
 
     private fun tools(): List<Tool> = offered.tools
     private val workspaces = Workspaces(config, registry, trackers)
-    private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets, ::log)
+    private val uiApi = UiApi(config, registry, workspaces, trackers, events, queue::snapshot, trackerSettings.syncMs / 1000, scope, secrets, ::log, brainIndex = { root -> brain.cached(root) ?: run { brain.warm(root); null } })
     private val resources = ResourceInventory(config.workspaces.adoption, workspaces::recent, installId = { InstallId.of(config.home) })
     private val processSource = SystemProcesses(GradleDaemonLog.homes(config.workspaces.gradleUserHome))
     private val processes = ProcessInventory(workspaces, processSource)

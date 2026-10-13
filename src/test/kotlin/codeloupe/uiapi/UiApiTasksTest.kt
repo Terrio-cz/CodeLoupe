@@ -4,6 +4,7 @@ import codeloupe.CodeLoupe
 import codeloupe.TestRepos
 import codeloupe.config.Config
 import codeloupe.config.MetricsConfig
+import codeloupe.config.WorkspacesConfig
 import codeloupe.daemon.Daemon
 import codeloupe.tracker.RecordedYouTrack
 import codeloupe.tracker.youtrack.HttpReply
@@ -63,8 +64,13 @@ class UiApiTasksTest {
             }.toString(),
         )
     }
+    private val brain = TestRepos.tmpDir("ui-task-brain").resolve("hub").also { hub ->
+        Files.createDirectories(hub.resolve("brain/tasks"))
+        Files.writeString(hub.resolve("brain/brain.mjs"), "process.exit(2);\n")
+        Files.writeString(hub.resolve("brain/tasks/CL-26.md"), "# CL-26\n\n## 2026-10-13 10:00:00 w1\n~ decided\n% plan=ok code=wip\n\n## 2026-10-13 11:00:00 w2\n= PASS 3 tests\n")
+    }
     private val port = ServerSocket(0).use { it.localPort }
-    private val daemon = Daemon.start(Config(home, port, queryTimeoutMs = 60_000, buildTimeoutMs = 120_000, buildHeapMb = 512, defaultRoot = null, metrics = MetricsConfig(transcriptDirs = listOf(TestRepos.tmpDir("ui-transcripts").toString()))))
+    private val daemon = Daemon.start(Config(home, port, queryTimeoutMs = 60_000, buildTimeoutMs = 120_000, buildHeapMb = 512, defaultRoot = null, metrics = MetricsConfig(transcriptDirs = listOf(TestRepos.tmpDir("ui-transcripts").toString())), workspaces = WorkspacesConfig(brains = listOf(brain.toString()))))
     private val http = HttpClient.newHttpClient()
 
     @AfterAll
@@ -121,6 +127,15 @@ class UiApiTasksTest {
         assertTrue(detail["links"]!!.jsonArray.any { it.jsonObject["id"]!!.jsonPrimitive.content == "CL-4" })
         assertTrue(detail["fields"]!!.jsonArray.any { it.jsonObject["name"]!!.jsonPrimitive.content == "State" })
         assertTrue(detail["activity"]!!.jsonArray.any { it.jsonObject["kind"]!!.jsonPrimitive.content == "created" })
+        val notes = detail["brain"]!!.jsonObject["brains"]!!.jsonArray.single().jsonObject
+        assertEquals("hub", notes["workspace"]!!.jsonPrimitive.content)
+        assertEquals(listOf("=", "~"), notes["entries"]!!.jsonArray.map { it.jsonObject["marker"]!!.jsonPrimitive.content }.filter { it != "%" })
+        assertEquals(listOf("plan", "code"), notes["state"]!!.jsonArray.map { it.jsonObject["key"]!!.jsonPrimitive.content })
+        assertEquals(3, notes["entryCount"]!!.jsonPrimitive.content.toInt())
+        assertEquals("true", notes["indexing"]!!.jsonPrimitive.content, "the engine is down, so the index stays cold and the notes show anyway")
+        assertEquals(0, json("/ui-api/v1/tasks/cl-4")["brain"]!!.jsonObject["brains"]!!.jsonArray.size, "a task without a brain file")
+        val listed = json("/ui-api/v1/brain/${json("/ui-api/v1/brain")["workspaces"]!!.jsonArray.single().jsonObject["id"]!!.jsonPrimitive.content}/tasks")["tasks"]!!.jsonArray.single().jsonObject
+        assertEquals("true", listed["tracked"]!!.jsonPrimitive.content)
         assertEquals(404, get("/ui-api/v1/tasks/CL-9999").statusCode())
         assertEquals(404, get("/ui-api/v1/tasks/ABC-1").statusCode())
 

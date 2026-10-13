@@ -43,6 +43,7 @@ fun Route.uiApiRoutes(api: UiApi) {
         get("settings") { call.answer(SettingsView.serializer()) { api.settings() } }
         get("brain") { call.answer(BrainView.serializer()) { api.brain() } }
         get("brain/{id}/topic") { call.answer(BrainTopicView.serializer()) { api.brainTopic(call.parameters["id"].orEmpty(), call.query("name")) } }
+        get("brain/{id}/tasks") { call.answer(BrainTasksView.serializer()) { api.brainTasks(call.parameters["id"].orEmpty()) } }
         get("brain/{id}/search") {
             call.answer(BrainSearchView.serializer()) {
                 api.brainSearch(call.parameters["id"].orEmpty(), call.query("q"), call.request.queryParameters.getAll("topic").orEmpty().filter { it.isNotEmpty() }, call.query("tasks") in setOf("1", "true"), call.query("limit"))

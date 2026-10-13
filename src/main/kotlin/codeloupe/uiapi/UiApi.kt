@@ -1,5 +1,7 @@
 package codeloupe.uiapi
 
+import codeloupe.brain.BrainIndex
+import codeloupe.brain.BrainRoot
 import codeloupe.config.Config
 import codeloupe.daemon.QueueSnapshot
 import codeloupe.events.EventBus
@@ -28,6 +30,8 @@ class UiApi(
     secrets: SecretAccess,
     log: (String) -> Unit = {},
     waitMs: Long = Transcripts.DEFAULT_WAIT_MS,
+    /** The brain index of a workspace as last built, null while it is cold (the caller then starts building it). */
+    brainIndex: (BrainRoot) -> BrainIndex? = { null },
 ) : AutoCloseable {
     private val catalog = RepoCatalog(registry, workspaces)
     private val callLog = CallLog(config.home.resolve("calls.jsonl"))
@@ -45,6 +49,7 @@ class UiApi(
     private val environment = EnvironmentViews(secrets, config.secrets.rotationDays)
     private val accountViews = AccountViews(transcripts.accounts, transcripts, trackers, secrets, callLog)
     private val brainViews = BrainViews(config.workspaces)
+    private val brainTasks = BrainTaskViews(config.workspaces, brainIndex, tasks::isTracked)
 
     suspend fun nav(gapsSince: String?): Nav {
         val since = gapsSince?.let { runCatching { Instant.parse(it) }.getOrNull() ?: throw UiApiException.badRequest("gapsSince must be an ISO instant") }
@@ -72,7 +77,7 @@ class UiApi(
 
     suspend fun tasks(project: String?, state: String?, q: String?, limit: String?, cursor: String?): TaskPage = tasks.page(project, state, q, limit, cursor)
 
-    suspend fun task(id: String): TaskDetail = tasks.detail(id)
+    suspend fun task(id: String): TaskDetail = tasks.detail(id).let { it.copy(brain = brainTasks.of(it.id)) }
 
     suspend fun index(): IndexHealth = index.health()
 
@@ -102,6 +107,8 @@ class UiApi(
     }
 
     suspend fun brain(): BrainView = brainViews.list()
+
+    suspend fun brainTasks(id: String): BrainTasksView = brainTasks.list(id)
 
     suspend fun brainTopic(id: String, topic: String?): BrainTopicView = brainViews.topic(id, topic)
 

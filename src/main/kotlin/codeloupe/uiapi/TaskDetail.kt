@@ -25,6 +25,8 @@ data class TaskDetail(
     val activity: List<Activity>,
     val worktrees: List<WorktreeSummary>,
     val mirror: Mirror,
+    /** What the configured brains hold on the task; filled by [UiApi.task], empty from the mirror alone. */
+    val brain: TaskBrain = TaskBrain(),
 ) {
     @Serializable
     data class Field(val name: String, val value: String)

@@ -62,6 +62,8 @@ internal class TaskViews(private val trackers: Trackers, private val worktrees: 
         )
     }
 
+    fun isTracked(id: String): Boolean = trackers.mirror(id) != null
+
     /** The summary of task [id], or null when the mirror does not hold it. */
     suspend fun summaryOf(id: String): TaskSummary? {
         val (mirror, canonical) = trackers.mirror(id) ?: return null

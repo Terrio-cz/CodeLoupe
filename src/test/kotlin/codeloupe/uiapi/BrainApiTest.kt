@@ -47,6 +47,9 @@ class BrainApiTest {
         workspace.resolve("brain/facts/db.md").writeText("# db\nDurable facts.\n\n+ shared DB is postgres <!-- 2026-09-23 -->\n! never run DDL there\n")
         workspace.resolve("brain/facts/review-patterns/sql.md").writeText("+ use anti-join\n")
         workspace.resolve("brain/facts/old.md").writeText("+ read from the file <!-- 2026-09-01 -->\n")
+        workspace.resolve("brain/tasks").createDirectories()
+        workspace.resolve("brain/tasks/TER-5.md").writeText("# TER-5\n\n## 2026-10-13 10:00:00 w1\n~ decided\n% plan=ok code=wip\n\n## 2026-10-13 11:00:00 w2\n= PASS 3 tests\n")
+        workspace.resolve("brain/tasks/TER-6.md").writeText("# TER-6\n")
         broken.resolve("brain").createDirectories()
         broken.resolve("brain/brain.mjs").writeText("console.error('boom: index is corrupt'); process.exit(3);\n")
         daemon = Daemon.start(
@@ -105,6 +108,21 @@ class BrainApiTest {
         }
         assertEquals(404, get("/ui-api/v1/brain/$id/topic?name=nothing").statusCode())
         assertEquals(400, get("/ui-api/v1/brain/$id/topic").statusCode())
+    }
+
+    @Test
+    fun `the tasks view lists the task files with their last entry, state and entry count`() {
+        val id = workspaces().first()["id"]!!.jsonPrimitive.content
+        val tasks = json("/ui-api/v1/brain/$id/tasks")["tasks"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("TER-5", "TER-6"), tasks.map { it["id"]!!.jsonPrimitive.content })
+        val five = tasks.first()
+        assertEquals("2026-10-13T11:00:00.000Z", five["lastAt"]!!.jsonPrimitive.content)
+        assertEquals("3", five["entries"]!!.jsonPrimitive.content)
+        assertEquals(listOf("plan=ok", "code=wip"), five["state"]!!.jsonArray.map { "${it.jsonObject["key"]!!.jsonPrimitive.content}=${it.jsonObject["value"]!!.jsonPrimitive.content}" })
+        assertEquals("false", five["tracked"]!!.jsonPrimitive.content)
+        assertEquals("null", tasks.last()["lastAt"].toString())
+        assertEquals(404, get("/ui-api/v1/brain/ffffffffffff/tasks").statusCode())
+        assertEquals(0, json("/ui-api/v1/brain/${workspaces().last()["id"]!!.jsonPrimitive.content}/tasks")["tasks"]!!.jsonArray.size)
     }
 
     @Test
