@@ -1,6 +1,7 @@
 package codeloupe.tracker.youtrack
 
 import codeloupe.tracker.FieldChange
+import codeloupe.tracker.IssueAttachment
 import codeloupe.tracker.IssueStamp
 import codeloupe.tracker.NewComment
 import codeloupe.tracker.TrackerAdapter
@@ -90,6 +91,45 @@ class YouTrackAdapter(private val http: HttpTransport) : TrackerAdapter {
         val updated = (reply["issue"] as? JsonObject)?.get("updated")?.let { (it as? JsonPrimitive)?.content?.toLongOrNull() }
         return NewComment(YouTrackJson.comment(reply), updated)
     }
+
+    override fun attach(id: String, name: String, bytes: ByteArray): IssueAttachment {
+        val path = "/api/issues/${checkedId(id)}/attachments"
+        val reply = http.postFile("$path?fields=${YouTrackJson.ATTACHMENT_FIELDS}", name, bytes)
+        if (reply.status !in 200..299) throw TrackerException("YouTrack HTTP ${reply.status} on POST $path${reason(reply.body)}")
+        val stored = Json.parseToJsonElement(reply.body).let { (it as? JsonArray)?.firstOrNull() ?: it } as? JsonObject
+            ?: throw TrackerException("YouTrack returned no attachment on POST $path")
+        return YouTrackJson.attachment(stored)
+    }
+
+    override fun create(epic: String, summary: String, description: String, fields: Map<String, String>): TrackerIssue {
+        val epicId = checkedId(epic)
+        val project = ((getOrNull("/api/issues/$epicId?fields=project(id)") as? JsonObject ?: throw TrackerException("no issue $epicId"))["project"] as? JsonObject)
+            ?.get("id")?.let { (it as? JsonPrimitive)?.content } ?: throw TrackerException("no project known for $epicId")
+        // The field types come from the epic: an issue of the same project holds every field the new one can set.
+        val known = learnTypes(epicId, epicId.substringBefore('-').uppercase())
+        val values = if (fields.keys.any { it.equals("assignee", true) } || known.keys.none { it.endsWith("/assignee") }) fields else fields + ("Assignee" to me())
+        val custom = values.filterValues { it.isNotBlank() }.map { (name, text) -> customField(epicId, name, text) }
+        val body = buildJsonObject {
+            put("project", buildJsonObject { put("id", project) })
+            put("summary", summary)
+            put("description", description)
+            put("customFields", JsonArray(custom))
+        }
+        return YouTrackJson.issue(post("/api/issues?fields=${YouTrackJson.ISSUE_FIELDS}", body))
+    }
+
+    override fun subtaskOf(id: String, epic: String) {
+        val body = buildJsonObject {
+            put("query", "subtask of ${checkedId(epic)}")
+            put("issues", JsonArray(listOf(buildJsonObject { put("idReadable", checkedId(id)) })))
+        }
+        val reply = http.post("/api/commands", body.toString())
+        if (reply.status !in 200..299) throw TrackerException("YouTrack HTTP ${reply.status} on POST /api/commands${reason(reply.body)}")
+    }
+
+    /** The login of the user the token belongs to. */
+    private fun me(): String = ((getOrNull("/api/users/me?fields=login") as? JsonObject)?.get("login") as? JsonPrimitive)?.content
+        ?: throw TrackerException("the tracker did not say who the token belongs to; pass an assignee")
 
     private fun customField(issueId: String, name: String, text: String): JsonObject {
         val project = issueId.substringBefore('-').uppercase()

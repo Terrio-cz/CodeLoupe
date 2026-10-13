@@ -37,4 +37,17 @@ interface TrackerAdapter {
 
     /** Adds a comment to [id]. */
     fun comment(id: String, text: String): NewComment = throw TrackerException("this tracker is read only")
+
+    /** Stores [bytes] as a file named [name] on [id] and returns the attachment as the tracker now holds it. */
+    fun attach(id: String, name: String, bytes: ByteArray): IssueAttachment = throw TrackerException("this tracker is read only")
+
+    /**
+     * Creates an issue in the project of [epic] (not yet linked to it). [fields] are custom fields of the project (Type, Priority,
+     * Component, …) as for [update]; an issue without an Assignee goes to the user the token belongs to.
+     */
+    fun create(epic: String, summary: String, description: String, fields: Map<String, String>): TrackerIssue =
+        throw TrackerException("this tracker is read only")
+
+    /** Makes [id] a subtask of [epic]. */
+    fun subtaskOf(id: String, epic: String): Unit = throw TrackerException("this tracker is read only")
 }

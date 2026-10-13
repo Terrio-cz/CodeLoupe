@@ -120,7 +120,8 @@ Every tool is on MCP and on the CLI (`codeloupe <tool> --help`); details in the
 | `task_context` | a planner's whole starting pack for a task: issue, description, comments, linked tasks, touched code with its callers, rules that apply (needs a tracker) |
 | `dispatch_plan` | which ready tasks can run in parallel without touching the same code, with each task's state and epic (needs a tracker) |
 | `similar` | open tasks that look like a draft issue (needs a tracker) |
-| `update` | set fields and add a comment on a tracker issue (needs a tracker) |
+| `update` | set fields, add a comment, tick or rewrite an acceptance criterion on a tracker issue (needs a tracker) |
+| `attach` / `create` | attach a file to a tracker issue; create an issue under an epic (needs a tracker) |
 | `brain_brief` | the start of a role in a workspace that keeps a shared-memory brain (`brain/brain.mjs`): state, settled findings, task notes, decisions and the facts the role reads, whole entries ranked by code proximity (anchors on your files and symbols, callers, module, tasks that changed that code) above text; see [Brain index](docs/wiki/Brain-index.md) |
 | `brain_search` | whole brain entries for words and files, ranked the same way |
 
