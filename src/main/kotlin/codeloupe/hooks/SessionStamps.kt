@@ -13,8 +13,8 @@ import java.util.concurrent.TimeUnit
  * Notes which login runs a session when it starts (CL-226): its fingerprint goes to [SessionIdentities], and the ingest gives it to the
  * session's transcripts. The session's own login decides, as the hook saw it in the session's environment ([SessionLogin]): the account
  * uuid Claude Desktop hands its sessions, else the account a launcher named, mapped to the identity `accounts.json` declares for it.
- * Only a session with neither and without a token of its own is given the login file of its config directory, and only when no two
- * listed accounts share that directory: such a file holds whichever login was written last, not the session's. [note] only queues
+ * Only a session with neither and without a token of its own is given the login file of its config directory: that is the login the
+ * CLI itself signs in with, while a desktop or token session may run as another one than the file names. [note] only queues
  * the work, so a hook never waits for the disk, and every failure is swallowed. A subagent belongs to the session that started it, so its
  * start adds nothing for a session already stamped; it only covers a session that began before the daemon was running.
  */
@@ -50,13 +50,8 @@ class SessionStamps(
         if (own.account != null) {
             return accounts().filter { it.id == own.account || it.email.equals(own.account, ignoreCase = true) }.singleOrNull()?.identity
         }
-        if (own.token || dir == null || shared(dir)) return null
+        if (own.token || dir == null) return null
         return login.fingerprintOf(dir)
-    }
-
-    private fun shared(dir: Path): Boolean {
-        val normal = dir.toAbsolutePath().normalize()
-        return accounts().count { it.configDir.toAbsolutePath().normalize() == normal } > 1
     }
 
     companion object {

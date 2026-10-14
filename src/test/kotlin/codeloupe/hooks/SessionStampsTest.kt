@@ -70,14 +70,14 @@ class SessionStampsTest {
     }
 
     @Test
-    fun `a session with a token of its own, or on a directory two accounts share, is not given the login file`() {
+    fun `a session with a token of its own is not given the login file, a plain CLI session on a shared directory is`() {
         LoginFiles.write(configDir.resolve(".claude.json"), "uuid-b")
-        send(hooks(), event("SessionStart", "token", transcript("token"), token = true))
-        send(hooks(accounts = listOf(account("a", null), account("b", null))), event("SessionStart", "shared", transcript("shared")))
+        val hooks = hooks(accounts = listOf(account("a", null), account("b", null)))
+        send(hooks, event("SessionStart", "token", transcript("token"), token = true))
         assertTrue(store.all().isEmpty())
 
-        send(hooks(accounts = listOf(account("a", null), account("b", null, root.resolve("cfg-b")))), event("SessionStart", "own", transcript("own")))
-        assertEquals(AccountIdentity.fingerprint("uuid-b"), store.all()["own"])
+        send(hooks, event("SessionStart", "cli", transcript("cli")))
+        assertEquals(mapOf("cli" to AccountIdentity.fingerprint("uuid-b")), store.all())
     }
 
     private fun send(hooks: Hooks, json: JsonObject) = runBlocking { hooks.reply(json) }

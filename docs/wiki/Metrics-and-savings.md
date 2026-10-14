@@ -38,6 +38,7 @@ With `desktopDir` on the accounts of `accounts.json` (the user-data directory of
 `codeloupe metrics tokens [--since 30d] [--until] [--account <id>|unknown] [--max n] [--format jsonl|csv|json]` exports the tokens every run spent per minute and model (input, cache writes 5m and 1h,
 cache read, output and the thinking part of it) with the session, role and account of the run: with `metrics limits` it is all a calibration of the limit weights needs (which model and which token
 class move the 5-hour and weekly percent), with no transcript read and no account guessed. Numbers and names only.
+`metrics limits --hits` exports the usage-limit answers runs got instead (time, `session` or `weekly`, when it lifts, session, account; never the text).
 
 ## Which commands agents use
 

@@ -59,6 +59,19 @@ class TokenMinutesIngestTest {
     }
 
     @Test
+    fun `the usage-limit answers come with the session and account, without their text`() {
+        rig().use { rig ->
+            val resets = Instant.parse("2026-10-08T15:00:00Z")
+            TranscriptBuilder(start).prompt("p").turn().limit("You've hit your session limit", resets, "five_hour").write(rig.project.resolve("s1.jsonl"))
+            rig.ingest.passNow()
+            val hits = LimitAnswers(rig.db).between(everything.first, everything.second, LimitSnapshots.Who.All, 10)
+            assertEquals(listOf(LimitAnswer(hits.single().at, "session", "2026-10-08T15:00:00.000Z", "s1", "a")), hits)
+            assertEquals("at,kind,resetsAt,session,account\n${hits.single().at},session,2026-10-08T15:00:00.000Z,s1,a\n", LimitAnswers.csv(hits))
+            assertTrue(LimitAnswers(rig.db).between(everything.first, everything.second, LimitSnapshots.Who.Unknown, 10).isEmpty())
+        }
+    }
+
+    @Test
     fun `the csv has a header and a row per minute`() {
         val row = TokenMinute("2026-10-08T10:00:00Z", "s1", "subagent", "terrio-coder", "C--repo", "claude-opus-5-5", 1, 2, 3, 4, 5, 6, null, "abc")
         assertEquals(
