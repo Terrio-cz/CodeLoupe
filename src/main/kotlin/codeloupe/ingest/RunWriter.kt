@@ -12,6 +12,7 @@ import codeloupe.metrics.ShellCommand
 import codeloupe.metrics.ToolCall
 import codeloupe.metrics.ToolResult
 import codeloupe.metrics.TranscriptParser
+import codeloupe.metrics.Usage
 import codeloupe.metrics.plain
 import kotlinx.serialization.json.JsonObject
 import java.sql.Connection
@@ -45,7 +46,7 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
     /** Forgets a file and its run, for a transcript that was replaced by a shorter one. */
     fun forget(key: String) = db.transaction { c ->
         val id = runId(c, key)
-        if (id != null) listOf("steps", "usage_hours", "gaps", "limits").forEach { table -> c.prepareStatement("DELETE FROM $table WHERE run_id = ?").use { it.setLong(1, id); it.executeUpdate() } }
+        if (id != null) listOf("steps", "usage_hours", "usage_minutes", "gaps", "limits").forEach { table -> c.prepareStatement("DELETE FROM $table WHERE run_id = ?").use { it.setLong(1, id); it.executeUpdate() } }
         c.prepareStatement("DELETE FROM runs WHERE path = ?").use { it.setString(1, key); it.executeUpdate() }
         c.prepareStatement("DELETE FROM files WHERE path = ?").use { it.setString(1, key); it.executeUpdate() }
     }
@@ -58,6 +59,7 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
             val id = upsertRun(c, delta)
             insertSteps(c, id, delta.results)
             addHours(c, id, delta)
+            addMinutes(c, id, delta)
             insertLimits(c, id, delta.limits)
             aggregate(c, id)
             added = replaceGaps(c, id, delta.found.key, p)
@@ -140,6 +142,26 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
                 s.setLong(1, runId)
                 s.setLong(2, hour)
                 s.setDouble(3, cost)
+                s.addBatch()
+            }
+            s.executeBatch()
+        }
+    }
+
+    private fun addMinutes(c: Connection, runId: Long, d: FileDelta) {
+        val byMinute = d.usages.groupBy { Math.floorDiv(it.atMs, MINUTE_MS) to (it.model ?: UNKNOWN_MODEL) }
+        if (byMinute.isEmpty()) return
+        c.prepareStatement(
+            "INSERT INTO usage_minutes(run_id, minute, model, input, cw5m, cw1h, cache_read, output, thinking) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+                "ON CONFLICT(run_id, minute, model) DO UPDATE SET input = input + excluded.input, cw5m = cw5m + excluded.cw5m, cw1h = cw1h + excluded.cw1h, " +
+                "cache_read = cache_read + excluded.cache_read, output = output + excluded.output, thinking = thinking + excluded.thinking",
+        ).use { s ->
+            byMinute.forEach { (key, us) ->
+                val u = us.fold(Usage()) { sum, at -> sum + at.usage }
+                s.setLong(1, runId)
+                s.setLong(2, key.first)
+                s.setString(3, key.second)
+                listOf(u.input, u.cw5m, u.cw1h, u.cacheRead, u.output, us.sumOf { it.thinking }).forEachIndexed { i, v -> s.setLong(4 + i, v) }
                 s.addBatch()
             }
             s.executeBatch()
@@ -256,6 +278,8 @@ class RunWriter(private val db: TranscriptDb, private val categorizer: Categoriz
 
     companion object {
         const val HOUR_MS = 3_600_000L
+        const val MINUTE_MS = 60_000L
+        const val UNKNOWN_MODEL = "unknown"
         private const val ERROR_CHARS = 80
         private const val TITLE_CHARS = 120
         private val GAP_INPUT = setOf("codeloupe", "code_read", "code_search", "code_search_shell")

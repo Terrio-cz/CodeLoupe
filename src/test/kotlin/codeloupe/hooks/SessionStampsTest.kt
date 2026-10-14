@@ -1,6 +1,7 @@
 package codeloupe.hooks
 
 import codeloupe.TestRepos
+import codeloupe.accounts.ClaudeAccount
 import codeloupe.accounts.ClaudeLogin
 import codeloupe.accounts.LoginFiles
 import codeloupe.accounts.SessionIdentities
@@ -30,16 +31,53 @@ class SessionStampsTest {
 
     private fun transcript(session: String, dir: Path = configDir) = dir.resolve("projects").resolve("C--repo").resolve("$session.jsonl").toString()
 
-    private fun hooks(config: HooksConfig = HooksConfig(), run: (Runnable) -> Unit = Runnable::run) = Hooks(
+    private fun hooks(config: HooksConfig = HooksConfig(), accounts: List<ClaudeAccount> = emptyList(), run: (Runnable) -> Unit = Runnable::run) = Hooks(
         Steering(FakeSources("/repo", emptyMap()), ShellPaths("/home/me", windows = false)), { config }, AppendLog(root.resolve("hooks.jsonl"))::append, { "/repo" },
-        stamps = SessionStamps(store, ClaudeLogin(userHome), run),
+        stamps = SessionStamps(store, ClaudeLogin(userHome), { accounts }, run),
     )
 
-    private fun event(name: String, session: String, path: String?) = buildJsonObject {
+    private fun event(name: String, session: String, path: String?, login: String? = null, account: String? = null, token: Boolean = false) = buildJsonObject {
         put("hook_event_name", name)
         put("session_id", session)
         put("cwd", "/repo")
         path?.let { put("transcript_path", it) }
+        login?.let { put("codeloupe_login", it) }
+        account?.let { put("codeloupe_account", it) }
+        if (token) put("codeloupe_token_login", true)
+    }
+
+    private fun account(id: String, identity: String?, dir: Path = configDir) =
+        ClaudeAccount(id, id, dir, implicit = false, identity = identity, email = "$id@example.com")
+
+    @Test
+    fun `the session's own account uuid wins over the login file, which holds whichever login was written last`() {
+        LoginFiles.write(configDir.resolve(".claude.json"), "uuid-b")
+        send(hooks(), event("SessionStart", "s1", transcript("s1"), login = uuid))
+        assertEquals(AccountIdentity.fingerprint(uuid), store.all()["s1"])
+        assertFalse(uuid in Files.readString(root.resolve(SessionIdentities.FILE)))
+    }
+
+    @Test
+    fun `a launcher's account gives the identity accounts json declares for it, by id or e-mail`() {
+        LoginFiles.write(configDir.resolve(".claude.json"), "uuid-b")
+        val accounts = listOf(account("a", "aaaaaaaaaaaa"), account("b", "bbbbbbbbbbbb"), account("c", null))
+        val hooks = hooks(accounts = accounts)
+        send(hooks, event("SessionStart", "s1", transcript("s1"), account = "a", token = true))
+        send(hooks, event("SessionStart", "s2", transcript("s2"), account = "B@Example.com", token = true))
+        send(hooks, event("SessionStart", "s3", transcript("s3"), account = "c"))
+        send(hooks, event("SessionStart", "s4", transcript("s4"), account = "nobody"))
+        assertEquals(mapOf("s1" to "aaaaaaaaaaaa", "s2" to "bbbbbbbbbbbb"), store.all())
+    }
+
+    @Test
+    fun `a session with a token of its own is not given the login file, a plain CLI session on a shared directory is`() {
+        LoginFiles.write(configDir.resolve(".claude.json"), "uuid-b")
+        val hooks = hooks(accounts = listOf(account("a", null), account("b", null)))
+        send(hooks, event("SessionStart", "token", transcript("token"), token = true))
+        assertTrue(store.all().isEmpty())
+
+        send(hooks, event("SessionStart", "cli", transcript("cli")))
+        assertEquals(mapOf("cli" to AccountIdentity.fingerprint("uuid-b")), store.all())
     }
 
     private fun send(hooks: Hooks, json: JsonObject) = runBlocking { hooks.reply(json) }
@@ -128,7 +166,7 @@ class SessionStampsTest {
     @Test
     fun `the reply does not wait for the stamp`() {
         LoginFiles.write(configDir.resolve(".claude.json"), "uuid-a")
-        val hooks = hooks { queued += it }
+        val hooks = hooks(run = { queued += it })
         send(hooks, event("SessionStart", "s1", transcript("s1")))
         assertTrue(store.all().isEmpty(), "the work is only queued while the hook answers")
         queued.single().run()

@@ -7,6 +7,8 @@ import java.sql.Connection
  * Brings the account columns of what is already stored in line with what is known now (CL-226): a session stamped after its transcript
  * was read gets its identity, and an account that shares a directory (or an `identity-<fingerprint>` that `accounts.json` has since
  * claimed) is resolved again. A session that a desktop instance lists (CL-231) goes to that instance's account, over everything else.
+ * A stamp that changed replaces the identity stored before it: the hook once stamped the login file of the shared directory, which named
+ * whichever login was written last, not the session's (CL-226).
  * It runs only when a stamp or a desktop session is new or the listed accounts changed, and a failure is retried by the next pass.
  */
 internal object AccountBackfill {
@@ -39,7 +41,7 @@ internal object AccountBackfill {
 
     private fun stamp(c: Connection, table: String, fresh: Map<String, String>) {
         if (fresh.isEmpty()) return
-        c.prepareStatement("UPDATE $table SET identity = ? WHERE session = ? AND identity IS NULL").use { s ->
+        c.prepareStatement("UPDATE $table SET identity = ?1 WHERE session = ?2 AND identity IS NOT ?1").use { s ->
             for ((session, identity) in fresh) {
                 s.setString(1, identity)
                 s.setString(2, session)

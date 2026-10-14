@@ -85,9 +85,12 @@ hook's context in the transcript, to show whether the map pays for itself. `hook
 ## Account stamp
 
 The `SessionStart` and `SubagentStart` hooks also note which Claude login runs the session, so `/usage` snapshots and runs of two logins that share `~/.claude` can be told apart
-(`codeloupe metrics limits`, [In the desktop app](Desktop-app#accounts)). The daemon takes the config directory from the `transcript_path` of the hook input, reads the account
-uuid of the `.claude.json` there (`~/.claude.json` for the default directory) and appends `session id -> 12-character fingerprint of the uuid` to `<home>/session-identities.jsonl`.
-Neither the uuid nor the e-mail is written anywhere. The work is queued on a background thread, so the hook answers at once; any failure leaves the session without a stamp and
+(`codeloupe metrics limits`, [In the desktop app](Desktop-app#accounts)). The session's own environment decides: `hook.sh` adds the account uuid Claude Desktop gives its sessions
+(`CLAUDE_CODE_ACCOUNT_UUID`), the account a launcher started it on (`CODELOUPE_ACCOUNT`, an id or e-mail of `accounts.json`, mapped to the `identity` declared there) and whether it signs in
+with a token of its own (`CLAUDE_CODE_OAUTH_TOKEN`, never its value). Only a session with none of these reads the account uuid of the `.claude.json` of its config directory (from the
+`transcript_path`; `~/.claude.json` for the default directory): that is the login the CLI signs in with, while a desktop or token session may run as another login than the
+file names, which holds whichever was written last. The daemon appends `session id -> 12-character fingerprint of the uuid` to `<home>/session-identities.jsonl`; a newer stamp of a session replaces the identity
+stored for it. Neither the uuid nor the e-mail is written anywhere. The work is queued on a background thread, so the hook answers at once; any failure leaves the session without a stamp and
 never touches the session. It needs no `sessionStart` setting: `hooks.stampAccount` (default `true`) turns it off alone, `hooks.enabled: false` and `CODELOUPE_HOOKS=off` turn it off with every other hook.
 A subagent belongs to the session that started it and adds a stamp only for a session the daemon has not seen start.
 

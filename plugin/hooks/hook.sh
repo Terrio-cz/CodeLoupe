@@ -36,7 +36,22 @@ case $? in 0) auth=(-H "@$CL_TOKEN_FILE") ;; 2) ;; *) exit 0 ;; esac
 IFS= read -r -d '' body
 wait=2
 # Only the event name counts: a Bash command that mentions SessionStart is still a tool call.
-case "$body" in *'"hook_event_name":"SessionStart"'*|*'"hook_event_name": "SessionStart"'*) wait=10 ;; esac
+case "$body" in *'"hook_event_name":"SessionStart"'*|*'"hook_event_name": "SessionStart"'*) wait=10; start=1 ;; *'"hook_event_name":"SubagentStart"'*|*'"hook_event_name": "SubagentStart"'*) start=1 ;; esac
+
+# A session start also says which login runs the session, as its own environment knows it: the shared ~/.claude.json holds the
+# login written last, not this session's (CL-226). The uuid goes to this machine's daemon only, which keeps just its fingerprint.
+if [ -n "$start" ] && [[ $body == '{'* ]]; then
+  login=()
+  [[ $CLAUDE_CODE_ACCOUNT_UUID =~ ^[0-9A-Fa-f-]{8,64}$ ]] && login+=("\"codeloupe_login\":\"$CLAUDE_CODE_ACCOUNT_UUID\"")
+  [[ $CODELOUPE_ACCOUNT =~ ^[A-Za-z0-9._@+-]{1,100}$ ]] && login+=("\"codeloupe_account\":\"$CODELOUPE_ACCOUNT\"")
+  [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] && login+=('"codeloupe_token_login":true')
+  if [ ${#login[@]} -gt 0 ]; then
+    fields=$(IFS=,; printf '%s' "${login[*]}")
+    rest=${body#\{}
+    lead=${rest#"${rest%%[![:space:]]*}"}
+    if [[ $lead == '}'* ]]; then body="{$fields$rest"; else body="{$fields,$rest"; fi
+  fi
+fi
 
 # No proxy: the body holds prompts and commands and goes to this machine only.
 reply=$(curl -sf --noproxy '*' --connect-timeout 0.3 -m "$wait" -H 'x-codeloupe: 1' "${auth[@]}" -H 'content-type: application/json' --data-binary @- "http://127.0.0.1:$port/hook" <<<"$body" 2>/dev/null) || exit 0

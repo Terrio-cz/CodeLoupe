@@ -3,6 +3,8 @@ package codeloupe.cli
 import codeloupe.JsonFormat
 import codeloupe.commands.CommandPeriod
 import codeloupe.config.ConfigLoader
+import codeloupe.ingest.LimitAnswer
+import codeloupe.ingest.LimitAnswers
 import codeloupe.ingest.LimitCsv
 import codeloupe.ingest.LimitSnapshot
 import codeloupe.ingest.LimitSnapshots
@@ -24,6 +26,7 @@ class MetricsLimitsCommand : CliktCommand(name = "limits") {
     private val until by option(help = "End of the period: a day or an instant (default now)")
     private val account by option(help = "Only this account id; 'unknown' for the snapshots whose account is not decidable")
     private val latest by option("--latest", help = "Only the newest snapshot of every meter per account, whatever the period").flag()
+    private val hits by option("--hits", help = "The usage-limit answers runs got instead of the /usage snapshots: when, which limit, when it lifts, session and account").flag()
     private val max by option("--max", help = "At most this many snapshots, the newest ones (default 100000)").int().default(100_000)
     private val format by option(help = "jsonl (default), csv or json").choice("jsonl", "csv", "json").default("jsonl")
 
@@ -47,6 +50,15 @@ class MetricsLimitsCommand : CliktCommand(name = "limits") {
             null -> LimitSnapshots.Who.All
             "unknown" -> LimitSnapshots.Who.Unknown
             else -> LimitSnapshots.Who.Account(account!!)
+        }
+        if (hits) {
+            val answers = TranscriptDb(file).use { LimitAnswers(it).between(from, to, who, max) }
+            when (format) {
+                "csv" -> echo(LimitAnswers.csv(answers), trailingNewline = false)
+                "json" -> echo(JsonFormat.json.encodeToString(ListSerializer(LimitAnswer.serializer()), answers))
+                else -> answers.forEach { echo(JsonFormat.json.encodeToString(LimitAnswer.serializer(), it)) }
+            }
+            return
         }
         val rows: List<LimitSnapshot> = TranscriptDb(file).use { db ->
             val snapshots = LimitSnapshots(db)

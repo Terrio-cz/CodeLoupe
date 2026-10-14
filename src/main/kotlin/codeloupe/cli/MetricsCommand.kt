@@ -9,7 +9,7 @@ class MetricsCommand : CliktCommand(name = "metrics") {
     init {
         subcommands(
             MetricsCollectCommand(), MetricsCompareCommand(), MetricsWhatIfCommand(), MetricsGapsCommand(), MetricsBoilerplateCommand(),
-            MetricsHooksCommand(), MetricsOrientationCommand(), MetricsWeightCommand(), MetricsCommandsCommand(), MetricsLimitsCommand(),
+            MetricsHooksCommand(), MetricsOrientationCommand(), MetricsWeightCommand(), MetricsCommandsCommand(), MetricsLimitsCommand(), MetricsTokensCommand(),
         )
     }
 
