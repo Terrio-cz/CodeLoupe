@@ -649,25 +649,47 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
+      # The three installers build at the same time (CL-195): electron-builder of rc.1 runs while Gradle builds rc.2, then rc.2 and
+      # rc.3 run together, each in its own copy app-<version>/ (stage/, dist/ and out/ of its own, node_modules linked to app/), so
+      # nothing of one is read while another writes it. One after another they took about 230 s of the 480 s of this step.
       - name: Build the installers of two versions and one with a broken daemon
         shell: bash
         run: |
           targets=
           [ "${{ runner.os }}" = Linux ] && targets="--linux AppImage"
-          (cd app && npm ci --ignore-scripts)
-          mkdir updates
-          for v in 0.0.1-rc.1 0.0.1-rc.2; do
-            rm -rf build/bundle
-            ./gradlew bundle --console=plain --no-daemon -PreleaseVersion=$v
-            (cd app && npm run dist -- -c.extraMetadata.version=$v $targets)
-            mkdir "updates/$v"
-            cp app/dist/CodeLoupe-$v-* app/dist/latest*.yml "updates/$v/"
-            node tools/feed-check.mjs "updates/$v" --version "$v" --feed "$([ "${{ runner.os }}" = Linux ] && echo latest-linux.yml || echo latest.yml)"
-          done
+          (cd app && npm ci --ignore-scripts && npx electron-vite build)
+          # A copy of app/ for version $1 with the bundle Gradle built last staged in it.
+          prepare() {
+            mkdir "app-$1"
+            (cd app && tar -cf - --exclude=./node_modules --exclude=./dist --exclude=./stage .) | tar -xf - -C "app-$1"
+            node -e "require('fs').symlinkSync(require('path').resolve('app/node_modules'), 'app-$1/node_modules', 'junction')"
+            (cd "app-$1" && node scripts/stage-resources.mjs)
+          }
+          installer() {
+            (cd "app-$1" && npx electron-builder --publish never -c.extraMetadata.version=$1 $targets) > "installer-$1.log" 2>&1
+          }
+          finish() {
+            wait "$2" || { cat "installer-$1.log"; echo "the installer of $1 failed"; exit 1; }
+            cat "installer-$1.log"
+            mkdir -p "updates/$1"
+            cp app-$1/dist/CodeLoupe-$1-* app-$1/dist/latest*.yml "updates/$1/"
+          }
+          feed="$([ "${{ runner.os }}" = Linux ] && echo latest-linux.yml || echo latest.yml)"
+          ./gradlew bundle --console=plain --no-daemon -PreleaseVersion=0.0.1-rc.1
+          prepare 0.0.1-rc.1
+          installer 0.0.1-rc.1 & first=$!
+          rm -rf build/bundle
+          ./gradlew bundle --console=plain --no-daemon -PreleaseVersion=0.0.1-rc.2
+          prepare 0.0.1-rc.2
           # The third build is the second with a daemon jar that cannot start.
-          (cd app && node ../tools/break-bundle.mjs stage/codeloupe 0.0.1-rc.3 && npx electron-builder --publish never -c.extraMetadata.version=0.0.1-rc.3 $targets)
-          mkdir updates/0.0.1-rc.3
-          cp app/dist/CodeLoupe-0.0.1-rc.3-* app/dist/latest*.yml updates/0.0.1-rc.3/
+          prepare 0.0.1-rc.3
+          node tools/break-bundle.mjs app-0.0.1-rc.3/stage/codeloupe 0.0.1-rc.3
+          installer 0.0.1-rc.2 & second=$!
+          installer 0.0.1-rc.3 & third=$!
+          finish 0.0.1-rc.1 "$first"
+          finish 0.0.1-rc.2 "$second"
+          finish 0.0.1-rc.3 "$third"
+          for v in 0.0.1-rc.1 0.0.1-rc.2; do node tools/feed-check.mjs "updates/$v" --version "$v" --feed "$feed"; done
 
       - name: Install a virtual display
         if: runner.os == 'Linux'
