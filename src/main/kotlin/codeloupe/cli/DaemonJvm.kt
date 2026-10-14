@@ -17,6 +17,10 @@ package codeloupe.cli
  * ran out on a desktop with ~20 worktrees, three trackers and 5 000 transcripts (CL-238: 58 MB live after a full collection
  * before its fixes, ~40 MB after), so the limit leaves several times the live set for bursts. A daemon that runs out ends
  * instead of collecting forever with its port bound and its server threads gone, and `codeloupe start` starts a new one.
+ *
+ * The serial collector grows the old generation with promoted garbage instead of collecting it, so the daemon runs a full
+ * collection after work ([codeloupe.daemon.HeapTrimmer]); without steps one collection shrinks the heap to the live set
+ * instead of a tenth of the way per collection.
  */
 object DaemonJvm {
     const val HEAP_MB = 256
@@ -25,7 +29,7 @@ object DaemonJvm {
     /** [parsesHere]: the daemon parses edited files itself (`parseWorkerIdleSeconds` 0). */
     fun args(parsesHere: Boolean = false): List<String> = listOf(
         "-Xms16m", "-Xmx${if (parsesHere) HEAP_MB_PARSING else HEAP_MB}m", "-Xmn10m", "-Xss512k",
-        "-XX:+UseSerialGC", "-XX:MinHeapFreeRatio=10", "-XX:MaxHeapFreeRatio=30",
+        "-XX:+UseSerialGC", "-XX:MinHeapFreeRatio=10", "-XX:MaxHeapFreeRatio=30", "-XX:-ShrinkHeapInSteps",
         "-XX:+UseCompactObjectHeaders", "-XX:TieredStopAtLevel=1", "-XX:ReservedCodeCacheSize=32m", "-XX:MaxMetaspaceSize=96m",
         "-XX:+ExitOnOutOfMemoryError",
     )
