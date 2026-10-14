@@ -1,6 +1,8 @@
 package codeloupe.index
 
+import codeloupe.platform.LongPaths
 import org.sqlite.SQLiteConfig
+import org.sqlite.SQLiteOpenMode
 import java.nio.file.Path
 import java.sql.Connection
 
@@ -41,12 +43,14 @@ object Store {
         val config = SQLiteConfig().apply {
             setReadOnly(readOnly)
             setBusyTimeout(5000)
+            // An overlay past MAX_PATH is attached by its URI name (LongPaths.sqliteName).
+            setOpenMode(SQLiteOpenMode.OPEN_URI)
             if (!readOnly) {
                 setJournalMode(SQLiteConfig.JournalMode.WAL)
                 setSynchronous(SQLiteConfig.SynchronousMode.NORMAL)
             }
         }
-        val connection = config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
+        val connection = config.createConnection(LongPaths.sqliteUrl(file))
         if (!readOnly) connection.createStatement().use { s -> SCHEMA.forEach(s::execute) }
         return connection
     }

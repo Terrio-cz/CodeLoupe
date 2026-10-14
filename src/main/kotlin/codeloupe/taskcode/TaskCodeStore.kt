@@ -1,5 +1,6 @@
 package codeloupe.taskcode
 
+import codeloupe.platform.LongPaths
 import codeloupe.tracker.mirror.batch
 import codeloupe.tracker.mirror.exec
 import codeloupe.tracker.mirror.query
@@ -23,13 +24,13 @@ class TaskCodeStore(file: Path, pattern: String) : AutoCloseable {
             setJournalMode(SQLiteConfig.JournalMode.WAL)
             setSynchronous(SQLiteConfig.SynchronousMode.NORMAL)
         }
-        var connection = config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
+        var connection = config.createConnection(LongPaths.sqliteUrl(file))
         val version = connection.createStatement().use { s -> s.executeQuery("PRAGMA user_version").use { r -> r.next(); r.getInt(1) } }
         val samePattern = version == SCHEMA_VERSION && connection.query("SELECT value FROM meta WHERE key = 'pattern'") { it.getString(1) }.firstOrNull() == pattern
         if (version != 0 && !samePattern) {
             connection.close()
             listOf("", "-wal", "-shm").forEach { Files.deleteIfExists(Path.of("$file$it")) }
-            connection = config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
+            connection = config.createConnection(LongPaths.sqliteUrl(file))
         }
         try {
             connection.createStatement().use { s ->

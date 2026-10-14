@@ -14,7 +14,7 @@ object Sqlite {
             setJournalMode(SQLiteConfig.JournalMode.WAL)
             setSynchronous(SQLiteConfig.SynchronousMode.NORMAL)
         }
-        val connection = config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
+        val connection = config.createConnection(LongPaths.sqliteUrl(file))
         connection.createStatement().use { s -> schema.forEach(s::execute) }
         return connection
     }

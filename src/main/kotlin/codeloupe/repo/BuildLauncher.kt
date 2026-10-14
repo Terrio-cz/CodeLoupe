@@ -5,6 +5,7 @@ import codeloupe.index.BuildResult
 import codeloupe.index.BuildWorker
 import codeloupe.index.StoreUpdate
 import codeloupe.platform.JavaProcess
+import codeloupe.platform.LongPaths
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
@@ -29,7 +30,8 @@ open class BuildLauncher(private val heapMb: Int, private val timeoutMs: Long) {
 
     private fun run(args: List<String>, workDir: Path): BuildResult {
         val command = JavaProcess.command(BuildWorker::class.java.name, jvmArgs(), args)
-        val process = ProcessBuilder(command).directory(workDir.toFile()).start().apply { outputStream.close() }
+        // Every path goes as an argument: under a home past MAX_PATH the worker starts elsewhere (CL-253).
+        val process = ProcessBuilder(command).directory(LongPaths.processDir(workDir).toFile()).start().apply { outputStream.close() }
         val stderr = CompletableFuture.supplyAsync { tail(process.errorStream.readAllBytes().toString(Charsets.UTF_8)) }
         val stdout = CompletableFuture.supplyAsync { process.inputStream.readAllBytes().toString(Charsets.UTF_8) }
         if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
