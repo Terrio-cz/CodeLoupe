@@ -70,9 +70,9 @@ class WorktreeRemoverTest {
         git(repo, "worktree", "lock", locked.toString())
         val first = WorktreeRemover().remove(entry(moved, "CL-4", head = planned))
         val second = WorktreeRemover().remove(entry(locked, "CL-5"))
-        assertTrue(first is WorktreeRemover.Outcome.Blocked && "moved" in first.reason)
-        assertTrue(second is WorktreeRemover.Outcome.Blocked && "locked" in second.reason)
-        assertTrue(moved.exists() && locked.exists())
+        assertTrue(first is WorktreeRemover.Outcome.Blocked && "moved" in first.reason, "$first")
+        assertTrue(second is WorktreeRemover.Outcome.Blocked && "locked" in second.reason, "$second")
+        assertTrue(moved.exists() && locked.exists(), "moved ${moved.exists()}, locked ${locked.exists()}")
     }
 
     @Test

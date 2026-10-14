@@ -14,7 +14,7 @@ val bundleOs = System.getProperty("os.name").lowercase().let {
 val bundleArch = System.getProperty("os.arch").lowercase().let { if (it == "amd64" || it == "x86_64") "x64" else if (it == "aarch64") "arm64" else it }
 val bundleName = "codeloupe-${project.version}-$bundleOs-$bundleArch"
 
-// What the jars use, found by jdeps, plus what only shows up at run time: TLS to trackers (EC curves), zip file
+// What the jars use besides what jdeps finds, because it only shows up at run time: TLS to trackers (EC curves), zip file
 // systems, the management beans behind the daemon's /status, java.util.logging.
 val extraModules = listOf("java.logging", "jdk.crypto.ec", "jdk.zipfs", "jdk.management")
 
@@ -33,41 +33,60 @@ val javaExtension = extensions.getByType<JavaPluginExtension>()
 val toolchainHome = extensions.getByType<JavaToolchainService>().launcherFor(javaExtension.toolchain).map { it.metadata.installationPath.asFile }
 val installDist = tasks.named("installDist")
 
-val bundleRuntime = tasks.register("bundleRuntime") {
-    description = "Builds the minimal jlink runtime for the daemon and CLI."
+// `-PprebuiltInstall=<dir>` (CL-195): bin/ and lib/ of an installDist made elsewhere, with that build's bundle-modules.txt as
+// modules.txt. The install is the same on every OS, so CI compiles it once on Linux and the slow macOS Intel runner only links
+// the runtime and lays out the bundle.
+val prebuiltInstall = (findProperty("prebuiltInstall") as String?)?.let { file(it) }
+
+// The JDK modules the jars use, found by jdeps, plus what only shows up at run time. jdeps reads the whole Kotlin compiler: 13 s on a
+// laptop, 90 s on a slow macOS Intel runner.
+val bundleModules = tasks.register("bundleModules") {
+    description = "Lists the JDK modules the bundle runtime needs."
     group = "distribution"
     val libDir = layout.buildDirectory.dir("install/codeloupe/lib")
-    val runtimeDir = layout.buildDirectory.dir("bundle/runtime")
+    val modulesFile = layout.buildDirectory.file("bundle-modules.txt")
     dependsOn(installDist)
     inputs.dir(libDir)
     inputs.property("extraModules", extraModules)
     inputs.property("skippedModules", skippedModules)
+    inputs.property("jdk", toolchainHome.map { it.absolutePath })
+    outputs.file(modulesFile)
+    doLast {
+        val exe = if (bundleOs == "windows") ".exe" else ""
+        val jars = libDir.get().asFile.listFiles { f -> f.extension == "jar" }!!.map { it.absolutePath }.sorted()
+        val process = ProcessBuilder(
+            toolchainHome.get().resolve("bin/jdeps$exe").absolutePath, "--multi-release", javaExtension.toolchain.languageVersion.get().toString(),
+            "--ignore-missing-deps", "--print-module-deps", *jars.toTypedArray(),
+        ).redirectError(ProcessBuilder.Redirect.INHERIT).start()
+        val found = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
+        check(process.waitFor() == 0) { "jdeps failed" }
+        val modules = (found.trim().split(',').filter { it.isNotBlank() } + extraModules).filter { it !in skippedModules }.toSortedSet()
+        modulesFile.get().asFile.writeText(modules.joinToString(",") + "\n")
+    }
+}
+
+val bundleRuntime = tasks.register("bundleRuntime") {
+    description = "Builds the minimal jlink runtime for the daemon and CLI."
+    group = "distribution"
+    val modulesFile = prebuiltInstall?.resolve("modules.txt") ?: layout.buildDirectory.file("bundle-modules.txt").get().asFile
+    val runtimeDir = layout.buildDirectory.dir("bundle/runtime")
+    if (prebuiltInstall == null) dependsOn(bundleModules)
+    inputs.file(modulesFile)
     inputs.property("unusedRuntimeFiles", unusedRuntimeFiles)
     inputs.property("jdk", toolchainHome.map { it.absolutePath })
     outputs.dir(runtimeDir)
     doLast {
         val jdk = toolchainHome.get()
         val exe = if (bundleOs == "windows") ".exe" else ""
-        fun run(vararg command: String, capture: Boolean = false): String {
-            val process = ProcessBuilder(*command).redirectErrorStream(false)
-                .redirectError(ProcessBuilder.Redirect.INHERIT).also { if (!capture) it.redirectOutput(ProcessBuilder.Redirect.INHERIT) }.start()
-            val out = if (capture) process.inputStream.readAllBytes().toString(Charsets.UTF_8) else ""
-            check(process.waitFor() == 0) { "${command.first()} failed" }
-            return out
-        }
-        val jars = libDir.get().asFile.listFiles { f -> f.extension == "jar" }!!.map { it.absolutePath }.sorted()
-        val found = run(
-            jdk.resolve("bin/jdeps$exe").absolutePath, "--multi-release", javaExtension.toolchain.languageVersion.get().toString(),
-            "--ignore-missing-deps", "--print-module-deps", *jars.toTypedArray(), capture = true,
-        ).trim().split(',').filter { it.isNotBlank() }
-        val modules = (found + extraModules).filter { it !in skippedModules }.toSortedSet().joinToString(",")
+        val modules = modulesFile.readText().trim()
         logger.lifecycle("jlink modules: $modules")
         val out = runtimeDir.get().asFile
         out.deleteRecursively()
-        run(
+        val process = ProcessBuilder(
             jdk.resolve("bin/jlink$exe").absolutePath, "--add-modules", modules, "--output", out.absolutePath,
             "--strip-debug", "--no-header-files", "--no-man-pages", "--compress", "zip-6", "--generate-cds-archive",
-        )
+        ).inheritIO().start()
+        check(process.waitFor() == 0) { "jlink failed" }
         out.walkTopDown().filter { it.isFile && it.name in unusedRuntimeFiles }.forEach { check(it.delete()) { "cannot delete $it" } }
     }
 }
@@ -76,7 +95,7 @@ val bundleDir = tasks.register<Sync>("bundleDir") {
     description = "Lays out the bundle: bin/, lib/ and runtime/."
     group = "distribution"
     into(layout.buildDirectory.dir("bundle/$bundleName"))
-    from(installDist)
+    if (prebuiltInstall != null) from(prebuiltInstall) { exclude("modules.txt") } else from(installDist)
     from(bundleRuntime) { into("runtime") }
 }
 

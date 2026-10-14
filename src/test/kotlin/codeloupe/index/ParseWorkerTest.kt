@@ -4,6 +4,7 @@ import codeloupe.CodeLoupe
 import codeloupe.TestRepos
 import codeloupe.config.Config
 import codeloupe.daemon.Daemon
+import codeloupe.processes.ProcessInfo
 import codeloupe.processes.SystemProcesses
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -103,7 +104,11 @@ class ParseWorkerTest {
             val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/find")).header(CodeLoupe.HEADER, "1").header(CodeLoupe.TOKEN_HEADER, daemon.token).POST(HttpRequest.BodyPublishers.ofString(body)).build()
             return http.send(request, HttpResponse.BodyHandlers.ofString()).body()
         }
-        fun workers() = SystemProcesses().read().filter { it.commandLine?.contains("codeloupe.index.ParseWorker") == true }
+        // Only the workers of this JVM's daemon: a test in another fork starts its own at the same time.
+        fun workers(): List<ProcessInfo> {
+            val mine = ProcessHandle.current().descendants().map { it.pid() }.toList().toSet()
+            return SystemProcesses().read().filter { it.pid in mine && it.commandLine?.contains("codeloupe.index.ParseWorker") == true }
+        }
         try {
             assertTrue(find(repo.toString(), "total").contains("Billing"))
             val before = workers().map { it.pid }.toSet()

@@ -1,5 +1,6 @@
 package codeloupe.processes
 
+import codeloupe.TestRepos
 import codeloupe.jobs.FakeJob
 import java.nio.file.Files
 import java.nio.file.Path
@@ -7,13 +8,20 @@ import java.nio.file.Path
 /** Real child JVMs with a given working directory and a marker in their command line, killed with the test. */
 class ChildProcesses : AutoCloseable {
     private val started = ArrayList<Process>()
+    private val outputs = HashMap<Long, Path>()
+    private val outputDir by lazy { TestRepos.tmpDir("children") }
 
-    /** A JVM that sleeps (or spins for [spinMs]) in [directory], its command line carrying [marker] and then [after]. */
+    /**
+     * A JVM that sleeps (or spins for [spinMs]) in [directory], its command line carrying [marker] and then [after]. It prints
+     * `ready` when its main method runs, which [awaitListed] waits for.
+     */
     fun start(directory: Path, marker: String, sleepMs: Long = 120_000, spinMs: Long = 0, after: List<String> = emptyList()): Process {
-        val args = listOfNotNull(if (spinMs > 0) "spin=$spinMs" else null, "sleep=$sleepMs", marker) + after
+        val args = listOfNotNull("print=$READY", if (spinMs > 0) "spin=$spinMs" else null, "sleep=$sleepMs", marker) + after
+        val output = Files.createTempFile(outputDir, "child-", ".out")
         val process = ProcessBuilder(FakeJob.command(*args.toTypedArray())).directory(directory.toFile()).redirectErrorStream(true)
-            .redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
+            .redirectOutput(output.toFile()).start()
         started += process
+        outputs[process.pid()] = output
         return process
     }
 
@@ -39,17 +47,22 @@ class ChildProcesses : AutoCloseable {
 
     /**
      * Waits until the OS lists [process] with its working directory and command line, and until the JVM has stopped starting up:
-     * a slow machine spends seconds of CPU on that, which would read as a busy daemon.
+     * a slow machine spends seconds of CPU on that, which would read as a busy daemon. Half a second without CPU alone is no proof
+     * on a loaded runner: a JVM waiting for the disk is quiet too and busy again after it (CL-195), so its main method must have run.
+     * Without [settle] it only waits for the main method, after which a spinning child spins.
      */
     fun awaitListed(process: Process, source: ProcessSource = world(), settle: Boolean = true): ProcessInfo {
         val until = System.currentTimeMillis() + 30_000
         while (System.currentTimeMillis() < until) {
             val listed = source.read().firstOrNull { it.pid == process.pid() && it.cwd != null && it.commandLine != null }
-            if (listed != null && (!settle || quiet(process))) return listed
+            if (listed != null && ready(process) && (!settle || quiet(process))) return listed
             Thread.sleep(100)
         }
         error("pid ${process.pid()} was not listed with its directory and command line, or never settled")
     }
+
+    private fun ready(process: Process): Boolean =
+        outputs[process.pid()]?.let { output -> runCatching { Files.readString(output).contains(READY) }.getOrDefault(false) } ?: true
 
     private fun quiet(process: Process): Boolean {
         val handle = process.toHandle()
@@ -60,6 +73,8 @@ class ChildProcesses : AutoCloseable {
 
     override fun close() = started.forEach { runCatching { it.destroyForcibly() } }
 }
+
+private const val READY = "ready"
 
 const val GRADLE_DAEMON_MARKER = "org.gradle.launcher.daemon.bootstrap.GradleDaemon"
 const val GRADLE_CLIENT_MARKER = "org.gradle.launcher.GradleMain"

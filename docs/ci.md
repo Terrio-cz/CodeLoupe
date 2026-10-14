@@ -75,12 +75,20 @@ then `update test (windows-latest)` at 11 minutes; the bundles take 5 to 7.5 min
   skipped. What Kotlin can still break in an installed build (the daemon does not start) is caught by `bundle` and
   `installer smoke`, which start the daemon of every bundle and installer; the update test builds both of its versions from
   the same commit, so it does not compare two Kotlin versions.
-- **Windows tests on two runners.** `gradle/test-shards.gradle.kts` runs a share of the classes for `-PtestShard=1/2`; a class
-  belongs to a share by its name (the 15 slowest are placed by hand, alternately, and `TestShardsTest` fails when one of them
-  no longer exists). The first share keeps the name `test (windows-latest)` that the ruleset requires, the second is
-  `test (windows-latest, shard 2)`; **add the second to the required checks**, because a red second share fails the run but not
-  the required check. macOS is not split: macOS runners are scarce (a run that asked for a sixth at once waited six minutes
-  for a free one), so one more job there costs more than it gains.
+- **Windows tests on four runners, Linux on two.** `gradle/test-shards.gradle.kts` runs a share of the classes for
+  `-PtestShard=1/4`; a class belongs to a share by its name, and the 37 classes of 10 s and more are placed by their measured
+  Windows time, longest first, each to the share with the least so far (`TestShardsTest` fails when one of them no longer exists).
+  The first share keeps the name `test (windows-latest)` / `test (ubuntu-latest)`, the others are `test (<os>, shard <n>)`; all of
+  them are required checks of the ruleset on main. macOS is not split: macOS runners are scarce (a run that asked for a sixth at
+  once waited six minutes for a free one), so one more job there costs more than it gains.
+- **The macOS Intel bundle does not compile** (job `dist`). The jars, the launchers and the JDK module list (`bundleModules`,
+  jdeps) are the same on every OS; `dist` builds them on Linux in about 85 s and `bundle (macos-15-intel)` lays out its bundle from
+  them (`-PprebuiltInstall`), linking only the runtime. The Intel runner took 160 to 460 s for `./gradlew bundle` before (Kotlin
+  compile up to 250 s, jdeps over the Kotlin compiler up to 90 s); the job now takes 242 to 329 s instead of 360 to 825 s. The
+  steps are shared with the other `bundle` legs through a YAML anchor; the other three still compile themselves, because waiting
+  for `dist` would cost them more than the compile.
+- **A hung test fails by name.** `junit.jupiter.execution.timeout.default` is 5 minutes (the longest test takes 1.5), so a hang
+  like the one of run 38181094368 fails that test instead of running the job into its 20 minute limit with no word.
 - **Forks per runner.** Two forks on a hosted Linux or Windows runner (4 vCPU) and three on a macOS runner (3 cores). Four
   forks on the four cores were tried and removed: Windows 599 s against 660 s with two, Linux 393 s against 330 to 400 s, the
   summed class time grew from 900 to 1566 s, and `IngestScaleTest`, `SessionStartDaemonTest` and `HooksDaemonTest` failed on
@@ -90,6 +98,10 @@ then `update test (windows-latest)` at 11 minutes; the bundles take 5 to 7.5 min
 - **Flaky tests found on the way** (all test code): `PostEditSampleTest` read a source saved as Latin-1
   (`BudgetsConfig.kt`); the hook script tests wrote to a script that had already exited (`Process.feed`); the session start
   test counted the `was:` line as a caller line; `IngestScaleTest` judged one sample of a 200 ms read (now the fastest of three).
+  Second round (2026-10-14): the child JVMs of `ProcessStopperTest` were taken as settled after half a second without CPU, which a
+  JVM waiting for the disk on a loaded runner also is (now they print `ready` from their main method first, both ways it failed);
+  `ParseWorkerTest` counted the parse workers of every JVM on the machine, also the other fork's; `JobsTest` gave a surviving job
+  2.5 s to outlive the start of the next daemon (now 10 s) and read a killed job as alive before the OS had reaped it.
 - **Unknown means everything.** A new branch, a tag, a force push that dropped the base, a scheduled run, or a failure of the
   `changes` job itself runs every step: the answer is skipped only when it is known to be `false`.
 
@@ -122,9 +134,26 @@ output, so the test that hung is unknown. Medians of the three consecutive green
 668, 507) 641 s; before: 752 s median of the four green main runs of 2026-10-11, 12.5 minutes, 14 minutes over the 23
 runs of 2026-10-09 and 10. The Intel runner started 164 s after the push in the run of row 5; the run of row 8 had no wait and took 8.5 minutes.
 
-What is left on the critical path is not test time but the macOS Intel runner: `compileKotlin` takes 137 to 190 s there
-against about 50 s on the other systems, then the bundle, the installer and the installer smoke test follow in series (425 to
-677 s plus about 70 s), and a macOS job can wait minutes for a free runner. A run on main is therefore 9 to 11 minutes, not
-a steady 10. Ideas not taken: building the jar once and sharing it with the four `bundle` jobs (a larger change of
-`gradle/bundle.gradle.kts`), `-Xbackend-threads=0` for the Kotlin compiler, and excluding the workspace from Windows
-Defender (a change of the runner's security settings).
+### Second round (branch CL-195, 2026-10-14)
+
+Main before it: 588 to 926 s, median 810 s over twelve finished runs of 2026-10-13 and 14 (one more took 1618 s); the long poles were `bundle (macos-15-intel)` (360 to
+825 s, the Intel runner is fast or up to three times slower from run to run), `update test (windows-latest)` (657 to 729 s) and the
+first Windows share (544 to 615 s). Changes: the `dist` job for the Intel bundle, Linux in two shares, Windows in three and then four,
+the flaky tests above.
+
+| Run | Push | Wall | Longest job | test windows | test linux | test macOS | bundle Intel (wait) | update test windows | Result |
+|---|---|---|---|---|---|---|---|---|---|
+| 38547672973 | Kotlin, 3 Windows shares | 770 s | test linux 573 s | 517 / 439 / 556 | 573 | 304 | 274 (260 s queued) | skipped | green |
+| 38549341524 | workflow, Linux in two | 709 s | update test 698 s | 618 / 409 / 406 | 312 / - | 477 | 329 (175 s) | 698 s | green |
+| 38551078789 | workflow, 4 Windows shares | 1054 s | test macOS 652 s | 366 / 371 / 393 / - | 306 / 351 | 652 | 242 (527 s) | 709 s | green |
+
+The jobs themselves now fit in 10 minutes except the Windows update test; the wall time does not, because of waiting for runners. A
+push runs about 25 jobs, 8 of them on macOS, and the account runs 20 jobs at once, 5 on macOS, shared with every branch the agent
+windows push at the same time: in the third run the macOS test started 402 s after the push and the Intel bundle 527 s. That is the
+reason the criterion of 10 minutes is not met steadily, not the work in the jobs.
+
+The Windows update test stays at about 700 s (476 s for two Gradle builds and three NSIS installers, 180 s for the test); it runs
+only when the app, the build or the workflows changed. Building the installers uncompressed was tried (`-c.compression=store`): the
+NSIS step still took 74 s against 74 s, it is bound by the disk, not by LZMA, so it was dropped. Ideas not taken: building the three
+installers in parallel (they share `app/stage` and `app/dist`), `-Xbackend-threads=0` for the Kotlin compiler, and excluding the
+workspace from Windows Defender (a change of the runner's security settings).

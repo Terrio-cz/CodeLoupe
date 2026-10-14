@@ -100,6 +100,9 @@ tasks.test {
     maxParallelForks = (findProperty("testForks") as String?)?.toInt() ?: (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     systemProperty("codeloupe.projectDir", projectDir.absolutePath)
+    // A test that hangs fails by name after 5 minutes (the longest takes 1.5) instead of the CI job running into its limit with
+    // no word of which one it was (CL-195).
+    systemProperty("junit.jupiter.execution.timeout.default", "5 m")
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }
 
