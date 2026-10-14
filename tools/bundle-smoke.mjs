@@ -15,6 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { noJavaEnv } from './no-java-env.mjs';
+import { aotGateFailure } from './aot-gate.mjs';
 
 const [bundle, ...rest] = process.argv.slice(2);
 const opt = name => { const at = rest.indexOf(`--${name}`); return at < 0 ? undefined : rest[at + 1]; };
@@ -210,7 +211,8 @@ async function checkAotCaches(report) {
   const median = xs => [...xs].sort((a, b) => a - b)[xs.length >> 1];
   report.cliMs = Object.fromEntries(Object.entries(times).map(([k, v]) => [k, Math.round(median(v))]));
   report.aotVsDynamicPct = Math.round((1 - report.cliMs.aot / report.cliMs.dynamic) * 100);
-  if (report.cliMs.aot >= report.cliMs.dynamic) throw new Error(`the AOT cache is not faster than the dynamic archive: ${JSON.stringify(report.cliMs)}`);
+  const gate = aotGateFailure(report.cliMs);
+  if (gate) throw new Error(gate);
 }
 
 const report = { os: process.platform, arch: process.arch, port };
