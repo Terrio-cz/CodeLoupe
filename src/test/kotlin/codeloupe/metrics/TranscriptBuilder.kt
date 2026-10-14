@@ -33,6 +33,15 @@ class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T1
         lines += assistantLine(input, output, cacheRead, written1h, written5m, tools.toList())
     }
 
+    /** One assistant turn of [model] (another than the transcript's), [thinking] of its output being thinking. */
+    fun turnOf(model: String, input: Long = 10, output: Long = 5, thinking: Long = 0, cacheRead: Long = 100) = apply {
+        turn++
+        lines += assistantLine(input, output, cacheRead, 30, 20, emptyList(), model, thinking)
+    }
+
+    /** Moves the clock of the next line [seconds] on. */
+    fun later(seconds: Long) = apply { tick += seconds }
+
     /**
      * One assistant turn written the way Claude Code streams it: a line per content block under one message id, with the
      * output tokens growing from line to line ([outputs]); the tool calls come with the last line.
@@ -44,7 +53,7 @@ class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T1
         }
     }
 
-    private fun assistantLine(input: Long, output: Long, cacheRead: Long, written1h: Long, written5m: Long, tools: List<Triple<String, String, JsonObject>>): String =
+    private fun assistantLine(input: Long, output: Long, cacheRead: Long, written1h: Long, written5m: Long, tools: List<Triple<String, String, JsonObject>>, model: String = this.model, thinking: Long? = null): String =
         buildJsonObject {
             put("type", "assistant")
             put("timestamp", stamp())
@@ -54,6 +63,7 @@ class TranscriptBuilder(private val start: Instant = Instant.parse("2026-10-05T1
                 putJsonObject("usage") {
                     put("input_tokens", input)
                     put("output_tokens", output)
+                    thinking?.let { putJsonObject("output_tokens_details") { put("thinking_tokens", it) } }
                     put("cache_read_input_tokens", cacheRead)
                     put("cache_creation_input_tokens", written1h + written5m)
                     putJsonObject("cache_creation") {

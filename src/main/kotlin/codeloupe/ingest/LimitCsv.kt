@@ -11,7 +11,7 @@ object LimitCsv {
         }
     }
 
-    private fun cell(value: String?): String = when {
+    internal fun cell(value: String?): String = when {
         value == null -> ""
         value.any { it == ',' || it == '"' || it == '\n' || it == '\r' } -> "\"" + value.replace("\"", "\"\"") + "\""
         else -> value

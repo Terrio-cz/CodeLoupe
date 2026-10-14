@@ -56,7 +56,7 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
 
     /** Drops everything read so far, for transcripts that must be read again (other categories). The `/usage` snapshots stay: Claude Code deletes old transcripts, so they could not be read again. */
     fun clear() = transaction { db ->
-        db.createStatement().use { s -> listOf("steps", "usage_hours", "gaps", "limits", "runs", "files").forEach { s.executeUpdate("DELETE FROM $it") } }
+        db.createStatement().use { s -> listOf("steps", "usage_hours", "usage_minutes", "gaps", "limits", "runs", "files").forEach { s.executeUpdate("DELETE FROM $it") } }
     }
 
     override fun close() {
@@ -109,6 +109,10 @@ class TranscriptDb(private val file: Path) : AutoCloseable {
             "CREATE INDEX IF NOT EXISTS steps_codeloupe ON steps(run_id) WHERE category = 'codeloupe'",
             "CREATE TABLE IF NOT EXISTS usage_hours (run_id INTEGER NOT NULL, hour INTEGER NOT NULL, cost REAL NOT NULL, PRIMARY KEY (run_id, hour)) WITHOUT ROWID",
             "CREATE INDEX IF NOT EXISTS usage_hours_hour ON usage_hours(hour)",
+            // Token components per minute and model of a run (CL-226), for the limit calibration: thinking is the part of output that was thinking.
+            "CREATE TABLE IF NOT EXISTS usage_minutes (run_id INTEGER NOT NULL, minute INTEGER NOT NULL, model TEXT NOT NULL, input INTEGER NOT NULL, cw5m INTEGER NOT NULL, " +
+                "cw1h INTEGER NOT NULL, cache_read INTEGER NOT NULL, output INTEGER NOT NULL, thinking INTEGER NOT NULL, PRIMARY KEY (run_id, minute, model)) WITHOUT ROWID",
+            "CREATE INDEX IF NOT EXISTS usage_minutes_minute ON usage_minutes(minute)",
             "CREATE TABLE IF NOT EXISTS gaps (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL, seq INTEGER NOT NULL, turn INTEGER NOT NULL, " +
                 "at_ms INTEGER NOT NULL, week TEXT NOT NULL, tool TEXT NOT NULL, shape TEXT NOT NULL, kind TEXT NOT NULL, token TEXT, fallback TEXT)",
             "CREATE INDEX IF NOT EXISTS gaps_at ON gaps(at_ms)",

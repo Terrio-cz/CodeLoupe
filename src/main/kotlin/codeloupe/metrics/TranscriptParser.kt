@@ -93,7 +93,7 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
     private fun assistant(message: JsonObject, timestamp: String?) {
         if (model == null) model = message["model"].str()
         val id = message["id"].str()?.takeIf { it.isNotEmpty() }
-        if (id != null) usage(hash(id), message["usage"].obj(), timestamp)
+        if (id != null) usage(hash(id), message["usage"].obj(), timestamp, message["model"].str())
         for (block in message["content"].arr().orEmpty()) {
             val b = block.obj() ?: continue
             if (b["type"].str() == "tool_use") {
@@ -114,7 +114,7 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
      * handful), not the final count. Everything else is the same on every line, so the first line makes the turn and each
      * later line only adds what the output has grown by.
      */
-    private fun usage(key: Long, u: JsonObject?, timestamp: String?) {
+    private fun usage(key: Long, u: JsonObject?, timestamp: String?, model: String?) {
         val output = u?.get("output_tokens").num()
         val before = seen[key]
         if (before == null) {
@@ -127,13 +127,14 @@ class TranscriptParser(role: String, from: ParserSnapshot? = null) {
             val counted = Usage(u?.get("input_tokens").num(), written5m, written1h, u?.get("cache_read_input_tokens").num(), output)
             usage += counted
             startTracker.firstTurn(counted)
-            usages += UsageAt(at(timestamp), counted)
+            // Every line of a message holds the same thinking count, so the first one gives it.
+            usages += UsageAt(at(timestamp), counted, model = model, thinking = u?.get("output_tokens_details").obj()?.get("thinking_tokens").num() ?: 0)
             peak = maxOf(peak, u?.get("input_tokens").num() + u?.get("cache_read_input_tokens").num() + u?.get("cache_creation_input_tokens").num())
         } else if (output > before) {
             seen[key] = output
             val grown = Usage(output = output - before)
             usage += grown
-            usages += UsageAt(at(timestamp), grown, continuation = true)
+            usages += UsageAt(at(timestamp), grown, continuation = true, model = model)
         }
     }
 

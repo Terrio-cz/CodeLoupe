@@ -35,6 +35,10 @@ ones), `defaultCategories` (false = only yours), `prices` (see Money) and `inges
 Two logins sharing `~/.claude` show up as `identity-<fingerprint>` accounts (the plugin's session-start hook stamps each session with its login); `--account identity-<fingerprint>` and `--latest` take them like any account, and `unknown` leaves them out.
 With `desktopDir` on the accounts of `accounts.json` (the user-data directory of the Claude Desktop instance each is signed in to, CL-231) a session an instance lists in its `claude-code-sessions` goes to that instance's account, before the identity and the directory, so `--account a` and `--account b` split the `/usage` reports of two logins that share `~/.claude` by the app that started the session; sessions no instance lists keep the rules above.
 
+`codeloupe metrics tokens [--since 30d] [--until] [--account <id>|unknown] [--max n] [--format jsonl|csv|json]` exports the tokens every run spent per minute and model (input, cache writes 5m and 1h,
+cache read, output and the thinking part of it) with the session, role and account of the run: with `metrics limits` it is all a calibration of the limit weights needs (which model and which token
+class move the 5-hour and weekly percent), with no transcript read and no account guessed. Numbers and names only.
+
 ## Which commands agents use
 
 `codeloupe metrics commands [--since 10d] [--until] [--role coder] [--run <id>] [--top 15] [--sort cost|calls|tokens] [--json]` ranks the

@@ -196,8 +196,8 @@ class TranscriptIngest(
         const val BASELINE = "baseline"
         const val PARSER = "parser"
 
-        /** Bumped when [TranscriptParser] counts differently, so the runs already stored are read again (2: output is the final count of a message, CL-206; 3: usage-limit answers are kept, CL-210; 4: steps keep the size and a hash of the call input, the answer of a `Write` and the group of a shell call, CL-220; 5: `/usage` snapshots and the account of every transcript are stored, CL-226). */
-        const val PARSER_VERSION = "5"
+        /** Bumped when [TranscriptParser] counts differently, so the runs already stored are read again (2: output is the final count of a message, CL-206; 3: usage-limit answers are kept, CL-210; 4: steps keep the size and a hash of the call input, the answer of a `Write` and the group of a shell call, CL-220; 5: `/usage` snapshots and the account of every transcript are stored, CL-226; 6: token components per minute and model, CL-226). */
+        const val PARSER_VERSION = "6"
         const val CATEGORIES = "categories"
         const val META_GRACE_MS = 60_000L
         const val BATCH_FILES = 50
