@@ -17,7 +17,9 @@ bundle runs without Java. jlink output runs only on the OS it was built on, so C
 daemon's RSS; CI runs it on every push and keeps the numbers as `bundle-report-<os>` artifacts. With `--aot` it also waits for the
 AOT caches the daemon makes in the background (`<home>/aot/`), checks that they are one clean set (CLI, daemon, parse worker), that a copy of
 the jars and a damaged cache run without a message, and times a CLI call with no archive, with a dynamic class-data archive and with the AOT
-cache, and the parse worker's start with and without its cache (`workerStartMs`). The caches are not shipped in the installers: the daemon
+cache, and the parse worker's start with and without its cache (`workerStartMs`). The run fails when the AOT cache is not faster than no archive or more than 15 % slower than
+the dynamic archive (`tools/aot-gate.mjs`): medians of a dozen calls on a shared runner move by tens of milliseconds (macOS Intel measured
+510 ms against 456 ms once), while an unused or broken cache is about twice as slow as the dynamic archive (CL-249). The caches are not shipped in the installers: the daemon
 makes them on the user's machine for the exact runtime and jar there (CL-251).
 
 Measured in CI on 2026-10-08 (Temurin 25.0.4, tiny repository, daemon idle after its first index build):
