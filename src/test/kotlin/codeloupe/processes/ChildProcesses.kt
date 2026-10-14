@@ -49,12 +49,13 @@ class ChildProcesses : AutoCloseable {
      * Waits until the OS lists [process] with its working directory and command line, and until the JVM has stopped starting up:
      * a slow machine spends seconds of CPU on that, which would read as a busy daemon. Half a second without CPU alone is no proof
      * on a loaded runner: a JVM waiting for the disk is quiet too and busy again after it (CL-195), so its main method must have run.
+     * Without [settle] it only waits for the main method, after which a spinning child spins.
      */
     fun awaitListed(process: Process, source: ProcessSource = world(), settle: Boolean = true): ProcessInfo {
         val until = System.currentTimeMillis() + 30_000
         while (System.currentTimeMillis() < until) {
             val listed = source.read().firstOrNull { it.pid == process.pid() && it.cwd != null && it.commandLine != null }
-            if (listed != null && (!settle || (ready(process) && quiet(process)))) return listed
+            if (listed != null && ready(process) && (!settle || quiet(process))) return listed
             Thread.sleep(100)
         }
         error("pid ${process.pid()} was not listed with its directory and command line, or never settled")
