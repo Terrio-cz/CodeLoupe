@@ -12,7 +12,9 @@ import java.util.Base64
  * is cut down to [KEPT]; pass what a process needs as arguments.
  */
 object DetachedStart {
-    fun start(command: List<String>, workDir: Path) {
+    fun start(command: List<String>, dir: Path) {
+        // A home past MAX_PATH cannot be a working directory on Windows (CL-253); what is started here takes its paths as arguments.
+        val workDir = LongPaths.processDir(dir)
         if (NativeCalls.isWindows && runCatching { windows(command, workDir) }.getOrDefault(false)) return
         ProcessBuilder(command)
             .apply { if (!NativeCalls.isWindows) cut(environment()) }

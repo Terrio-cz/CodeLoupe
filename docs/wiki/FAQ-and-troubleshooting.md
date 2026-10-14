@@ -52,6 +52,7 @@ use; commercial use needs an agreement with the licensor.
 | The desktop app does not start the daemon | After `codeloupe stop` (or a stop in the app) the app leaves it stopped until the next `codeloupe start`. |
 | `codeloupe stop` refuses | Jobs are running; `--force` ends them. |
 | The first query is slow | It builds the repository's index (seconds; longer for large repositories), and for about 20 s after an install a call takes ~0.3 s while the daemon makes the JVM's AOT caches. Later queries take milliseconds. |
+| `codeloupe.bat` prints *The system cannot find the path specified* | The install directory is past Windows' 260-character limit, and cmd.exe cannot run a batch file there; install CodeLoupe in a shorter directory. A deep `CODELOUPE_HOME` is fine: the indexes, the daemon and the AOT caches work under it (CL-253). |
 | An answer says `busy` | The daemon had no result within the query wait (10 s), for instance while an index was building; ask again. `queryTimeoutMs` and `maxParallelQueries` are in [Configuration](Configuration). |
 | `usages` lists hits marked `?` | They are candidates: the syntax cannot tell which declaration they mean. Qualify the name (`Type.member`) to narrow it. |
 | A job was refused (exit 2) | The `policyHook` denied it, crashed, timed out or printed unreadable output; the command never ran ([Jobs and events](Jobs-and-events)). |
