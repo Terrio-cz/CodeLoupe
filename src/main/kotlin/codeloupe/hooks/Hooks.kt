@@ -1,6 +1,7 @@
 package codeloupe.hooks
 
 import codeloupe.JsonFormat
+import codeloupe.accounts.Accounts
 import codeloupe.accounts.ClaudeLogin
 import codeloupe.accounts.SessionIdentities
 import codeloupe.config.Config
@@ -137,7 +138,7 @@ class Hooks(
 
     // Local metadata and independent of the session-start context; nothing is written while the hooks are off.
     private fun stamp(input: HookInput, settings: HooksConfig) {
-        if (settings.enabled && settings.stampAccount) runCatching { stamps?.note(input.event, input.session, input.transcriptPath) }
+        if (settings.enabled && settings.stampAccount) runCatching { stamps?.note(input.event, input.session, input.transcriptPath, input.login) }
     }
 
     private fun steer(input: HookInput, steer: HooksConfig.SteerConfig, started: Long): JsonObject? {
@@ -229,7 +230,7 @@ class Hooks(
                 Steering(IndexedSources(registry, windows), paths), { ConfigLoader.hooks(config.home) },
                 AppendLog(config.home.resolve("hooks.jsonl"))::append, { path -> runCatching { registry.locate(directoryOf(path)).worktree }.getOrNull() }, callsOn,
                 SessionContext(registry, projects), SessionWeights(scope), WarnedLevels(config.home.resolve("weight-warned.txt")), forgetReads, PostEditCheck(registry, paths),
-                SessionStamps(SessionIdentities(config.home.resolve(SessionIdentities.FILE)), ClaudeLogin()),
+                SessionStamps(SessionIdentities(config.home.resolve(SessionIdentities.FILE)), ClaudeLogin(), Accounts(config.home)::claude),
             )
         }
     }

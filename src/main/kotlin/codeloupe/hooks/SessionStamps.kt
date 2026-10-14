@@ -1,40 +1,62 @@
 package codeloupe.hooks
 
+import codeloupe.accounts.ClaudeAccount
 import codeloupe.accounts.ClaudeLogin
 import codeloupe.accounts.SessionIdentities
+import codeloupe.metrics.AccountIdentity
+import java.nio.file.Path
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 /**
- * Notes which login runs a session when it starts (CL-226): the fingerprint of the account in the session's config directory goes to
- * [SessionIdentities], and the ingest gives it to the session's transcripts. [note] only queues the work, so a hook never waits for the
- * disk, and every failure is swallowed. A subagent belongs to the session that started it, so its start adds nothing for a session already
- * stamped; it only covers a session that began before the daemon was running.
+ * Notes which login runs a session when it starts (CL-226): its fingerprint goes to [SessionIdentities], and the ingest gives it to the
+ * session's transcripts. The session's own login decides, as the hook saw it in the session's environment ([SessionLogin]): the account
+ * uuid Claude Desktop hands its sessions, else the account a launcher named, mapped to the identity `accounts.json` declares for it.
+ * Only a session with neither and without a token of its own is given the login file of its config directory, and only when no two
+ * listed accounts share that directory: such a file holds whichever login was written last, not the session's. [note] only queues
+ * the work, so a hook never waits for the disk, and every failure is swallowed. A subagent belongs to the session that started it, so its
+ * start adds nothing for a session already stamped; it only covers a session that began before the daemon was running.
  */
 class SessionStamps(
     private val store: SessionIdentities,
     private val login: ClaudeLogin,
+    private val accounts: () -> List<ClaudeAccount> = { emptyList() },
     private val run: (Runnable) -> Unit = background(),
 ) {
     private val stamped = object : LinkedHashMap<String, String>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<String, String>) = size > MAX_SESSIONS
     }
 
-    fun note(event: String, session: String, transcriptPath: String?) {
+    fun note(event: String, session: String, transcriptPath: String?, own: SessionLogin = SessionLogin.NONE) {
         if (!SESSION_ID.matches(session)) return
         if (event == SUBAGENT_START && synchronized(stamped) { session in stamped }) return
-        val dir = transcriptPath?.let(SessionConfigDir::of) ?: return
+        val dir = transcriptPath?.let(SessionConfigDir::of)
+        if (dir == null && own.uuid == null && own.account == null) return
         runCatching {
             run(
                 Runnable {
                     runCatching {
-                        val fingerprint = login.fingerprintOf(dir) ?: return@runCatching
+                        val fingerprint = fingerprintOf(own, dir) ?: return@runCatching
                         if (synchronized(stamped) { stamped.put(session, fingerprint) } != fingerprint) store.record(session, fingerprint)
                     }
                 },
             )
         }
+    }
+
+    private fun fingerprintOf(own: SessionLogin, dir: Path?): String? {
+        own.uuid?.let { return AccountIdentity.fingerprint(it) }
+        if (own.account != null) {
+            return accounts().filter { it.id == own.account || it.email.equals(own.account, ignoreCase = true) }.singleOrNull()?.identity
+        }
+        if (own.token || dir == null || shared(dir)) return null
+        return login.fingerprintOf(dir)
+    }
+
+    private fun shared(dir: Path): Boolean {
+        val normal = dir.toAbsolutePath().normalize()
+        return accounts().count { it.configDir.toAbsolutePath().normalize() == normal } > 1
     }
 
     companion object {

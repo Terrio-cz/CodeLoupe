@@ -139,4 +139,25 @@ class DesktopSessionIngestTest {
             assertEquals(listOf<String?>("a"), accountOfSession(rig, "later"))
         }
     }
+
+    private fun identities(rig: IngestRig, session: String): Set<String?> = rig.db.reader.createStatement().use { s ->
+        s.executeQuery("SELECT identity FROM files WHERE session = '$session' UNION SELECT identity FROM usage_snapshots WHERE session = '$session'").use { r -> buildSet { while (r.next()) add(r.getString(1)) } }
+    }
+
+    @Test
+    fun `a corrected stamp replaces the identity stored before it`() {
+        val fpB = AccountIdentity.fingerprint("uuid-b")
+        stamps.record("sc", fpB)
+        rig(a(), b().copy(identity = fpB)).use { rig ->
+            report(33).write(rig.project.resolve("sc.jsonl"))
+            rig.ingest.passNow()
+            assertEquals(listOf<String?>("b"), accountOfSession(rig, "sc"))
+
+            stamps.record("sc", fpA)
+            rig.ingest.passNow()
+            assertEquals(setOf<String?>(fpA), identities(rig, "sc"))
+            assertEquals(listOf<String?>("a"), accountOfSession(rig, "sc"))
+            assertEquals(listOf<String?>("a"), fileAccount(rig, "sc"))
+        }
+    }
 }
