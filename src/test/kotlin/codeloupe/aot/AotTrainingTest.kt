@@ -103,6 +103,24 @@ class AotTrainingTest {
     }
 
     /**
+     * A home past MAX_PATH (CL-253): the training repository and home cannot be working directories there and SQLite cannot open its
+     * files as plain paths. The caches are made, and a daemon in such a home starts with them and without them, and its worker parses.
+     */
+    @Test
+    fun `the caches are made under a home path of 240+ characters, and a daemon there starts with and without them`() {
+        val deep = Files.createDirectories(home.resolve("d".repeat(120)).resolve("e".repeat(120)))
+        val deepPrefix = deep.resolve("aot").resolve("C__deep_codeloupe-0123456789ab")
+        assertTrue(deep.toString().length >= 240, deep.toString())
+        Files.createDirectories(deepPrefix.parent)
+        val caches = AotCaches(deepPrefix)
+        assertTrue(AotTrainer(caches, jar.toString(), java).train(), "no caches; failure note: ${runCatching { Files.readString(caches.failed) }.getOrNull()}")
+        assertTrue(caches.isReady())
+        daemonStartsWith(caches.daemonFlags(), deep)
+        daemonStartsWith(listOf("-XX:-UsePerfData"), deep)
+        assertEquals(WorkerSamples.files.size, facts(jar, caches.workerFlags()).size)
+    }
+
+    /**
      * The parse worker (CL-251) with its cache, with the cache of another build (a jar that differs, as after an update that kept
      * the caches) and with a damaged one: every one answers, with the same facts as a worker without a cache.
      */
@@ -147,10 +165,10 @@ class AotTrainingTest {
         }
     }
 
-    private fun daemonStartsWith(flags: List<String>) {
+    private fun daemonStartsWith(flags: List<String>, under: Path = home) {
         assertTrue(flags.isNotEmpty())
         val port = ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
-        val daemonHome = Files.createTempDirectory(home, "daemon")
+        val daemonHome = Files.createTempDirectory(under, "daemon")
         val command = listOf(java) + DaemonJvm.args() + flags + listOf("--enable-native-access=ALL-UNNAMED", "-cp", jar.toString(), "codeloupe.MainKt", "daemon", "--home", daemonHome.toString(), "--port", port.toString())
         val process = ProcessBuilder(command).redirectErrorStream(true).redirectOutput(daemonHome.resolve("out.txt").toFile()).start().also { it.outputStream.close() }
         val http = LocalHttp("http://127.0.0.1:$port")

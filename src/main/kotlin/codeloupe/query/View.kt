@@ -1,6 +1,7 @@
 package codeloupe.query
 
 import codeloupe.index.Store
+import codeloupe.platform.LongPaths
 import codeloupe.platform.TimedPart
 import codeloupe.platform.Timings
 import java.nio.file.Path
@@ -23,7 +24,7 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
     init {
         if (overlayFile != null) {
             try {
-                db.createStatement().use { it.execute("ATTACH DATABASE '${overlayFile.toString().replace("'", "''")}' AS ov") }
+                db.createStatement().use { it.execute("ATTACH DATABASE '${LongPaths.sqliteName(overlayFile).replace("'", "''")}' AS ov") }
                 // One read transaction: every statement sees the same version of an overlay that a refresh may be rewriting.
                 db.autoCommit = false
             } catch (e: Exception) {

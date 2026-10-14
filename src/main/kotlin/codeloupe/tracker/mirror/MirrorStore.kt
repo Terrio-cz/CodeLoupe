@@ -1,6 +1,7 @@
 package codeloupe.tracker.mirror
 
 import codeloupe.JsonFormat
+import codeloupe.platform.LongPaths
 import codeloupe.tracker.Criterion
 import codeloupe.tracker.FieldChange
 import codeloupe.tracker.IssueAttachment
@@ -32,7 +33,7 @@ class MirrorStore(file: Path) : AutoCloseable {
 
     /** The mirror is a cache: a file of another schema version is dropped and loaded again from the tracker. */
     private fun open(file: Path, config: SQLiteConfig): Connection {
-        val existing = config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
+        val existing = config.createConnection(LongPaths.sqliteUrl(file))
         val (version, tables) = closingOnFailure(existing) {
             it.createStatement().use { s -> s.executeQuery("PRAGMA user_version").use { r -> r.next(); r.getInt(1) } } to
                 it.query("SELECT count(*) FROM sqlite_master") { r -> r.getInt(1) }.first()
@@ -40,7 +41,7 @@ class MirrorStore(file: Path) : AutoCloseable {
         val connection = if (version == SCHEMA_VERSION || tables == 0) existing else {
             existing.close()
             listOf("", "-wal", "-shm").forEach { Files.deleteIfExists(Path.of("$file$it")) }
-            config.createConnection("jdbc:sqlite:${file.toAbsolutePath()}")
+            config.createConnection(LongPaths.sqliteUrl(file))
         }
         closingOnFailure(connection) {
             it.createStatement().use { s ->

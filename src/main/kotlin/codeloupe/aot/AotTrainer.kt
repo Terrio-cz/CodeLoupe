@@ -9,6 +9,7 @@ import codeloupe.daemon.DaemonToken
 import codeloupe.index.ParseRequest
 import codeloupe.index.ParseWorker
 import codeloupe.platform.JavaProcess
+import codeloupe.platform.LongPaths
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.PersonIdent
 import java.io.File
@@ -37,12 +38,19 @@ internal class AotTrainer(
     private val stepSeconds: Long = 120,
 ) {
     private val id = System.nanoTime().toString(36)
-    private val work: Path = caches.suffixed(".work-$id")
+    // The training repository and home are working directories of the recorded JVMs, which Windows takes only under MAX_PATH:
+    // under a deep home they go to the temporary directory (CL-253).
+    private val work: Path = caches.suffixed(".work-$id").let { beside ->
+        if (LongPaths.fitsProcessDir(beside.resolve("home"))) beside else Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().resolve("$TEMP_WORK$id")
+    }
     private val stepLog: Path get() = work.resolve("step.log")
 
     /** True when both caches are in place and marked ready. */
     fun train(): Boolean {
         require(classPath.endsWith(".jar") && File.pathSeparator !in classPath) { "the CLI cache needs a single jar on the class path, not $classPath" }
+        check(LongPaths.fitsProcessDir(work.resolve("home"))) {
+            "the CodeLoupe home (${caches.prefix.parent.parent}) and the temporary directory are both too long for a working directory (${LongPaths.PROCESS_DIR_MAX} characters)"
+        }
         removeLeftovers()
         Files.createDirectories(work)
         try {
@@ -190,6 +198,14 @@ internal class AotTrainer(
         Files.newDirectoryStream(caches.prefix.parent).use { entries ->
             for (entry in entries) if (entry.name.startsWith(own) && (".tmp-" in entry.name || ".work-" in entry.name)) delete(entry)
         }
+        // Those of any install in the temporary directory: a training takes minutes, so one a day old is not running.
+        val temp = Path.of(System.getProperty("java.io.tmpdir"))
+        val before = System.currentTimeMillis() - 86_400_000L
+        runCatching {
+            Files.newDirectoryStream(temp, "$TEMP_WORK*").use { entries ->
+                for (entry in entries) if (entry != work && runCatching { Files.getLastModifiedTime(entry).toMillis() < before }.getOrDefault(false)) delete(entry)
+            }
+        }
     }
 
     // The caches of older builds of this install and the dynamic class-data archives the launchers made before: nothing reads them now.
@@ -251,6 +267,9 @@ internal class AotTrainer(
 
         /** Days after which the caches of another install that no daemon started from ([AotLauncher.markUsed]) are removed. */
         const val UNUSED_DAYS = 30L
+
+        /** Name start of a training's work directory in the temporary directory. */
+        internal const val TEMP_WORK = "codeloupe-aot-work-"
 
         private const val MAIN_CLASS = "codeloupe.MainKt"
         private val WORKER_CLASS = ParseWorker::class.java.name
