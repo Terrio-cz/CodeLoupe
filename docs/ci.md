@@ -152,8 +152,11 @@ push runs about 25 jobs, 8 of them on macOS, and the account runs 20 jobs at onc
 windows push at the same time: in the third run the macOS test started 402 s after the push and the Intel bundle 527 s. That is the
 reason the criterion of 10 minutes is not met steadily, not the work in the jobs.
 
-The Windows update test stays at about 700 s (476 s for two Gradle builds and three NSIS installers, 180 s for the test); it runs
-only when the app, the build or the workflows changed. Building the installers uncompressed was tried (`-c.compression=store`): the
-NSIS step still took 74 s against 74 s, it is bound by the disk, not by LZMA, so it was dropped. Ideas not taken: building the three
-installers in parallel (they share `app/stage` and `app/dist`), `-Xbackend-threads=0` for the Kotlin compiler, and excluding the
-workspace from Windows Defender (a change of the runner's security settings).
+The Windows update test went from about 700 s to 617 s (runs 38557338831 and 38603482354). Its three installers are built in
+copies `app-<version>/` (own `stage/`, `dist/`, `out/`, `node_modules` linked to `app/`): the rc.1 installer builds while Gradle
+builds rc.2, then rc.2 and rc.3 build together, and both Gradle builds share one warm daemon. The build step went from 476 s to
+369 s; nearly all of it comes from the overlap with Gradle, because two NSIS builds at once took 141 s against about 150 s one
+after the other: NSIS is bound by the runner's disk, not by its CPU, and building the installers uncompressed
+(`-c.compression=store`) was tried and changed nothing either. The test itself takes about 195 s, which is real waiting for the
+installer, the update and the rollback. Not taken: excluding the workspace from Windows Defender (a change of the runner's
+security settings), `-Xbackend-threads=0` for the Kotlin compiler.
