@@ -103,13 +103,16 @@ jobs:
             forks: 3
           - os: windows-latest
             shard: 1
-            shards: 3
+            shards: 4
           - os: windows-latest
             shard: 2
-            shards: 3
+            shards: 4
           - os: windows-latest
             shard: 3
-            shards: 3
+            shards: 4
+          - os: windows-latest
+            shard: 4
+            shards: 4
     env:
       TEST_FORKS: ${{ matrix.forks }}
       TEST_SHARD: ${{ matrix.shards && format('{0}/{1}', matrix.shard, matrix.shards) || '' }}
@@ -649,9 +652,7 @@ jobs:
       - name: Build the installers of two versions and one with a broken daemon
         shell: bash
         run: |
-          # Windows: the installers are not compressed (CL-195). LZMA took about a minute of each of the three NSIS builds; the update
-          # follows the same steps whatever the payload's compression, and the files only travel to a local feed.
-          targets=-c.compression=store
+          targets=
           [ "${{ runner.os }}" = Linux ] && targets="--linux AppImage"
           (cd app && npm ci --ignore-scripts)
           mkdir updates

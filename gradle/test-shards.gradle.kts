@@ -1,5 +1,5 @@
-// Runs a share of the test classes: `-PtestShard=2/3` is the second of three shares (CL-195). CI uses it to split the Windows
-// tests over three runners and the Linux tests over two; without the property every class runs.
+// Runs a share of the test classes: `-PtestShard=2/4` is the second of four shares (CL-195). CI uses it to split the Windows
+// tests over four runners and the Linux tests over two; without the property every class runs.
 //
 // A class belongs to a share by its name alone, so every class runs in exactly one share and nothing needs listing when a test
 // is added. The slowest classes are placed by their time, longest first, each to the share with the least so far, because a hash
