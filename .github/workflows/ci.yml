@@ -675,11 +675,12 @@ jobs:
             cp app-$1/dist/CodeLoupe-$1-* app-$1/dist/latest*.yml "updates/$1/"
           }
           feed="$([ "${{ runner.os }}" = Linux ] && echo latest-linux.yml || echo latest.yml)"
-          ./gradlew bundle --console=plain --no-daemon -PreleaseVersion=0.0.1-rc.1
+          # One Gradle daemon for both builds: the second starts warm instead of configuring the build again.
+          ./gradlew bundle --console=plain -PreleaseVersion=0.0.1-rc.1
           prepare 0.0.1-rc.1
           installer 0.0.1-rc.1 & first=$!
           rm -rf build/bundle
-          ./gradlew bundle --console=plain --no-daemon -PreleaseVersion=0.0.1-rc.2
+          ./gradlew bundle --console=plain -PreleaseVersion=0.0.1-rc.2
           prepare 0.0.1-rc.2
           # The third build is the second with a daemon jar that cannot start.
           prepare 0.0.1-rc.3
