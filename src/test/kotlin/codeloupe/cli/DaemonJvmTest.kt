@@ -15,4 +15,9 @@ class DaemonJvmTest {
         assertTrue("-XX:+ExitOnOutOfMemoryError" in DaemonJvm.args())
         assertTrue("-XX:+ExitOnOutOfMemoryError" in DaemonJvm.args(parsesHere = true))
     }
+
+    @Test
+    fun `one full collection shrinks the heap to its live set`() {
+        assertTrue("-XX:-ShrinkHeapInSteps" in DaemonJvm.args())
+    }
 }

@@ -28,7 +28,7 @@ const java = javaHome ? path.join(javaHome, 'bin', windows ? 'java.exe' : 'java'
 const jcmd = javaHome ? path.join(javaHome, 'bin', windows ? 'jcmd.exe' : 'jcmd') : 'jcmd';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // The flags of DaemonJvm (cli/DaemonJvm.kt); keep in step.
-const DAEMON_JVM = ['-Xms16m', '-Xmx64m', '-Xmn10m', '-Xss512k', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10', '-XX:MaxHeapFreeRatio=30', '-XX:+UseCompactObjectHeaders',
+const DAEMON_JVM = ['-Xms16m', '-Xmx64m', '-Xmn10m', '-Xss512k', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10', '-XX:MaxHeapFreeRatio=30', '-XX:-ShrinkHeapInSteps', '-XX:+UseCompactObjectHeaders',
   '-XX:TieredStopAtLevel=1', '-XX:ReservedCodeCacheSize=32m', '-XX:MaxMetaspaceSize=96m'];
 
 function git(cwd, ...a) {

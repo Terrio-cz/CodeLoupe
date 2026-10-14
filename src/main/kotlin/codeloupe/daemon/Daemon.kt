@@ -188,6 +188,7 @@ class Daemon private constructor(
     )
     @Volatile private var lastClientCall: Instant? = null
     private val history = ResourceHistory()
+    private val heapTrimmer = HeapTrimmer()
     private val runner = ToolRunner(registry, config.defaultRoot, AppendLog(config.home.resolve("calls.jsonl")), onCall = { trackers.touch(); history.sample() })
     private val mcp = McpTools(runner, ::tools, JobTool(jobs))
     private val toolListFingerprint = mcp.fingerprint()
@@ -306,6 +307,7 @@ class Daemon private constructor(
             // No keep-alive: a pooled socket would outlive a daemon restart and fail the client's next call.
             val call = context
             lastClientCall = Instant.now()
+            heapTrimmer.touch()
             call.response.header(HttpHeaders.Connection, "close")
             guard.refusal(call)?.let {
                 call.respondJson(it.status, error(it.message))
