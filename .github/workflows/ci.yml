@@ -92,6 +92,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            shard: 1
+            shards: 2
+          - os: ubuntu-latest
+            shard: 2
+            shards: 2
           # Three forks on the three cores of a macOS runner took 310 to 400 s, two forks 600 to 690 s. Four forks on the four cores
           # of a Linux or Windows runner did not help (393 and 599 s against 330 to 400 and 660) and starved the timing tests.
           - os: macos-latest

@@ -255,7 +255,8 @@ class JobsTest {
     @Test
     fun `a daemon that crashed takes over a job whose process survived and loses one whose process is gone`() {
         val home2 = TestRepos.tmpDir("jobs-crash")
-        val survivor = ProcessBuilder(FakeJob.command("sleep=2500", "exit=6")).start()
+        // Long enough to outlive the start of the next daemon, which takes seconds on a loaded runner.
+        val survivor = ProcessBuilder(FakeJob.command("sleep=10000", "exit=6")).start()
         val gone = ProcessBuilder(FakeJob.command("exit=0")).start().also { it.waitFor(30, java.util.concurrent.TimeUnit.SECONDS) }
         val logs = home2.resolve("jobs").also(Files::createDirectories)
         fun running(id: String, process: Process, wake: Wake) = JobRecord(
@@ -308,6 +309,8 @@ class JobsTest {
         )
         assertEquals(409, refused.statusCode())
         first.stop()
+        // The stop kills the job; the OS may take a moment to reap it.
+        ProcessHandle.of(pid).ifPresent { runCatching { it.onExit().get(10, java.util.concurrent.TimeUnit.SECONDS) } }
         assertFalse(ProcessHandle.of(pid).map { it.isAlive }.orElse(false))
         val second = Daemon.start(config(home3, port3), jobKeyProtector = keys)
         try {
