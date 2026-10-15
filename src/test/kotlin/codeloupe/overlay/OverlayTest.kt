@@ -296,6 +296,8 @@ class OverlayTest {
         assertContains(find(registry, feature, "Alpha.one"), "fun one")
         write(repo, ALPHA, alpha("three"))
         commit(repo, "landing")
+        // The default branch's own worktree waits for the sync, so the landing is the current base from here on.
+        assertContains(find(registry, repo, "Alpha.three"), "fun three")
         assertEquals(0, registry.staleReads())
         // The worktree has not moved: the pair its last check settled is still true of it, and nothing waits for the new one.
         assertContains(find(registry, feature, "Alpha.one"), "fun one")
@@ -312,15 +314,50 @@ class OverlayTest {
     }
 
     @Test
-    fun `an edit of a worktree after a landing is never answered from the previous pair`() {
+    fun `an edit of a worktree after a landing shows at once, read against the previous base while the overlay is re-derived`() {
         val registry = Registry(config, queue)
         assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertContains(find(registry, repo, "Alpha.one"), "fun one")
         write(repo, ALPHA, alpha("three"))
         commit(repo, "landing")
+        assertContains(find(registry, repo, "Alpha.three"), "fun three")
+        write(feature, BETA, "package demo\n\nclass Beta\n")
         write(feature, ALPHA, alpha("edited"))
         assertContains(find(registry, feature, "Alpha.edited"), "fun edited")
+        assertEquals(1, registry.staleReads(), "the edit was checked against the previous base, not after a git reconcile")
         assertNone(find(registry, feature, "Alpha.one"), "the old body")
-        assertEquals(0, registry.staleReads())
+        assertContains(find(registry, feature, "Beta"), "class Beta")
+        waitFor("the overlay is re-derived against the landing") {
+            val before = registry.staleReads()
+            find(registry, feature, "Alpha.edited")
+            registry.staleReads() == before
+        }
+        assertContains(find(registry, feature, "Alpha.edited"), "fun edited")
+        assertContains(find(registry, feature, "Beta"), "class Beta")
+        assertNone(find(registry, feature, "Alpha.three"), "the landing's code is not in the worktree")
+        assertContains(find(registry, repo, "Alpha.three"), "fun three")
+    }
+
+    @Test
+    fun `a task worktree reads on from the current base while a landing syncs, the default branch's worktree waits for it`() {
+        val gate = CompletableDeferred<Unit>()
+        val registry = Registry(config, queue)
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertContains(find(registry, repo, "Alpha.one"), "fun one")
+        queue.run(JobQueue.Lane.FAST, "hold") { gate.await() }
+        write(repo, ALPHA, alpha("three"))
+        commit(repo, "landing")
+        val base = registry.snapshot().single().baseCommit
+        // The inline sync queues behind the held fast lane; the task worktree answers from the base it was checked against.
+        val started = System.nanoTime()
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertTrue(System.nanoTime() - started < 10_000_000_000, "did not wait for the sync")
+        assertEquals(base, registry.snapshot().single().baseCommit, "answered before the sync")
+        gate.complete(Unit)
+        assertContains(find(registry, repo, "Alpha.three"), "fun three")
+        assertEquals(git(repo, "rev-parse", "HEAD"), registry.snapshot().single().baseCommit, "the default branch's worktree waited for the sync")
+        assertContains(find(registry, feature, "Alpha.one"), "fun one")
+        assertNone(find(registry, feature, "Alpha.three"), "the landing's code is not in the worktree")
     }
 
     @Test

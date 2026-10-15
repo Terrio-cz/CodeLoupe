@@ -97,7 +97,7 @@ class Registry(
      * is waited for; during a larger one the old base keeps answering. Only a missing base makes the caller wait for a
      * full build (bounded by queryTimeoutMs). A commit whose build failed is not retried for [RETRY_FAILED_MS].
      */
-    suspend fun base(repo: RepoState): RepoState {
+    suspend fun base(repo: RepoState, waitForSync: Boolean = true): RepoState {
         val head = headOf(repo)
         if (repo.baseCommit == head) return repo
         val failed = synchronized(repo) { repo.failure?.takeIf { it.commit == head && System.currentTimeMillis() - repo.failedAt < RETRY_FAILED_MS } }
@@ -113,7 +113,7 @@ class Registry(
         }
         val sync = withContext(Dispatchers.IO) { builds.sync(repo, head) }
         // A failed sync is recorded in repo.failure; the old base answers meanwhile.
-        if (sync.inline) withTimeoutOrNull(config.queryTimeoutMs) { runCatching { sync.job.await() } }
+        if (sync.inline && waitForSync) withTimeoutOrNull(config.queryTimeoutMs) { runCatching { sync.job.await() } }
         return repo
     }
 
@@ -146,6 +146,8 @@ class Registry(
     /** The state of [worktree]'s overlay layer on [repo]'s base (see [Overlays.layer]); reads state only, starts nothing. */
     fun layer(worktree: String, repo: RepoState): String = overlays.layer(worktree, synchronized(repo) { repo.baseCommit })
 
+    private fun isMain(location: RepoLocation): Boolean = Path.of(location.worktree) == mainWorktree(location.commonDir)
+
     /** The main worktree of the repository whose git common dir is [commonDir]. */
     fun mainWorktree(commonDir: String): Path = Path.of(if (commonDir.endsWith("/.git")) commonDir.removeSuffix("/.git") else commonDir)
 
@@ -156,11 +158,17 @@ class Registry(
      */
     suspend fun <T> query(root: String, speculative: Boolean = true, arrived: Long = System.nanoTime(), read: (View) -> T): T {
         val location = locate(root)
-        val repo = base(repo(location.commonDir))
+        val known = repo(location.commonDir)
+        // A task worktree checked against the current base reads on from it while a landing syncs: its overlay holds what differs
+        // from that base. The default branch's own worktree waits, or its overlay would parse the landing a second time.
+        val current = synchronized(known) { known.baseCommit }
+        val main = isMain(location)
+        val waitForSync = current == null || overlays.known(location.worktree, current) == null || main
+        val repo = base(known, waitForSync)
         repeat(ATTEMPTS) {
             val (baseFile, baseCommit) = synchronized(repo) { repo.baseFile!! to repo.baseCommit!! }
-            // A base that just moved does not make an unchanged worktree wait for its overlay to be derived anew.
-            overlays.stale(repo, location.worktree, baseCommit, baseFile)?.let { stale ->
+            // A base that just moved does not make a worktree wait for git to derive its overlay anew.
+            overlays.stale(repo, location.worktree, baseCommit, baseFile, arrived, edits = !main)?.let { stale ->
                 val early = withContext(Dispatchers.IO) { read(repo, stale.baseFile, stale.baseCommit, stale.view.file, read) }
                 if (early != null) return early.value
             }

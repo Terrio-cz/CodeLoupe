@@ -70,7 +70,14 @@ class Overlays(
      * The overlay of [worktree] against [baseCommit], brought up to date by a check that started at most `checkMs`
      * before [arrived] (`System.nanoTime()` when the query came in). Null when the base moved on: the caller starts over.
      */
-    suspend fun fresh(repo: RepoState, worktree: String, baseCommit: String, baseFile: Path, arrived: Long): OverlayVersion? {
+    suspend fun fresh(repo: RepoState, worktree: String, baseCommit: String, baseFile: Path, arrived: Long): OverlayVersion? =
+        check(repo, worktree, baseCommit, baseFile, arrived, onPrevious = false)
+
+    /**
+     * [fresh] against [baseCommit], which is the current base, or with [onPrevious] the previous one the overlay is still
+     * relative to: then only what moved in the worktree since its last check is read, the landing waits for the re-derivation.
+     */
+    private suspend fun check(repo: RepoState, worktree: String, baseCommit: String, baseFile: Path, arrived: Long, onPrevious: Boolean): OverlayVersion? {
         val deadline = System.nanoTime() + waitMs * 1_000_000
         while (true) {
             val state = stateOf(repo, worktree)
@@ -78,7 +85,8 @@ class Overlays(
                 // Evicted while we waited for the lock: a fresh state owns the overlay now.
                 if (states[key(worktree)] !== state) return@withLock null
                 // The base moved since the caller read it: checking against the old one would only flip the overlay back.
-                if (synchronized(repo) { repo.baseCommit } != baseCommit) return null
+                val target = synchronized(repo) { if (onPrevious) repo.previousCommit else repo.baseCommit }
+                if (target != baseCommit || (onPrevious && state.base != baseCommit)) return null
                 state.running?.takeIf { it.isActive }?.let { return@withLock it }
                 if (state.base == baseCommit && !state.mustCheck && arrived - state.checkedAt <= checkNanos) return state.view!!
                 state.checkedAt = System.nanoTime()
@@ -96,25 +104,29 @@ class Overlays(
     }
 
     /**
-     * When the base just moved and this worktree has not changed, the previous base with the worktree's overlay on it: the
-     * pair the last check settled, still true of the worktree. The overlay is re-derived against [baseCommit] in the
-     * background, so the first query after a landing does not wait for it. Null when the worktree changed since its last
-     * check (an edit must show), when a refresh is writing, or when there is no previous pair to answer from.
+     * When the base just moved, the previous base with the worktree's overlay on it: still true of an unchanged worktree, and
+     * brought up to date against that base when the worktree changed since its last check (its own edits are read, the files the
+     * landing changed are not). The overlay is re-derived against [baseCommit] in the background, so the first query after a
+     * landing waits neither for that nor for git. Null when there is no previous pair to answer from, and for a changed worktree
+     * without [edits] (the default branch's own, which changed with the landing: against the previous base it would parse the landing).
      */
-    fun stale(repo: RepoState, worktree: String, baseCommit: String, baseFile: Path): StaleRead? {
+    suspend fun stale(repo: RepoState, worktree: String, baseCommit: String, baseFile: Path, arrived: Long, edits: Boolean = true): StaleRead? {
         val state = states[key(worktree)] ?: return null
         val view = state.view ?: return null
         val (previousCommit, previousFile) = synchronized(repo) { repo.previousCommit to repo.previousFile }
         if (previousFile == null || view.base != previousCommit || view.base == baseCommit || !previousFile.exists()) return null
-        if (state.mustCheck || state.running?.isActive == true || state.large) return null
+        if (state.large) return null
         // The walk costs what a check costs; no lock, so it does not wait for the re-derivation that holds it.
-        val walk = Timings.measure(TimedPart.CHECK) { WorktreeScan.scan(Path.of(worktree), state.prune) }
-        if (walk.sources != state.scan || walk.ignoreFiles != state.ignoreFiles || state.view !== view) return null
+        val unchanged = !state.mustCheck && state.running?.isActive != true &&
+            Timings.measure(TimedPart.CHECK) { WorktreeScan.scan(Path.of(worktree), state.prune) }.let { it.sources == state.scan && it.ignoreFiles == state.ignoreFiles } &&
+            state.view === view
+        if (!unchanged && !edits) return null
+        val answer = if (unchanged) view else check(repo, worktree, previousCommit!!, previousFile, arrived, onPrevious = true) ?: return null
         if (state.rebase?.isActive != true) {
             state.rebase = scope.launch { rebases.withPermit { runCatching { fresh(repo, worktree, baseCommit, baseFile, System.nanoTime()) } } }
         }
         staleReads.incrementAndGet()
-        return StaleRead(previousCommit!!, previousFile, view)
+        return StaleRead(previousCommit!!, previousFile, answer)
     }
 
     /** Closes the kept write connections; the next refresh opens its store again. */

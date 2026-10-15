@@ -32,6 +32,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -99,6 +100,25 @@ class DispatchTest {
         assertContains(again, "unchanged since your read")
         assertTrue(again.length < 250, "${again.length} chars")
         assertContains(plan(ids("CL-27", "CL-30", "CL-91"), "slots" to JsonPrimitive(1), "since" to JsonPrimitive("none")), "W1 single CL-27")
+    }
+
+    @Test
+    fun `a landing that changes no file a task names keeps its prediction, one that does predicts the task again`() {
+        val none = "since" to JsonPrimitive("none")
+        val first = plan(ids("CL-27", "CL-30"), none)
+        val made = TouchPrediction.made.get()
+        land("src/main/kotlin/demo/Other.kt", "package demo\n\nclass Other\n")
+        assertEquals(first, plan(ids("CL-27", "CL-30"), none))
+        assertEquals(made, TouchPrediction.made.get(), "nothing predicted again")
+        land(BILLING, BILLING_TEXT.replace("a / 10", "a / 5"))
+        assertEquals(first, plan(ids("CL-27", "CL-30"), none))
+        assertEquals(made + 1, TouchPrediction.made.get(), "CL-27 names Billing.kt, CL-30 names nothing the landing changed")
+    }
+
+    private fun land(path: String, text: String) {
+        repo.resolve(path).also { it.parent.createDirectories() }.writeText(text)
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "landing")
     }
 
     @Test

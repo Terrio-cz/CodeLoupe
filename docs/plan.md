@@ -2264,6 +2264,45 @@ souborů s novou funkcí, takže se nic nedá převzít; `--large-pause 5000` s 
 - **Zbývá**: trénink v home s dlouhou cestou (> ~150 znaků) selže na hlubokých cestách tréninkového repozitáře („the recorded CLI call
   failed“), platí od CL-150; výchozí home je krátký. Ověřit log nainstalované aplikace po vydání.
 
+### Živé p95 po vydání 0.1.9 — CL-246, CL-247 a CL-256 (2026-10-15)
+
+Živý daemon 0.1.9 (14,5 h pod supervisorem Foremanu na Terriu) stále ukazoval `task_context` p95 3 060 ms, `changes` p95 2 549 ms a
+`dispatch_plan` p50 2,2 s / p95 66 s, ač profil CL-246/247 dával ~0,6 s. Příčina z `calls.jsonl` (od 0.1.9 s `root`) spárovaného s
+`daemon.log` a ze vzorků stacků živého daemona (`jcmd Thread.print`; přibalený runtime nemá JFR):
+
+- **Pomalé je první volání po landingu**, scénář, který profil neměřil. Každé `changes` i `task_context` nad 1,3 s má v okně
+  řádek `overlay …: checked against <nová báze>`: dotaz za sebou čekal na inline sync báze (0,3–1,6 s), git reconcile overlaye proti
+  nové bázi (0,2–1,2 s; git proces živě průměrně 158 ms, `/status` 6 626 spawnů za 1 047 s) a parse edit kodéra (0,6–1,6 s).
+  `stale()` z CL-96 pomáhal jen nezměněnému worktree; reviewer volá `changes` právě po commitech kodéra.
+- **`dispatch_plan`**: plný plán (výchozí pool) trval 51–131 s jednou po každém landingu, pak 1–2 s. Predikce dotyku byly klíčované
+  `updated@baseCommit`, takže každý landing (a každá změna stavu nebo komentář) znovu predikoval celý pool + úkoly živých oken, a to
+  v **jednom čtení**, které drželo jeden ze dvou permitů `readGate` (`maxParallelQueries` 2) po celou dobu; dva překrývající se plány
+  zablokovaly všechny ostatní dotazy (`symbol` 1 309 ms, `grep` 2 423 ms v těch oknech). Každý ze tří nástrojů měl navíc vlastní
+  cache predikcí, takže `task_context` predikoval úkol znovu hned po `dispatch_plan` (vzorek: `TouchPrediction.path` uvnitř
+  `task_context` 2 283 ms, overlay check téhož volání 996 ms). Živá okna četla change set (3 git procesy) worktree po worktree.
+
+Opravy:
+
+- **Worktree úkolu po landingu**: dokud sync báze běží, čte dál ze současné báze (jeho overlay drží, co se od ní liší); po přepnutí se
+  změněný worktree zkontroluje **inkrementálně proti předchozí bázi** (jen jeho vlastní edity) a overlay se proti nové bázi
+  přepočítá na pozadí (`Overlays.stale(…, edits)`, `check(onPrevious)`). Hlavní worktree výchozí větve dál čeká na sync, jinak by
+  jeho overlay parsoval landing podruhé.
+- **Predikce** (`PredictionCache`, sdílená přes `registry.taskCodes`): klíčem je repozitář, úkol a seznam zmínek (ne `updated`); po
+  landingu platí dál, pokud `LandingDiff` (jeden `git diff` na dvojici bází, text před/po přes JGit, nad 200 souborů vše znovu)
+  nemění nic, co zmínky jmenují nebo na co by se mohly přeložit (`TouchPrediction.touchedBy`: cesta, celé identifikátory segmentů
+  symbolu a slova, literál, přidaný/smazaný soubor ve složce nevyřešené cesty nebo modulu; obsah jen indexovaných souborů). Výpočet
+  jednoho úkolu běží najednou jednou; `touches` čte po úkolu, ne pool v jednom čtení; živá okna po 4 souběžně.
+- **Správnost invalidace na živých datech** (316 otevřených úkolů Terria, predikce na staré i nové bázi, `LandingBench` mimo repo):
+  landing 8653b5c→70055eb (1 soubor) ponechá 293, přepočítá 23, **0 rozdílů**; landing TER-648 17a19b7→94fd56b (4 soubory, 2 Kotlin
+  zdroje) ponechá 255, přepočítá 61, 0 rozdílů; 5 landingů 17a19b7→70055eb (195 souborů) ponechá 41,
+  přepočítá 275, 0 rozdílů; 3925e40→70055eb (>200 souborů) přepočítá vše. Predikce celého poolu teď stojí jen tolik, kolik úkolů
+  landing skutečně zasáhl (40 úkolů od nuly ~6 s v nečinném procesu, živě několikanásobně).
+- **Testy**: `OverlayTest` (edit po landingu viditelný hned a čtený proti předchozí bázi; worktree úkolu neodpoví až po syncu, který
+  stojí ve frontě, hlavní worktree na něj čeká), `DispatchTest` (landing jinde nepredikuje nic znovu a plán je bajt po bajtu stejný,
+  landing do `Billing.kt` predikuje znovu jen CL-27).
+- **Zbývá**: první check čerstvého worktree (git reconcile, živě 0,3–1,2 s) a parse edit kodéra (desítky souborů 0,5–1,6 s) jsou na
+  cestě dál; `dispatch_plan` p50 drží change sety živých oken (git). Živé p95 ověřit po dalším vydání na ≥ 50 voláních.
+
 ### Výsledek CL-71 — build daemony a procesy po workspacech (2026-10-08)
 
 - **Procesy po workspacech** (`codeloupe.processes`, `GET /processes`, `ws processes`, `workspaces --ram`): proces patří workspace,

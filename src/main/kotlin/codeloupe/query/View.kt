@@ -50,6 +50,9 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
     fun reads(file: Path): Boolean = file == baseFile || file == overlayFile
 
     /** The base commit the attached overlay was made against; null without an overlay. */
+    /** The commit the base index was built for. */
+    fun baseCommit(): String? = query("SELECT value FROM main.meta WHERE key = 'commit'", emptyMap()) { it.getString(1) }.firstOrNull()
+
     fun overlayBase(): String? =
         if (overlay) query("SELECT value FROM ov.meta WHERE key = 'base'", emptyMap()) { it.getString(1) }.firstOrNull() else null
 
