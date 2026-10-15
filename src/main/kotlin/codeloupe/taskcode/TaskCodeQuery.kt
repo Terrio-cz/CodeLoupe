@@ -14,7 +14,10 @@ import codeloupe.tracker.read.TaskRow
 import codeloupe.tracker.read.TaskRows
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.nio.file.Files
 import java.nio.file.Path
@@ -23,11 +26,10 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * `task_code`: a task id answers with the code the task touched (landed, from its commits) or will touch (open, from
  * its text, with evidence) and the worktree working on it; a symbol or path answers with the tasks that touched it,
- * each with its landing commit, and the open tasks predicted to. Predictions of open tasks are kept per issue version
- * and base commit, so a repeated `code_tasks` costs nothing new.
+ * each with its landing commit, and the open tasks predicted to. Predictions of open tasks are kept ([PredictionCache]) while
+ * the issue mentions the same things and no landing changed what they name, so a repeated `code_tasks` costs nothing new.
  */
 class TaskCodeQuery(private val registry: Registry, private val trackers: Trackers, private val initialWaitMs: Long = 10_000, private val staleWaitMs: Long = 3_000) {
-    private val predictions = ConcurrentHashMap<String, Pair<String, TouchPrediction.Result>>()
     private val mentions = ConcurrentHashMap<String, Pair<Long, List<Mention>>>()
 
     /** Everything `task_code` knows of one task, before it is rendered; [store] and [repo] let a caller ask the history more. */
@@ -75,11 +77,11 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
         val issues = ids.associateWith { id -> trackers.mirror(id)?.let { (mirror, canonical) -> Triple(mirror, canonical, mirror.store.issue(canonical)) } }
         val landed = withContext(Dispatchers.IO) { ids.associateWith { LandedTask.of(p.store, trackers.mirror(it)?.second ?: it.uppercase()) } }
         val open = ids.filter { landed.getValue(it).commits.isEmpty() && issues[it]?.third != null }
-        val predicted = if (open.isEmpty()) emptyMap() else registry.query(root, speculative = false) { view ->
-            open.associateWith { id ->
-                val (mirror, canonical, issue) = issues.getValue(id)!!
-                predict(view, p.dir, p.repo, mirror, canonical, issue!!.updated).predictions
-            }
+        val arrived = System.nanoTime()
+        val predicted = open.associateWith { id ->
+            val (mirror, canonical, issue) = issues.getValue(id)!!
+            // A read per task: one read for the whole pool held a read permit for all of it, a minute after a landing (CL-256).
+            registry.query(root, speculative = false, arrived) { view -> predict(view, p.dir, p.repo, mirror, canonical, issue!!.updated).predictions }
         }
         return ids.associateWith { id ->
             val task = landed.getValue(id)
@@ -89,13 +91,17 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
     }
 
     /** Every worktree of the repository of [root] that is on a branch and is not the main worktree. */
-    suspend fun liveWindows(root: String): List<LiveWindow> {
+    suspend fun liveWindows(root: String): List<LiveWindow> = coroutineScope {
         val p = prelude(root)
         val main = registry.mainWorktree(p.repo.commonDir).toString().replace('\\', '/')
-        return WorktreeBranches.of(p.repo.commonDir).filterValues { !it.equals(main, ignoreCase = true) }.map { (branch, path) ->
-            val set = runCatching { registry.changedFiles(path) }.getOrNull()
-            LiveWindow(branch, path, p.pattern.idsIn(branch), set?.let { s -> (s.files.map { it.path } + s.otherFiles).toSet() }.orEmpty())
-        }
+        // Each change set is a few git processes, 0.2-0.4 s on a busy machine: ten worktrees one after another took seconds.
+        val gate = Semaphore(LIVE_AT_ONCE)
+        WorktreeBranches.of(p.repo.commonDir).filterValues { !it.equals(main, ignoreCase = true) }.map { (branch, path) ->
+            async {
+                val set = gate.withPermit { runCatching { registry.changedFiles(path) }.getOrNull() }
+                LiveWindow(branch, path, p.pattern.idsIn(branch), set?.let { s -> (s.files.map { it.path } + s.otherFiles).toSet() }.orEmpty())
+            }
+        }.awaitAll()
     }
 
     private suspend fun taskAnswer(root: String, dir: Path, repo: RepoState, store: TaskCodeStore, query: String, refreshed: Refreshed? = null): TaskCodeRender.TaskAnswer = coroutineScope {
@@ -181,9 +187,8 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
     }
 
     private fun predict(view: View, worktree: Path, repo: RepoState, mirror: TrackerMirror, id: String, updated: Long): TouchPrediction.Result {
-        val stamp = "$updated@${repo.baseCommit}"
-        predictions[id]?.let { (seen, result) -> if (seen == stamp) return result }
-        return TouchPrediction(view, worktree).of(mentions(mirror, id, updated)).also { predictions[id] = stamp to it }
+        val mentions = mentions(mirror, id, updated)
+        return registry.taskCodes.predictions.get(repo.commonDir, id, view.baseCommit() ?: repo.baseCommit, mentions) { TouchPrediction(view, worktree).of(mentions) }
     }
 
     /** A tracker that lists repositories covers only those; one that lists none covers every repository. */
@@ -194,4 +199,8 @@ class TaskCodeQuery(private val registry: Registry, private val trackers: Tracke
         trackers.mirrors.flatMap { m -> TaskRows.byIds(m.store, ids.filter { m.canonical(it) != null }).values }.associateBy { it.id.uppercase() }
 
     private fun pattern(repo: RepoState) = TaskPattern.of(registry.mainWorktree(repo.commonDir), trackers.projects())
+
+    private companion object {
+        const val LIVE_AT_ONCE = 4
+    }
 }

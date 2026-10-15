@@ -1,12 +1,14 @@
 package codeloupe.taskcode
 
 import codeloupe.index.ModulePath
+import codeloupe.lang.Languages
 import codeloupe.query.DeclRow
 import codeloupe.query.PathOrder
 import codeloupe.query.Resolver
 import codeloupe.query.View
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Resolves an issue's mentions against the code index into a predicted touch set: paths and symbols the index has
@@ -18,6 +20,7 @@ class TouchPrediction(private val view: View, private val worktree: Path) {
     class Result(val predictions: List<Prediction>, val unresolved: List<Mention>, val ambiguous: List<Mention>)
 
     fun of(mentions: List<Mention>): Result {
+        made.incrementAndGet()
         val found = LinkedHashMap<String, Prediction>()
         val unresolved = ArrayList<Mention>()
         val ambiguous = ArrayList<Mention>()
@@ -151,13 +154,6 @@ class TouchPrediction(private val view: View, private val worktree: Path) {
         return Outcome.Found(hits.map { Prediction(Prediction.GUESS, "module $it", null, "", listOf(m.evidence)) })
     }
 
-    /** The longest fixed piece of a route (`/v1/sources/{id}` -> `/v1/sources/`), the method dropped; null when too short to mean anything. */
-    private fun needle(text: String): String? {
-        val route = text.substringAfter(' ', text).trim()
-        val fixed = route.split(Regex("\\{[^}]*}|:[A-Za-z_]+|\\*")).maxByOrNull { it.length }.orEmpty()
-        return fixed.takeIf { it.length >= MIN_NEEDLE }
-    }
-
     private fun parentExists(path: String): Boolean =
         '/' in path && !path.contains("..") && runCatching { Files.isDirectory(worktree.resolve(path.substringBeforeLast('/'))) }.getOrDefault(false)
 
@@ -180,10 +176,60 @@ class TouchPrediction(private val view: View, private val worktree: Path) {
         data object Nothing : Outcome
     }
 
-    private companion object {
-        const val MAX_EVIDENCE = 2
-        const val MAX_WORD_FILES = 6
-        const val MAX_LITERAL_FILES = 5
-        const val MIN_NEEDLE = 4
+    companion object {
+        private const val MAX_EVIDENCE = 2
+        private const val MAX_WORD_FILES = 6
+        private const val MAX_LITERAL_FILES = 5
+        private const val MIN_NEEDLE = 4
+
+        /** Predictions made from scratch (tests). */
+        val made = AtomicInteger()
+
+        /**
+         * Whether a landing that changed [files] can change [result], made from [mentions] before it: a changed path a path mention
+         * names, a file added or deleted where a module or a path the index lacked would be, or a changed text (before or after)
+         * that holds a mentioned name, word or literal. What none of them holds resolves the same way on both sides of the landing.
+         */
+        fun touchedBy(mentions: List<Mention>, result: Result, files: List<LandingDiff.LandedText>): Boolean {
+            // An unresolved path, or one predicted new, turns on whether its folder exists: a file added or deleted there can flip it.
+            val folderBound = result.unresolved.filter { it.kind == Mention.Kind.PATH }.map { it.text }.toSet() +
+                result.predictions.filter { it.mark == Prediction.NEW }.map { it.target }
+            return mentions.any { m -> files.any { touches(m, it, folderBound) } }
+        }
+
+        private fun touches(m: Mention, file: LandingDiff.LandedText, folderBound: Set<String>): Boolean {
+            // Declarations, file contents and modules come from indexed files only; a path may also name a docs or build file.
+            val indexed = Languages.languageOf(file.path) != null
+            fun holds(text: String) = indexed && (file.before?.contains(text) == true || file.after?.contains(text) == true)
+            // A name or word is declared as a whole identifier: `id` is not touched by every `valid`.
+            fun names(name: String) = indexed && Regex("(?<![\\w$])${Regex.escape(name)}(?![\\w$])").let { re ->
+                file.before?.let(re::containsMatchIn) == true || file.after?.let(re::containsMatchIn) == true
+            }
+            fun under(dir: String) = dir.isNotEmpty() && (file.before == null || file.after == null) &&
+                (file.path.startsWith("$dir/") || file.path.contains("/$dir/"))
+            return when (m.kind) {
+                Mention.Kind.PATH -> {
+                    val (suffix, _) = Mentions.pathSuffix(m.text)
+                    file.path == suffix || file.path.endsWith("/$suffix") ||
+                        ((m.text in folderBound || suffix in folderBound) && under(suffix.substringBeforeLast('/', "")))
+                }
+                Mention.Kind.SYMBOL -> {
+                    val bare = m.text.substringBefore('(')
+                    // Every segment: a qualifier resolves through its own declaration (`Type.member`, a companion).
+                    bare.split('.').any { it.isNotEmpty() && names(it) } || file.path.endsWith("/$bare.kt") || file.path.endsWith("/$bare.java")
+                }
+                Mention.Kind.WORD -> names(m.text)
+                Mention.Kind.LITERAL -> needle(m.text)?.let(::holds) == true
+                // The module list changes only when a module gains its first indexed file or loses its last.
+                Mention.Kind.MODULE -> indexed && under(m.text.replace('\\', '/').trimEnd('/'))
+            }
+        }
+
+        /** The longest fixed piece of a route (`/v1/sources/{id}` -> `/v1/sources/`), the method dropped; null when too short to mean anything. */
+        private fun needle(text: String): String? {
+            val route = text.substringAfter(' ', text).trim()
+            val fixed = route.split(Regex("\\{[^}]*}|:[A-Za-z_]+|\\*")).maxByOrNull { it.length }.orEmpty()
+            return fixed.takeIf { it.length >= MIN_NEEDLE }
+        }
     }
 }

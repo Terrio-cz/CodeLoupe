@@ -18,6 +18,9 @@ import java.util.concurrent.ConcurrentHashMap
 class TaskCodes(private val queue: JobQueue, private val waitMs: Long, private val log: (String) -> Unit = {}) : AutoCloseable {
     private val stores = ConcurrentHashMap<String, Pair<String, TaskCodeStore>>()
 
+    /** Touch predictions of open tasks, shared by the tools that ask for them. */
+    val predictions = PredictionCache()
+
     /** The store of [repo], current to the default branch's tip, for task ids of [pattern]. */
     suspend fun current(repo: RepoState, pattern: TaskPattern): TaskCodeStore {
         val store = open(repo, pattern)
