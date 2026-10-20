@@ -44,13 +44,27 @@ class TelemetryTest {
     @Test
     fun `budgets warn on what exceeds them, and judge latency only with enough calls`() {
         val budgets = BudgetsConfig(p95Ms = 500, queueWaitMs = 10_000, rssMb = 200, busyRate = 0.1)
-        val slow = CallLatency(window = 50, p95Ms = 900, busyRate = 0.3)
+        val slow = CallLatency(window = 50, p95Ms = 900, busyRate = 0.3, byTool = mapOf("find" to ToolLatency(50, 100, 900)))
         val state = BudgetState.check(budgets, slow, rssMb = 300, queueWaitMs = 20_000)
         assertEquals(false, state.ok)
         assertEquals(4, state.warnings.size)
-        assertTrue(state.warnings.first().startsWith("p95 latency 900 ms exceeds 500 ms"))
-        assertEquals(BudgetState(true), BudgetState.check(budgets, CallLatency(window = 5, p95Ms = 9_000, busyRate = 1.0), rssMb = 150, queueWaitMs = 0))
+        assertTrue(state.warnings.first().startsWith("find p95 latency 900 ms exceeds 500 ms"))
+        val few = CallLatency(window = 5, p95Ms = 9_000, busyRate = 1.0, byTool = mapOf("find" to ToolLatency(5, 9_000, 9_000)))
+        assertEquals(BudgetState(true), BudgetState.check(budgets, few, rssMb = 150, queueWaitMs = 0))
         assertEquals(BudgetState(true), BudgetState.check(budgets, CallLatency(), rssMb = null, queueWaitMs = 0))
+    }
+
+    @Test
+    fun `each tool is judged against its own p95 budget, and status carries it`() {
+        val budgets = BudgetsConfig()
+        val latency = CallLatency(
+            window = 100, p95Ms = 8_000,
+            byTool = mapOf("dispatch_plan" to ToolLatency(40, 1_800, 8_000), "find" to ToolLatency(40, 7, 41), "symbol" to ToolLatency(20, 50, 1_500)),
+        )
+        assertEquals(listOf("symbol p95 latency 1500 ms exceeds 1000 ms"), BudgetState.check(budgets, latency, rssMb = null, queueWaitMs = 0).warnings)
+        val sent = latency.withBudgets(budgets).byTool
+        assertEquals(10_000, sent.getValue("dispatch_plan").budgetMs)
+        assertEquals(1_000, sent.getValue("find").budgetMs)
     }
 
     @Test
@@ -58,6 +72,12 @@ class TelemetryTest {
         val file = Json.parseToJsonElement("""{"budgets": {"p95Ms": 250, "rssMb": "180", "busyRate": -1, "queueWaitMs": "x"}}""").jsonObject
         assertEquals(BudgetsConfig(p95Ms = 250, rssMb = 180), BudgetsConfig.parse(file))
         assertEquals(BudgetsConfig(), BudgetsConfig.parse(Json.parseToJsonElement("{}").jsonObject))
+        val tools = Json.parseToJsonElement("""{"budgets": {"toolP95Ms": {"changes": 8000, "grep": 2000, "find": "x"}}}""").jsonObject
+        val parsed = BudgetsConfig.parse(tools)
+        assertEquals(8_000, parsed.p95For("changes"))
+        assertEquals(2_000, parsed.p95For("grep"))
+        assertEquals(10_000, parsed.p95For("dispatch_plan"), "a default the config does not name stays")
+        assertEquals(1_000, parsed.p95For("find"), "a bad value falls back to the lookup budget")
     }
 
     @Test

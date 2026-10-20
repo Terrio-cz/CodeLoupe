@@ -127,7 +127,8 @@ Overview                                            [24h|7d|30d]  ⟳
 - Savings by tool: vodorovné pruhy, jedna série, seřazeno sestupně, hodnota přímo u pruhu.
 - Daemon karta: z `/status` (reálný daemon i v mock režimu), tlačítka volají main proces (§ 8).
 - Řada **Call latency · Daemon memory · Daemon CPU load** (CL-40) pod grafem ceny: p95 latence volání podle nástroje z `/status` `latency`
-  (posledních 1 000 volání) s ryskou budgetu `p95Ms`; RSS daemonu z `GET /status/history` s ryskou `rssMb`;
+  (posledních 1 000 volání) na log ose od 10 ms, s ryskou vlastního budgetu nástroje (`budgetMs` z `/status`, `budgets.toolP95Ms`,
+  jinak `p95Ms`; CL-257), u každého řádku počet volání a p50; RSS daemonu z `GET /status/history` s ryskou `rssMb`;
   zátěž CPU jako podíl jednoho jádra mezi dvěma odečty (rozdíl `cpuSec` / uplynulý čas, přes přestávku delší než
   5 min bez čáry — daemon při nečinnosti žádné odečty nebere). Každý graf má tabulkový pohled a shrnutí v `aria-label`.
 - **Varování rozpočtů**: banner nad KPI, když `/status` `budgets.warnings` něco uvádí (p95, busy, čekání ve frontě,

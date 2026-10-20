@@ -207,7 +207,7 @@ class Daemon private constructor(
         val runtime = Runtime.getRuntime()
         val cpu = ProcessHandle.current().info().totalCpuDuration().map { it.toSeconds() }.orElse(0)
         val rss = ProcessMemory.rssMb()
-        val latency = runner.latency()
+        val latency = runner.latency().withBudgets(config.budgets)
         val queueSnapshot = queue.snapshot()
         history.sample()
         return DaemonStatus(

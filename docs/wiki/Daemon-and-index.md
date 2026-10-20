@@ -29,7 +29,8 @@ when a question arrives. This page is the model in the head; the numbers are mea
 | Idle daemon of a small bundle | 94-109 MB ([Packaging and releasing](Packaging-and-releasing#bundle)) |
 | CLI call against a running daemon | about 0.2 s |
 
-Budgets that make `/status` warn (`p95Ms`, `queueWaitMs`, `rssMb`, `busyRate`) are configurable
+Budgets that make `/status` warn (`p95Ms`, per-tool `toolP95Ms`, `queueWaitMs`, `rssMb`, `busyRate`) are configurable; p95 latency is judged per tool
+against that tool's budget, once it has 20 calls in the window
 ([Configuration](Configuration)).
 
 ## What the index holds
