@@ -465,7 +465,14 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 .bar-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .bar-list li { display: grid; grid-template-columns: minmax(120px, 200px) 1fr 72px var(--note-w, 64px); gap: 12px; align-items: center; min-height: 24px; }
 .bar-list li > .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bar-list.latency li { grid-template-columns: minmax(70px, 110px) 1fr 64px 88px; }
+/* A latency row sits in a third of the page: name and p95 on one line, the bar on its own full-width line, the note under it. */
+.bar-list.latency { gap: 12px; }
+.bar-list.latency li { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; column-gap: 8px; }
+.bar-list.latency li > .num { display: inline-flex; align-items: center; gap: 6px; }
+.bar-list.latency li > .bar-track, .bar-list.latency li > .note { grid-column: 1 / -1; }
+.bar-list.latency li > .note { font-size: var(--fs-xs); }
+.latency-axis { position: relative; height: 16px; margin-top: 6px; font-size: var(--fs-xs); }
+.latency-axis > span { position: absolute; top: 0; white-space: nowrap; }
 .bar-track { height: 10px; position: relative; background: var(--surface-2); border-radius: var(--r-full); }
 .bar-track > span {
   position: absolute; left: 0; top: 0; bottom: 0; min-width: 3px; border-radius: var(--r-full);

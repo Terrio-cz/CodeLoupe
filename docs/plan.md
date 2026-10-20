@@ -383,7 +383,7 @@ reference, anonymní třídy.
 `calls.jsonl` na každé volání: nástroj, jazyk, latence, čekání ve frontě, velikost výsledku, počet
 `exact`/`candidate`, prázdný výsledek, `busy`. `/status`: RSS, CPU čas, délka fronty, doba sync/buildu,
 velikost DB, počet vrstev; p50/p95 latence a velikosti, míra `empty`/`busy` z posledních 1000 volání
-(`latency`), `budgets` s varováními při překročení (`config.json` `budgets`: `p95Ms`, `queueWaitMs`, `rssMb`, `busyRate`)
+(`latency`), `budgets` s varováními při překročení (`config.json` `budgets`: `p95Ms`, `toolP95Ms` — p95 se posuzuje po nástrojích, CL-257 — `queueWaitMs`, `rssMb`, `busyRate`)
 a `/status/history` s odečty RSS/heap/CPU (jednou za minutu při používání, posledních 240; CL-24).
 
 ### 8.3 Detektor mezer

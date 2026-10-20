@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { LatencyBars } from '../src/renderer/src/components/LatencyBars';
+import { LatencyBars, overBudget } from '../src/renderer/src/components/LatencyBars';
 import { TimeChart } from '../src/renderer/src/components/TimeChart';
 import type { CallLatency } from '../src/shared/contract';
 
@@ -15,6 +15,26 @@ describe('LatencyBars', () => {
     expect(html.indexOf('changes')).toBeLessThan(html.indexOf('find'));
     expect(html).toContain('over budget');
     expect(html).toContain('budget 1');
+  });
+
+  it('judges each tool against its own budget and keeps calls and p50 on every row', () => {
+    const own: CallLatency = {
+      ...latency,
+      byTool: { find: { calls: 200, p50Ms: 7, p95Ms: 41, budgetMs: 1000 }, dispatch_plan: { calls: 30, p50Ms: 1800, p95Ms: 8000, budgetMs: 10_000 } },
+    };
+    const html = renderToStaticMarkup(<LatencyBars latency={own} budgetMs={1000} />);
+    expect(html).not.toContain('over budget');
+    expect(html).toContain('30× · p50 1.8 s · budget 10 s');
+    expect(html).toContain('200× · p50 7 ms');
+    expect(overBudget(own, 1000)).toBe('all 2 tools within budget');
+    expect(overBudget(latency, 1000)).toBe('1 of 2 tools over budget');
+  });
+
+  it('places bars on a log axis from 10 ms', () => {
+    const html = renderToStaticMarkup(<LatencyBars latency={{ ...latency, byTool: { a: { calls: 1, p50Ms: 1, p95Ms: 100 }, b: { calls: 1, p50Ms: 1, p95Ms: 10_000 } } }} budgetMs={1000} />);
+    expect(html).toContain('width:100%');
+    expect(html).toContain('width:33.33');
+    expect(html).toContain('left:66.66');
   });
 
   it('says so when no call has been made', () => {

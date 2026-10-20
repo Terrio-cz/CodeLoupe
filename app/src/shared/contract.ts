@@ -91,7 +91,8 @@ export interface CallLatency {
   /** 0..1 */
   emptyRate: number;
   busyRate: number;
-  byTool: Record<string, { calls: number; p50Ms: number; p95Ms: number }>;
+  /** `budgetMs`: the tool's own p95 budget (`config.json` `budgets.toolP95Ms`, else `budgets.p95Ms`); absent from older daemons. */
+  byTool: Record<string, { calls: number; p50Ms: number; p95Ms: number; budgetMs?: number | null }>;
 }
 /** One reading of `GET /status/history`: taken while the daemon is used, one a minute, the last 240. */
 export interface ResourceSample {

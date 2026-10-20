@@ -3,7 +3,7 @@ import type { ToolCalls } from '../../../shared/contract';
 import { bridge, useApi } from '../api';
 import { BarList, CostChart } from '../components/Charts';
 import { DataTable, type Column } from '../components/DataTable';
-import { LatencyBars } from '../components/LatencyBars';
+import { LatencyBars, overBudget } from '../components/LatencyBars';
 import { CountUp } from '../components/CountUp';
 import { Icon } from '../components/Icon';
 import { BaselineNote } from '../components/BaselineNote';
@@ -139,7 +139,7 @@ export function Overview() {
             {limits && (
               <>
                 <dt>Daemon memory</dt><dd>{st ? `${st.rssMb} MB of ${limits.daemonRssMb} MB` : `limit ${limits.daemonRssMb} MB`}</dd>
-                <dt>p95 latency</dt><dd>{st?.latency ? `${ms(st.latency.p95Ms)} of ${ms(limits.p95Ms)}` : `limit ${ms(limits.p95Ms)}`}</dd>
+                <dt>p95 latency</dt><dd>{st?.latency ? overBudget(st.latency, limits.p95Ms) : `limit ${ms(limits.p95Ms)} for lookups`}</dd>
                 <dt>Busy</dt><dd>{st?.latency ? `${pct(st.latency.busyRate * 100, 1)} of ${pct(limits.busyRate * 100)}` : `limit ${pct(limits.busyRate * 100)}`}</dd>
                 <dt>Queue wait</dt><dd>{ms(limits.queueWaitMs)} max</dd>
               </>
