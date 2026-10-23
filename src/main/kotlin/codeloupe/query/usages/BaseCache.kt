@@ -17,8 +17,25 @@ internal class BaseCache {
     val files = SharedLru<String, List<FileScope>>(SCOPE_ROWS) { it.sumOf(FileScope::weight) + 1 }
     val refsByLine = SharedLru<Pair<String, Int>, List<RefRow>>(LINE_ROWS) { it.size + 1 }
 
+    /** Paths of the files a literal is found in, by literal, in path order. */
+    val containing = SharedLru<String, List<String>>(CONTAINING_ROWS) { it.size + 1 }
+
+    /** The file texts the literal lookups of a burst scan. */
+    val texts = BaseTexts()
+
     private val supertypes = Once<Map<String, List<DeclRow>>>()
     private val imported = Once<Map<String, List<ImportRow>>>()
+    private val livePaths = Once<List<String>>()
+    private val moduleNames = Once<List<String>>()
+
+    /**
+     * Paths of the files the base holds, in table order; built once per generation. A suffix lookup scans this list: the
+     * `LIKE` scan it replaces read every row of `files`, content included, ~10 ms a lookup on Terrio (CL-258).
+     */
+    fun paths(read: () -> List<String>): List<String> = livePaths.get { read().let { it.size to it } }
+
+    /** The modules of the base; built once per generation. */
+    fun modules(read: () -> List<String>): List<String> = moduleNames.get { read().let { it.size to it } }
 
     /** Indexed types by the name of each direct supertype they list; built once per generation. */
     fun bySupertype(read: () -> List<DeclRow>): Map<String, List<DeclRow>> = supertypes.get {
@@ -51,6 +68,7 @@ internal class BaseCache {
         const val REF_ROWS = 40_000
         const val SCOPE_ROWS = 40_000
         const val LINE_ROWS = 15_000
+        const val CONTAINING_ROWS = 20_000
         const val MAP_ROWS = 100_000
     }
 }

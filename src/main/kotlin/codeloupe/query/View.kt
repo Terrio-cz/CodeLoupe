@@ -4,6 +4,8 @@ import codeloupe.index.Store
 import codeloupe.platform.LongPaths
 import codeloupe.platform.TimedPart
 import codeloupe.platform.Timings
+import codeloupe.query.usages.BaseCaches
+import codeloupe.query.usages.BaseTexts
 import java.nio.file.Path
 import java.sql.PreparedStatement
 
@@ -15,6 +17,8 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
     private val openedAt = System.nanoTime()
     private val db = Store.open(baseFile, readOnly = true)
     private val overlay = overlayFile != null
+    // What every view of this base generation derives once: its paths, modules and literal hits.
+    private val shared by lazy { BaseCaches.of(baseFile) }
     // A pooled view serves many queries: only the statements used most recently stay compiled.
     private val statements = object : LinkedHashMap<String, Pair<PreparedStatement, NamedSql>>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<String, Pair<PreparedStatement, NamedSql>>): Boolean =
@@ -148,22 +152,35 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
 
     /** Paths ending with the given suffix (`OrderService.kt`, `shop/OrderService.kt`). */
     fun filesBySuffix(suffix: String): List<String> {
-        val like = mapOf("like" to "%" + Like.escape(suffix))
-        val rows = query("SELECT path FROM main.files WHERE deleted = 0 AND path LIKE :like ESCAPE '\\'", like) { it.getString(1) }
+        val rows = basePaths().filter { Like.endsWith(it, suffix) }
         if (!overlay) return rows
+        val like = mapOf("like" to "%" + Like.escape(suffix))
         val ov = query("SELECT path, deleted FROM ov.files WHERE path LIKE :like ESCAPE '\\'", like) { it.getString(1) to (it.getInt(2) != 0) }
         val gone = ov.filter { it.second }.map { it.first }.toSet()
         return LinkedHashSet(rows.filter { it !in gone } + ov.filter { !it.second }.map { it.first }).toList()
     }
 
+    // Table order, as the `LIKE` scan this replaces answered.
+    private fun basePaths(): List<String> = shared.paths { query("SELECT path FROM main.files WHERE deleted = 0 ORDER BY id", emptyMap()) { it.getString(1) } }
+
+    // In path order, as `ORDER BY path` sorted the hits; null when the base holds more text than is worth keeping in the heap.
+    private fun baseTexts(): List<BaseTexts.Text>? = shared.texts.get {
+        val bytes = query("SELECT coalesce(sum(size), 0) FROM main.files WHERE deleted = 0 AND content IS NOT NULL", emptyMap()) { it.getLong(1) }.single()
+        if (bytes > MAX_TEXT_BYTES) return@get null
+        buildList { stream("SELECT path, content FROM main.files WHERE deleted = 0 AND content IS NOT NULL ORDER BY path", emptyMap()) { add(BaseTexts.Text(it.getString(1), it.getString(2))) } }
+    }
+
     /** Paths of files whose content holds [literal], at most [limit], overlay copies masking base ones. */
     fun filesContaining(literal: String, limit: Int): List<String> {
-        val params = mapOf("lit" to literal, "limit" to limit)
-        val base = "SELECT path FROM main.files WHERE deleted = 0 AND content IS NOT NULL AND instr(content, :lit) > 0"
-        if (!overlay) return query("$base ORDER BY path LIMIT :limit", params) { it.getString(1) }
-        val ov = query("SELECT path, deleted, content IS NOT NULL AND instr(content, :lit) > 0 FROM ov.files", params) { Triple(it.getString(1), it.getInt(2) != 0, it.getInt(3) != 0) }
+        // Every base hit, kept per literal: a content scan of the base is ~40 ms on Terrio, and tasks share their routes and tables.
+        val base = shared.containing.getOrPut(literal) {
+            baseTexts()?.filter { it.content.contains(literal) }?.map { it.path }
+                ?: query("SELECT path FROM main.files WHERE deleted = 0 AND content IS NOT NULL AND instr(content, :lit) > 0 ORDER BY path", mapOf("lit" to literal)) { it.getString(1) }
+        }
+        if (!overlay) return base.take(limit)
+        val ov = query("SELECT path, deleted, content IS NOT NULL AND instr(content, :lit) > 0 FROM ov.files", mapOf("lit" to literal)) { Triple(it.getString(1), it.getInt(2) != 0, it.getInt(3) != 0) }
         val masked = ov.map { it.first }.toSet()
-        val hits = query("$base ORDER BY path", params) { it.getString(1) }.filter { it !in masked } + ov.filter { !it.second && it.third }.map { it.first }
+        val hits = base.filter { it !in masked } + ov.filter { !it.second && it.third }.map { it.first }
         return hits.sortedWith(PathOrder).take(limit)
     }
 
@@ -250,7 +267,7 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
 
     /** Every module of the index (`importers/ruian`), the root module as an empty string. */
     fun modules(): List<String> {
-        val base = query("SELECT DISTINCT module FROM main.files WHERE deleted = 0 AND module IS NOT NULL", emptyMap()) { it.getString(1) }
+        val base = shared.modules { query("SELECT DISTINCT module FROM main.files WHERE deleted = 0 AND module IS NOT NULL", emptyMap()) { it.getString(1) } }
         if (!overlay) return base
         return (base + query("SELECT DISTINCT module FROM ov.files WHERE deleted = 0 AND module IS NOT NULL", emptyMap()) { it.getString(1) }).distinct()
     }
@@ -280,5 +297,7 @@ class View(val baseFile: Path, val overlayFile: Path? = null) : AutoCloseable {
 
     private companion object {
         const val MAX_STATEMENTS = 24
+        // Terrio's base holds ~21 MB of text.
+        const val MAX_TEXT_BYTES = 48L shl 20
     }
 }
