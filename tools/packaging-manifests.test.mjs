@@ -65,7 +65,9 @@ test('every manifest carries the URL and hash of the release files', () => {
   assert.ok(cask.includes(`arm:   "${hashes[arm]}"`));
   assert.ok(cask.includes(`intel: "${hashes[intel]}"`));
   assert.ok(cask.includes('releases/download/v#{version}/CodeLoupe-#{version}-mac-#{arch}.dmg'));
-  assert.ok(cask.includes('"com.apple.quarantine"'));
+  assert.ok(cask.includes('run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/CodeLoupe.app"]'));
+  assert.match(cask, /^  postflight_steps do$/m);
+  assert.doesNotMatch(cask, /^\s*postflight do$/m, 'brew style refuses a postflight block');
   assert.match(cask, /^cask "codeloupe" do\n[\s\S]*\nend\n$/);
 });
 

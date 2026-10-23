@@ -128,7 +128,10 @@ export function scoopManifest(c) {
   };
 }
 
-/** A Homebrew cask; the postflight removes the quarantine flag, so the unsigned app opens without the manual allow. */
+/**
+ * A Homebrew cask; its postflight steps remove the quarantine flag, so the unsigned app opens without the manual allow.
+ * A step block, not a `postflight` block: `brew style` refuses the latter since Homebrew enforced declarative steps (CL-259).
+ */
 export function caskManifest(c) {
   return `cask "codeloupe" do
   arch arm: "arm64", intel: "x64"
@@ -153,9 +156,8 @@ export function caskManifest(c) {
   binary "#{appdir}/CodeLoupe.app/Contents/Resources/codeloupe/bin/codeloupe"
 
   # The app is signed ad hoc, not notarised: without this Gatekeeper asks for a manual allow on the first start.
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args: ["-dr", "com.apple.quarantine", "#{appdir}/CodeLoupe.app"]
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/CodeLoupe.app"]
   end
 
   zap trash: [
