@@ -149,6 +149,33 @@ class DaemonAuthTest {
     }
 
     @Test
+    fun `a stale MCP connection is told to reconnect instead of getting a bare 401`() {
+        val config = config()
+        val daemon = Daemon.start(config)
+        try {
+            // What a window that connected to a daemon from before the token keeps sending (CL-260).
+            val stale = send(
+                config.port, "POST", "/mcp", """{"jsonrpc":"2.0","id":7,"method":"tools/list"}""",
+                local, "accept" to "application/json, text/event-stream",
+            )
+            assertEquals(200, stale.statusCode(), "a 401 reaches the client as a failed registration, with the reason gone")
+            val answer = Json.parseToJsonElement(stale.body()).jsonObject
+            assertEquals("7", answer["id"]!!.jsonPrimitive.content, "the client matches the answer to its own call by id")
+            val said = answer["error"]!!.jsonObject["message"]!!.jsonPrimitive.content
+            assertContains(said, "daemon token")
+            assertContains(said, "Reconnect")
+
+            // Every other route keeps the 401, and says that a token is the problem and not a missing registration.
+            val refused = send(config.port, "GET", "/jobs", null, local)
+            assertEquals(401, refused.statusCode())
+            assertContains(refused.headers().firstValue("www-authenticate").orElse(""), "invalid_token")
+            assertEquals(0, daemon.status().jobs.running, "nothing ran")
+        } finally {
+            daemon.stop()
+        }
+    }
+
+    @Test
     fun `the token is made owner-only, survives a restart, and a replaced file takes effect without one`() {
         val config = config()
         val first = Daemon.start(config)

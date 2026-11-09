@@ -10,10 +10,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 class StatusCommand(private val load: () -> Config = { ConfigLoader.load() }) : CliktCommand(name = "status") {
-    override fun help(context: Context) = "Print the daemon's status as JSON (exit code 3 when it is not running or wedged)."
+    override fun help(context: Context) =
+        "Print the daemon's status as JSON (exit code 3 when it is not running or wedged, 4 when the daemon on the port is another version)."
 
     override fun run() {
-        val client = DaemonClient(load())
+        val config = load()
+        val client = DaemonClient(config)
         var status = client.status()
         if (status == null) {
             val wedged = client.wedged()
@@ -24,7 +26,13 @@ class StatusCommand(private val load: () -> Config = { ConfigLoader.load() }) : 
                 throw ProgramResult(3)
             }
         }
+        // The JSON first: this is the command someone runs to find out what is going on, and it is the daemon's own answer,
+        // jar included. Then the verdict, because a daemon of another version answering is a fault and not a status.
         echo(PRETTY.encodeToString(JsonObject.serializer(), status))
+        OtherVersion.of(status, config.port)?.let {
+            echo(it.refusal, err = true)
+            throw ProgramResult(4)
+        }
     }
 
     private companion object {

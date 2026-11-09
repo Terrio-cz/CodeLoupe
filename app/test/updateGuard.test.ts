@@ -22,7 +22,7 @@ function makeBundle(dir: string, version: string): string {
 }
 
 const state = (phase: DaemonState['phase'], version?: string, over: Partial<DaemonState> = {}): DaemonState => ({
-  phase, status: version ? ({ name: 'codeloupe', version } as DaemonStatus) : null, port: 1, message: null, manualStop: false, checkedAt: null, ...over,
+  phase, status: version ? ({ name: 'codeloupe', version } as DaemonStatus) : null, port: 1, message: null, versionMismatch: null, manualStop: false, checkedAt: null, ...over,
 });
 
 class FakeManager extends EventEmitter implements GuardedManager {

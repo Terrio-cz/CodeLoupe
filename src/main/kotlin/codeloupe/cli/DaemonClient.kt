@@ -52,27 +52,56 @@ class DaemonClient(private val config: Config, private val launcher: (() -> Unit
 
     /**
      * The running daemon's status, starting it if need be. A wedged daemon ([WedgedDaemon]) holds the port a new one needs: with
-     * [endWedged] it is ended first and [ended] hears of it, otherwise the call fails naming it.
+     * [endWedged] it is ended first and [ended] hears of it, otherwise the call fails naming it. A daemon of another version
+     * ([OtherVersion]) is never spoken to: with [replaceOtherVersion] it is stopped and a new one started, which [replacing]
+     * hears of first, and otherwise the call fails naming it. Replacing one ends the jobs it runs, so that needs [force].
      */
-    fun ensureDaemon(endWedged: Boolean = false, ended: (WedgedDaemon) -> Unit = {}): JsonObject {
-        status()?.let { return named(it) }
+    fun ensureDaemon(
+        endWedged: Boolean = false,
+        replaceOtherVersion: Boolean = false,
+        force: Boolean = false,
+        ended: (WedgedDaemon) -> Unit = {},
+        replacing: (OtherVersion) -> Unit = {},
+    ): JsonObject {
+        status()?.let { answer ->
+            val named = named(answer)
+            val other = OtherVersion.of(named, config.port) ?: return named
+            if (!replaceOtherVersion) throw DaemonRefusal(other.refusal)
+            if (!force) other.jobsRefusal?.let { throw DaemonRefusal(it) }
+            replacing(other)
+            runCatching { shutdown(force) }.onFailure { throw DaemonRefusal("${other.what}: it could not be stopped (${it.message})") }
+            if (status(WEDGED_LOOK_MS) != null) throw DaemonRefusal("${other.what}: it still answers after being asked to stop")
+            // A daemon closes its databases after its port has gone quiet: wait for that process, so nothing below takes the
+            // one we have just stopped for a wedged daemon and says so.
+            WedgedDaemon.find(config.home, config.port)?.takeIf { it.pid == other.pid.toLongOrNull() }?.end()
+        }
         val wedged = wedged()
         if (wedged == null) {
-            status()?.let { return named(it) } // only slow: it answered the longer look
+            status()?.let { return ours(it) } // only slow: it answered the longer look
         } else {
-            if (!endWedged) throw IllegalStateException(wedged.message)
-            if (!wedged.end()) throw IllegalStateException("${wedged.message}; it could not be ended")
+            if (!endWedged) throw DaemonRefusal(wedged.message)
+            if (!wedged.end()) throw DaemonRefusal("${wedged.message}; it could not be ended")
             ended(wedged)
         }
-        PortPolicy.refusal(config)?.let { throw IllegalStateException(it) }
+        PortPolicy.refusal(config)?.let { throw DaemonRefusal(it) }
         Files.createDirectories(config.home)
         (launcher ?: ::launch)()
         startedHere = true
         repeat(80) {
             Thread.sleep(100)
-            status(300)?.let { return named(it) }
+            status(300)?.let { return ours(it) }
         }
-        throw IllegalStateException("daemon did not start on 127.0.0.1:${config.port}; see ${config.home.resolve("daemon.log")}")
+        throw DaemonRefusal("daemon did not start on 127.0.0.1:${config.port}; see ${config.home.resolve("daemon.log")}")
+    }
+
+    /**
+     * The answer of a daemon this client may speak to: the one `daemon.json` names, with our home and our version. Another
+     * version is refused rather than used, because its answers come out of its own index and nothing else would say so.
+     */
+    private fun ours(status: JsonObject): JsonObject {
+        val named = named(status)
+        OtherVersion.of(named, config.port)?.let { throw DaemonRefusal(it.refusal) }
+        return named
     }
 
     /**
@@ -101,9 +130,9 @@ class DaemonClient(private val config: Config, private val launcher: (() -> Unit
             val pid = status["pid"]?.jsonPrimitive?.content?.toLongOrNull()
             if (named == null || named == pid) return status
             Thread.sleep(NAMED_WAIT_MS)
-            status = status(300) ?: throw IllegalStateException("the daemon on 127.0.0.1:${config.port} stopped answering")
+            status = status(300) ?: throw DaemonRefusal("the daemon on 127.0.0.1:${config.port} stopped answering")
         }
-        throw IllegalStateException("127.0.0.1:${config.port} is answered by process ${status["pid"]?.jsonPrimitive?.content}, but daemon.json names ${namedPid()}: not trusting it (stop it, or delete ${config.home.resolve("daemon.json")} if the daemon it names is gone)")
+        throw DaemonRefusal("127.0.0.1:${config.port} is answered by process ${status["pid"]?.jsonPrimitive?.content}, but daemon.json names ${namedPid()}: not trusting it (stop it, or delete ${config.home.resolve("daemon.json")} if the daemon it names is gone)")
     }
 
     private fun namedPid(): Long? = runCatching {
@@ -119,7 +148,7 @@ class DaemonClient(private val config: Config, private val launcher: (() -> Unit
         val ours = config.home.toAbsolutePath().normalize().toString()
         val theirs = Path.of(home).toAbsolutePath().normalize().toString()
         if (!theirs.equals(ours, ignoreCase = PathCase.insensitive)) {
-            throw IllegalStateException("127.0.0.1:${config.port} is served by a daemon with home $theirs, not $ours")
+            throw DaemonRefusal("127.0.0.1:${config.port} is served by a daemon with home $theirs, not $ours")
         }
         return status
     }
@@ -127,7 +156,7 @@ class DaemonClient(private val config: Config, private val launcher: (() -> Unit
     fun call(tool: String, args: JsonObject): ToolOutcome {
         ensureDaemon()
         val reply = exchange("POST", "/api/$tool", args.toString(), bodyRequired = true)
-        if (reply.body.isEmpty()) throw IllegalStateException(emptyAnswer(reply))
+        if (reply.body.isEmpty()) throw DaemonRefusal(emptyAnswer(reply))
         val json = JsonFormat.json.parseToJsonElement(reply.body).jsonObject
         return json["text"]?.let { JsonFormat.json.decodeFromJsonElement(ToolOutcome.serializer(), json) }
             ?: ToolOutcome(false, json["error"]?.jsonPrimitive?.content ?: reply.body)
@@ -181,7 +210,7 @@ class DaemonClient(private val config: Config, private val launcher: (() -> Unit
         }.getOrNull()
         if (response?.status == 409 || response?.status == 401) {
             val said = runCatching { JsonFormat.json.parseToJsonElement(response.body).jsonObject["error"]?.jsonPrimitive?.content }.getOrNull()
-            throw IllegalStateException(said ?: if (response.body.isEmpty()) emptyAnswer(response) else "daemon has jobs")
+            throw DaemonRefusal(said ?: if (response.body.isEmpty()) emptyAnswer(response) else "daemon has jobs")
         }
         repeat(50) {
             if (status(200) == null) return true

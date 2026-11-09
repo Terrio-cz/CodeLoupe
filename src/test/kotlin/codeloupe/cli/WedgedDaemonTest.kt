@@ -1,5 +1,6 @@
 package codeloupe.cli
 
+import codeloupe.CodeLoupe
 import codeloupe.JsonFormat
 import codeloupe.TestRepos
 import codeloupe.config.Config
@@ -52,7 +53,7 @@ class WedgedDaemonTest {
         val pid = ProcessHandle.current().pid()
         val fake = HttpServer.create(InetSocketAddress("127.0.0.1", config.port), 0)
         fake.createContext("/status") { exchange ->
-            val body = """{"name":"codeloupe","pid":$pid,"port":${config.port},"home":"${config.home.toString().replace("\\", "\\\\")}"}""".toByteArray()
+            val body = """{"name":"codeloupe","version":"${CodeLoupe.VERSION}","pid":$pid,"port":${config.port},"home":"${config.home.toString().replace("\\", "\\\\")}"}""".toByteArray()
             exchange.sendResponseHeaders(200, body.size.toLong())
             exchange.responseBody.use { it.write(body) }
         }

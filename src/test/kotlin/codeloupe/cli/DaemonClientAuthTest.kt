@@ -46,7 +46,7 @@ class DaemonClientAuthTest {
             val seen = CopyOnWriteArrayList<Map<String, List<String>>>()
             val rogue = HttpServer.create(InetSocketAddress("127.0.0.1", config.port), 0)
             rogue.createContext("/status") { exchange ->
-                val body = """{"name":"codeloupe","pid":${ProcessHandle.current().pid()},"home":"${config.home.toString().replace("\\", "\\\\")}"}""".toByteArray()
+                val body = """{"name":"codeloupe","version":"${CodeLoupe.VERSION}","pid":${ProcessHandle.current().pid()},"home":"${config.home.toString().replace("\\", "\\\\")}"}""".toByteArray()
                 proof?.let { exchange.responseHeaders.add(CodeLoupe.PROOF_HEADER, it) }
                 exchange.sendResponseHeaders(200, body.size.toLong())
                 exchange.responseBody.use { it.write(body) }

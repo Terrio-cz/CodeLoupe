@@ -64,6 +64,8 @@ export interface DaemonStatus {
   pid: number;
   port: number;
   home: string;
+  /** The jar the daemon runs (CL-260); absent from older daemons, which only name their version. */
+  jar?: string | null;
   uptimeSec: number;
   rssMb: number;
   heapMb: number;

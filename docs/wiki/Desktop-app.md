@@ -12,6 +12,11 @@ shows the daemon's state, RSS and queue; the app starts the daemon when it is do
 writes `<home>/stopped` until `codeloupe start` removes it) and sends notifications for budget breaches, finished builds,
 new gaps and daemon outages. Its memory budget is 300 MB RSS.
 
+When the daemon on the port is not the version the app ships, every screen has no data to show, which reads as a
+CodeLoupe that lost everything. A banner above the screen says which version answers and which jar it runs, and offers
+**Restart daemon** ([Daemon and index](Daemon-and-index)). The app does not restart it by itself: that ends the jobs the
+old daemon runs for other sessions.
+
 ## Accounts
 
 `<home>/accounts.json` lists the Claude Code accounts of this machine (each a config directory, `CLAUDE_CONFIG_DIR`) and the YouTrack instances to mirror; the

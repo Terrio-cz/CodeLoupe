@@ -611,6 +611,7 @@ table.data td.empty-cell .state { padding: 28px 16px; }
 .banner > .icon { color: var(--warning-text); margin-top: 2px; }
 .banner .banner-body { flex: 1; min-width: 0; }
 .banner ul.plain { margin: 4px 0 0; padding-left: 18px; }
+.banner .actions { margin-top: 8px; }
 .banner.info { background: var(--accent-weak); }
 .banner.info > .icon { color: var(--accent-text); }
 .banner.warning { background: var(--warning-weak); }

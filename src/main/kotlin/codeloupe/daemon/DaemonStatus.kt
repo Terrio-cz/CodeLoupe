@@ -16,6 +16,8 @@ data class DaemonStatus(
     val pid: Long,
     val port: Int,
     val home: String,
+    /** The jar (or classes directory) the daemon runs, so its own answer names the install and not only the version. */
+    val jar: String? = null,
     val uptimeSec: Long,
     val rssMb: Long?,
     val heapMb: Long,
