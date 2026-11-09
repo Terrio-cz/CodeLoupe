@@ -8,6 +8,8 @@ export class SettingsStore {
   private value: AppSettings;
   /** Overrides for this run only: CODELOUPE_APP_CLI='["java","-cp","C:/…/codeloupe/lib/*","codeloupe.MainKt"]', CODELOUPE_APP_API=mock|daemon. */
   private overlay: Partial<AppSettings> = {};
+  /** The bundle the app runs as the daemon, for [bundledVersion]; its path changes with every update. */
+  private bundle: BundledDaemon | null = null;
   private readonly file: string;
 
   /**
@@ -40,8 +42,20 @@ export class SettingsStore {
    */
   setBundled(bundled: BundledDaemon | null): void {
     if (!bundled || this.value.cliCommand !== DEFAULT_SETTINGS.cliCommand || this.value.cliArgs.length > 0) return;
+    this.bundle = bundled;
     this.overlay.cliCommand = bundled.command;
     this.overlay.cliArgs = bundled.args;
+  }
+
+  /**
+   * The version a daemon this app starts reports, or null when the app does not decide which daemon runs — no bundle,
+   * or a CLI of the user's or of the environment. Only then may the version on the port be called the wrong one
+   * (CL-260): otherwise the app would judge a daemon it does not start.
+   */
+  bundledVersion(): string | null {
+    const settings = this.get();
+    if (!this.bundle || settings.cliCommand !== this.bundle.command) return null;
+    return JSON.stringify(settings.cliArgs) === JSON.stringify(this.bundle.args) ? this.bundle.version : null;
   }
 
   get(): AppSettings {
