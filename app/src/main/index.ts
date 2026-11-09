@@ -63,7 +63,8 @@ async function main(): Promise<void> {
 
   const client = new DaemonClient(() => manager.port(), () => home.dir);
   const manager: DaemonManager = new DaemonManager(
-    client, home, () => store.get(), () => (win && win.isVisible() ? 5_000 : 15_000), () => bundled?.version ?? null,
+    // The version follows the bundle the store actually runs: an update switches it, and a CLI of the user's clears it.
+    client, home, () => store.get(), () => (win && win.isVisible() ? 5_000 : 15_000), () => store.bundledVersion(),
   );
   const daemonApi = new DaemonApi(client);
   let mock: MockApi | null = null;

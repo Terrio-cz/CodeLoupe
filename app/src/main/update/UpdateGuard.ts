@@ -111,8 +111,12 @@ export class UpdateGuard {
    * which an AppImage update does, or another build took the port) it is restarted from the new bundle, a few times.
    */
   private observe(s: DaemonState, bundleVersion: string): void {
-    if (this.done || s.phase !== 'running' || !s.status) return;
-    if (s.status.version === bundleVersion) {
+    if (this.done) return;
+    // A daemon of another version is reported as a fault with no status (CL-260); right after an update it is the
+    // state to expect, and restarting it from the new bundle is this guard's own job, so it is read from either place.
+    const answering = s.phase === 'running' && s.status ? s.status.version : s.versionMismatch?.running ?? null;
+    if (answering === null) return;
+    if (answering === bundleVersion) {
       this.succeed();
     } else if (!this.restarting && this.restarts < MAX_RESTARTS && !s.manualStop) {
       this.restarts++;
@@ -183,7 +187,9 @@ export class UpdateGuard {
   private watchRecovery(record: RollbackRecord, shipped: BundledDaemon): void {
     if (this.onRecovery) return;
     this.onRecovery = s => {
-      if (s.phase !== 'running' || s.status?.version !== record.failedVersion) return;
+      // While the previous bundle is in force, a daemon of the failed version is reported as another version (CL-260).
+      const answering = s.phase === 'running' && s.status ? s.status.version : s.versionMismatch?.running ?? null;
+      if (answering !== record.failedVersion) return;
       this.stopRecovery();
       this.deps.files.clearRollback();
       this.deps.files.removePrevious();

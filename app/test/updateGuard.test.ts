@@ -92,6 +92,18 @@ describe('UpdateGuard', () => {
     expect(files.readPending()).toBeNull();
   });
 
+  it('restarts a daemon that the manager reports as another version (CL-260)', async () => {
+    const { g, manager, files } = await guard();
+    g.watch();
+    // What the manager now says about a daemon that outlived the update: an error, no status, the version named.
+    const mismatch = state('error', undefined, { versionMismatch: { running: '0.9.0-rc.1', expected: '0.9.0-rc.2', jar: null } });
+    manager.push(mismatch);
+    manager.push(mismatch);
+    expect(manager.restart).toHaveBeenCalledOnce();
+    manager.push(state('running', '0.9.0-rc.2'));
+    expect(files.readPending()).toBeNull();
+  });
+
   it('leaves a daemon the user stopped alone', async () => {
     const { g, manager } = await guard();
     g.watch();
