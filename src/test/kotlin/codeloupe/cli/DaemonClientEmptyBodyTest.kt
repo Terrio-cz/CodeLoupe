@@ -1,5 +1,6 @@
 package codeloupe.cli
 
+import codeloupe.CodeLoupe
 import codeloupe.TestRepos
 import codeloupe.config.Config
 import codeloupe.daemon.DaemonToken
@@ -27,7 +28,7 @@ class DaemonClientEmptyBodyTest {
         fun start() {
             val rogue = HttpServer.create(InetSocketAddress("127.0.0.1", config.port), 0)
             rogue.createContext("/status") { exchange ->
-                val body = """{"name":"codeloupe","pid":${ProcessHandle.current().pid()},"home":"${config.home.toString().replace("\\", "\\\\")}"}""".toByteArray()
+                val body = """{"name":"codeloupe","version":"${CodeLoupe.VERSION}","pid":${ProcessHandle.current().pid()},"home":"${config.home.toString().replace("\\", "\\\\")}"}""".toByteArray()
                 exchange.respond(200, body)
             }
             rogue.createContext("/api/find") { exchange ->

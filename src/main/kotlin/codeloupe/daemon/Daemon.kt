@@ -51,6 +51,7 @@ import codeloupe.reconcile.ReleaseStore
 import codeloupe.reconcile.releaseRoutes
 import codeloupe.reconcile.Reconciler
 import codeloupe.reconcile.reconcileRoutes
+import codeloupe.platform.CodeSource
 import codeloupe.platform.IsoTime
 import codeloupe.platform.OwnerOnly
 import codeloupe.processes.GradleDaemonLog
@@ -82,6 +83,7 @@ import codeloupe.workspace.Workspaces
 import codeloupe.workspace.workspaceRoutes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
@@ -92,6 +94,7 @@ import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.receiveChannel
+import io.ktor.server.request.receiveText
 import io.ktor.server.request.path
 import io.ktor.server.response.header
 import io.ktor.server.response.respondText
@@ -198,6 +201,7 @@ class Daemon private constructor(
     private lateinit var guard: RequestGuard
     private val infoFile = config.home.resolve("daemon.json")
     private val pid = ProcessHandle.current().pid()
+    private val jar = CodeSource.of(javaClass)
     private lateinit var server: EmbeddedServer<*, *>
 
     /** The secret clients present in `x-codeloupe-token`; what `<home>/daemon.token` holds. For tests and the process that started the daemon. */
@@ -211,7 +215,7 @@ class Daemon private constructor(
         val queueSnapshot = queue.snapshot()
         history.sample()
         return DaemonStatus(
-            name = CodeLoupe.NAME, version = CodeLoupe.VERSION, pid = pid, port = config.port, home = config.home.toString(),
+            name = CodeLoupe.NAME, version = CodeLoupe.VERSION, pid = pid, port = config.port, home = config.home.toString(), jar = jar,
             uptimeSec = Instant.now().epochSecond - started.epochSecond, rssMb = rss,
             heapMb = (runtime.totalMemory() - runtime.freeMemory()) / MB, cpuSec = cpu,
             calls = runner.stats(), latency = latency, budgets = BudgetState.check(config.budgets, latency, rss, queueSnapshot.waitMsMax),
@@ -310,7 +314,16 @@ class Daemon private constructor(
             heapTrimmer.touch()
             call.response.header(HttpHeaders.Connection, "close")
             guard.refusal(call)?.let {
-                call.respondJson(it.status, error(it.message))
+                val token = it.status == HttpStatusCode.Unauthorized
+                if (token) call.response.header(HttpHeaders.WWWAuthenticate, McpRefusal.CHALLENGE)
+                // An MCP client turns a 401 into a registration attempt and loses the reason; it reads a JSON-RPC error.
+                // Only the POST that carries a call: the GET of that path is the server's event stream, not a request.
+                if (token && call.request.path() == "/mcp" && call.request.httpMethod == HttpMethod.Post) {
+                    val body = runCatching { call.receiveText() }.getOrNull()
+                    call.respondJson(HttpStatusCode.OK, McpRefusal.answer(body, it.message))
+                } else {
+                    call.respondJson(it.status, error(it.message))
+                }
                 return@intercept finish()
             }
             try {

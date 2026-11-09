@@ -62,7 +62,9 @@ async function main(): Promise<void> {
   let quitting = false;
 
   const client = new DaemonClient(() => manager.port(), () => home.dir);
-  const manager: DaemonManager = new DaemonManager(client, home, () => store.get(), () => (win && win.isVisible() ? 5_000 : 15_000));
+  const manager: DaemonManager = new DaemonManager(
+    client, home, () => store.get(), () => (win && win.isVisible() ? 5_000 : 15_000), () => bundled?.version ?? null,
+  );
   const daemonApi = new DaemonApi(client);
   let mock: MockApi | null = null;
   const source = (): ApiSource => (store.get().apiSource === 'mock' ? (mock ??= new MockApi()) : daemonApi);

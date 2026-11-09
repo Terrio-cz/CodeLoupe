@@ -15,6 +15,11 @@ export interface DaemonState {
   port: number;
   /** Last problem in plain words (CLI missing, start failed, foreign process on the port, …). */
   message: string | null;
+  /**
+   * The daemon on the port is not the version the app ships (CL-260): what it reports and what it runs. The app shows
+   * this as a banner with the restart that puts it right, because on its own it looks like a CodeLoupe with no data.
+   */
+  versionMismatch: { running: string; expected: string; jar: string | null } | null;
   /** Stopped by the user (app or CLI marker): no automatic start. */
   manualStop: boolean;
   checkedAt: string | null;

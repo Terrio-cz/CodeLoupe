@@ -80,6 +80,19 @@ port bound. A daemon whose process is alive while its port gives no answer is **
 app runs) or `codeloupe stop` ends that process first. Only the process that wrote `daemon.json` counts: it must have
 started just before the `startedAt` written there.
 
+A daemon of **another version** is never spoken to either. Its answers come out of its own index, so a launcher that
+attached to one left the user with screens that looked empty and nothing that said why (CL-260). The launcher compares
+the `version` of `/status` with its own: `codeloupe status` prints the daemon's answer and then calls it a fault
+(exit code 4), any other command fails naming both versions, and `codeloupe start` stops it and starts the daemon of
+its own install. Replacing it ends the jobs that daemon runs for other sessions, so `start` refuses while one runs and
+names them; `codeloupe start --force` replaces it anyway. `/status` carries the `jar` the daemon runs, so a mismatch
+names the install and not only the version.
+
+That same `start` retires an install an upgrade has replaced: a directory `app*` beside the daemon's data that holds a
+CodeLoupe jar, and is not the one the launcher runs from, moves into `<home>/retired-deploys/`. One left lying there
+stays executable, and that is all it takes for the old daemon to take the port again, since it sits next to the data a
+session is already reading.
+
 ## What it keeps in its home
 
 | In `<home>` | What |

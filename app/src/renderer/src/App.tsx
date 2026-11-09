@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { bridge, refreshAll, useApi } from './api';
+import { DaemonVersionBanner } from './components/DaemonVersionBanner';
 import { Icon } from './components/Icon';
 import { RANGE_OPTIONS, Segmented } from './components/Parts';
 import { Sidebar, sidebarCounts } from './components/Sidebar';
@@ -117,6 +118,8 @@ export function App() {
               <Icon name="refresh" key={spin} className={spin ? 'spin' : undefined} />
             </button>
           </header>
+          {/* Above every screen, not only Overview: a daemon of another version leaves all of them with no data. */}
+          <DaemonVersionBanner daemon={daemon} />
           {/* Re-keyed per screen (and per task detail), so the new screen's veil fades out over it (styles.css, Motion). */}
           <div className="content" key={route.screen === 'tasks' ? `tasks/${route.id ?? ''}` : route.screen}>
             {VIEWS[route.screen](route)}

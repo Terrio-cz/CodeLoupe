@@ -42,7 +42,8 @@ each tool returns is in the [Tools reference](Tools-reference).
 
 The first query in a repository builds its index (seconds); later queries take milliseconds. The
 daemon starts on the first CLI call; `codeloupe start` / `stop` manage it explicitly. `codeloupe status` prints the
-daemon's state as JSON (exit code 3 when it is not running); `codeloupe repos add <folder>...` makes it know a repository
+daemon's state as JSON (exit code 3 when it is not running, 4 when a daemon of another version holds the port);
+`codeloupe repos add <folder>...` makes it know a repository
 before the first question ([Configuration](Configuration#repositories)).
 
 A CLI call against a running daemon takes ~0.15 s. The start script maps a JVM AOT cache from `<home>/aot/` (about 22 MB for

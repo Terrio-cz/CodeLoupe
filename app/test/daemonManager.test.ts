@@ -8,15 +8,19 @@ import path from 'node:path';
 import type { DaemonClient } from '../src/main/daemon/DaemonClient';
 import type { DaemonHome, DaemonInfo } from '../src/main/daemon/DaemonHome';
 
-const status = (pid: number, name = 'codeloupe'): DaemonStatus => ({
-  name: name as 'codeloupe', version: '0.1.0', pid, port: 47391, home: 'h', uptimeSec: 1, rssMb: 70, heapMb: 10, cpuSec: 0,
+const status = (pid: number, name = 'codeloupe', version = '0.1.0', jar?: string): DaemonStatus => ({
+  name: name as 'codeloupe', version, pid, port: 47391, home: 'h', jar, uptimeSec: 1, rssMb: 70, heapMb: 10, cpuSec: 0,
   calls: { total: 0, errors: 0, busy: 0 }, queue: { fast: { running: null, waiting: [] }, heavy: { running: null, waiting: [] } }, repos: [],
 });
 
-/** A fake daemon: `up` decides whether /status answers, `pid` what it reports, daemon.json holds `filePid`. */
-function setup(opts: { up?: boolean; pid?: number; filePid?: number | null; stoppedMarker?: boolean; startedAfterStop?: boolean; fileProcessAlive?: boolean } = {}) {
-  const world = { up: opts.up ?? false, pid: opts.pid ?? 100, filePid: opts.filePid === undefined ? 100 : opts.filePid, name: 'codeloupe', marker: !!opts.stoppedMarker, startedAfterStop: opts.startedAfterStop ?? true, fileProcessAlive: opts.fileProcessAlive ?? false };
-  const client = { status: vi.fn(async () => { if (!world.up) throw new Error('down'); return status(world.pid, world.name); }) } as unknown as DaemonClient;
+/**
+ * A fake daemon: `up` decides whether /status answers, `pid` and `version` what it reports, daemon.json holds `filePid`.
+ * `expect` is the version the app ships, which by default is the one the fake reports.
+ */
+function setup(opts: { up?: boolean; pid?: number; filePid?: number | null; stoppedMarker?: boolean; startedAfterStop?: boolean; fileProcessAlive?: boolean; version?: string; jar?: string; expect?: string | null } = {}) {
+  const world = { up: opts.up ?? false, pid: opts.pid ?? 100, filePid: opts.filePid === undefined ? 100 : opts.filePid, name: 'codeloupe', marker: !!opts.stoppedMarker, startedAfterStop: opts.startedAfterStop ?? true, fileProcessAlive: opts.fileProcessAlive ?? false, version: opts.version ?? '0.1.0', jar: opts.jar };
+  const expected = opts.expect === undefined ? '0.1.0' : opts.expect;
+  const client = { status: vi.fn(async () => { if (!world.up) throw new Error('down'); return status(world.pid, world.name, world.version, world.jar); }) } as unknown as DaemonClient;
   const home = {
     port: () => 47391,
     info: (): DaemonInfo | null => (world.filePid === null ? null : { pid: world.filePid, port: 47391 }),
@@ -26,7 +30,7 @@ function setup(opts: { up?: boolean; pid?: number; filePid?: number | null; stop
     alivePid: () => (world.fileProcessAlive ? world.filePid : null),
   } as unknown as DaemonHome;
   const cli = vi.fn(async (verb: 'start' | 'stop') => { world.up = verb === 'start'; return ''; });
-  const m = new DaemonManager(client, home, () => DEFAULT_SETTINGS, () => 1000, cli);
+  const m = new DaemonManager(client, home, () => DEFAULT_SETTINGS, () => 1000, () => expected, cli);
   return { m, world, cli };
 }
 
@@ -79,6 +83,34 @@ describe('DaemonManager', () => {
     await m.check(true);
     expect(m.current.phase).toBe('running');
     expect(m.trusted).toBe(true);
+  });
+
+  it('names a daemon of another version at once instead of showing empty screens', async () => {
+    const { m, cli } = setup({ up: true, version: '0.0.1', jar: 'C:\\deploys\\app2\\lib\\codeloupe-0.0.1.jar' });
+    await m.check(true);
+    expect(m.current.phase).toBe('error');
+    expect(m.trusted).toBe(false);
+    expect(m.current.versionMismatch).toEqual({ running: '0.0.1', expected: '0.1.0', jar: 'C:\\deploys\\app2\\lib\\codeloupe-0.0.1.jar' });
+    expect(m.current.message).toContain('0.0.1');
+    // Replacing it ends the jobs it runs for other windows, so the restart is the user's to ask for.
+    expect(cli).not.toHaveBeenCalled();
+  });
+
+  it('clears the version mismatch once the right daemon answers', async () => {
+    const { m, world } = setup({ up: true, version: '0.0.1' });
+    await m.check(true);
+    expect(m.current.versionMismatch).not.toBeNull();
+    world.version = '0.1.0';
+    await m.check(true);
+    expect(m.current.phase).toBe('running');
+    expect(m.current.versionMismatch).toBeNull();
+  });
+
+  it('does not judge the version when the app ships no daemon', async () => {
+    const { m } = setup({ up: true, version: '0.0.1', expect: null });
+    await m.check(true);
+    expect(m.current.phase).toBe('running');
+    expect(m.current.versionMismatch).toBeNull();
   });
 
   it('treats another service on the port as an error at once', async () => {
@@ -170,7 +202,7 @@ function setupFailing() {
   const client = { status: vi.fn(async () => { throw new Error('down'); }) } as unknown as DaemonClient;
   const home = { port: () => 47391, info: () => null, stoppedByUser: () => false, setStoppedByUser: () => undefined, alivePid: () => null } as unknown as DaemonHome;
   const cli = vi.fn(async () => { throw new Error('not found'); });
-  return { m: new DaemonManager(client, home, () => DEFAULT_SETTINGS, () => 1000, cli), cli };
+  return { m: new DaemonManager(client, home, () => DEFAULT_SETTINGS, () => 1000, () => null, cli), cli };
 }
 
 describe('resolveCommand', () => {

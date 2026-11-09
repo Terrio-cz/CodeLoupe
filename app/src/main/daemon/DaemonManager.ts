@@ -8,6 +8,13 @@ import type { AppSettings } from '../../shared/settings';
 import type { DaemonClient } from './DaemonClient';
 import type { DaemonHome } from './DaemonHome';
 
+/** What is wrong with the daemon that answered: `hard` is not ours at all, `mismatch` is ours in another version. */
+interface Foreign {
+  hard: boolean;
+  message: string;
+  mismatch?: NonNullable<DaemonState['versionMismatch']>;
+}
+
 const CLI_TIMEOUT_MS = 30_000;
 const WAIT_MS = 10_000;
 const MAX_ATTEMPTS = 5;
@@ -36,11 +43,13 @@ export class DaemonManager extends EventEmitter {
     private readonly home: DaemonHome,
     private readonly settings: () => AppSettings,
     private readonly periodMs: () => number,
+    /** The version of the daemon bundle the app starts; null when it ships none (a development run). */
+    private readonly expectedVersion: () => string | null = () => null,
     /** Runs `<cli> start|stop`; injectable for tests. */
     private readonly runCli: (verb: 'start' | 'stop') => Promise<string> = verb => execCli(settings(), verb, this.port()),
   ) {
     super();
-    this.state = { phase: 'unknown', status: null, port: this.port(), message: null, manualStop: home.stoppedByUser(), checkedAt: null };
+    this.state = { phase: 'unknown', status: null, port: this.port(), message: null, versionMismatch: null, manualStop: home.stoppedByUser(), checkedAt: null };
   }
 
   get current(): DaemonState {
@@ -95,12 +104,12 @@ export class DaemonManager extends EventEmitter {
           this.home.setStoppedByUser(false);
           manualStop = false;
         }
-        this.set({ phase: 'running', status, port, message: null, manualStop });
+        this.set({ phase: 'running', status, port, message: null, versionMismatch: null, manualStop });
       } else if (foreign.hard || (tick && ++this.mismatchTicks >= 3)) {
-        this.set({ phase: 'error', status: null, port, message: foreign.message });
+        this.set({ phase: 'error', status: null, port, message: foreign.message, versionMismatch: foreign.mismatch ?? null });
       } else {
         // daemon.json is written after the daemon listens and removed on stop: give it a moment.
-        this.set({ phase: 'starting', status: null, port, message: null });
+        this.set({ phase: 'starting', status: null, port, message: null, versionMismatch: null });
       }
       return this.state;
     }
@@ -151,9 +160,19 @@ export class DaemonManager extends EventEmitter {
     });
   }
 
-  /** Whether /status came from the daemon that wrote daemon.json; `hard` = not CodeLoupe at all. */
-  private foreign(status: DaemonStatus): { hard: boolean; message: string } | null {
+  /** Whether /status came from the daemon that wrote daemon.json and runs the version the app ships; `hard` = not ours at all. */
+  private foreign(status: DaemonStatus): Foreign | null {
     if (status.name !== 'codeloupe') return { hard: true, message: `Another service is responding on port ${this.port()}.` };
+    // A daemon of another version answers out of its own index, which looks like a CodeLoupe with nothing in it (CL-260).
+    const expected = this.expectedVersion();
+    if (expected && status.version !== expected) {
+      const jar = status.jar ?? null;
+      return {
+        hard: true,
+        message: `CodeLoupe ${status.version} is serving port ${this.port()}, but this app ships ${expected}${jar ? ` (it runs ${jar})` : ''}.`,
+        mismatch: { running: status.version, expected, jar },
+      };
+    }
     const info = this.home.info();
     if (!info || info.pid !== status.pid) {
       return { hard: false, message: `Process ${status.pid} is responding on port ${this.port()}, daemon.json names ${info ? info.pid : 'none'}.` };
@@ -201,14 +220,14 @@ export class DaemonManager extends EventEmitter {
       if (up && status) {
         const foreign = this.foreign(status);
         if (foreign?.hard) {
-          this.set({ phase: 'error', status: null, message: foreign.message });
+          this.set({ phase: 'error', status: null, message: foreign.message, versionMismatch: foreign.mismatch ?? null });
           return false;
         }
         if (!foreign) {
           this.failures = 0;
           this.everRunning = true;
           this.mismatchTicks = 0;
-          this.set({ phase: 'running', status, port: this.port(), message: null });
+          this.set({ phase: 'running', status, port: this.port(), message: null, versionMismatch: null });
           return true;
         }
       }
