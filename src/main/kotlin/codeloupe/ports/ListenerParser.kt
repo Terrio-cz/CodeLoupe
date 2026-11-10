@@ -2,8 +2,9 @@ package codeloupe.ports
 
 /** Reads the listening TCP ports and their process ids out of what the OS tools print. */
 object ListenerParser {
-    // A listening socket has no peer: its foreign address is 0.0.0.0:0 or [::]:0 whatever language the state is printed in.
-    private val WINDOWS = Regex("""^\s*TCP\s+\S+:(\d+)\s+(?:0\.0\.0\.0|\[::\]):0\s+\S+\s+(\d+)\s*$""", RegexOption.MULTILINE)
+    // A listening socket has no peer: its foreign port is 0, whatever language the state is printed in. The foreign address is
+    // 0.0.0.0 or [::], or on Windows 11 build 26300 the local one (`127.0.0.1:47392  127.0.0.1:0  LISTENING`, CL-263).
+    private val WINDOWS = Regex("""^\s*TCP\s+\S+:(\d+)\s+\S+:0\s+\S+\s+(\d+)\s*$""", RegexOption.MULTILINE)
     private val SS_PORT = Regex("""^\s*LISTEN\s+\d+\s+\d+\s+\S*?:(\d+)\s+\S+""", RegexOption.MULTILINE)
     private val SS_PID = Regex("""pid=(\d+)""")
 
