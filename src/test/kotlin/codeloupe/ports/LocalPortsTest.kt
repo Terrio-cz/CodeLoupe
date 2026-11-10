@@ -1,6 +1,7 @@
 package codeloupe.ports
 
 import codeloupe.platform.NativeCalls
+import codeloupe.platform.ToolOutput
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -52,6 +53,12 @@ class LocalPortsTest {
         assumeTrue(runCatching { ProcessBuilder(tool).start().destroyForcibly() }.isSuccess, "$tool is not installed here")
         val port = freePort()
         ServerSocket(port).use {
+            // Windows 11 build 26300 leaves wildcard listeners out of its TCP table (netstat and Get-NetTCPConnection alike, CL-263):
+            // what the OS does not list cannot be parsed, so the test proves the parsing only where the OS shows the socket.
+            if (NativeCalls.isWindows) {
+                val listed = Regex("""^\s*TCP\s+\S+:$port\s""", RegexOption.MULTILINE).containsMatchIn(ToolOutput.read(10, "netstat", "-ano"))
+                assumeTrue(listed, "netstat does not list this process's listener on $port (Windows TCP table bug)")
+            }
             val listener = LocalPorts().listeners()[port]
             assertEquals(ProcessHandle.current().pid(), listener?.pid, "listeners: ${LocalPorts().listeners().keys}")
             assertTrue(listener?.process != null, "its command line or executable is shown")

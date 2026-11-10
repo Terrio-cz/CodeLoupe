@@ -23,6 +23,18 @@ class ListenerParserTest {
     }
 
     @Test
+    fun `netstat of Windows 11 build 26300 gives a listener the local address as its foreign one`() {
+        val text = """
+              TCP    127.0.0.1:47392        127.0.0.1:0            LISTENING       31200
+              TCP    10.0.0.133:50527       10.0.0.133:0           LISTENING       7001
+              TCP    [::1]:5173             [::1]:0                LISTENING       6002
+              TCP    127.0.0.1:47392        127.0.0.1:57360        TIME_WAIT       0
+              TCP    127.0.0.1:57360        127.0.0.1:47392        ESTABLISHED     7777
+        """.trimIndent()
+        assertEquals(listOf(47392 to 31200L, 50527 to 7001L, 5173 to 6002L), ListenerParser.windows(text).map { it.port to it.pid })
+    }
+
+    @Test
     fun `netstat of Windows lists IPv6 listeners and does not depend on the language of the state`() {
         val text = """
               TCP    [::]:3000              [::]:0                 ABHÖREN        6001
