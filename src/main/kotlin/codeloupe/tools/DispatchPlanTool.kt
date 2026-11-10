@@ -21,7 +21,7 @@ class DispatchPlanTool(
     override val name = "dispatch_plan"
     override val description = "Plan the next windows of work: from candidates=[ids], epic=<id>, or query=<filters> (none: the most urgent plannable leaf " +
         "tasks of the workspace's own tracker project: held by a worktree, in progress/review, blocked by a dependency or in exclude=[ids] are dropped before the pool is cut) it predicts each task's touch set (landed files, else the code its text names), compares them with each other and with the " +
-        "live worktrees, and answers windows — a batch of up to 3 light tasks, a chain of up to 3 steps, or one task — each with the shared " +
+        "live worktrees, and answers windows — one batch of up to 3 tasks that clash or depend (any weight, dependencies first; no chains), or one task — each with the shared " +
         "code that put its tasks together and per-task state, epic and keys (file:/dir:), then what waits (with its state) and why (fights with a live worktree, unmet " +
         "dependency, no free slot) and the live windows. slots = free windows (default 4); width=dir (default) also treats one directory as a " +
         "clash, file only one file. replay=true plans past work again (resolved tasks with their landed files, no live windows) to check a recorded dispatch. Asking again answers 'unchanged' or only the changed sections. You keep the final judgment."

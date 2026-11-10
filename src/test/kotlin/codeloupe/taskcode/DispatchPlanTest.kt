@@ -18,25 +18,25 @@ class DispatchPlanTest {
     @Test
     fun `tasks that share a file are one window and say which file`() {
         val result = plan(listOf(task("T-1", "a/X.kt", "a/Y.kt"), task("T-2", "a/X.kt", "b/Z.kt"), task("T-3", "c/W.kt")))
-        assertEquals(listOf("chain T-1>T-2", "single T-3"), result.shape())
+        assertEquals(listOf("batch T-1+T-2", "single T-3"), result.shape())
         assertContains(result.windows.first().why.single(), "a/X.kt (T-1 =, T-2 =)")
     }
 
     @Test
-    fun `up to three light tasks that clash are one batch, a heavier one makes a chain`() {
+    fun `up to three clashing tasks of any weight are one batch, the rest of a larger group waits for it`() {
         val batch = plan(listOf(task("T-1", "a/X.kt", light = true), task("T-2", "a/X.kt", light = true), task("T-3", "a/X.kt", light = true)))
         assertEquals(listOf("batch T-1+T-2+T-3"), batch.shape())
-        val chain = plan(listOf(task("T-1", "a/X.kt", light = true), task("T-2", "a/X.kt")))
-        assertEquals(listOf("chain T-1>T-2"), chain.shape())
+        val heavy = plan(listOf(task("T-1", "a/X.kt", light = true), task("T-2", "a/X.kt")))
+        assertEquals(listOf("batch T-1+T-2"), heavy.shape())
         val four = plan((1..4).map { task("T-$it", "a/X.kt", light = true) })
-        assertEquals(listOf("chain T-1>T-2>T-3"), four.shape())
-        assertEquals("after the chain T-1→T-2→T-3", four.waiting.single { it.id == "T-4" }.reason)
+        assertEquals(listOf("batch T-1+T-2+T-3"), four.shape())
+        assertEquals("after the batch T-1+T-2+T-3", four.waiting.single { it.id == "T-4" }.reason)
     }
 
     @Test
     fun `a shared directory clashes unless the width is file`() {
         val tasks = listOf(task("T-1", "a/X.kt"), task("T-2", "a/Y.kt"))
-        assertEquals(listOf("chain T-1>T-2"), plan(tasks).shape())
+        assertEquals(listOf("batch T-1+T-2"), plan(tasks).shape())
         assertContains(plan(tasks).windows.single().why.single(), "a (T-1 =, T-2 =)")
         assertEquals(listOf("single T-1", "single T-2"), plan(tasks, width = DispatchPlan.Width.FILE).shape())
     }
@@ -60,10 +60,10 @@ class DispatchPlanTest {
     }
 
     @Test
-    fun `dependencies chain the tasks, an unfinished outside dependency waits, and so does what depends on it`() {
+    fun `dependent tasks are one batch with the dependency first, an unfinished outside dependency waits, and so does what depends on it`() {
         val tasks = listOf(task("T-2", "b/B.kt", blockers = setOf("T-1")), task("T-1", "a/A.kt"), task("T-3", "c/C.kt", blockers = setOf("T-8")), task("T-4", "d/D.kt", blockers = setOf("T-3")))
         val result = plan(tasks)
-        assertEquals(listOf("chain T-1>T-2"), result.shape())
+        assertEquals(listOf("batch T-1+T-2"), result.shape())
         assertContains(result.windows.single().why.single(), "T-2 depends on T-1")
         assertEquals(listOf("T-3", "T-4"), result.waiting.map { it.id })
         assertContains(result.waiting.first().reason, "depends on T-8")
