@@ -2,9 +2,9 @@ package codeloupe.taskcode
 
 /**
  * Which tasks get a window now so that no two windows fight over code: tasks whose predicted touch sets overlap (one file,
- * or with [Width.DIR] one directory) or that depend on each other form a group that is never split; a group of up to three
- * light tasks is one batch, any other group a chain of at most three steps with dependencies first; a group that
- * overlaps a live worktree waits. Windows are ranked by their most urgent task and cut at [slots]. Markdown files never block.
+ * or with [Width.DIR] one directory) or that depend on each other form a group that is never split; a group is one batch of
+ * up to three tasks of any weight, dependencies first (one plan, round and land; chains of windows are no longer planned),
+ * the rest of a larger group waits for it; a group that overlaps a live worktree waits. Windows are ranked by their most urgent task and cut at [slots]. Markdown files never block.
  */
 class DispatchPlan(private val width: Width = Width.DIR) {
     enum class Width { FILE, DIR }
@@ -19,7 +19,7 @@ class DispatchPlan(private val width: Width = Width.DIR) {
 
     class Window(val steps: List<List<String>>, val why: List<String>) {
         val tasks: List<String> get() = steps.flatten()
-        val kind: String get() = if (steps.size == 1 && steps.single().size > 1) "batch" else if (steps.size > 1) "chain" else "single"
+        val kind: String get() = if (tasks.size > 1) "batch" else "single"
     }
 
     class Waiting(val id: String, val reason: String)
@@ -75,14 +75,10 @@ class DispatchPlan(private val width: Width = Width.DIR) {
     }
 
     private fun window(group: List<Task>, waiting: MutableList<Waiting>): Window {
-        val why = group.indices.flatMap { i -> (i + 1 until group.size).mapNotNull { j -> related(group[i], group[j]) } }.distinct().take(MAX_WHY)
-        val dependent = group.any { t -> t.blockers.any { b -> group.any { it.id.equals(b.removeSuffix("?"), ignoreCase = true) } } }
-        val steps = when {
-            group.size == 1 -> listOf(listOf(group.single().id))
-            group.size <= MAX_BATCH && group.all { it.light } && !dependent -> listOf(group.map { it.id })
-            else -> group.map { listOf(it.id) }.also { chain -> chain.drop(MAX_STEPS).forEach { waiting += Waiting(it.single(), "after the chain ${chain.take(MAX_STEPS).joinToString("→") { s -> s.single() }}") } }.take(MAX_STEPS)
-        }
-        return Window(steps, why)
+        val batch = group.take(MAX_BATCH)
+        group.drop(MAX_BATCH).forEach { waiting += Waiting(it.id, "after the batch ${batch.joinToString("+") { b -> b.id }}") }
+        val why = batch.indices.flatMap { i -> (i + 1 until batch.size).mapNotNull { j -> related(batch[i], batch[j]) } }.distinct().take(MAX_WHY)
+        return Window(listOf(batch.map { it.id }), why)
     }
 
     /** Why two tasks must share a window, or null when they are free of each other. */
@@ -108,7 +104,6 @@ class DispatchPlan(private val width: Width = Width.DIR) {
 
     private companion object {
         const val MAX_BATCH = 3
-        const val MAX_STEPS = 3
         const val MAX_WHY = 2
     }
 }
