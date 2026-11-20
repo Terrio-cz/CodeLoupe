@@ -165,4 +165,29 @@ class AccountsTest {
         assertEquals(listOf("tracker mirror: t"), store.list().single().usedBy)
         assertEquals("no secret store to read T_ONE from", assertFailsWith<TrackerException> { TokenSource.Stored("T_ONE", { null }, "x").read() }.message)
     }
+
+    @Test
+    fun `a config json tracker reads a store token in its scope, falls back to the global one, and refuses a bad scope`() {
+        val vault = home.resolve("secrets").resolve("vault.env")
+        val store = SecretStore(vault, PassphraseProtector("pw".toCharArray(), iterations = 1_000))
+        store.set("YT", SecretScope.GLOBAL, "global-fake-token")
+        store.set("YT", SecretScope.workspace("C:/ws/aquatic"), "workspace-fake-token")
+        home.resolve("config.json").writeText(
+            """{"trackers":[
+              {"name":"aq","url":"https://aq.example","projects":["A"],"token":{"store":"YT","scope":"workspace:C:/ws/aquatic"}},
+              {"name":"other","url":"https://o.example","projects":["O"],"token":{"store":"YT","scope":"workspace:C:/ws/none"}},
+              {"name":"plain","url":"https://p.example","projects":["P"],"token":{"store":"YT"}},
+              {"name":"bad","url":"https://b.example","projects":["B"],"token":{"store":"YT","scope":"team:x"}}
+            ]}""",
+        )
+        val settings = TrackerSettingsLoader.load(home, { store })
+        val byName = settings.instances.associateBy { it.name }
+        assertEquals("workspace-fake-token", byName.getValue("aq").token.read())
+        assertEquals("global-fake-token", byName.getValue("other").token.read(), "a scope without the name falls back to global")
+        assertEquals("global-fake-token", byName.getValue("plain").token.read())
+        assertEquals("store YT workspace:${SecretScope.workspace("C:/ws/aquatic").id}", byName.getValue("aq").token.toString())
+        assertNull(byName["bad"])
+        assertTrue(settings.problems.single().startsWith("trackers[3]: scope must be"), settings.problems.toString())
+        assertFalse(settings.toString().contains("fake-token") || settings.problems.joinToString().contains("fake-token"))
+    }
 }

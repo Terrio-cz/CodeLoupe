@@ -20,7 +20,9 @@ In `<home>/config.json` ([Configuration](Configuration)):
 
 The token comes from an environment variable of the daemon (`{ "env": "NAME" }`; on Windows the user's persistent
 variables, not the shell that happened to start it, see [Jobs and events](Jobs-and-events)) or a
-`KEY=value` file (`{ "dotenv": "<path>", "key": "NAME" }`), read by the daemon on each request; it never appears in
+`KEY=value` file (`{ "dotenv": "<path>", "key": "NAME" }`), read by the daemon on each request, or a name in the
+encrypted secret store (`{ "store": "NAME", "scope": "workspace:<id>" }`; `scope` is optional, the narrowest of global
+and that scope wins, so a token kept per workspace by `codeloupe env` needs no plaintext copy). It never appears in
 answers, errors, `/status` or logs. The desktop app can also keep a YouTrack token in the secret store and add the
 instance itself ([Desktop app](Desktop-app#accounts)).
 
