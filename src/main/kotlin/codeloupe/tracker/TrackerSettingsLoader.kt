@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import codeloupe.accounts.AccountsFile
+import codeloupe.secrets.SecretScope
 import codeloupe.secrets.SecretStore
 import java.net.URI
 import java.nio.file.Files
@@ -14,8 +15,10 @@ import java.nio.file.Path
 /**
  * Reads `trackers` from `<home>/config.json`:
  * `{ "trackers": [ { "name": "acme", "type": "youtrack", "url": "https://acme.youtrack.cloud", "projects": ["ABC"],
- * "token": { "env": "YOUTRACK_TOKEN" } or { "dotenv": "<file>", "key": "YOUTRACK_TOKEN" }, "repos": ["<repo>"] } ],
- * "trackerSyncMinutes": 3, "trackerIdleMinutes": 10 }`. Unusable entries are skipped and reported in `problems`.
+ * "token": { "env": "YOUTRACK_TOKEN" } or { "dotenv": "<file>", "key": "YOUTRACK_TOKEN" } or { "store": "YOUTRACK_TOKEN", "scope": "workspace:<id>" },
+ * "repos": ["<repo>"] } ], "trackerSyncMinutes": 3, "trackerIdleMinutes": 10 }`. A `store` token is read from the encrypted store in
+ * process, the narrowest of global and the optional `scope` winning, so a workspace token needs no plaintext copy. Unusable entries
+ * are skipped and reported in `problems`.
  */
 object TrackerSettingsLoader {
     fun load(home: Path, store: () -> SecretStore? = { null }, env: () -> Map<String, String> = System::getenv): TrackerSettings {
@@ -28,7 +31,7 @@ object TrackerSettingsLoader {
         val configured = (file["trackers"] as? JsonArray).orEmpty().mapIndexedNotNull { i, entry ->
             val o = entry as? JsonObject
             if (o == null) null.also { problems += "trackers[$i] is not an object" }
-            else instance(o, env).onFailure { problems += "trackers[$i]: ${it.message}" }.getOrNull()
+            else instance(o, store, env).onFailure { problems += "trackers[$i]: ${it.message}" }.getOrNull()
         }
         // A tracker of config.json keeps its name; an account of the same name is the one that is skipped.
         val instances = configured + accounts.filter { a -> configured.none { it.name == a.name }.also { free -> if (!free) problems += "account ${a.name} has the name of a tracker in config.json; skipped" } }
@@ -49,7 +52,7 @@ object TrackerSettingsLoader {
             }
         }
 
-    private fun instance(o: JsonObject, env: () -> Map<String, String>): Result<TrackerInstance> = runCatching {
+    private fun instance(o: JsonObject, store: () -> SecretStore?, env: () -> Map<String, String>): Result<TrackerInstance> = runCatching {
         val url = o.text("url")?.trimEnd('/') ?: error("no url")
         val uri = runCatching { URI(url) }.getOrNull()
         require(uri != null && uri.scheme in setOf("https", "http") && uri.host != null) { "url is not an http(s) URL" }
@@ -61,13 +64,18 @@ object TrackerSettingsLoader {
             type = o.text("type") ?: "youtrack",
             url = url,
             projects = projects,
-            token = (o["token"] as? JsonObject)?.let { token(it, env) } ?: error("token needs { \"env\": NAME } or { \"dotenv\": file, \"key\": NAME }"),
+            token = (o["token"] as? JsonObject)?.let { token(it, o.text("name") ?: uri.host, store, env) }
+                ?: error("token needs { \"env\": NAME }, { \"dotenv\": file, \"key\": NAME } or { \"store\": NAME, \"scope\": SCOPE }"),
             repos = o.texts("repos"),
         )
     }
 
-    private fun token(o: JsonObject, env: () -> Map<String, String>): TokenSource? {
+    private fun token(o: JsonObject, tracker: String, store: () -> SecretStore?, env: () -> Map<String, String>): TokenSource? {
         o.text("env")?.let { return TokenSource.Env(it, env) }
+        o.text("store")?.let { name ->
+            val scope = o.text("scope")?.let(SecretScope::parse)?.takeIf { it != SecretScope.GLOBAL }
+            return TokenSource.Stored(name, store, "tracker mirror: $tracker", chain = listOfNotNull(SecretScope.GLOBAL, scope))
+        }
         val file = o.text("dotenv") ?: return null
         return TokenSource.DotEnv(Path.of(file), o.text("key") ?: return null)
     }
